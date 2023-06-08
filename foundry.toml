@@ -2,5 +2,15 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+optimizer_runs = 10000
+ignored_error_codes = ["unreachable"]
+remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/","solmate/=lib/solmate/src"]
+
+[profile.smt]
+model_checker.engine = "chc"
+model_checker.targets = ["assert"]
+model_checker.timeout = 60
+model_checker.contracts = {"./src/CreditVaultProtocol.sol" = ["CreditVaultProtocol"]}
+model_checker.invariants = ["contract", "reentrancy"]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

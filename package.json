@@ -1,0 +1,11 @@
+{
+  "name": "euler-conductor",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/euler-xyz/euler-conductor.git",
+  "author": "kasperpawlowski <kasperpawlowski@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.6.2"
+  }
+}
