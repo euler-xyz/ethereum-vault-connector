@@ -1,3 +1,16 @@
+# IDE - VSCode
+.vscode/
+
+# Logs
+logs/
+*.log
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm/
+
 # Compiler files
 cache/
 out/
@@ -12,3 +25,7 @@ docs/
 
 # Dotenv file
 .env
+
+# System Files
+.DS_Store
+Thumbs.db

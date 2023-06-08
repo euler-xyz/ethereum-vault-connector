@@ -1,0 +1,6 @@
+{
+    "rules": {
+        "private-vars-leading-underscore": ["off",{"strict":false}],
+        "const-name-snakecase": "off"
+    }
+}
