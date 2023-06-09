@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+pragma solidity ^0.8.0;
+
+import "./Types.sol";
+
+abstract contract TransientStorage is Types {
+    ArrayStorage[2] internal transientArrays;
+    mapping(address => bytes) internal transientMapping;
+}
