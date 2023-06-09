@@ -7,7 +7,7 @@ import "./Constants.sol";
 abstract contract Storage is Constants {
     // Dispatcher and upgrades
 
-    bool internal inBatchExecution;
+    bool internal liquidityCheckDeferred;
     address internal governorAdmin;
     address internal eulerMarketRegistry;
 

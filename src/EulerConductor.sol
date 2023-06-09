@@ -15,7 +15,7 @@ contract EulerConductor is Logic {
     constructor(address admin, address registry) {
         emit Genesis();
 
-        inBatchExecution = false;
+        liquidityCheckDeferred = false;
         governorAdmin = admin;
         eulerMarketRegistry = registry;
     }

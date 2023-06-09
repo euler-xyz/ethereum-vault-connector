@@ -47,11 +47,11 @@ abstract contract Logic is Array, Events {
     }
 
     modifier executeBatch() {
-        inBatchExecution = true;
+        liquidityCheckDeferred = true;
 
         _;
 
-        inBatchExecution = false;
+        liquidityCheckDeferred = false;
 
         requireLiquidityAll();
         checkMarketStatusAll();
@@ -70,7 +70,7 @@ abstract contract Logic is Array, Events {
 
         _;
 
-        if (!inBatchExecution) {
+        if (!liquidityCheckDeferred) {
             IEulerMarket(market).hook(HOOK__MARKET_END_OF_TX, data);
         } else if (!arrayIncludes(transientArrays[MARKET_STATUS_ARRAY_TYPE], market)) {
             doAddElement(transientArrays[MARKET_STATUS_ARRAY_TYPE], market);
@@ -82,7 +82,7 @@ abstract contract Logic is Array, Events {
         _;
         
         // check liquidity for the account, but not if we're in the middle of a deferral
-        if (!inBatchExecution) {
+        if (!liquidityCheckDeferred) {
             requireLiquidityInternal(account);
         } else if (!arrayIncludes(transientArrays[LIQUIDITY_DEFERRAL_ARRAY_TYPE], account)) {
             doAddElement(transientArrays[LIQUIDITY_DEFERRAL_ARRAY_TYPE], account);
@@ -181,7 +181,7 @@ abstract contract Logic is Array, Events {
         liquidityCheck(account)
         returns (bool success, bytes memory result)
     {
-        return market.call(abi.encodePacked(data, inBatchExecution, uint160(msg.sender), uint160(account)));
+        return market.call(abi.encodePacked(data, liquidityCheckDeferred, uint160(msg.sender), uint160(account)));
 
         // the market must check if the msg.sender is EulerConductor and if it is,
         // it must check that the trailing account address that was attached to the 
