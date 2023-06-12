@@ -9,7 +9,6 @@ interface IEulerMarketRegistry {
 }
 
 interface IEulerMarket {
-    function disableLiabilityMarket(address account) external;
     function checkLiquidity(address account, address[] memory collaterals) external view returns (bool isLiquid);
     function hook(uint hookNumber, bytes memory data) external returns (bytes memory);
 }
@@ -24,9 +23,8 @@ contract EulerConductor is TransientStorage {
 
     string public constant name = "Euler Conductor";
 
-    uint internal constant EXEC_STATE__INITIAL_STATE = 1 << 0;
-    uint internal constant EXEC_STATE__REENTRANCY_LOCK = 1 << 1;
-    uint internal constant EXEC_STATE__DEFERRED_CHECKS = 1 << 2;
+    uint internal constant EXEC_STATE__REENTRANCY_LOCK = 1 << 0;
+    uint internal constant EXEC_STATE__DEFERRED_CHECKS = 1 << 1;
 
     uint internal constant COLLATERAL_ARRAY_TYPE = 0;
     uint internal constant LIABILITY_ARRAY_TYPE = 1;
@@ -34,8 +32,9 @@ contract EulerConductor is TransientStorage {
     uint internal constant LIQUIDITY_DEFERRAL_ARRAY_TYPE = 0;
     uint internal constant MARKET_STATUS_ARRAY_TYPE = 1;
 
-    uint internal constant HOOK__MARKET_FIRST_TOUCHED = 0;
-    uint internal constant HOOK__MARKET_SUMMARY = 1;
+    uint internal constant HOOK__DISABLE_LIABILITY_MARKET = 0;
+    uint internal constant HOOK__MARKET_FIRST_TOUCHED = 1;
+    uint internal constant HOOK__MARKET_SUMMARY = 2;
 
 
     // Storage 
@@ -45,7 +44,6 @@ contract EulerConductor is TransientStorage {
     mapping(address => bool) public isMarketActive;
     mapping(address => address) public accountOperators;
 
-    uint internal executionState;
     mapping(address => ArrayStorage[2]) internal accountArrays;
     address[] internal activeMarkets;
 
@@ -61,7 +59,7 @@ contract EulerConductor is TransientStorage {
     
     event ReferralCode(bytes32 indexed referralCode);
 
-    error BatchDispatchSimulation(EulerBatchItemResponse[] simulation);
+    error BatchDispatchSimulation(EulerBatchItemSimulationResult[] simulation);
 
 
     // Constructor
@@ -69,7 +67,6 @@ contract EulerConductor is TransientStorage {
     constructor(address admin, address registry) {
         emit Genesis();
 
-        executionState = EXEC_STATE__INITIAL_STATE;
         governorAdmin = admin;
         eulerMarketRegistry = registry;
     }
@@ -183,11 +180,11 @@ contract EulerConductor is TransientStorage {
         activeMarkets.push(market);
 
         // assure that the market is implemented correctly
-        enableLiabilityMarket(market, msg.sender);
-        IEulerMarket(market).disableLiabilityMarket(msg.sender);
-
-        bytes memory data = IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0));
-        IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, data);
+        IEulerMarket(market).hook(HOOK__DISABLE_LIABILITY_MARKET, abi.encode(msg.sender));
+        IEulerMarket(market).hook(
+            HOOK__MARKET_SUMMARY, 
+            IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0))
+        );
 
         address[] memory collaterals = new address[](0);
         require(IEulerMarket(market).checkLiquidity(msg.sender, collaterals), "e/dry-liquidity-check-invalid");
@@ -241,7 +238,7 @@ contract EulerConductor is TransientStorage {
         return arrayIncludes(accountArrays[account][LIABILITY_ARRAY_TYPE], market);
     }
 
-    function enableLiabilityMarket(address market, address account) public ownerOrOperator(account) liquidityCheck(account) {
+    function enableLiabilityMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
         require(isMarketActive[market], "e/market-not-activated");
         doAddElement(accountArrays[account][LIABILITY_ARRAY_TYPE], market);
     }
@@ -257,15 +254,54 @@ contract EulerConductor is TransientStorage {
         IDeferredChecks(msg.sender).onDeferredChecks(data);
     }
 
-    function batchDispatch(EulerBatchItem[] calldata items, bytes32 referralCode) external defer {
-        doBatchDispatch(items, referralCode, false);
+    function batchDispatch(EulerBatch calldata batch) external registerReferralCode(batch.referralCode) defer
+    returns (EulerBatchItemSimulationResult[] memory simulation) {
+        if (batch.isSimulation) simulation = new EulerBatchItemSimulationResult[](batch.items.length);
+
+        for (uint i = 0; i < batch.items.length;) {
+            EulerBatchItem calldata item = batch.items[i];
+            address targetContract = item.targetContract;
+            bool success;
+            bytes memory result;
+
+            if (targetContract == address(this)) {
+                (success, result) = targetContract.delegatecall(item.data);
+            } else {
+                (success, result) = executeInternal(targetContract, item.targetAccount, item.data);
+            }
+
+            if (batch.isSimulation) {
+                simulation[i].success = success;
+                simulation[i].result = result;
+            } else if (!(success || item.allowError)) {
+                revertBytes(result);
+            }
+
+            unchecked { ++i; }
+        }
+
+        if (batch.isSimulation) revert BatchDispatchSimulation(simulation);
     }
 
-    function batchDispatchSimulate(EulerBatchItem[] calldata items, bytes32 referralCode) external defer {
-        doBatchDispatch(items, referralCode, true);
+    function batchDispatchSimulate(EulerBatch calldata batch) external
+    returns (EulerBatchItemSimulationResult[] memory simulation) {
+        (bool success, bytes memory result) = address(this).delegatecall(
+            abi.encodeWithSelector(
+                this.batchDispatch.selector,
+                batch
+            )
+        );
 
-        // TODO decide if really needed. commenting out for now to get rid of the warning
-        //revert("e/simulation-did-not-revert");
+        if (success) revert("e/simulation-did-not-revert");
+
+        if(bytes4(result) == BatchDispatchSimulation.selector){
+            assembly {
+                result := add(result, 0x4)
+            }
+            simulation = abi.decode(result, (EulerBatchItemSimulationResult[]));
+        } else {
+            revertBytes(result);
+        }
     }
 
 
@@ -289,41 +325,6 @@ contract EulerConductor is TransientStorage {
 
 
     // INTERNAL FUNCTIONS
-
-    function doBatchDispatch(EulerBatchItem[] calldata items, bytes32 referralCode, bool revertResponse) internal registerReferralCode(referralCode) {
-        EulerBatchItemResponse[] memory response;
-        if (revertResponse) response = new EulerBatchItemResponse[](items.length);
-
-        for (uint i = 0; i < items.length;) {
-            EulerBatchItem calldata item = items[i];
-            address targetContract = item.targetContract;
-            bool success;
-            bytes memory result;
-
-            if (targetContract == address(this)) {
-                (success, result) = targetContract.delegatecall(item.data);
-            } else {
-                (success, result) = executeInternal(targetContract, item.targetAccount, item.data);
-            }
-
-            if (revertResponse) {
-                response[i].success = success;
-                response[i].result = result;
-            } else if (!(success || item.allowError)) {
-                if (result.length > 0) {
-                    assembly {
-                        revert(add(32, result), mload(result))
-                    }
-                }
-
-                revert("e/empty-error");
-            }
-
-            unchecked { ++i; }
-        }
-
-        if (revertResponse) revert BatchDispatchSimulation(response);
-    }
 
     function executeInternal(address targetContract, address targetAccount, bytes calldata data) internal
         nonReentrant
@@ -402,7 +403,7 @@ contract EulerConductor is TransientStorage {
 
     // Liquidity check internals
 
-    function checkLiquidityInternal(address account) internal view returns (bool isLiquid) {
+    function checkLiquidityInternal(address account) internal view returns (bool) {
         address[] memory liabilities = getArray(accountArrays[account][LIABILITY_ARRAY_TYPE]);
         
         if (liabilities.length == 0) return true;
@@ -411,7 +412,11 @@ contract EulerConductor is TransientStorage {
         
         address[] memory collaterals = getArray(accountArrays[account][COLLATERAL_ARRAY_TYPE]);
 
-        return IEulerMarket(liabilities[0]).checkLiquidity(account, collaterals);
+        try IEulerMarket(liabilities[0]).checkLiquidity(account, collaterals) returns (bool isLiquid) {
+            return isLiquid;
+        } catch {
+            return false;
+        }
     }
 
     function requireLiquidityInternal(address account) internal view {
@@ -446,7 +451,7 @@ contract EulerConductor is TransientStorage {
         uint8 numElements = arrayStorage.numElements;
         uint searchIndex = type(uint).max;
 
-        if (numElements == 0) return; // already exited
+        if (numElements == 0) return; // already removed
 
         if (firstElement == element) {
             searchIndex = 0;
@@ -459,7 +464,7 @@ contract EulerConductor is TransientStorage {
                 unchecked { ++i; }
             }
 
-            if (searchIndex == type(uint).max) return; // already exited
+            if (searchIndex == type(uint).max) return; // already removed
         }
 
         uint lastMarketIndex = numElements - 1;
@@ -536,5 +541,18 @@ contract EulerConductor is TransientStorage {
 
             delete transientArrays[arrayType];
         }
+    }
+
+
+    // Error handling
+
+    function revertBytes(bytes memory errMsg) internal pure {
+        if (errMsg.length > 0) {
+            assembly {
+                revert(add(32, errMsg), mload(errMsg))
+            }
+        }
+
+        revert("e/empty-error");
     }
 }
