@@ -10,7 +10,7 @@ interface IEulerMarketRegistry {
 
 interface IEulerMarket {
     function checkLiquidity(address account, address[] memory collaterals) external view returns (bool isLiquid);
-    function hook(uint hookNumber, bytes memory data) external returns (bytes memory);
+    function hook(uint hookNumber, bytes memory data) external returns (bytes memory result);
 }
 
 interface IDeferredChecks {
@@ -23,15 +23,6 @@ contract EulerConductor is TransientStorage {
 
     string public constant name = "Euler Conductor";
 
-    uint internal constant EXEC_STATE__REENTRANCY_LOCK = 1 << 0;
-    uint internal constant EXEC_STATE__DEFERRED_CHECKS = 1 << 1;
-
-    uint internal constant COLLATERAL_ARRAY_TYPE = 0;
-    uint internal constant LIABILITY_ARRAY_TYPE = 1;
-
-    uint internal constant LIQUIDITY_DEFERRAL_ARRAY_TYPE = 0;
-    uint internal constant MARKET_STATUS_ARRAY_TYPE = 1;
-
     uint internal constant HOOK__DISABLE_LIABILITY_MARKET = 0;
     uint internal constant HOOK__MARKET_FIRST_TOUCHED = 1;
     uint internal constant HOOK__MARKET_SUMMARY = 2;
@@ -41,11 +32,13 @@ contract EulerConductor is TransientStorage {
 
     address public governorAdmin;
     address public eulerMarketRegistry;
-    mapping(address => bool) public isMarketActive;
-    mapping(address => address) public accountOperators;
 
-    mapping(address => ArrayStorage[2]) internal accountArrays;
+    mapping(address => address) public accountOperators;
+    mapping(address => ArrayStorage) internal accountCollaterals;
+    mapping(address => ArrayStorage) internal accountLiabilities;
+
     address[] internal activeMarkets;
+    mapping(address => bool) internal isActive;
 
 
     // Events, Errors
@@ -80,72 +73,67 @@ contract EulerConductor is TransientStorage {
     }
 
     modifier marketOnly(address market) {
-        require(market == msg.sender, "e/market-only");
+        require(msg.sender == market, "e/market-only");
         _;
     }
 
     modifier ownerOrOperator(address account) {
         require(
-            ((uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF)) || accountOperators[account] == msg.sender, 
+            ((uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF)) || msg.sender == accountOperators[account],
             "e/account-operator-only"
         );
         
         _;
     }
 
-    modifier nonReentrant {
-        require((executionState & EXEC_STATE__REENTRANCY_LOCK) == 0, "e/reentrant-call");
-        executionState |= EXEC_STATE__REENTRANCY_LOCK;
-
+    modifier notInDeferral {
+        require(!checksDeferred, "e/checks-deferred");
         _;
-
-        executionState &= ~EXEC_STATE__REENTRANCY_LOCK;
     }
 
     modifier defer() {
-        executionState |= EXEC_STATE__DEFERRED_CHECKS;
+        checksDeferred = true;
 
         _;
 
-        executionState &= ~EXEC_STATE__DEFERRED_CHECKS;
+        checksDeferred = false;
 
-        iterateExecuteAndClear(LIQUIDITY_DEFERRAL_ARRAY_TYPE);
-        iterateExecuteAndClear(MARKET_STATUS_ARRAY_TYPE);
+        requireLiquidityAll();
+        checkMarketStatusAll();
 
-        assert(transientArrays[LIQUIDITY_DEFERRAL_ARRAY_TYPE].numElements == 0);
-        assert(transientArrays[MARKET_STATUS_ARRAY_TYPE].numElements == 0);
+        assert(liquidityDeferrals.numElements == 0);
+        assert(marketStatusChecks.numElements == 0);
     }
 
     modifier marketStatusCheck(address market) {
-        // skip the check if the address is not an active market
-        if (!isMarketActive[market]) {
+        // skip the hooks if the address is not an active market
+        if (!isActive[market]) {
             _;
             return;
         }
 
         bytes memory data;
-        if (!arrayIncludes(transientArrays[MARKET_STATUS_ARRAY_TYPE], market)) {
+        if (!arrayIncludes(marketStatusChecks, market)) {
             data = IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0));
         }
 
         _;
 
-        if ((executionState & EXEC_STATE__DEFERRED_CHECKS) == 0) {
+        if (!checksDeferred) {
             IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, data);
-        } else if (!arrayIncludes(transientArrays[MARKET_STATUS_ARRAY_TYPE], market)) {
-            doAddElement(transientArrays[MARKET_STATUS_ARRAY_TYPE], market);
-            transientMapping[market] = data;
+        } else if (!arrayIncludes(marketStatusChecks, market)) {
+            doAddElement(marketStatusChecks, market);
+            marketStatuses[market] = data;
         }
     }
 
     modifier liquidityCheck(address account) {
         _;
         
-        // check liquidity for the account, but not if we're in the middle of a deferral
-        if ((executionState & EXEC_STATE__DEFERRED_CHECKS) == 0) {
+        if (!checksDeferred) {
             requireLiquidityInternal(account);
-        } else if (!arrayIncludes(transientArrays[LIQUIDITY_DEFERRAL_ARRAY_TYPE], account)) {
-            doAddElement(transientArrays[LIQUIDITY_DEFERRAL_ARRAY_TYPE], account);
+        } else if (!arrayIncludes(liquidityDeferrals, account)) {
+            doAddElement(liquidityDeferrals, account);
         }
     }
 
@@ -171,12 +159,12 @@ contract EulerConductor is TransientStorage {
 
     // Market activation
 
-    function activateMarket(address market) external nonReentrant {
+    function activateMarket(address market) external {
         require(market != address(this), "e/invalid-market");
-        require(!isMarketActive[market], "e/market-already-activated");
+        require(!isActive[market], "e/market-already-activated");
         require(IEulerMarketRegistry(eulerMarketRegistry).isRegistered(market), "e/market-not-registred");
 
-        isMarketActive[market] = true;
+        isActive[market] = true;
         activeMarkets.push(market);
 
         // assure that the market is implemented correctly
@@ -192,7 +180,11 @@ contract EulerConductor is TransientStorage {
         emit MarketActivated(market, msg.sender);
     }
 
-    function getActiveMarkets() external view returns (address[] memory) {
+    function isMarketActive(address market) external view notInDeferral returns (bool) {
+        return isActive[market];
+    }
+
+    function getActiveMarkets() external view notInDeferral returns (address[] memory) {
         return activeMarkets;
     }
 
@@ -210,41 +202,42 @@ contract EulerConductor is TransientStorage {
 
     // Collateral management
 
-    function getCollateralMarkets(address account) external view returns (address[] memory) {
-        return getArray(accountArrays[account][COLLATERAL_ARRAY_TYPE]);
+    function getCollateralMarkets(address account) external view notInDeferral returns (address[] memory) {
+        return getArray(accountCollaterals[account]);
     }
 
-    function isCollateralMarketEnabled(address market, address account) external view returns (bool) {
-        return arrayIncludes(accountArrays[account][COLLATERAL_ARRAY_TYPE], market);
+    function isCollateralMarketEnabled(address market, address account) external view notInDeferral returns (bool) {
+        return arrayIncludes(accountCollaterals[account], market);
     }
 
     function enableCollateralMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        require(isMarketActive[market], "e/market-not-activated");
-        doAddElement(accountArrays[account][COLLATERAL_ARRAY_TYPE], market);
+        require(isActive[market], "e/market-not-activated");
+        doAddElement(accountCollaterals[account], market);
     }
 
     function disableCollateralMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        doRemoveElement(accountArrays[account][COLLATERAL_ARRAY_TYPE], market);
+        doRemoveElement(accountCollaterals[account], market);
     }
 
 
     // Liability management
 
-    function getLiabilityMarkets(address account) external view returns (address[] memory) {
-        return getArray(accountArrays[account][LIABILITY_ARRAY_TYPE]);
+    function getLiabilityMarkets(address account) external view notInDeferral returns (address[] memory) {
+        return getArray(accountLiabilities[account]);
     }
 
     function isLiabilityMarketEnabled(address market, address account) external view returns (bool) {
-        return arrayIncludes(accountArrays[account][LIABILITY_ARRAY_TYPE], market);
+        require(msg.sender == market || !checksDeferred, "e/checks-deferred");
+        return arrayIncludes(accountLiabilities[account], market);
     }
 
     function enableLiabilityMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        require(isMarketActive[market], "e/market-not-activated");
-        doAddElement(accountArrays[account][LIABILITY_ARRAY_TYPE], market);
+        require(isActive[market], "e/market-not-activated");
+        doAddElement(accountLiabilities[account], market);
     }
 
     function disableLiabilityMarket(address market, address account) external marketOnly(market) liquidityCheck(account) {
-        doRemoveElement(accountArrays[account][LIABILITY_ARRAY_TYPE], market);
+        doRemoveElement(accountLiabilities[account], market);
     }
 
 
@@ -283,8 +276,7 @@ contract EulerConductor is TransientStorage {
         if (batch.isSimulation) revert BatchDispatchSimulation(simulation);
     }
 
-    function batchDispatchSimulate(EulerBatch calldata batch) external
-    returns (EulerBatchItemSimulationResult[] memory simulation) {
+    function batchDispatchSimulate(EulerBatch calldata batch) external returns (EulerBatchItemSimulationResult[] memory simulation) {
         (bool success, bytes memory result) = address(this).delegatecall(
             abi.encodeWithSelector(
                 this.batchDispatch.selector,
@@ -295,9 +287,7 @@ contract EulerConductor is TransientStorage {
         if (success) revert("e/simulation-did-not-revert");
 
         if(bytes4(result) == BatchDispatchSimulation.selector){
-            assembly {
-                result := add(result, 0x4)
-            }
+            assembly { result := add(result, 4) }
             simulation = abi.decode(result, (EulerBatchItemSimulationResult[]));
         } else {
             revertBytes(result);
@@ -307,11 +297,13 @@ contract EulerConductor is TransientStorage {
 
     // Call forwarding
 
-    function execute(address targetContract, address targetAccount, bytes calldata data) external returns (bool success, bytes memory result) {
+    function execute(address targetContract, address targetAccount, bytes calldata data) external 
+    returns (bool success, bytes memory result) {
         return executeInternal(targetContract, targetAccount, data);
     }
 
-    function forward(address targetContract, address targetAccount, bytes calldata data) external returns (bool success, bytes memory result) {
+    function forward(address targetContract, address targetAccount, bytes calldata data) external 
+    returns (bool success, bytes memory result) {
         return forwardInternal(targetContract, targetAccount, data);
     }
 
@@ -327,7 +319,6 @@ contract EulerConductor is TransientStorage {
     // INTERNAL FUNCTIONS
 
     function executeInternal(address targetContract, address targetAccount, bytes calldata data) internal
-        nonReentrant
         marketStatusCheck(targetContract)
         ownerOrOperator(targetAccount)
         liquidityCheck(targetAccount)
@@ -335,13 +326,7 @@ contract EulerConductor is TransientStorage {
     {
         require(targetContract != address(this), "e/invalid-target");
         
-        return targetContract.call(
-            abi.encodePacked(
-                data, 
-                uint160(targetAccount), 
-                (executionState & EXEC_STATE__DEFERRED_CHECKS) != 0
-            )
-        );
+        return targetContract.call(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
         // this function executes arbitrary calldata on a target contract.
         // if a target is an active market, the market status is checked.
@@ -358,23 +343,16 @@ contract EulerConductor is TransientStorage {
     }
 
     function forwardInternal(address targetContract, address targetAccount, bytes calldata data) internal
-        nonReentrant
         marketStatusCheck(targetContract)
         liquidityCheck(targetAccount)
         returns (bool success, bytes memory result)
     {
-        address[] memory liabilities = getArray(accountArrays[targetAccount][LIABILITY_ARRAY_TYPE]);
+        address[] memory liabilities = getArray(accountLiabilities[targetAccount]);
 
         require(liabilities.length == 1 && liabilities[0] == msg.sender, "e/liability-not-in-control");
-        require(arrayIncludes(accountArrays[targetAccount][COLLATERAL_ARRAY_TYPE], targetContract), "e/collateral-not-enabled");
+        require(arrayIncludes(accountCollaterals[targetAccount], targetContract), "e/collateral-not-enabled");
 
-        return targetContract.call(
-            abi.encodePacked(
-                data, 
-                uint160(targetAccount), 
-                (executionState & EXEC_STATE__DEFERRED_CHECKS) != 0
-            )
-        );
+        return targetContract.call(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
         // this function executes arbitrary calldata on a target contract.
         // the function checks whether the msg.sender is authorized to call the target
@@ -404,13 +382,13 @@ contract EulerConductor is TransientStorage {
     // Liquidity check internals
 
     function checkLiquidityInternal(address account) internal view returns (bool) {
-        address[] memory liabilities = getArray(accountArrays[account][LIABILITY_ARRAY_TYPE]);
+        address[] memory liabilities = getArray(accountLiabilities[account]);
         
         if (liabilities.length == 0) return true;
 
         require(liabilities.length == 1, "e/borrow-isolation-violation");
         
-        address[] memory collaterals = getArray(accountArrays[account][COLLATERAL_ARRAY_TYPE]);
+        address[] memory collaterals = getArray(accountCollaterals[account]);
 
         try IEulerMarket(liabilities[0]).checkLiquidity(account, collaterals) returns (bool isLiquid) {
             return isLiquid;
@@ -421,6 +399,49 @@ contract EulerConductor is TransientStorage {
 
     function requireLiquidityInternal(address account) internal view {
         require(checkLiquidityInternal(account), "e/collateral-violation");
+    }
+
+    function requireLiquidityAll() private {
+        address firstElement = liquidityDeferrals.firstElement;
+        uint8 numElements = liquidityDeferrals.numElements;
+
+        if (numElements == 0) return;
+
+        requireLiquidityInternal(firstElement);
+        
+        for (uint i = 1; i < numElements;) {
+            requireLiquidityInternal(liquidityDeferrals.elements[i]);
+            
+            delete liquidityDeferrals.elements[i];
+            unchecked { ++i; }
+        }
+
+        delete liquidityDeferrals;
+    }
+
+
+    // Market status check internals
+
+    function checkMarketStatusAll() private {
+        address firstElement = marketStatusChecks.firstElement;
+        uint8 numElements = marketStatusChecks.numElements;
+
+        if (numElements == 0) return;
+
+        IEulerMarket(firstElement).hook(HOOK__MARKET_SUMMARY, marketStatuses[firstElement]);
+        delete marketStatuses[firstElement];
+        
+        for (uint i = 1; i < numElements;) {
+            address market = marketStatusChecks.elements[i];
+
+            IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, marketStatuses[market]);
+            delete marketStatuses[market];
+            
+            delete marketStatusChecks.elements[i];
+            unchecked { ++i; }
+        }
+
+        delete marketStatusChecks;
     }
 
 
@@ -476,7 +497,7 @@ contract EulerConductor is TransientStorage {
 
         arrayStorage.numElements = uint8(lastMarketIndex);
 
-        if (lastMarketIndex != 0) delete arrayStorage.elements[lastMarketIndex]; // zero out for storage refund
+        if (lastMarketIndex != 0) delete arrayStorage.elements[lastMarketIndex];
     }
 
     function getArray(ArrayStorage storage arrayStorage) internal view returns (address[] memory) {
@@ -509,38 +530,6 @@ contract EulerConductor is TransientStorage {
         }
 
         return false;
-    }
-
-    function iterateExecuteAndClear(uint arrayType) private {
-        ArrayStorage storage arrayStorage = transientArrays[arrayType];
-        address firstElement = arrayStorage.firstElement;
-        uint8 numElements = arrayStorage.numElements;
-
-        if (numElements == 0) return;
-
-        if (arrayType == LIQUIDITY_DEFERRAL_ARRAY_TYPE) {
-            requireLiquidityInternal(firstElement);
-        } else { //if (arrayType == MARKET_STATUS_ARRAY_TYPE) {
-            IEulerMarket(firstElement).hook(HOOK__MARKET_SUMMARY, transientMapping[firstElement]);
-            delete transientMapping[firstElement];
-        }
-        
-        if (numElements > 1) {
-            for (uint i = 1; i < numElements;) {
-                if (arrayType == LIQUIDITY_DEFERRAL_ARRAY_TYPE) {
-                    requireLiquidityInternal(arrayStorage.elements[i]);
-                } else { //if (arrayType == MARKET_STATUS_ARRAY_TYPE) {
-                    address market = arrayStorage.elements[i];
-                    IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, transientMapping[market]);
-                    delete transientMapping[market];
-                }
-                
-                delete arrayStorage.elements[i];
-                unchecked { ++i; }
-            }
-
-            delete transientArrays[arrayType];
-        }
     }
 
 

@@ -5,7 +5,8 @@ pragma solidity ^0.8.0;
 import "./Types.sol";
 
 abstract contract TransientStorage is Types {
-    uint internal executionState;
-    ArrayStorage[2] internal transientArrays;
-    mapping(address => bytes) internal transientMapping;
+    bool internal checksDeferred;
+    ArrayStorage internal liquidityDeferrals;
+    ArrayStorage internal marketStatusChecks;
+    mapping(address => bytes) internal marketStatuses;
 }
