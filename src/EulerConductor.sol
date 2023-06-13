@@ -8,13 +8,17 @@ interface IEulerMarketRegistry {
     function isRegistered(address market) external returns (bool);
 }
 
+interface IEulerOperatorController {
+    function isAuthorized(address operator, address account) external returns (bool);
+}
+
 interface IEulerMarket {
     function checkLiquidity(address account, address[] memory collaterals) external view returns (bool isLiquid);
     function hook(uint hookNumber, bytes memory data) external returns (bytes memory result);
 }
 
 interface IDeferredChecks {
-    function onDeferredChecks(bytes memory data) external;
+    function onDeferredChecks(bytes memory data) external payable;
 }
 
 
@@ -33,12 +37,10 @@ contract EulerConductor is TransientStorage {
     address public governorAdmin;
     address public eulerMarketRegistry;
 
-    mapping(address => address) public accountOperators;
+    mapping(address => AddressStorage) internal addressLookup;
     mapping(address => ArrayStorage) internal accountCollaterals;
     mapping(address => ArrayStorage) internal accountLiabilities;
-
     address[] internal activeMarkets;
-    mapping(address => bool) internal isActive;
 
 
     // Events, Errors
@@ -48,7 +50,7 @@ contract EulerConductor is TransientStorage {
 
     event GovernorAdminSet(address indexed admin);
     event EulerMarketRegistrySet(address indexed registry);
-    event AccountOperatorSet(address indexed account, address operator);
+    event AccountOperatorOrControllerSet(address indexed account, address indexed operatorOrController, bool isController);
     
     event ReferralCode(bytes32 indexed referralCode);
 
@@ -78,10 +80,16 @@ contract EulerConductor is TransientStorage {
     }
 
     modifier ownerOrOperator(address account) {
-        require(
-            ((uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF)) || msg.sender == accountOperators[account],
-            "e/account-operator-only"
-        );
+        if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF)) {
+            address operator = addressLookup[account].accountOperatorOrController;
+            bool useController = addressLookup[account].useAccountOperatorController;
+            bool isAuthorized;
+        
+            if (useController) isAuthorized = IEulerOperatorController(operator).isAuthorized(msg.sender, account);
+            else isAuthorized = msg.sender == operator;
+
+            require(isAuthorized, "e/not-authorized");
+        }
         
         _;
     }
@@ -107,13 +115,14 @@ contract EulerConductor is TransientStorage {
 
     modifier marketStatusCheck(address market) {
         // skip the hooks if the address is not an active market
-        if (!isActive[market]) {
+        if (!addressLookup[market].isActiveMarket) {
             _;
             return;
         }
 
         bytes memory data;
-        if (!arrayIncludes(marketStatusChecks, market)) {
+        bool isFirstTouched = !arrayIncludes(marketStatusChecks, market);
+        if (isFirstTouched) {
             data = IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0));
         }
 
@@ -121,7 +130,7 @@ contract EulerConductor is TransientStorage {
 
         if (!checksDeferred) {
             IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, data);
-        } else if (!arrayIncludes(marketStatusChecks, market)) {
+        } else if (isFirstTouched) {
             doAddElement(marketStatusChecks, market);
             marketStatuses[market] = data;
         }
@@ -161,10 +170,10 @@ contract EulerConductor is TransientStorage {
 
     function activateMarket(address market) external {
         require(market != address(this), "e/invalid-market");
-        require(!isActive[market], "e/market-already-activated");
+        require(!addressLookup[market].isActiveMarket, "e/market-already-activated");
         require(IEulerMarketRegistry(eulerMarketRegistry).isRegistered(market), "e/market-not-registred");
 
-        isActive[market] = true;
+        addressLookup[market].isActiveMarket = true;
         activeMarkets.push(market);
 
         // assure that the market is implemented correctly
@@ -174,14 +183,13 @@ contract EulerConductor is TransientStorage {
             IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0))
         );
 
-        address[] memory collaterals = new address[](0);
-        require(IEulerMarket(market).checkLiquidity(msg.sender, collaterals), "e/dry-liquidity-check-invalid");
+        require(IEulerMarket(market).checkLiquidity(msg.sender, new address[](0)), "e/dry-liquidity-check-invalid");
 
         emit MarketActivated(market, msg.sender);
     }
 
     function isMarketActive(address market) external view notInDeferral returns (bool) {
-        return isActive[market];
+        return addressLookup[market].isActiveMarket;
     }
 
     function getActiveMarkets() external view notInDeferral returns (address[] memory) {
@@ -191,12 +199,19 @@ contract EulerConductor is TransientStorage {
 
     // Account operators
 
-    function setAccountOperator(uint subAccountId, address newOperator) external {
-        require(subAccountId < 256, "e/sub-account-id-too-big");
-        address account = address(uint160(msg.sender) ^ uint160(subAccountId));
+    function setAccountOperatorOrController(address account, address newOperatorOrController, bool isController) external {
+        require((uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF), "e/not-authorized");
 
-        accountOperators[account] = newOperator;
-        emit AccountOperatorSet(account, newOperator);
+        addressLookup[account].accountOperatorOrController = newOperatorOrController;
+        addressLookup[account].useAccountOperatorController = isController;
+        emit AccountOperatorOrControllerSet(account, newOperatorOrController, isController);
+    }
+
+    function getAccountOperatorOrController(address account) external view returns (address, bool) {
+        return (
+            addressLookup[account].accountOperatorOrController, 
+            addressLookup[account].useAccountOperatorController
+        );
     }
 
 
@@ -211,7 +226,7 @@ contract EulerConductor is TransientStorage {
     }
 
     function enableCollateralMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        require(isActive[market], "e/market-not-activated");
+        require(addressLookup[market].isActiveMarket, "e/market-not-activated");
         doAddElement(accountCollaterals[account], market);
     }
 
@@ -232,7 +247,7 @@ contract EulerConductor is TransientStorage {
     }
 
     function enableLiabilityMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        require(isActive[market], "e/market-not-activated");
+        require(addressLookup[market].isActiveMarket, "e/market-not-activated");
         doAddElement(accountLiabilities[account], market);
     }
 
@@ -243,11 +258,11 @@ contract EulerConductor is TransientStorage {
 
     // Batching
 
-    function deferChecks(bytes memory data) external defer {
-        IDeferredChecks(msg.sender).onDeferredChecks(data);
+    function deferChecks(bytes memory data) external payable defer {
+        IDeferredChecks(msg.sender).onDeferredChecks{value: msg.value}(data);
     }
 
-    function batchDispatch(EulerBatch calldata batch) external registerReferralCode(batch.referralCode) defer
+    function batchDispatch(EulerBatch calldata batch) external payable registerReferralCode(batch.referralCode) defer
     returns (EulerBatchItemSimulationResult[] memory simulation) {
         if (batch.isSimulation) simulation = new EulerBatchItemSimulationResult[](batch.items.length);
 
@@ -260,7 +275,7 @@ contract EulerConductor is TransientStorage {
             if (targetContract == address(this)) {
                 (success, result) = targetContract.delegatecall(item.data);
             } else {
-                (success, result) = executeInternal(targetContract, item.targetAccount, item.data);
+                (success, result) = executeInternal(targetContract, item.targetAccount, item.msgValue, item.data);
             }
 
             if (batch.isSimulation) {
@@ -276,7 +291,8 @@ contract EulerConductor is TransientStorage {
         if (batch.isSimulation) revert BatchDispatchSimulation(simulation);
     }
 
-    function batchDispatchSimulate(EulerBatch calldata batch) external returns (EulerBatchItemSimulationResult[] memory simulation) {
+    function batchDispatchSimulate(EulerBatch calldata batch) external payable 
+    returns (EulerBatchItemSimulationResult[] memory simulation) {
         (bool success, bytes memory result) = address(this).delegatecall(
             abi.encodeWithSelector(
                 this.batchDispatch.selector,
@@ -297,14 +313,14 @@ contract EulerConductor is TransientStorage {
 
     // Call forwarding
 
-    function execute(address targetContract, address targetAccount, bytes calldata data) external 
+    function execute(address targetContract, address targetAccount, bytes calldata data) external payable
     returns (bool success, bytes memory result) {
-        return executeInternal(targetContract, targetAccount, data);
+        return executeInternal(targetContract, targetAccount, msg.value, data);
     }
 
-    function forward(address targetContract, address targetAccount, bytes calldata data) external 
+    function forward(address targetContract, address targetAccount, bytes calldata data) external payable
     returns (bool success, bytes memory result) {
-        return forwardInternal(targetContract, targetAccount, data);
+        return forwardInternal(targetContract, targetAccount, msg.value, data);
     }
 
 
@@ -318,7 +334,7 @@ contract EulerConductor is TransientStorage {
 
     // INTERNAL FUNCTIONS
 
-    function executeInternal(address targetContract, address targetAccount, bytes calldata data) internal
+    function executeInternal(address targetContract, address targetAccount, uint msgValue, bytes calldata data) internal
         marketStatusCheck(targetContract)
         ownerOrOperator(targetAccount)
         liquidityCheck(targetAccount)
@@ -326,7 +342,7 @@ contract EulerConductor is TransientStorage {
     {
         require(targetContract != address(this), "e/invalid-target");
         
-        return targetContract.call(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
+        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
         // this function executes arbitrary calldata on a target contract.
         // if a target is an active market, the market status is checked.
@@ -342,7 +358,7 @@ contract EulerConductor is TransientStorage {
         // the liquidity check and market status check (if applicable) are deferred.
     }
 
-    function forwardInternal(address targetContract, address targetAccount, bytes calldata data) internal
+    function forwardInternal(address targetContract, address targetAccount, uint msgValue, bytes calldata data) internal
         marketStatusCheck(targetContract)
         liquidityCheck(targetAccount)
         returns (bool success, bytes memory result)
@@ -352,7 +368,7 @@ contract EulerConductor is TransientStorage {
         require(liabilities.length == 1 && liabilities[0] == msg.sender, "e/liability-not-in-control");
         require(arrayIncludes(accountCollaterals[targetAccount], targetContract), "e/collateral-not-enabled");
 
-        return targetContract.call(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
+        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
         // this function executes arbitrary calldata on a target contract.
         // the function checks whether the msg.sender is authorized to call the target
