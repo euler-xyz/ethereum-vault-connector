@@ -7,6 +7,6 @@ import "./Types.sol";
 abstract contract TransientStorage is Types {
     bool internal checksDeferred;
     ArrayStorage internal liquidityDeferrals;
-    ArrayStorage internal marketStatusChecks;
-    mapping(address => bytes) internal marketStatuses;
+    ArrayStorage internal vaultStatusChecks;
+    mapping(address => bytes) internal vaultStatuses;
 }
