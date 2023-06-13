@@ -3,17 +3,15 @@
 pragma solidity ^0.8.0;
 
 import "./TransientStorage.sol";
+import "./Array.sol";
 
 interface IEulerMarketRegistry {
     function isRegistered(address market) external returns (bool);
 }
 
-interface IEulerOperatorController {
-    function isAuthorized(address operator, address account) external returns (bool);
-}
-
 interface IEulerMarket {
     function checkLiquidity(address account, address[] memory collaterals) external view returns (bool isLiquid);
+    function getHookBitmask() external view returns (uint bitmask);
     function hook(uint hookNumber, bytes memory data) external returns (bytes memory result);
 }
 
@@ -23,36 +21,37 @@ interface IDeferredChecks {
 
 
 contract EulerConductor is TransientStorage {
+    using Array for ArrayStorage;
+
     // Constants
 
     string public constant name = "Euler Conductor";
 
-    uint internal constant HOOK__DISABLE_LIABILITY_MARKET = 0;
-    uint internal constant HOOK__MARKET_FIRST_TOUCHED = 1;
-    uint internal constant HOOK__MARKET_SUMMARY = 2;
+    uint internal constant HOOK__MARKET_FIRST_TOUCHED = 0;
+    uint internal constant HOOK__MARKET_SUMMARY = 1;
+    uint internal constant HOOK__ON_COLLATERAL_ADDED = 2;
+    uint internal constant HOOK__ON_COLLATERAL_REMOVED = 3;
+    uint internal constant HOOK__ON_LIABILITY_ADDED = 4;
+    uint internal constant HOOK__ON_LIABILITY_REMOVED = 5;
 
 
-    // Storage 
+    // Storage
 
     address public governorAdmin;
     address public eulerMarketRegistry;
+    mapping(address => mapping(address => bool)) public accountOperators; // account => operator => isOperator
 
-    mapping(address => AddressStorage) internal addressLookup;
     mapping(address => ArrayStorage) internal accountCollaterals;
     mapping(address => ArrayStorage) internal accountLiabilities;
-    address[] internal activeMarkets;
 
 
     // Events, Errors
 
     event Genesis();
-    event MarketActivated(address indexed market, address indexed marketCreator);
-
+    event ReferralCode(bytes32 indexed referralCode);
     event GovernorAdminSet(address indexed admin);
     event EulerMarketRegistrySet(address indexed registry);
-    event AccountOperatorOrControllerSet(address indexed account, address indexed operatorOrController, bool isController);
-    
-    event ReferralCode(bytes32 indexed referralCode);
+    event AccountOperatorSet(address indexed account, address indexed operator);
 
     error BatchDispatchSimulation(EulerBatchItemSimulationResult[] simulation);
 
@@ -80,17 +79,16 @@ contract EulerConductor is TransientStorage {
     }
 
     modifier ownerOrOperator(address account) {
-        if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF)) {
-            address operator = addressLookup[account].accountOperatorOrController;
-            bool useController = addressLookup[account].useAccountOperatorController;
-            bool isAuthorized;
-        
-            if (useController) isAuthorized = IEulerOperatorController(operator).isAuthorized(msg.sender, account);
-            else isAuthorized = msg.sender == operator;
+        require(
+            (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF) || 
+            accountOperators[account][msg.sender], 
+            "e/not-authorized"
+        );
+        _;
+    }
 
-            require(isAuthorized, "e/not-authorized");
-        }
-        
+    modifier inDeferral {
+        require(checksDeferred, "e/checks-not-deferred");
         _;
     }
 
@@ -114,36 +112,39 @@ contract EulerConductor is TransientStorage {
     }
 
     modifier marketStatusCheck(address market) {
-        // skip the hooks if the address is not an active market
-        if (!addressLookup[market].isActiveMarket) {
-            _;
-            return;
-        }
-
+        bool isFirstTouched = !marketStatusChecks.arrayIncludes(market);
+        uint bitmask;
         bytes memory data;
-        bool isFirstTouched = !arrayIncludes(marketStatusChecks, market);
+
         if (isFirstTouched) {
-            data = IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0));
+            require(IEulerMarketRegistry(eulerMarketRegistry).isRegistered(market), "e/market-not-registered");
+
+            try IEulerMarket(market).getHookBitmask() returns (uint _bitmask) {
+                bitmask = _bitmask;
+            } catch {}
+
+            if ((bitmask & HOOK__MARKET_FIRST_TOUCHED) != 0) {
+                data = IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0));
+            }
+
+            if (checksDeferred) {
+                marketStatusChecks.doAddElement(market);
+                marketStatuses[market] = abi.encode(bitmask, data);
+            }
         }
 
         _;
 
-        if (!checksDeferred) {
+        if (!checksDeferred && (bitmask & HOOK__MARKET_SUMMARY) != 0) {
             IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, data);
-        } else if (isFirstTouched) {
-            doAddElement(marketStatusChecks, market);
-            marketStatuses[market] = data;
         }
     }
 
     modifier liquidityCheck(address account) {
         _;
         
-        if (!checksDeferred) {
-            requireLiquidityInternal(account);
-        } else if (!arrayIncludes(liquidityDeferrals, account)) {
-            doAddElement(liquidityDeferrals, account);
-        }
+        if (checksDeferred) liquidityDeferrals.doAddElement(account);
+        else requireLiquidityInternal(account);
     }
 
     modifier registerReferralCode(bytes32 code) {
@@ -166,93 +167,88 @@ contract EulerConductor is TransientStorage {
     }
 
 
-    // Market activation
-
-    function activateMarket(address market) external {
-        require(market != address(this), "e/invalid-market");
-        require(!addressLookup[market].isActiveMarket, "e/market-already-activated");
-        require(IEulerMarketRegistry(eulerMarketRegistry).isRegistered(market), "e/market-not-registred");
-
-        addressLookup[market].isActiveMarket = true;
-        activeMarkets.push(market);
-
-        // assure that the market is implemented correctly
-        IEulerMarket(market).hook(HOOK__DISABLE_LIABILITY_MARKET, abi.encode(msg.sender));
-        IEulerMarket(market).hook(
-            HOOK__MARKET_SUMMARY, 
-            IEulerMarket(market).hook(HOOK__MARKET_FIRST_TOUCHED, abi.encode(0))
-        );
-
-        require(IEulerMarket(market).checkLiquidity(msg.sender, new address[](0)), "e/dry-liquidity-check-invalid");
-
-        emit MarketActivated(market, msg.sender);
-    }
-
-    function isMarketActive(address market) external view notInDeferral returns (bool) {
-        return addressLookup[market].isActiveMarket;
-    }
-
-    function getActiveMarkets() external view notInDeferral returns (address[] memory) {
-        return activeMarkets;
-    }
-
-
     // Account operators
 
-    function setAccountOperatorOrController(address account, address newOperatorOrController, bool isController) external {
+    function setAccountOperator(address account, address newOperator) external {
         require((uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF), "e/not-authorized");
 
-        addressLookup[account].accountOperatorOrController = newOperatorOrController;
-        addressLookup[account].useAccountOperatorController = isController;
-        emit AccountOperatorOrControllerSet(account, newOperatorOrController, isController);
-    }
-
-    function getAccountOperatorOrController(address account) external view returns (address, bool) {
-        return (
-            addressLookup[account].accountOperatorOrController, 
-            addressLookup[account].useAccountOperatorController
-        );
+        accountOperators[account][newOperator] = true;
+        emit AccountOperatorSet(account, newOperator);
     }
 
 
     // Collateral management
 
     function getCollateralMarkets(address account) external view notInDeferral returns (address[] memory) {
-        return getArray(accountCollaterals[account]);
+        return accountCollaterals[account].getArray();
     }
 
     function isCollateralMarketEnabled(address market, address account) external view notInDeferral returns (bool) {
-        return arrayIncludes(accountCollaterals[account], market);
+        return accountCollaterals[account].arrayIncludes(market);
     }
 
-    function enableCollateralMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        require(addressLookup[market].isActiveMarket, "e/market-not-activated");
-        doAddElement(accountCollaterals[account], market);
+    function enableCollateralMarket(address market, address account) external 
+    marketStatusCheck(market) 
+    ownerOrOperator(account) 
+    liquidityCheck(account) {
+        if (accountCollaterals[account].doAddElement(market)) {
+            (uint bitmask,) = abi.decode(marketStatuses[market], (uint, bytes));
+
+            if ((bitmask & HOOK__ON_COLLATERAL_ADDED) != 0) {
+                IEulerMarket(market).hook(HOOK__ON_COLLATERAL_ADDED, abi.encode(account));
+            }
+        }
     }
 
-    function disableCollateralMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        doRemoveElement(accountCollaterals[account], market);
+    function disableCollateralMarket(address market, address account) external 
+    marketStatusCheck(market) 
+    ownerOrOperator(account) 
+    liquidityCheck(account) {
+        if (accountCollaterals[account].doRemoveElement(market)) {
+            (uint bitmask,) = abi.decode(marketStatuses[market], (uint, bytes));
+
+            if ((bitmask & HOOK__ON_COLLATERAL_REMOVED) != 0) {
+                IEulerMarket(market).hook(HOOK__ON_COLLATERAL_REMOVED, abi.encode(account));
+            }
+        }
     }
 
 
     // Liability management
 
     function getLiabilityMarkets(address account) external view notInDeferral returns (address[] memory) {
-        return getArray(accountLiabilities[account]);
+        return accountLiabilities[account].getArray();
     }
 
     function isLiabilityMarketEnabled(address market, address account) external view returns (bool) {
         require(msg.sender == market || !checksDeferred, "e/checks-deferred");
-        return arrayIncludes(accountLiabilities[account], market);
+        return accountLiabilities[account].arrayIncludes(market);
     }
 
-    function enableLiabilityMarket(address market, address account) external ownerOrOperator(account) liquidityCheck(account) {
-        require(addressLookup[market].isActiveMarket, "e/market-not-activated");
-        doAddElement(accountLiabilities[account], market);
+    function enableLiabilityMarket(address market, address account) external 
+    marketStatusCheck(market) 
+    ownerOrOperator(account) 
+    liquidityCheck(account) {
+        if(accountLiabilities[account].doAddElement(market)) {
+            (uint bitmask,) = abi.decode(marketStatuses[market], (uint, bytes));
+
+            if ((bitmask & HOOK__ON_LIABILITY_ADDED) != 0) {
+                IEulerMarket(market).hook(HOOK__ON_LIABILITY_ADDED, abi.encode(account));
+            }
+        }
     }
 
-    function disableLiabilityMarket(address market, address account) external marketOnly(market) liquidityCheck(account) {
-        doRemoveElement(accountLiabilities[account], market);
+    function disableLiabilityMarket(address market, address account) external 
+    marketStatusCheck(market) 
+    marketOnly(market) 
+    liquidityCheck(account) {
+        if (accountLiabilities[account].doRemoveElement(market)) {
+            (uint bitmask,) = abi.decode(marketStatuses[market], (uint, bytes));
+
+            if ((bitmask & HOOK__ON_LIABILITY_REMOVED) != 0) {
+                IEulerMarket(market).hook(HOOK__ON_LIABILITY_REMOVED, abi.encode(account));
+            }
+        }
     }
 
 
@@ -326,6 +322,10 @@ contract EulerConductor is TransientStorage {
 
     // Liquidity check
 
+    function deferLiquidityCheck(address account) external inDeferral {
+        liquidityDeferrals.doAddElement(account);
+    }
+
     function checkLiquidity(address account) external view returns (bool isLiquid) {
         return checkLiquidityInternal(account);
     }
@@ -363,10 +363,10 @@ contract EulerConductor is TransientStorage {
         liquidityCheck(targetAccount)
         returns (bool success, bytes memory result)
     {
-        address[] memory liabilities = getArray(accountLiabilities[targetAccount]);
+        address[] memory liabilities = accountLiabilities[targetAccount].getArray();
 
         require(liabilities.length == 1 && liabilities[0] == msg.sender, "e/liability-not-in-control");
-        require(arrayIncludes(accountCollaterals[targetAccount], targetContract), "e/collateral-not-enabled");
+        require(accountCollaterals[targetAccount].arrayIncludes(targetContract), "e/collateral-not-enabled");
 
         return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
@@ -398,13 +398,13 @@ contract EulerConductor is TransientStorage {
     // Liquidity check internals
 
     function checkLiquidityInternal(address account) internal view returns (bool) {
-        address[] memory liabilities = getArray(accountLiabilities[account]);
+        address[] memory liabilities = accountLiabilities[account].getArray();
         
         if (liabilities.length == 0) return true;
 
         require(liabilities.length == 1, "e/borrow-isolation-violation");
         
-        address[] memory collaterals = getArray(accountCollaterals[account]);
+        address[] memory collaterals = accountCollaterals[account].getArray();
 
         try IEulerMarket(liabilities[0]).checkLiquidity(account, collaterals) returns (bool isLiquid) {
             return isLiquid;
@@ -444,15 +444,17 @@ contract EulerConductor is TransientStorage {
 
         if (numElements == 0) return;
 
-        IEulerMarket(firstElement).hook(HOOK__MARKET_SUMMARY, marketStatuses[firstElement]);
+        (, bytes memory data) = abi.decode(marketStatuses[firstElement], (uint, bytes));
+        IEulerMarket(firstElement).hook(HOOK__MARKET_SUMMARY, data);
         delete marketStatuses[firstElement];
         
         for (uint i = 1; i < numElements;) {
             address market = marketStatusChecks.elements[i];
+            (, data) = abi.decode(marketStatuses[market], (uint, bytes));
 
-            IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, marketStatuses[market]);
-            delete marketStatuses[market];
+            IEulerMarket(market).hook(HOOK__MARKET_SUMMARY, data);
             
+            delete marketStatuses[market];
             delete marketStatusChecks.elements[i];
             unchecked { ++i; }
         }
@@ -461,101 +463,11 @@ contract EulerConductor is TransientStorage {
     }
 
 
-    // Arrays helper functions
-
-    function doAddElement(ArrayStorage storage arrayStorage, address element) internal {
-        address firstElement = arrayStorage.firstElement;
-        uint8 numElements = arrayStorage.numElements;
-
-        if (numElements != 0) {
-            if (firstElement == element) return; // already in the first position
-            for (uint i = 1; i < numElements;) {
-                if (arrayStorage.elements[i] == element) return; // already in the array
-                unchecked { ++i; }
-            }
-        }
-
-        require(numElements < MAX_PRESENT_ELEMENTS, "e/array/too-many-elements");
-
-        if (numElements == 0) arrayStorage.firstElement = element;
-        else arrayStorage.elements[numElements] = element;
-
-        arrayStorage.numElements = numElements + 1;
-    }
-
-    function doRemoveElement(ArrayStorage storage arrayStorage, address element) internal {
-        address firstElement = arrayStorage.firstElement;
-        uint8 numElements = arrayStorage.numElements;
-        uint searchIndex = type(uint).max;
-
-        if (numElements == 0) return; // already removed
-
-        if (firstElement == element) {
-            searchIndex = 0;
-        } else {
-            for (uint i = 1; i < numElements;) {
-                if (arrayStorage.elements[i] == element) {
-                    searchIndex = i;
-                    break;
-                }
-                unchecked { ++i; }
-            }
-
-            if (searchIndex == type(uint).max) return; // already removed
-        }
-
-        uint lastMarketIndex = numElements - 1;
-
-        if (searchIndex != lastMarketIndex) {
-            if (searchIndex == 0) arrayStorage.firstElement = arrayStorage.elements[lastMarketIndex];
-            else arrayStorage.elements[searchIndex] = arrayStorage.elements[lastMarketIndex];
-        }
-
-        arrayStorage.numElements = uint8(lastMarketIndex);
-
-        if (lastMarketIndex != 0) delete arrayStorage.elements[lastMarketIndex];
-    }
-
-    function getArray(ArrayStorage storage arrayStorage) internal view returns (address[] memory) {
-        address firstElement = arrayStorage.firstElement;
-        uint8 numElements = arrayStorage.numElements;
-
-        address[] memory output = new address[](numElements);
-        if (numElements == 0) return output;
-
-        output[0] = firstElement;
-
-        for (uint i = 1; i < numElements;) {
-            output[i] = arrayStorage.elements[i];
-            unchecked { ++i; }
-        }
-
-        return output;
-    }
-
-    function arrayIncludes(ArrayStorage storage arrayStorage, address element) internal view returns (bool) {
-        address firstElement = arrayStorage.firstElement;
-        uint8 numElements = arrayStorage.numElements;
-
-        if (numElements == 0) return false;
-        if (firstElement == element) return true;
-
-        for (uint i = 1; i < numElements;) {
-            if (arrayStorage.elements[i] == element) return true;
-            unchecked { ++i; }
-        }
-
-        return false;
-    }
-
-
     // Error handling
 
     function revertBytes(bytes memory errMsg) internal pure {
         if (errMsg.length > 0) {
-            assembly {
-                revert(add(32, errMsg), mload(errMsg))
-            }
+            assembly { revert(add(32, errMsg), mload(errMsg)) }
         }
 
         revert("e/empty-error");
