@@ -5,6 +5,8 @@ pragma solidity ^0.8.0;
 import "./Types.sol";
 
 library Array {
+    error TooManyElements();
+
     uint internal constant MAX_PRESENT_ELEMENTS = 20;
 
     function doAddElement(Types.ArrayStorage storage arrayStorage, address element) internal returns (bool wasAdded) {
@@ -19,7 +21,7 @@ library Array {
             }
         }
 
-        require(numElements < MAX_PRESENT_ELEMENTS, "e/array/too-many-elements");
+        if (numElements >= MAX_PRESENT_ELEMENTS) revert TooManyElements();
 
         if (numElements == 0) arrayStorage.firstElement = element;
         else arrayStorage.elements[numElements] = element;
@@ -60,7 +62,8 @@ library Array {
 
         arrayStorage.numElements = uint8(lastMarketIndex);
 
-        if (lastMarketIndex != 0) delete arrayStorage.elements[lastMarketIndex];
+        if (lastMarketIndex == 0) delete arrayStorage.firstElement;
+        else delete arrayStorage.elements[lastMarketIndex];
 
         return true;
     }

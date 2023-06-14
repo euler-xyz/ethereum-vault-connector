@@ -4,15 +4,16 @@ pragma solidity ^0.8.0;
 
 import "./TransientStorage.sol";
 import "./Array.sol";
+import "forge-std/console.sol";
 
 interface IEulerVaultRegistry {
     function isRegistered(address vault) external returns (bool);
 }
 
 interface IEulerVault {
-    function checkLiquidity(address account, address[] memory collaterals) external view returns (bool isLiquid);
-    function getHookBitmask() external view returns (uint bitmask);
+    function checkAccountStatus(address account, address[] memory collaterals) external view returns (bool isValid);
     function hook(uint hookNumber, bytes memory data) external returns (bytes memory result);
+    error VaultStatusViolation();
 }
 
 interface IDeferredChecks {
@@ -27,8 +28,8 @@ contract EulerOrchestrator is TransientStorage {
 
     string public constant name = "Euler Orchestrator";
 
-    uint internal constant HOOK__VAULT_FIRST_TOUCHED = 0;
-    uint internal constant HOOK__VAULT_SUMMARY = 1;
+    uint internal constant HOOK__VAULT_SNAPSHOT = 0;
+    uint internal constant HOOK__VAULT_FINISH = 1;
 
 
     // Storage
@@ -44,12 +45,19 @@ contract EulerOrchestrator is TransientStorage {
     // Events, Errors
 
     event Genesis();
-    event ReferralCode(bytes32 indexed referralCode);
     event GovernorAdminSet(address indexed admin);
     event EulerVaultRegistrySet(address indexed registry);
-    event AccountOperatorSet(address indexed account, address indexed operator);
+    event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
 
-    error BatchDispatchSimulation(EulerBatchItemSimulationResult[] simulation);
+    error NotAuthorized();
+    error InvalidAddress();
+    error DeferralViolation();
+    error VaultNotRegistered(address vault);
+    error AccountStatusViolation(address account);
+    error VaultStatusViolation(address vault);
+    error ConductorViolation(address account);
+    error SimulationViolation();
+    error SimulationResult(EulerBatchItemSimulationResult[] simulation);
 
 
     // Constructor
@@ -65,31 +73,22 @@ contract EulerOrchestrator is TransientStorage {
     // Modifiers
 
     modifier governorOnly {
-        require(msg.sender == governorAdmin, "e/governor-only");
+        if (msg.sender != governorAdmin) revert NotAuthorized();
         _;
     }
 
     modifier vaultOnly(address vault) {
-        require(msg.sender == vault, "e/vault-only");
+        if (msg.sender != vault) revert NotAuthorized();
         _;
     }
 
     modifier ownerOrOperator(address account) {
-        require(
-            (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF) || 
-            accountOperators[account][msg.sender], 
-            "e/not-authorized"
-        );
-        _;
-    }
-
-    modifier inDeferral {
-        require(checksDeferred, "e/checks-not-deferred");
+        if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF) && !accountOperators[account][msg.sender]) revert NotAuthorized();
         _;
     }
 
     modifier notInDeferral {
-        require(!checksDeferred, "e/checks-deferred");
+        if (checksDeferred) revert DeferralViolation();
         _;
     }
 
@@ -100,50 +99,36 @@ contract EulerOrchestrator is TransientStorage {
 
         checksDeferred = false;
 
-        requireLiquidityAll();
+        requireAccountStatusCheckAll();
         checkVaultStatusAll();
 
-        assert(liquidityDeferrals.numElements == 0);
+        assert(accountStatusChecks.numElements == 0);
         assert(vaultStatusChecks.numElements == 0);
     }
 
     modifier vaultStatusCheck(address vault) {
         bool isFirstTouched = !vaultStatusChecks.arrayIncludes(vault);
-        uint bitmask;
         bytes memory data;
 
         if (isFirstTouched && IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) {
-            try IEulerVault(vault).getHookBitmask() returns (uint _bitmask) {
-                bitmask = _bitmask;
-            } catch {}
-
-            if ((bitmask & HOOK__VAULT_FIRST_TOUCHED) != 0) {
-                data = IEulerVault(vault).hook(HOOK__VAULT_FIRST_TOUCHED, abi.encode(0));
-            }
+            data = hookHandler(vault, HOOK__VAULT_SNAPSHOT, abi.encode(0));
 
             if (checksDeferred) {
                 vaultStatusChecks.doAddElement(vault);
-                vaultStatuses[vault] = abi.encode(bitmask, data);
+                vaultStatuses[vault] = data;
             }
         }
 
         _;
 
-        if (!checksDeferred && (bitmask & HOOK__VAULT_SUMMARY) != 0) {
-            IEulerVault(vault).hook(HOOK__VAULT_SUMMARY, data);
-        }
+        if (!checksDeferred) hookHandler(vault, HOOK__VAULT_FINISH, data);
     }
 
-    modifier liquidityCheck(address account) {
+    modifier accountStatusCheck(address account) {
         _;
         
-        if (checksDeferred) liquidityDeferrals.doAddElement(account);
-        else requireLiquidityInternal(account);
-    }
-
-    modifier registerReferralCode(bytes32 code) {
-        if (code != bytes32(0)) emit ReferralCode(code);
-        _;
+        if (checksDeferred) accountStatusChecks.doAddElement(account);
+        else requireAccountStatusCheckInternal(account);
     }
 
 
@@ -155,7 +140,7 @@ contract EulerOrchestrator is TransientStorage {
     }
 
     function setEulerVaultRegistry(address newEulerVaultRegistry) external governorOnly {
-        require(newEulerVaultRegistry != address(0), "e/bad-registry-address");
+        if (newEulerVaultRegistry == address(0)) revert InvalidAddress();
         eulerVaultRegistry = newEulerVaultRegistry;
         emit EulerVaultRegistrySet(newEulerVaultRegistry);
     }
@@ -163,11 +148,12 @@ contract EulerOrchestrator is TransientStorage {
 
     // Account operators
 
-    function setAccountOperator(address account, address newOperator) external {
-        require((uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF), "e/not-authorized");
+    function setAccountOperator(address account, address operator, bool isAuthorized) external {
+        if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF)) revert NotAuthorized();
+        else if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) revert InvalidAddress();
 
-        accountOperators[account][newOperator] = true;
-        emit AccountOperatorSet(account, newOperator);
+        accountOperators[account][operator] = isAuthorized;
+        emit AccountOperatorSet(account, operator, isAuthorized);
     }
 
 
@@ -181,16 +167,16 @@ contract EulerOrchestrator is TransientStorage {
         return accountPerformers[account].arrayIncludes(vault);
     }
 
-    function enablePerformer(address vault, address account) external 
+    function enablePerformer(address vault, address account) public 
     ownerOrOperator(account) 
-    liquidityCheck(account) {
-        require(IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault), "e/vault-not-registered");
+    accountStatusCheck(account) {
+        if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert VaultNotRegistered(vault);
         accountPerformers[account].doAddElement(vault);
     }
 
-    function disablePerformer(address vault, address account) external 
+    function disablePerformer(address vault, address account) public 
     ownerOrOperator(account) 
-    liquidityCheck(account) {
+    accountStatusCheck(account) {
         accountPerformers[account].doRemoveElement(vault);
     }
 
@@ -202,36 +188,36 @@ contract EulerOrchestrator is TransientStorage {
     }
 
     function isConductorEnabled(address vault, address account) external view returns (bool) {
-        require(msg.sender == vault || !checksDeferred, "e/checks-deferred");
+        if (msg.sender != vault && checksDeferred) revert DeferralViolation();
         return accountConductors[account].arrayIncludes(vault);
     }
 
-    function enableConductor(address vault, address account) external 
+    function enableConductor(address vault, address account) public 
     ownerOrOperator(account) 
-    liquidityCheck(account) {
-        require(IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault), "e/vault-not-registered");
+    accountStatusCheck(account) {
+        if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert VaultNotRegistered(vault);
         accountConductors[account].doAddElement(vault);
     }
 
-    function disableConductor(address vault, address account) external 
+    function disableConductor(address vault, address account) public 
     vaultOnly(vault) 
-    liquidityCheck(account) {
+    accountStatusCheck(account) {
         accountConductors[account].doRemoveElement(vault);
     }
 
 
     // Batching
 
-    function deferChecks(bytes memory data) external payable defer {
+    function deferChecks(bytes memory data) public payable defer {
         IDeferredChecks(msg.sender).onDeferredChecks{value: msg.value}(data);
     }
 
-    function batchDispatch(EulerBatch calldata batch) external payable registerReferralCode(batch.referralCode) defer
+    function batchDispatch(EulerBatchItem[] calldata items, bool isSimulation) public payable defer
     returns (EulerBatchItemSimulationResult[] memory simulation) {
-        if (batch.isSimulation) simulation = new EulerBatchItemSimulationResult[](batch.items.length);
+        if (isSimulation) simulation = new EulerBatchItemSimulationResult[](items.length);
 
-        for (uint i = 0; i < batch.items.length;) {
-            EulerBatchItem calldata item = batch.items[i];
+        for (uint i = 0; i < items.length;) {
+            EulerBatchItem calldata item = items[i];
             address targetContract = item.targetContract;
             bool success;
             bytes memory result;
@@ -242,7 +228,7 @@ contract EulerOrchestrator is TransientStorage {
                 (success, result) = executeInternal(targetContract, item.targetAccount, item.msgValue, item.data);
             }
 
-            if (batch.isSimulation) {
+            if (isSimulation) {
                 simulation[i].success = success;
                 simulation[i].result = result;
             } else if (!(success || item.allowError)) {
@@ -252,21 +238,22 @@ contract EulerOrchestrator is TransientStorage {
             unchecked { ++i; }
         }
 
-        if (batch.isSimulation) revert BatchDispatchSimulation(simulation);
+        if (isSimulation) revert SimulationResult(simulation);
     }
 
-    function batchDispatchSimulate(EulerBatch calldata batch) external payable 
+    function batchDispatchSimulate(EulerBatchItem[] calldata items) public payable
     returns (EulerBatchItemSimulationResult[] memory simulation) {
         (bool success, bytes memory result) = address(this).delegatecall(
             abi.encodeWithSelector(
                 this.batchDispatch.selector,
-                batch
+                items,
+                true
             )
         );
 
-        if (success) revert("e/simulation-did-not-revert");
+        if (success) revert SimulationViolation();
 
-        if(bytes4(result) == BatchDispatchSimulation.selector){
+        if(bytes4(result) == SimulationResult.selector){
             assembly { result := add(result, 4) }
             simulation = abi.decode(result, (EulerBatchItemSimulationResult[]));
         } else {
@@ -277,27 +264,44 @@ contract EulerOrchestrator is TransientStorage {
 
     // Call forwarding
 
-    function execute(address targetContract, address targetAccount, bytes calldata data) external payable
+    function execute(address targetContract, address targetAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
         return executeInternal(targetContract, targetAccount, msg.value, data);
     }
 
-    function forward(address targetContract, address targetAccount, bytes calldata data) external payable
+    function forward(address targetContract, address targetAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
         return forwardInternal(targetContract, targetAccount, msg.value, data);
     }
 
 
-    // Liquidity check
+    // Account Status check
 
-    function deferLiquidityCheck(address account) external inDeferral {
-        liquidityDeferrals.doAddElement(account);
+    function checkAccountStatus(address account) external view returns (bool isValid) {
+        return checkAccountStatusInternal(account);
     }
 
-    function checkLiquidity(address account) external view returns (bool isLiquid) {
-        return checkLiquidityInternal(account);
+    function checkAccountsStatus(address[] memory accounts) external view returns (bool[] memory isValid) {
+        isValid = new bool[](accounts.length);
+        for (uint i = 0; i < accounts.length;) {
+            isValid[i] = checkAccountStatusInternal(accounts[i]);
+            unchecked { ++i; }
+        }
     }
 
+    function requireAccountStatusCheck(address account) external {
+        if (checksDeferred) accountStatusChecks.doAddElement(account);
+        else requireAccountStatusCheckInternal(account);
+    }
+
+    function requireAccountsStatusCheck(address[] memory accounts) external {
+        bool areChecksDeferred = checksDeferred;
+        for (uint i = 0; i < accounts.length;) {
+            if (areChecksDeferred) accountStatusChecks.doAddElement(accounts[i]);
+            else requireAccountStatusCheckInternal(accounts[i]);
+            unchecked { ++i; }
+        }
+    }
 
 
     // INTERNAL FUNCTIONS
@@ -305,17 +309,17 @@ contract EulerOrchestrator is TransientStorage {
     function executeInternal(address targetContract, address targetAccount, uint msgValue, bytes calldata data) internal
         vaultStatusCheck(targetContract)
         ownerOrOperator(targetAccount)
-        liquidityCheck(targetAccount)
+        accountStatusCheck(targetAccount)
         returns (bool success, bytes memory result)
     {
-        require(targetContract != address(this), "e/invalid-target");
+        if (targetContract == address(this)) revert InvalidAddress();
         
         return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
         // this function executes arbitrary calldata on a target contract.
         // if a target is a registered vault, the vault status is checked.
         // the function checks whether the msg.sender is authorized to act on behalf
-        // of the targetAccount and liquidity check on that account is performed.
+        // of the targetAccount and account status check on that account is performed.
 
         // the target contract must check if the msg.sender is EulerConductor and if 
         // the trailing targetAccount address that is attached to the data is the 
@@ -323,18 +327,18 @@ contract EulerOrchestrator is TransientStorage {
         // to the calldata). if both conditions are met, it ensures that the msg.sender 
         // is authorized to act on behalf of the targetAccount.
         // additionally, if the trailing boolean flag is set, it means that
-        // the liquidity check and vault status check (if applicable) are deferred.
+        // the account status check and vault status check (if applicable) are deferred.
     }
 
     function forwardInternal(address targetContract, address targetAccount, uint msgValue, bytes calldata data) internal
         vaultStatusCheck(targetContract)
-        liquidityCheck(targetAccount)
+        accountStatusCheck(targetAccount)
         returns (bool success, bytes memory result)
     {
         address[] memory conductors = accountConductors[targetAccount].getArray();
 
-        require(conductors.length == 1 && conductors[0] == msg.sender, "e/conductor-not-in-control");
-        require(accountPerformers[targetAccount].arrayIncludes(targetContract), "e/performer-not-enabled");
+        if (conductors.length != 1) revert ConductorViolation(targetAccount);
+        else if (conductors[0] != msg.sender || !accountPerformers[targetAccount].arrayIncludes(targetContract)) revert NotAuthorized();
 
         return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
 
@@ -344,13 +348,13 @@ contract EulerOrchestrator is TransientStorage {
         // (such a conductor vault is in control) and if the target is enabled as a performer.
         // the vault status is checked for the target contract as the target contract
         // is always a registered vault (otherwise it wouldn't be enabled as a performer). 
-        // the liquidity check is always performed on the targetAccount.
+        // the account status check is always performed on the targetAccount.
 
         // this function helps the liquidation flow which may look as follows:
         // 1) liquidator enables the conductor vault to take over the liability
         // 2) liquidator calls liquidate() on the conductor vault
         //      if done from a batch, the vault should verify that the msg.sender is authorized 
-        //      to act on behalf of the liquidator and that the checks are deferred (liquidity check
+        //      to act on behalf of the liquidator and that the checks are deferred (account status check
         //      for a liquidator and vault status check for the conductor vault), as described 
         //      in executeInternal()
         // 3) conductor vault transfers the liability from the violator to the liquidator.
@@ -363,44 +367,43 @@ contract EulerOrchestrator is TransientStorage {
     }
 
 
-    // Liquidity check internals
+    // Account Status Check internals
 
-    function checkLiquidityInternal(address account) internal view returns (bool) {
+    function checkAccountStatusInternal(address account) internal view returns (bool) {
         address[] memory conductors = accountConductors[account].getArray();
         
         if (conductors.length == 0) return true;
-
-        require(conductors.length == 1, "e/borrow-isolation-violation");
+        else if (conductors.length > 1) revert ConductorViolation(account);
         
         address[] memory performers = accountPerformers[account].getArray();
 
-        try IEulerVault(conductors[0]).checkLiquidity(account, performers) returns (bool isLiquid) {
-            return isLiquid;
+        try IEulerVault(conductors[0]).checkAccountStatus(account, performers) returns (bool isValid) {
+            return isValid;
         } catch {
             return false;
         }
     }
 
-    function requireLiquidityInternal(address account) internal view {
-        require(checkLiquidityInternal(account), "e/collateral-violation");
+    function requireAccountStatusCheckInternal(address account) internal virtual {
+        if (!checkAccountStatusInternal(account)) revert AccountStatusViolation(account);
     }
 
-    function requireLiquidityAll() private {
-        address firstElement = liquidityDeferrals.firstElement;
-        uint8 numElements = liquidityDeferrals.numElements;
+    function requireAccountStatusCheckAll() private {
+        address firstElement = accountStatusChecks.firstElement;
+        uint8 numElements = accountStatusChecks.numElements;
 
         if (numElements == 0) return;
 
-        requireLiquidityInternal(firstElement);
+        requireAccountStatusCheckInternal(firstElement);
         
         for (uint i = 1; i < numElements;) {
-            requireLiquidityInternal(liquidityDeferrals.elements[i]);
+            requireAccountStatusCheckInternal(accountStatusChecks.elements[i]);
             
-            delete liquidityDeferrals.elements[i];
+            delete accountStatusChecks.elements[i];
             unchecked { ++i; }
         }
 
-        delete liquidityDeferrals;
+        delete accountStatusChecks;
     }
 
 
@@ -412,23 +415,31 @@ contract EulerOrchestrator is TransientStorage {
 
         if (numElements == 0) return;
 
-        (uint bitmask, bytes memory data) = abi.decode(vaultStatuses[firstElement], (uint, bytes));
-
-        if ((bitmask & HOOK__VAULT_SUMMARY) != 0) IEulerVault(firstElement).hook(HOOK__VAULT_SUMMARY, data);
+        hookHandler(firstElement, HOOK__VAULT_FINISH, vaultStatuses[firstElement]);
         delete vaultStatuses[firstElement];
         
         for (uint i = 1; i < numElements;) {
             address vault = vaultStatusChecks.elements[i];
-            (bitmask, data) = abi.decode(vaultStatuses[vault], (uint, bytes));
 
-            if ((bitmask & HOOK__VAULT_SUMMARY) != 0) IEulerVault(vault).hook(HOOK__VAULT_SUMMARY, data);
-            
+            hookHandler(vault, HOOK__VAULT_FINISH, vaultStatuses[vault]);
             delete vaultStatuses[vault];
+
             delete vaultStatusChecks.elements[i];
             unchecked { ++i; }
         }
 
         delete vaultStatusChecks;
+    }
+
+
+    // Hook handler
+
+    function hookHandler(address vault, uint hookNumber, bytes memory data) internal returns (bytes memory result) {
+        try IEulerVault(vault).hook(hookNumber, data) returns (bytes memory _result) {
+            result = _result;
+        } catch (bytes memory err) {
+            if (bytes4(err) == IEulerVault.VaultStatusViolation.selector) revert VaultStatusViolation(vault);
+        }
     }
 
 

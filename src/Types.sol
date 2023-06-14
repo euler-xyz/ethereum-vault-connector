@@ -19,12 +19,6 @@ abstract contract Types {
         bytes data;
     }
 
-    struct EulerBatch {
-        bool isSimulation;
-        bytes32 referralCode;
-        EulerBatchItem[] items;
-    }
-
     struct EulerBatchItemSimulationResult {
         bool success;
         bytes result;

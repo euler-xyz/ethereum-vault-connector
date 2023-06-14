@@ -11,7 +11,7 @@ contract ArrayTest is Test {
     Types.ArrayStorage arrayStorage;
     uint counter;
 
-    function test_positive(address[] memory elements, uint64 seed) public {
+    function test_AddRemove(address[] memory elements, uint64 seed) public {
         // ------------------ ADDING ------------------
         // make the first two elements identical to exercise an edge case
         if (++counter % 10 == 0 && elements.length >= 2) {
@@ -72,12 +72,12 @@ contract ArrayTest is Test {
         }
     }
 
-    function test_negative() public {
+    function test_AddRevertIfTooManyElements() public {
         for (uint i = 0; i < 20; ++i) {
             assertEq(arrayStorage.doAddElement(address(uint160(i))), true);
         }
 
-        vm.expectRevert("e/array/too-many-elements");
+        vm.expectRevert(Array.TooManyElements.selector);
         arrayStorage.doAddElement(address(uint160(100)));
     }
 }
