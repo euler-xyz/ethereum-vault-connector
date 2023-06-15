@@ -24,12 +24,15 @@ contract EulerConductor is TransientStorage {
 
     string public constant name = "Euler Conductor";
 
+    uint internal constant CHECKS_DEFERRED__INIT = 1;
+    uint internal constant CHECKS_DEFERRED__BUSY = 2;
+
     uint internal constant HOOK__VAULT_SNAPSHOT = 0;
     uint internal constant HOOK__VAULT_FINISH = 1;
 
 
     // Storage
-
+    uint internal checksDeferred;   // TODO: reuse for trailing data?
     address public governorAdmin;
     address public eulerVaultRegistry;
     mapping(address => mapping(address => bool)) public accountOperators; // account => operator => isOperator
@@ -52,8 +55,6 @@ contract EulerConductor is TransientStorage {
     error AccountStatusViolation(address account);
     error VaultStatusViolation(address vault, bytes data);
     error ControllerViolation(address account);
-    error SimulationViolation();
-    error SimulationResult(EulerBatchItemSimulationResult[] simulation);
 
 
     // Constructor
@@ -61,6 +62,7 @@ contract EulerConductor is TransientStorage {
     constructor(address admin, address registry) {
         emit Genesis();
 
+        checksDeferred = CHECKS_DEFERRED__INIT;
         governorAdmin = admin;
         eulerVaultRegistry = registry;
     }
@@ -81,30 +83,35 @@ contract EulerConductor is TransientStorage {
         _;
     }
 
-    /// @notice A modifier that allows only the owner or an operator of the account to call the function.
-    /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
+    /// @notice A modifier that allows only the owner or an operator of the account to call the function with exception of the zero address.
+    /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner. Modifiers allows the zero address to act as an operator of any account which is used for transaction simulation purposes.
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
-        if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF) && !accountOperators[account][msg.sender]) revert NotAuthorized();
+        if (
+            (uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF) && 
+            msg.sender != address(0) && 
+            !accountOperators[account][msg.sender]
+        ) revert NotAuthorized();
+
         _;
     }
 
     /// @notice A modifier that prevents the function from being called when the transaction is in checks deferral state.
     modifier notInDeferral {
-        if (checksDeferred) revert DeferralViolation();
+        if (checksDeferred != CHECKS_DEFERRED__INIT) revert DeferralViolation();
         _;
     }
 
     /// @notice A modifier that acts like a reentrancy guard on a batch, puts the batch transaction into checks deferral state and performs the account and vault checks at the end of the batch.
     /// @dev Transient storage must be cleared at the end of the batch.
     modifier defer() {
-        if (checksDeferred) revert DeferralViolation();
+        if (checksDeferred == CHECKS_DEFERRED__INIT) revert DeferralViolation();
 
-        checksDeferred = true;
+        checksDeferred = CHECKS_DEFERRED__BUSY;
 
         _;
 
-        checksDeferred = false;
+        checksDeferred = CHECKS_DEFERRED__INIT;
 
         requireAccountStatusCheckAll();
         checkVaultStatusAll();
@@ -122,7 +129,7 @@ contract EulerConductor is TransientStorage {
         if (!vaultStatusChecks.arrayIncludes(vault) && IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) {
             data = hookHandler(vault, HOOK__VAULT_SNAPSHOT, abi.encode(0));
 
-            if (checksDeferred) {
+            if (checksDeferred != CHECKS_DEFERRED__INIT) {
                 vaultStatusChecks.doAddElement(vault);
                 vaultStatuses[vault] = data;
             }
@@ -130,7 +137,7 @@ contract EulerConductor is TransientStorage {
 
         _;
 
-        if (!checksDeferred) hookHandler(vault, HOOK__VAULT_FINISH, data);
+        if (checksDeferred == CHECKS_DEFERRED__INIT) hookHandler(vault, HOOK__VAULT_FINISH, data);
     }
 
     /// @notice A modifier that checks the status of the specified account.
@@ -139,8 +146,8 @@ contract EulerConductor is TransientStorage {
     modifier accountStatusCheck(address account) {
         _;
         
-        if (checksDeferred) accountStatusChecks.doAddElement(account);
-        else requireAccountStatusCheckInternal(account);
+        if (checksDeferred == CHECKS_DEFERRED__INIT) requireAccountStatusCheckInternal(account);
+        else accountStatusChecks.doAddElement(account);
     }
 
 
@@ -237,7 +244,7 @@ contract EulerConductor is TransientStorage {
     /// @param vault The address of the controller that is being checked.
     /// @return A boolean value that indicates whether the vault is controller for the account or not.
     function isControllerEnabled(address account, address vault) external view returns (bool) {
-        if (msg.sender != vault && checksDeferred) revert DeferralViolation();
+        if (msg.sender != vault && checksDeferred != CHECKS_DEFERRED__INIT) revert DeferralViolation();
         return accountControllers[account].arrayIncludes(vault);
     }
 
@@ -267,60 +274,16 @@ contract EulerConductor is TransientStorage {
 
 
     /// @notice Defers the account and vault checks until the end of the transaction and executes a batch of batch items.
-    /// @dev If isSimulation is true, the function always reverts and returns an array of simulation results is returned via SimulationResult error, otherwise it returns an empty array.
     /// @param items An array of batch items to be executed.
-    /// @param isSimulation A boolean flag that indicates whether to simulate the results and revert or not.
-    /// @return simulation Irrelevant. If isSimulation is true, the simulation result is returned via SimulationResult error, otherwise the array is empty.
-    function batchDispatch(EulerBatchItem[] calldata items, bool isSimulation) public payable defer
-    returns (EulerBatchItemSimulationResult[] memory simulation) {
-        if (isSimulation) simulation = new EulerBatchItemSimulationResult[](items.length);
-
-        for (uint i = 0; i < items.length;) {
-            EulerBatchItem calldata item = items[i];
-            address targetContract = item.targetContract;
-            bool success;
-            bytes memory result;
-
-            if (targetContract == address(this)) {
-                (success, result) = targetContract.delegatecall(item.data);
-            } else {
-                (success, result) = executeInternal(targetContract, item.onBehalfOfAccount, item.msgValue, item.data);
-            }
-
-            if (isSimulation) {
-                simulation[i].success = success;
-                simulation[i].result = result;
-            } else if (!(success || item.allowError)) {
-                revertBytes(result);
-            }
-
-            unchecked { ++i; }
-        }
-
-        if (isSimulation) revert SimulationResult(simulation);
+    function batchDispatch(EulerBatchItem[] calldata items) public payable {
+        batchDispatchInternal(items, false);
     }
 
-    /// @notice Simulates the execution of a batch of batch items and returns the simulation results.
-    /// @param items An array of batch items to be simulated.
-    /// @return simulation An array of simulation results for each batch item.
-    function batchDispatchSimulate(EulerBatchItem[] calldata items) public payable
-    returns (EulerBatchItemSimulationResult[] memory simulation) {
-        (bool success, bytes memory result) = address(this).delegatecall(
-            abi.encodeWithSelector(
-                this.batchDispatch.selector,
-                items,
-                true
-            )
-        );
-
-        if (success) revert SimulationViolation();
-
-        if(bytes4(result) == SimulationResult.selector){
-            assembly { result := add(result, 4) }
-            simulation = abi.decode(result, (EulerBatchItemSimulationResult[]));
-        } else {
-            revertBytes(result);
-        }
+    /// @notice Defers the account and vault checks until the end of the transaction and executes a batch of batch items.
+    /// @param items An array of batch items to be executed.
+    /// @return batchResult An array of batch item results for each item.
+    function batchDispatchReturn(EulerBatchItem[] calldata items) public payable returns (EulerBatchItemResult[] memory batchResult) {
+        return batchDispatchInternal(items, true);
     }
 
 
@@ -377,24 +340,54 @@ contract EulerConductor is TransientStorage {
     /// @dev If in the middle of checks deferral, the account is added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) external {
-        if (checksDeferred) accountStatusChecks.doAddElement(account);
-        else requireAccountStatusCheckInternal(account);
+        if (checksDeferred == CHECKS_DEFERRED__INIT) requireAccountStatusCheckInternal(account);
+        else accountStatusChecks.doAddElement(account);
     }
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
     /// @dev If in the middle of checks deferral, the accounts are added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(address[] memory accounts) external {
-        bool areChecksDeferred = checksDeferred;
+        bool checksNotDeferred = checksDeferred == CHECKS_DEFERRED__INIT;
         for (uint i = 0; i < accounts.length;) {
-            if (areChecksDeferred) accountStatusChecks.doAddElement(accounts[i]);
-            else requireAccountStatusCheckInternal(accounts[i]);
+            if (checksNotDeferred) requireAccountStatusCheckInternal(accounts[i]);
+            else accountStatusChecks.doAddElement(accounts[i]);
             unchecked { ++i; }
         }
     }
 
 
     // INTERNAL FUNCTIONS
+
+    function batchDispatchInternal(EulerBatchItem[] calldata items, bool returnResult) internal defer returns (EulerBatchItemResult[] memory batchResult) {
+        if (returnResult) batchResult = new EulerBatchItemResult[](items.length);
+
+        for (uint i = 0; i < items.length;) {
+            EulerBatchItem calldata item = items[i];
+            address targetContract = item.targetContract;
+            bool success;
+            bytes memory result;
+
+            if (targetContract == address(this)) {
+                (success, result) = targetContract.delegatecall(item.data);
+            } else {
+                (success, result) = executeInternal(targetContract, item.onBehalfOfAccount, item.msgValue, item.data);
+            }
+
+            if (returnResult) {
+                batchResult[i].success = success;
+                batchResult[i].result = result;
+            } else if (!(success || item.allowError)) {
+                if (result.length > 0) {
+                    assembly { revert(add(32, result), mload(result)) }
+                }
+
+                revert("e/empty-error");
+            }
+
+            unchecked { ++i; }
+        }
+    }
 
     function executeInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
         vaultStatusCheck(targetContract)
@@ -404,7 +397,7 @@ contract EulerConductor is TransientStorage {
     {
         if (targetContract == address(this)) revert InvalidAddress();
         
-        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferred));
+        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferred != CHECKS_DEFERRED__INIT));
     }
 
     function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
@@ -417,7 +410,7 @@ contract EulerConductor is TransientStorage {
         if (controllers.length != 1) revert ControllerViolation(onBehalfOfAccount);
         else if (controllers[0] != msg.sender || !accountCollaterals[onBehalfOfAccount].arrayIncludes(targetContract)) revert NotAuthorized();
 
-        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferred));
+        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferred != CHECKS_DEFERRED__INIT));
     }
 
 
@@ -497,16 +490,5 @@ contract EulerConductor is TransientStorage {
                 revert VaultStatusViolation(vault, err);
             }
         }
-    }
-
-
-    // Error handling
-
-    function revertBytes(bytes memory errMsg) internal pure {
-        if (errMsg.length > 0) {
-            assembly { revert(add(32, errMsg), mload(errMsg)) }
-        }
-
-        revert("e/empty-error");
     }
 }

@@ -5,7 +5,6 @@ pragma solidity ^0.8.0;
 import "./Types.sol";
 
 abstract contract TransientStorage is Types {
-    bool internal checksDeferred;   // TODO: reuse for trailing data
     ArrayStorage internal accountStatusChecks;
     ArrayStorage internal vaultStatusChecks;
     mapping(address => bytes) internal vaultStatuses;
