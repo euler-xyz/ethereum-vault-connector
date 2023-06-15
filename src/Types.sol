@@ -13,7 +13,7 @@ abstract contract Types {
 
     struct EulerBatchItem {
         bool allowError;
-        address targetAccount;
+        address onBehalfOfAccount;
         address targetContract;
         uint msgValue;
         bytes data;

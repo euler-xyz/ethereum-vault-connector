@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "./TransientStorage.sol";
 import "./Array.sol";
-import "forge-std/console.sol";
+
 
 interface IEulerVaultRegistry {
     function isRegistered(address vault) external returns (bool);
@@ -13,20 +13,16 @@ interface IEulerVaultRegistry {
 interface IEulerVault {
     function checkAccountStatus(address account, address[] memory collaterals) external view returns (bool isValid);
     function hook(uint hookNumber, bytes memory data) external returns (bytes memory result);
-    error VaultStatusViolation();
-}
-
-interface IDeferredChecks {
-    function onDeferredChecks(bytes memory data) external payable;
+    error HookViolation(bytes data);
 }
 
 
-contract EulerOrchestrator is TransientStorage {
+contract EulerConductor is TransientStorage {
     using Array for ArrayStorage;
 
     // Constants
 
-    string public constant name = "Euler Orchestrator";
+    string public constant name = "Euler Conductor";
 
     uint internal constant HOOK__VAULT_SNAPSHOT = 0;
     uint internal constant HOOK__VAULT_FINISH = 1;
@@ -38,8 +34,8 @@ contract EulerOrchestrator is TransientStorage {
     address public eulerVaultRegistry;
     mapping(address => mapping(address => bool)) public accountOperators; // account => operator => isOperator
 
-    mapping(address => ArrayStorage) internal accountPerformers;
-    mapping(address => ArrayStorage) internal accountConductors;
+    mapping(address => ArrayStorage) internal accountCollaterals;
+    mapping(address => ArrayStorage) internal accountControllers;
 
 
     // Events, Errors
@@ -54,8 +50,8 @@ contract EulerOrchestrator is TransientStorage {
     error DeferralViolation();
     error VaultNotRegistered(address vault);
     error AccountStatusViolation(address account);
-    error VaultStatusViolation(address vault);
-    error ConductorViolation(address account);
+    error VaultStatusViolation(address vault, bytes data);
+    error ControllerViolation(address account);
     error SimulationViolation();
     error SimulationResult(EulerBatchItemSimulationResult[] simulation);
 
@@ -99,9 +95,11 @@ contract EulerOrchestrator is TransientStorage {
         _;
     }
 
-    /// @notice A modifier that puts the batch transaction into checks deferral state and performs the account and vault checks at the end of the batch.
+    /// @notice A modifier that acts like a reentrancy guard on a batch, puts the batch transaction into checks deferral state and performs the account and vault checks at the end of the batch.
     /// @dev Transient storage must be cleared at the end of the batch.
     modifier defer() {
+        if (checksDeferred) revert DeferralViolation();
+
         checksDeferred = true;
 
         _;
@@ -151,15 +149,15 @@ contract EulerOrchestrator is TransientStorage {
     /// @notice Sets a new governor admin address.
     /// @dev Only the current governor can call this function.
     /// @param newGovernorAdmin The address of the new governor admin.
-    function setGovernorAdmin(address newGovernorAdmin) external governorOnly {
+    function setGovernorAdmin(address newGovernorAdmin) external payable governorOnly {
         governorAdmin = newGovernorAdmin;
         emit GovernorAdminSet(newGovernorAdmin);
     }
 
     /// @notice Sets a new Euler vault registry address.
-    /// @dev Only the current governor can call this function. The Euler vault registry is a contract that keeps track of all the vaults that are allowed to interact with the orchestrator.
+    /// @dev Only the current governor can call this function. The Euler vault registry is a contract that keeps track of all the vaults that are allowed to interact with the conductor.
     /// @param newEulerVaultRegistry The address of the new Euler vault registry.
-    function setEulerVaultRegistry(address newEulerVaultRegistry) external governorOnly {
+    function setEulerVaultRegistry(address newEulerVaultRegistry) external payable governorOnly {
         if (newEulerVaultRegistry == address(0)) revert InvalidAddress();
         eulerVaultRegistry = newEulerVaultRegistry;
         emit EulerVaultRegistrySet(newEulerVaultRegistry);
@@ -173,7 +171,7 @@ contract EulerOrchestrator is TransientStorage {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
-    function setAccountOperator(address account, address operator, bool isAuthorized) external {
+    function setAccountOperator(address account, address operator, bool isAuthorized) external payable {
         if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF)) revert NotAuthorized();
         else if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) revert InvalidAddress();
 
@@ -182,98 +180,91 @@ contract EulerOrchestrator is TransientStorage {
     }
 
 
-    // Performers management
+    // Collaterals management
 
-    /// @notice Returns the array of performers for an account.
-    /// @dev A performer is a vault for which account's balances are under the control of the currently chosen conductor. This function cannot be called when the transaction is in deferral state, as the performers may change during the transaction thus cannot be relied on within a batch.
-    /// @param account The address of the account whose performers are being queried.
-    /// @return An array of addresses that are the performers for the account.
-    function getPerformers(address account) external view notInDeferral returns (address[] memory) {
-        return accountPerformers[account].getArray();
+    /// @notice Returns the array of collaterals for an account.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the transaction is in deferral state, as the collaterals may change during the transaction thus cannot be relied on within a batch.
+    /// @param account The address of the account whose collaterals are being queried.
+    /// @return An array of addresses that are the collaterals for the account.
+    function getCollaterals(address account) external view notInDeferral returns (address[] memory) {
+        return accountCollaterals[account].getArray();
     }
 
-    /// @notice Returns whether a performer is enabled for an account.
-    /// @dev A performer is a vault for which account's balances are under the control of the currently chosen conductor. This function cannot be called when the transaction is in deferral state, as the performers may change during the transaction thus cannot be relied on within a batch.
+    /// @notice Returns whether a collateral is enabled for an account.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the transaction is in deferral state, as the collaterals may change during the transaction thus cannot be relied on within a batch.
     /// @param account The address of the account that is being checked.
-    /// @param vault The address of the vault performer that is being checked.
-    /// @return A boolean value that indicates whether the vault is performer for the account or not.
-    function isPerformerEnabled(address account, address vault) external view notInDeferral returns (bool) {
-        return accountPerformers[account].arrayIncludes(vault);
+    /// @param vault The address of the collateral that is being checked.
+    /// @return A boolean value that indicates whether the vault is collateral for the account or not.
+    function isCollateralEnabled(address account, address vault) external view notInDeferral returns (bool) {
+        return accountCollaterals[account].arrayIncludes(vault);
     }
 
-    /// @notice Enables a performer for an account.
-    /// @dev A performer is a vault for which account's balances are under the control of the currently chosen conductor. Only the owner or an operator of the account can call this function and a vault must be registered to become a performer. Account status checks are performed.
-    /// @param account The address for which the performer is being enabled.
-    /// @param vault The address of the vault performer being enabled.
-    function enablePerformer(address account, address vault) public 
+    /// @notice Enables a collateral for an account.
+    /// @dev A collaterals is a vault for which account's balances are under the control of the currently chosen controller vault. Only the owner or an operator of the account can call this function and a vault must be registered to become a collateral. Account status checks are performed.
+    /// @param account The address for which the collateral is being enabled.
+    /// @param vault The address of the collateral being enabled.
+    function enableCollateral(address account, address vault) public payable
     ownerOrOperator(account) 
     accountStatusCheck(account) {
         if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert VaultNotRegistered(vault);
-        accountPerformers[account].doAddElement(vault);
+        accountCollaterals[account].doAddElement(vault);
     }
 
-    /// @notice Disables a performer for an account.
-    /// @dev A performer is a vault for which account’s balances are under the control of the currently chosen conductor. Only the owner or an operator of the account can call this function. Account status checks are performed.
-    /// @param account The address for which the performer is being disabled.
-    /// @param vault The address of the vault performer being disabled. 
-    function disablePerformer(address account, address vault) public 
+    /// @notice Disables a collateral for an account.
+    /// @dev A collateral is a vault for which account’s balances are under the control of the currently chosen controller vault. Only the owner or an operator of the account can call this function. Account status checks are performed.
+    /// @param account The address for which the collateral is being disabled.
+    /// @param vault The address of the collateral being disabled. 
+    function disableCollateral(address account, address vault) public payable
     ownerOrOperator(account) 
     accountStatusCheck(account) {
-        accountPerformers[account].doRemoveElement(vault);
+        accountCollaterals[account].doRemoveElement(vault);
     }
 
 
-    // Conductors management
+    // Controllers management
 
-    /// @notice Returns the array of conductors for an account.
-    /// @dev A conductor is a vault that has been chosen for an account to have special control over account's balances in the performers vaults. A user can have multiple conductors during checks deferred state (within a batch), but only one (or none) can be selected when the account status check is made. This function cannot be called when the transaction is in deferral state, as the conductors may change during the transaction thus cannot be relied on within a batch.
-    /// @param account The address of the account whose conductors are being queried.
-    /// @return An array of addresses that are the conductors for the account.
-    function getConductors(address account) external view notInDeferral returns (address[] memory) {
-        return accountConductors[account].getArray();
+    /// @notice Returns the array of controllers for an account.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers during checks deferred state (within a batch), but only one (or none) can be selected when the account status check is made. This function cannot be called when the transaction is in deferral state, as the controllers may change during the transaction thus cannot be relied on within a batch.
+    /// @param account The address of the account whose controllers are being queried.
+    /// @return An array of addresses that are the controllers for the account.
+    function getControllers(address account) external view notInDeferral returns (address[] memory) {
+        return accountControllers[account].getArray();
     }
 
-    /// @notice Returns whether a conductor is enabled for an account.
-    /// @dev A conductor is a vault that has been chosen for an account to have special control over account’s balances in the performers vaults. If msg.sender is not a vault itself, this function cannot be called when the transaction is in deferral state, as the conductors may change during the transaction thus cannot be relied on within a batch.
+    /// @notice Returns whether a controller is enabled for an account.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. If msg.sender is not a vault itself, this function cannot be called when the transaction is in deferral state, as the controllers may change during the transaction thus cannot be relied on within a batch.
     /// @param account The address of the account that is being checked.
-    /// @param vault The address of the vault conductor that is being checked.
-    /// @return A boolean value that indicates whether the vault is conductor for the account or not.
-    function isConductorEnabled(address account, address vault) external view returns (bool) {
+    /// @param vault The address of the controller that is being checked.
+    /// @return A boolean value that indicates whether the vault is controller for the account or not.
+    function isControllerEnabled(address account, address vault) external view returns (bool) {
         if (msg.sender != vault && checksDeferred) revert DeferralViolation();
-        return accountConductors[account].arrayIncludes(vault);
+        return accountControllers[account].arrayIncludes(vault);
     }
 
-    /// @notice Enables a conductor for an account.
-    /// @dev A conductor is a vault that has been chosen for an account to have special control over account’s balances in the performers vaults. Only the owner or an operator of the account can call this function and a vault must be registered to become a conductor. Account status checks are performed.
-    /// @param account The address for which the conductor is being enabled.
-    /// @param vault The address of the vault conductor being enabled. 
-    function enableConductor(address account, address vault) public 
+    /// @notice Enables a controller for an account.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the owner or an operator of the account can call this function and a vault must be registered to become a controller. Account status checks are performed.
+    /// @param account The address for which the controller is being enabled.
+    /// @param vault The address of the controller being enabled. 
+    function enableController(address account, address vault) public payable
     ownerOrOperator(account) 
     accountStatusCheck(account) {
         if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert VaultNotRegistered(vault);
-        accountConductors[account].doAddElement(vault);
+        accountControllers[account].doAddElement(vault);
     }
 
-    /// @notice Disables a conductor for an account.
-    /// @dev A conductor is a vault that has been chosen for an account to have special control over account’s balances in the performers vaults. Only the vault itself can call this function. Account status checks are performed.
-    /// @param account The address for which the conductor is being disabled.
-    /// @param vault The address of the vault conductor being disabled.
-    function disableConductor(address account, address vault) public 
+    /// @notice Disables a controller for an account.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function. Account status checks are performed.
+    /// @param account The address for which the controller is being disabled.
+    /// @param vault The address of the controller being disabled.
+    function disableController(address account, address vault) public payable
     vaultOnly(vault) 
     accountStatusCheck(account) {
-        accountConductors[account].doRemoveElement(vault);
+        accountControllers[account].doRemoveElement(vault);
     }
 
 
     // Batching
 
-    /// @notice Defers the account and vault checks until the end of the transaction and calls the onDeferredChecks function on the msg.sender with the data and value.
-    /// @dev This function puts the transaction into deferral state and performs the account and vault checks (if any) at the end of the transaction.
-    /// @param data The data to be passed to onDeferredChecks function.
-    // TODO: remove?
-    function deferChecks(bytes memory data) public payable defer {
-        IDeferredChecks(msg.sender).onDeferredChecks{value: msg.value}(data);
-    }
 
     /// @notice Defers the account and vault checks until the end of the transaction and executes a batch of batch items.
     /// @dev If isSimulation is true, the function always reverts and returns an array of simulation results is returned via SimulationResult error, otherwise it returns an empty array.
@@ -293,7 +284,7 @@ contract EulerOrchestrator is TransientStorage {
             if (targetContract == address(this)) {
                 (success, result) = targetContract.delegatecall(item.data);
             } else {
-                (success, result) = executeInternal(targetContract, item.targetAccount, item.msgValue, item.data);
+                (success, result) = executeInternal(targetContract, item.onBehalfOfAccount, item.msgValue, item.data);
             }
 
             if (isSimulation) {
@@ -336,34 +327,34 @@ contract EulerOrchestrator is TransientStorage {
     // Call forwarding
 
     /// @notice Executes a call to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any contract. If it is used to call a vault contract, the trailing data attached and the msg.sender can be used to check if msg.sender is authorized to act on behalf of the targetAccount and ensure that the account status check for the targetAccount and vault status check for the targetContract (if registered) are performed.
+    /// @dev This function can be used to interact with any contract. If it is used to call a vault contract, the trailing data attached and the msg.sender can be used to check if msg.sender is authorized to act on behalf of the passed account and ensure that the account status check for the passed account and vault status check for the targetContract (if registered) are performed.
     /// @param targetContract The address of the contract to be called. If it is a registered vault, the vault status check is performed.
-    /// @param targetAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
+    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
     /// @param data The encoded data which is called on the target contract.
     /// @return success A boolean value that indicates whether the call succeeded or not.
     /// @return result Returned data from the call.
-    function execute(address targetContract, address targetAccount, bytes calldata data) public payable
+    function execute(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
-        return executeInternal(targetContract, targetAccount, msg.value, data);
+        return executeInternal(targetContract, onBehalfOfAccount, msg.value, data);
     }
 
     /// @notice Forwards a call to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any registered vault if it is enabled as a target account performer and the caller is the only conductor for the target account. The trailing data attached and the msg.sender can be used to check if msg.sender is authorized to act on behalf of the targetAccount and ensure that the account status check for the targetAccount and vault status check for targetContract are performed.
+    /// @dev This function can be used to interact with any registered vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. The trailing data attached and the msg.sender can be used to check if msg.sender is authorized to act on behalf of the passed account and ensure that the account status check for the passed account and vault status check for targetContract are performed.
     /// @param targetContract The address of the contract to be called. It is always a registered vault thus the vault status check is performed.
-    /// @param targetAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
+    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
     /// @param data The encoded data which is called on the target contract.
     /// @return success A boolean value that indicates whether the call succeeded or not.
     /// @return result Returned data from the call. 
-    function forward(address targetContract, address targetAccount, bytes calldata data) public payable
+    function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
-        return forwardInternal(targetContract, targetAccount, msg.value, data);
+        return forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
     }
 
 
     // Account Status check
 
     /// @notice Checks the status of an account and returns whether it is valid or not.
-    /// @dev Account status check is performed by calling into selected conductor vault and passing the array of currently selected performers. If conductor vault is not selected, the account is considered valid.
+    /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param account The address of the account to be checked.
     /// @return isValid A boolean value that indicates whether the account is valid or not.
     function checkAccountStatus(address account) external view returns (bool isValid) {
@@ -371,7 +362,7 @@ contract EulerOrchestrator is TransientStorage {
     }
 
     /// @notice Checks the status of multiple accounts and returns an array of boolean values that indicate whether each account is valid or not. 
-    /// @dev Account status check is performed by calling into selected conductor vault and passing the array of currently selected performers. If conductor vault is not selected, the account is considered valid.
+    /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked. 
     /// @return isValid An array of boolean values that indicate whether each account is valid or not.
     function checkAccountsStatus(address[] memory accounts) external view returns (bool[] memory isValid) {
@@ -383,7 +374,7 @@ contract EulerOrchestrator is TransientStorage {
     }
 
     /// @notice Checks the status of an account and reverts if it is not valid.
-    /// @dev If in the middle of checks deferral, the account is added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected conductor vault and passing the array of currently selected performers. If conductor vault is not selected, the account is considered valid.
+    /// @dev If in the middle of checks deferral, the account is added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) external {
         if (checksDeferred) accountStatusChecks.doAddElement(account);
@@ -391,7 +382,7 @@ contract EulerOrchestrator is TransientStorage {
     }
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev If in the middle of checks deferral, the accounts are added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected conductor vault and passing the array of currently selected performers. If conductor vault is not selected, the account is considered valid.
+    /// @dev If in the middle of checks deferral, the accounts are added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(address[] memory accounts) external {
         bool areChecksDeferred = checksDeferred;
@@ -405,42 +396,42 @@ contract EulerOrchestrator is TransientStorage {
 
     // INTERNAL FUNCTIONS
 
-    function executeInternal(address targetContract, address targetAccount, uint msgValue, bytes calldata data) internal
+    function executeInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
         vaultStatusCheck(targetContract)
-        ownerOrOperator(targetAccount)
-        accountStatusCheck(targetAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
+        ownerOrOperator(onBehalfOfAccount)
+        accountStatusCheck(onBehalfOfAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
         returns (bool success, bytes memory result)
     {
         if (targetContract == address(this)) revert InvalidAddress();
         
-        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
+        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferred));
     }
 
-    function forwardInternal(address targetContract, address targetAccount, uint msgValue, bytes calldata data) internal
+    function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
         vaultStatusCheck(targetContract)
-        accountStatusCheck(targetAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
+        accountStatusCheck(onBehalfOfAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
         returns (bool success, bytes memory result)
     {
-        address[] memory conductors = accountConductors[targetAccount].getArray();
+        address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
 
-        if (conductors.length != 1) revert ConductorViolation(targetAccount);
-        else if (conductors[0] != msg.sender || !accountPerformers[targetAccount].arrayIncludes(targetContract)) revert NotAuthorized();
+        if (controllers.length != 1) revert ControllerViolation(onBehalfOfAccount);
+        else if (controllers[0] != msg.sender || !accountCollaterals[onBehalfOfAccount].arrayIncludes(targetContract)) revert NotAuthorized();
 
-        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(targetAccount), checksDeferred));
+        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferred));
     }
 
 
     // Account Status Check internals
 
     function checkAccountStatusInternal(address account) internal view returns (bool) {
-        address[] memory conductors = accountConductors[account].getArray();
+        address[] memory controllers = accountControllers[account].getArray();
         
-        if (conductors.length == 0) return true;
-        else if (conductors.length > 1) revert ConductorViolation(account);
+        if (controllers.length == 0) return true;
+        else if (controllers.length > 1) revert ControllerViolation(account);
         
-        address[] memory performers = accountPerformers[account].getArray();
+        address[] memory collaterals = accountCollaterals[account].getArray();
 
-        try IEulerVault(conductors[0]).checkAccountStatus(account, performers) returns (bool isValid) {
+        try IEulerVault(controllers[0]).checkAccountStatus(account, collaterals) returns (bool isValid) {
             return isValid;
         } catch {
             return false;
@@ -501,7 +492,10 @@ contract EulerOrchestrator is TransientStorage {
         try IEulerVault(vault).hook(hookNumber, data) returns (bytes memory _result) {
             result = _result;
         } catch (bytes memory err) {
-            if (bytes4(err) == IEulerVault.VaultStatusViolation.selector) revert VaultStatusViolation(vault);
+            if (bytes4(err) == IEulerVault.HookViolation.selector) {
+                assembly { err := add(err, 4) }
+                revert VaultStatusViolation(vault, err);
+            }
         }
     }
 
