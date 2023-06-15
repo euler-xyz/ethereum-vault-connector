@@ -203,26 +203,26 @@ contract EulerOrchestratorHandler is EulerOrchestrator {
         verifyAccountStatusChecks(asc);
     }
 
-    function handlerEnablePerformer(address vault, address account) external {
-        super.enablePerformer(vault, account);
+    function handlerEnablePerformer(address account, address vault) external {
+        super.enablePerformer(account, vault);
 
         performerConductorChecks( account);   
     }
 
-    function handlerDisablePerformer(address vault, address account) external {
-        super.disablePerformer(vault, account);
+    function handlerDisablePerformer(address account, address vault) external {
+        super.disablePerformer(account, vault);
 
         performerConductorChecks(account);
     }
 
-    function handlerEnableConductor(address vault, address account) external {
-        super.enableConductor(vault, account);
+    function handlerEnableConductor(address account, address vault) external {
+        super.enableConductor(account, vault);
 
         performerConductorChecks(account);   
     }
 
-    function handlerDisableConductor(address vault, address account) external {
-        super.disableConductor(vault, account);
+    function handlerDisableConductor(address account, address vault) external {
+        super.disableConductor(account, vault);
 
         performerConductorChecks(account);   
     }
@@ -425,13 +425,13 @@ contract EulerOrchestratorTest is Test {
 
     function test_IsPerformerEnabled(address alice, address vault) public {
         orchestrator.setChecksDeferred(false);
-        orchestrator.isPerformerEnabled(vault, alice);
+        orchestrator.isPerformerEnabled(alice, vault);
     }
 
     function test_IsPerformerEnabled_RevertIfChecksDeferred(address alice, address vault) public {
         orchestrator.setChecksDeferred(true);
         vm.expectRevert(EulerOrchestrator.DeferralViolation.selector);
-        orchestrator.isPerformerEnabled(vault, alice);
+        orchestrator.isPerformerEnabled(alice, vault);
     }
 
     function test_PerformersManagement(address alice, uint8 subAccountId, uint8 numberOfVaults, uint seed) public {
@@ -454,7 +454,7 @@ contract EulerOrchestratorTest is Test {
             EulerRegistryMock(registry).setRegistered(conductor, true);
 
             vm.prank(alice);
-            orchestrator.enableConductor(conductor, account);
+            orchestrator.enableConductor(account, conductor);
         }
 
         // enabling performers
@@ -467,12 +467,12 @@ contract EulerOrchestratorTest is Test {
                 : address(new EulerVaultMock());
 
             EulerRegistryMock(registry).setRegistered(vault, true);
-            bool alreadyEnabled = orchestrator.isPerformerEnabled(vault, account);
+            bool alreadyEnabled = orchestrator.isPerformerEnabled(account, vault);
 
             assert((alreadyEnabled && i % 5 == 0) || (!alreadyEnabled && i % 5 != 0));
 
             vm.prank(msgSender);
-            orchestrator.handlerEnablePerformer(vault, account);
+            orchestrator.handlerEnablePerformer(account, vault);
             
             address[] memory performersPost = orchestrator.getPerformers(account);
             
@@ -495,7 +495,7 @@ contract EulerOrchestratorTest is Test {
             address vault = performersPre[seed % performersPre.length];
 
             vm.prank(msgSender);
-            orchestrator.handlerDisablePerformer(vault, account);
+            orchestrator.handlerDisablePerformer(account, vault);
 
             address[] memory performersPost = orchestrator.getPerformers(account);
 
@@ -515,21 +515,21 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(EulerOrchestrator.NotAuthorized.selector);
-        orchestrator.handlerEnablePerformer(vault, bob);
+        orchestrator.handlerEnablePerformer(bob, vault);
 
         vm.prank(alice);
         vm.expectRevert(EulerOrchestrator.NotAuthorized.selector);
-        orchestrator.handlerDisablePerformer(vault, bob);
+        orchestrator.handlerDisablePerformer(bob, vault);
 
 
         vm.prank(bob);
         orchestrator.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        orchestrator.handlerEnablePerformer(vault, bob);
+        orchestrator.handlerEnablePerformer(bob, vault);
 
         vm.prank(alice);
-        orchestrator.handlerDisablePerformer(vault, bob);
+        orchestrator.handlerDisablePerformer(bob, vault);
     }
 
     function test_PerformersManagement_RevertIfVaultNotRegistered(address alice) public {
@@ -537,21 +537,21 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(EulerOrchestrator.VaultNotRegistered.selector, vault));
-        orchestrator.handlerEnablePerformer(vault, alice);
+        orchestrator.handlerEnablePerformer(alice, vault);
 
         vm.prank(alice);
         // does not revert. because only registered performers can be enabled it doesn't check for registration here
-        orchestrator.handlerDisablePerformer(vault, alice);
+        orchestrator.handlerDisablePerformer(alice, vault);
 
 
         EulerRegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
-        orchestrator.handlerEnablePerformer(vault, alice);
+        orchestrator.handlerEnablePerformer(alice, vault);
 
 
         vm.prank(alice);
-        orchestrator.handlerDisablePerformer(vault, alice);
+        orchestrator.handlerDisablePerformer(alice, vault);
     }
 
     function test_PerformersManagement_RevertIfAccountStatusViolated(address alice) public {
@@ -562,28 +562,28 @@ contract EulerOrchestratorTest is Test {
         EulerRegistryMock(registry).setRegistered(conductor, true);
 
         vm.prank(alice);
-        orchestrator.enableConductor(conductor, alice);
+        orchestrator.enableConductor(alice, conductor);
         EulerVaultMock(conductor).reset();
 
         EulerVaultMock(conductor).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(EulerOrchestrator.AccountStatusViolation.selector, alice));
-        orchestrator.handlerEnablePerformer(vault, alice);
+        orchestrator.handlerEnablePerformer(alice, vault);
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(EulerOrchestrator.AccountStatusViolation.selector, alice));
-        orchestrator.handlerDisablePerformer(vault, alice);
+        orchestrator.handlerDisablePerformer(alice, vault);
 
 
         EulerVaultMock(conductor).setAccountStatusState(0); // account status is NOT violated
         
         vm.prank(alice);
-        orchestrator.handlerEnablePerformer(vault, alice);
+        orchestrator.handlerEnablePerformer(alice, vault);
         EulerVaultMock(conductor).reset();  // reset so that the account status check verification succeeds
 
         vm.prank(alice);
-        orchestrator.handlerDisablePerformer(vault, alice);
+        orchestrator.handlerDisablePerformer(alice, vault);
     }
 
     function test_GetConductors(address alice) public {
@@ -600,14 +600,14 @@ contract EulerOrchestratorTest is Test {
     function test_IsConductorEnabled(address alice) public {
         address vault = address(new EulerVaultMock());
         orchestrator.setChecksDeferred(false);
-        orchestrator.isConductorEnabled(vault, alice);
+        orchestrator.isConductorEnabled(alice, vault);
 
         // even though checks are deferred, the function succeeds if called by the vault asking if vault enabled
         // as a conductor
         orchestrator.setChecksDeferred(true);
         EulerVaultMock(vault).call(
             address(orchestrator),
-            abi.encodeWithSelector(EulerOrchestrator.isConductorEnabled.selector, vault, alice)
+            abi.encodeWithSelector(EulerOrchestrator.isConductorEnabled.selector, alice, vault)
         );
     }
 
@@ -616,7 +616,7 @@ contract EulerOrchestratorTest is Test {
 
         orchestrator.setChecksDeferred(true);
         vm.expectRevert(EulerOrchestrator.DeferralViolation.selector);
-        orchestrator.isConductorEnabled(vault, alice);
+        orchestrator.isConductorEnabled(alice, vault);
     }
 
     function test_ConductorsManagement(address alice, uint8 subAccountId, uint seed) public {
@@ -636,31 +636,31 @@ contract EulerOrchestratorTest is Test {
         address vault = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(vault, true);
 
-        assertFalse(orchestrator.isConductorEnabled(vault, account));
+        assertFalse(orchestrator.isConductorEnabled(account, vault));
         address[] memory conductorsPre = orchestrator.getConductors(account);
 
         vm.prank(msgSender);
-        orchestrator.handlerEnableConductor(vault, account);
+        orchestrator.handlerEnableConductor(account, vault);
         
         address[] memory conductorsPost = orchestrator.getConductors(account);
         
         assertEq(conductorsPost.length, conductorsPre.length + 1);
         assertEq(conductorsPost[conductorsPost.length - 1], vault);
-        assertTrue(orchestrator.isConductorEnabled(vault, account));
+        assertTrue(orchestrator.isConductorEnabled(account, vault));
 
         // enabling the same conductor again should succeed (duplicate will not be added)
         EulerVaultMock(vault).reset();
-        assertTrue(orchestrator.isConductorEnabled(vault, account));
+        assertTrue(orchestrator.isConductorEnabled(account, vault));
         conductorsPre = orchestrator.getConductors(account);
 
         vm.prank(msgSender);
-        orchestrator.handlerEnableConductor(vault, account);
+        orchestrator.handlerEnableConductor(account, vault);
         
         conductorsPost = orchestrator.getConductors(account);
         
         assertEq(conductorsPost.length, conductorsPre.length);
         assertEq(conductorsPost[0], conductorsPre[0]);
-        assertTrue(orchestrator.isConductorEnabled(vault, account));
+        assertTrue(orchestrator.isConductorEnabled(account, vault));
         
         // trying to enable second conductor will throw on the account status check if checks are not deferred
         address otherVault = address(new EulerVaultMock());
@@ -668,24 +668,24 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(msgSender);
         vm.expectRevert(abi.encodeWithSelector(EulerOrchestrator.ConductorViolation.selector, account));
-        orchestrator.handlerEnableConductor(otherVault, account);
+        orchestrator.handlerEnableConductor(account, otherVault);
 
         // only the conductor vault can disable itself
         EulerVaultMock(vault).reset();
-        assertTrue(orchestrator.isConductorEnabled(vault, account));
+        assertTrue(orchestrator.isConductorEnabled(account, vault));
         conductorsPre = orchestrator.getConductors(account);
 
         vm.prank(msgSender);
         EulerVaultMock(vault).call(
             address(orchestrator),
-            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, vault, account)
+            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, account, vault)
         );
         
         conductorsPost = orchestrator.getConductors(account);
         
         assertEq(conductorsPost.length, conductorsPre.length - 1);
         assertEq(conductorsPost.length, 0);
-        assertFalse(orchestrator.isConductorEnabled(vault, account));
+        assertFalse(orchestrator.isConductorEnabled(account, vault));
     }
 
     function test_EnableConductor_RevertIfNotOwnerAndNotOperator(address alice, address bob) public {
@@ -696,14 +696,14 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(EulerOrchestrator.NotAuthorized.selector);
-        orchestrator.handlerEnableConductor(vault, bob);
+        orchestrator.handlerEnableConductor(bob, vault);
 
 
         vm.prank(bob);
         orchestrator.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        orchestrator.handlerEnableConductor(vault, bob);
+        orchestrator.handlerEnableConductor(bob, vault);
     }
 
     function test_DisableConductor_RevertIfMsgSenderNotConductor(address alice, address bob) public {
@@ -716,19 +716,19 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(EulerOrchestrator.NotAuthorized.selector);
-        orchestrator.handlerDisableConductor(vault, bob);
+        orchestrator.handlerDisableConductor(bob, vault);
 
         vm.prank(bob);
         orchestrator.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
         vm.expectRevert(EulerOrchestrator.NotAuthorized.selector);  // although operator, conductor msg.sender is expected
-        orchestrator.handlerDisableConductor(vault, bob);
+        orchestrator.handlerDisableConductor(bob, vault);
 
         vm.prank(alice);
         EulerVaultMock(vault).call(
             address(orchestrator),
-            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, vault, bob)
+            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, bob, vault)
         );
     }
 
@@ -739,23 +739,23 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(EulerOrchestrator.VaultNotRegistered.selector, vault));
-        orchestrator.handlerEnableConductor(vault, alice);
+        orchestrator.handlerEnableConductor(alice, vault);
 
         vm.prank(alice);
         vm.expectRevert(EulerOrchestrator.NotAuthorized.selector);
-        orchestrator.handlerDisableConductor(vault, alice);
+        orchestrator.handlerDisableConductor(alice, vault);
 
 
         EulerRegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
-        orchestrator.handlerEnableConductor(vault, alice);
+        orchestrator.handlerEnableConductor(alice,vault );
 
         //EulerVaultMock(vault).reset(); // not necessary as there's no conductor to perform the account status check
         vm.prank(alice);
         EulerVaultMock(vault).call(
             address(orchestrator),
-            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, vault, alice)
+            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, alice, vault)
         );
     }
 
@@ -767,18 +767,18 @@ contract EulerOrchestratorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(EulerOrchestrator.AccountStatusViolation.selector, alice));
-        orchestrator.handlerEnableConductor(vault, alice);
+        orchestrator.handlerEnableConductor(alice, vault);
 
         vm.prank(alice);
         // succeeds as there's no conductor to perform the account status check
         EulerVaultMock(vault).call(
             address(orchestrator),
-            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, vault, alice)
+            abi.encodeWithSelector(EulerOrchestratorHandler.handlerDisableConductor.selector, alice, vault)
         );
 
         EulerVaultMock(vault).reset();  // account status is NOT violated
         
         vm.prank(alice);
-        orchestrator.handlerEnablePerformer(vault, alice);
+        orchestrator.handlerEnablePerformer(alice, vault);
     }
 }
