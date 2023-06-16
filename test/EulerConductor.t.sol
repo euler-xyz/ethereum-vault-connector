@@ -12,8 +12,8 @@ contract TargetMock {
         address onBehalfOfAccount;
         bool checksDeferred;
         assembly {
-            onBehalfOfAccount := shr(96, calldataload(sub(calldatasize(), 40)))
-            checksDeferred := shr(96, calldataload(sub(calldatasize(), 1)))
+            onBehalfOfAccount := shr(96, calldataload(sub(calldatasize(), 21)))
+            checksDeferred := shr(248, calldataload(sub(calldatasize(), 1)))
         }
 
         require(msg.sender == conductor, "executeExample/invalid-sender");
@@ -33,6 +33,8 @@ contract EulerRegistryMock is IEulerVaultRegistry {
 }
 
 contract EulerVaultMock is IEulerVault, TargetMock, Test {
+    uint public hookToRevert;
+    bool public hookRevertWithStandardError;
     uint internal accountStatusState;
     address[] internal accountStatusChecked;
     uint[] internal hooksCalled;
@@ -40,12 +42,25 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
     uint internal constant HOOK__VAULT_SNAPSHOT = 0;
     uint internal constant HOOK__VAULT_FINISH = 1;
 
+    constructor() {
+        accountStatusState = 0;
+        hookToRevert = HOOK__VAULT_FINISH + 1;
+        hookRevertWithStandardError = true;
+    }
+
     function setAccountStatusState(uint state) external {
         accountStatusState = state;
     }
 
+    function setHookToRevert(uint _hook, bool withStandardError) external {
+        hookToRevert = _hook;
+        hookRevertWithStandardError = withStandardError;
+    }
+
     function reset() external {
         accountStatusState = 0;
+        hookToRevert = HOOK__VAULT_FINISH + 1;
+        hookRevertWithStandardError = true;
 
         delete accountStatusChecked;
         delete hooksCalled;
@@ -70,6 +85,11 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
     }
 
     function hook(uint hookNumber, bytes memory data) external returns (bytes memory result) {
+        if (hookToRevert == hookNumber) {
+            if (hookRevertWithStandardError) revert HookViolation("hook/standard/violation");
+            else revert("hook/other/violation");
+        }
+
         if (hookNumber == HOOK__VAULT_SNAPSHOT) {
             if (abi.decode(data, (uint)) != 0) revert HookViolation("hook/1/violation");
         } else if (hookNumber == HOOK__VAULT_FINISH) {
@@ -108,8 +128,8 @@ contract EulerConductorHandler is EulerConductor {
     ) EulerConductor(admin, registry) {}
 
     function setChecksDeferred(bool deferred) external {
-        if (deferred) checksDeferred = CHECKS_DEFERRED__BUSY;
-        else checksDeferred = CHECKS_DEFERRED__INIT;
+        if (deferred) checksDeferredState = CHECKS_DEFERRED__BUSY;
+        else checksDeferredState = CHECKS_DEFERRED__INIT;
     }
 
     function requireAccountStatusCheckInternal(address account) internal override {
@@ -120,7 +140,7 @@ contract EulerConductorHandler is EulerConductor {
     }
 
     function verifyTransientStorage(VaultStatusCheck[] memory vsc) internal view {
-        require(checksDeferred == CHECKS_DEFERRED__INIT, "verifyTransientStorage/checks-deferred");
+        require(checksDeferredState == CHECKS_DEFERRED__INIT, "verifyTransientStorage/checks-deferred");
         require(accountStatusChecks.numElements == 0, "verifyTransientStorage/account-status-checks/numElements");
         require(accountStatusChecks.firstElement == address(0), "verifyTransientStorage/account-status-checks/firstElement");
 
@@ -181,7 +201,7 @@ contract EulerConductorHandler is EulerConductor {
     }
 
     function collateralControllerChecks(address account) internal {
-        if (checksDeferred != CHECKS_DEFERRED__INIT) return;
+        if (checksDeferredState != CHECKS_DEFERRED__INIT) return;
 
         address[] memory controllers = accountControllers[account].getArray();
 
@@ -232,23 +252,18 @@ contract EulerConductorHandler is EulerConductor {
         verifyAccountStatusChecks(asc);
     }
 
-    function handlerBatchReturn(EulerBatchItem[] calldata items, AccountStatusCheck[] memory asc, VaultStatusCheck[] memory vsc) public payable
-    returns (EulerBatchItemResult[] memory batchResult)
+    function handlerBatchRevert(EulerBatchItem[] calldata items) public payable
+    returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult)
     {
-        batchResult = super.batchDispatchReturn(items);
-
-        verifyTransientStorage(vsc);
-        verifyVaultStatusChecks(vsc);
-        verifyAccountStatusChecks(asc);
+        return super.batchDispatchRevert(items);
     }
 
     function handlerExecute(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable 
     returns (bool success, bytes memory result) {
         (success, result) = super.execute(targetContract, onBehalfOfAccount, data);
 
-        if (checksDeferred == CHECKS_DEFERRED__INIT) {
+        if (checksDeferredState == CHECKS_DEFERRED__INIT) {
             address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
-
             require(controllers.length <= 1, "handlerExecute/length");
 
             if (controllers.length == 1) {
@@ -262,7 +277,11 @@ contract EulerConductorHandler is EulerConductor {
             }
         }
 
-        if (checksDeferred == 1 && EulerRegistryMock(eulerVaultRegistry).isRegistered(targetContract)) {
+        if (
+            checksDeferredState == CHECKS_DEFERRED__INIT && 
+            EulerRegistryMock(eulerVaultRegistry).isRegistered(targetContract) &&
+            !EulerVaultMock(targetContract).hookRevertWithStandardError()
+        ) {
             VaultStatusCheck[] memory vsc = new VaultStatusCheck[](1);
 
             vsc[0].vault = targetContract;
@@ -284,7 +303,7 @@ contract EulerConductorHandler is EulerConductor {
     returns (bool success, bytes memory result) {
         (success, result) = super.forward(targetContract, onBehalfOfAccount, data);
 
-        if (checksDeferred == CHECKS_DEFERRED__INIT) {
+        if (checksDeferredState == CHECKS_DEFERRED__INIT) {
             AccountStatusCheck[] memory asc = new AccountStatusCheck[](1);
             VaultStatusCheck[] memory vsc = new VaultStatusCheck[](1);
 
@@ -305,7 +324,7 @@ contract EulerConductorHandler is EulerConductor {
 }
 
 contract EulerConductorTest is Test {
-    address owner = makeAddr("owner");
+    address governor = makeAddr("governor");
     EulerConductorHandler conductor;
     address registry;
 
@@ -315,30 +334,30 @@ contract EulerConductorTest is Test {
 
     function setUp() public {
         registry = address(new EulerRegistryMock());
-        conductor = new EulerConductorHandler(owner, registry);
+        conductor = new EulerConductorHandler(governor, registry);
 
         require(address(this) != address(0), "setUp/zero-address");
     }
 
-    function test_SetGovernorAdmin(address newOwner) public {
-        assertEq(conductor.governorAdmin(), owner);
+    function test_SetGovernorAdmin(address newGovernor) public {
+        assertEq(conductor.governorAdmin(), governor);
 
-        vm.prank(owner);
+        vm.prank(governor);
         //vm.expectEmit(address(true, false, false, false, conductor));
-        //emit EulerConductor.GovernorAdminSet(newOwner);
-        conductor.setGovernorAdmin(newOwner);
+        //emit EulerConductor.GovernorAdminSet(newGovernor);
+        conductor.setGovernorAdmin(newGovernor);
 
-        assertEq(conductor.governorAdmin(), newOwner);
+        assertEq(conductor.governorAdmin(), newGovernor);
     }
 
-    function test_SetGovernorAdmin_RevertIfNotGovernor(address newOwner, address notOwner) public {
-        vm.assume(notOwner != owner);
+    function test_SetGovernorAdmin_RevertIfNotGovernor(address newGovernor, address notGovernor) public {
+        vm.assume(notGovernor != governor);
 
-        assertEq(conductor.governorAdmin(), owner);
+        assertEq(conductor.governorAdmin(), governor);
 
-        vm.prank(notOwner);
+        vm.prank(notGovernor);
         vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.setGovernorAdmin(newOwner);
+        conductor.setGovernorAdmin(newGovernor);
     }
 
     function test_SetEulerVaultRegistry(address newRegistry) public {
@@ -346,7 +365,7 @@ contract EulerConductorTest is Test {
 
         assertEq(conductor.eulerVaultRegistry(), registry);
 
-        vm.prank(owner);
+        vm.prank(governor);
         //vm.expectEmit(address(true, false, false, false, conductor));
         //emit EulerConductor.EulerVaultRegistrySet(newRegistry);
         conductor.setEulerVaultRegistry(newRegistry);
@@ -354,12 +373,12 @@ contract EulerConductorTest is Test {
         assertEq(conductor.eulerVaultRegistry(), newRegistry);
     }
 
-    function test_SetEulerVaultRegistry_RevertIfNotGovernor(address newRegistry, address notOwner) public {
-        vm.assume(notOwner != owner && newRegistry != address(0));
+    function test_SetEulerVaultRegistry_RevertIfNotGovernor(address newRegistry, address notGovernor) public {
+        vm.assume(notGovernor != governor && newRegistry != address(0));
 
         assertEq(conductor.eulerVaultRegistry(), registry);
 
-        vm.prank(notOwner);
+        vm.prank(notGovernor);
         vm.expectRevert(EulerConductor.NotAuthorized.selector);
         conductor.setEulerVaultRegistry(newRegistry);
     }
@@ -367,7 +386,7 @@ contract EulerConductorTest is Test {
     function test_SetEulerVaultRegistry_RevertIfZeroAddress() public {
         assertEq(conductor.eulerVaultRegistry(), registry);
 
-        vm.prank(owner);
+        vm.prank(governor);
         vm.expectRevert(EulerConductor.InvalidAddress.selector);
         conductor.setEulerVaultRegistry(address(0));
     }
@@ -888,17 +907,16 @@ contract EulerConductorTest is Test {
     }
 
     function test_Execute_RevertIfVaultStatusInvalid(address alice, uint seed) public {
-        address targetContract;
+        address targetContract = address(new EulerVaultMock());
+        vm.assume(targetContract != address(conductor));
+
         if (seed % 2 == 0) {
-            // test for a non-registered contract, in this case vault status is not checked thus doesn't revert
-            targetContract = address(new TargetMock());
-        } else {
-            // test for a registered vault
-            targetContract = address(new EulerVaultMock());
+            // test for a registered vault, in this case vault status is checked thus should revert
             EulerRegistryMock(registry).setRegistered(targetContract, true);
         }
 
-        vm.assume(targetContract != address(conductor));
+        // test for both hooks reverting but not both at a time
+        EulerVaultMock(targetContract).setHookToRevert(seed % 4 == 0 ? 0 : 1, true);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
@@ -914,6 +932,21 @@ contract EulerConductorTest is Test {
         );
 
         hoax(alice, seed);
+
+        // expect revert only when registered vault
+        if (seed % 2 == 0) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    EulerConductor.VaultStatusViolation.selector,
+                    targetContract,
+                    abi.encodeWithSelector(
+                        IEulerVault.HookViolation.selector, 
+                        "hook/standard/violation"
+                    )
+                )
+            );
+        }
+
         conductor.handlerExecute{value: seed}(
             targetContract,
             alice,

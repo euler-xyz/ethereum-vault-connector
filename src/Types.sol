@@ -19,7 +19,7 @@ abstract contract Types {
         bytes data;
     }
 
-    struct EulerBatchItemResult {
+    struct EulerResult {
         bool success;
         bytes result;
     }
