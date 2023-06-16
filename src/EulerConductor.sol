@@ -25,15 +25,15 @@ contract EulerConductor is TransientStorage {
 
     string public constant name = "Euler Conductor";
 
-    uint internal constant CHECKS_DEFERRED__INIT = 1;
-    uint internal constant CHECKS_DEFERRED__BUSY = 2;
+    uint8 internal constant CHECKS_DEFERRED__INIT = 1;
+    uint8 internal constant CHECKS_DEFERRED__BUSY = 2;
 
     uint internal constant HOOK__VAULT_SNAPSHOT = 0;
     uint internal constant HOOK__VAULT_FINISH = 1;
 
 
     // Storage
-    uint internal checksDeferredState;   // TODO: reuse for trailing data?
+    ExecutionContext internal executionContext;
     address public governorAdmin;
     address public eulerVaultRegistry;
     mapping(address => mapping(address => bool)) public accountOperators; // account => operator => isOperator
@@ -65,7 +65,7 @@ contract EulerConductor is TransientStorage {
     constructor(address admin, address registry) {
         emit Genesis();
 
-        checksDeferredState = CHECKS_DEFERRED__INIT;
+        executionContext.checksDeferredState = CHECKS_DEFERRED__INIT;
         governorAdmin = admin;
         eulerVaultRegistry = registry;
     }
@@ -100,20 +100,20 @@ contract EulerConductor is TransientStorage {
 
     /// @notice A modifier that prevents the function from being called when the transaction is in checks deferral state.
     modifier notInDeferral {
-        if (checksDeferredState != CHECKS_DEFERRED__INIT) revert DeferralViolation();
+        if (executionContext.checksDeferredState != CHECKS_DEFERRED__INIT) revert DeferralViolation();
         _;
     }
 
     /// @notice A modifier that acts like a reentrancy guard on a batch, puts the batch transaction into checks deferral state.
     /// @dev Transient storage must be cleared at the end of the batch.
     modifier defer() {
-        if (checksDeferredState == CHECKS_DEFERRED__INIT) revert DeferralViolation();
+        if (executionContext.checksDeferredState == CHECKS_DEFERRED__INIT) revert DeferralViolation();
 
-        checksDeferredState = CHECKS_DEFERRED__BUSY;
+        executionContext.checksDeferredState = CHECKS_DEFERRED__BUSY;
 
         _;
 
-        checksDeferredState = CHECKS_DEFERRED__INIT;
+        executionContext.checksDeferredState = CHECKS_DEFERRED__INIT;
 
         assert(accountStatusChecks.numElements == 0);
         assert(vaultStatusChecks.numElements == 0);
@@ -123,7 +123,7 @@ contract EulerConductor is TransientStorage {
     /// @dev Checks are performed only once per vault per transaction. First, the snapshot hook is called. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the batch and the snapshot data is stored. If the checks are not deferred, the finish hook is called after the action is performed.
     /// @param vault The address of the vault to be checked.
     modifier vaultStatusCheck(address vault) {
-        bool checksDeferred = checksDeferredState != CHECKS_DEFERRED__INIT;
+        bool checksDeferred = executionContext.checksDeferredState != CHECKS_DEFERRED__INIT;
         bool isRegistered = IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault);
         bytes memory data;
 
@@ -148,9 +148,13 @@ contract EulerConductor is TransientStorage {
     /// @dev Checks are performed only once per account per transaction. If the checks are deferred, the account is added to the list of the accounts to check at the end of the batch. If the checks are not deferred, the check is performed immediately after the action is performed.
     /// @param account The address of the account to be checked.
     modifier accountStatusCheck(address account) {
+        executionContext.onBehalfOfAccount = account;
+
         _;
+
+        executionContext.onBehalfOfAccount = address(0);
         
-        if (checksDeferredState == CHECKS_DEFERRED__INIT) requireAccountStatusCheckInternal(account);
+        if (executionContext.checksDeferredState == CHECKS_DEFERRED__INIT) requireAccountStatusCheckInternal(account);
         else accountStatusChecks.doAddElement(account);
     }
 
@@ -188,6 +192,14 @@ contract EulerConductor is TransientStorage {
 
         accountOperators[account][operator] = isAuthorized;
         emit AccountOperatorSet(account, operator, isAuthorized);
+    }
+
+
+    // Execution state
+
+    function getExecutionContext() external view returns (bool checksDeferred, address onBehalfOfAccount) {
+        ExecutionContext memory state = executionContext;
+        return (state.checksDeferredState != CHECKS_DEFERRED__INIT, state.onBehalfOfAccount);
     }
 
 
@@ -248,7 +260,7 @@ contract EulerConductor is TransientStorage {
     /// @param vault The address of the controller that is being checked.
     /// @return A boolean value that indicates whether the vault is controller for the account or not.
     function isControllerEnabled(address account, address vault) external view returns (bool) {
-        if (msg.sender != vault && checksDeferredState != CHECKS_DEFERRED__INIT) revert DeferralViolation();
+        if (msg.sender != vault && executionContext.checksDeferredState != CHECKS_DEFERRED__INIT) revert DeferralViolation();
         return accountControllers[account].arrayIncludes(vault);
     }
 
@@ -324,7 +336,7 @@ contract EulerConductor is TransientStorage {
     // Call forwarding
 
     /// @notice Executes a call to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any contract. If it is used to call a vault contract, the trailing data attached and the msg.sender can be used to check if msg.sender is authorized to act on behalf of the passed account and ensure that the account status check for the passed account and vault status check for the targetContract (if registered) are performed.
+    /// @dev This function can be used to interact with any contract.
     /// @param targetContract The address of the contract to be called. If it is a registered vault, the vault status check is performed.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
     /// @param data The encoded data which is called on the target contract.
@@ -332,11 +344,11 @@ contract EulerConductor is TransientStorage {
     /// @return result Returned data from the call.
     function execute(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
-        return executeInternal(targetContract, onBehalfOfAccount, msg.value, data);
+        (success, result) = executeInternal(targetContract, onBehalfOfAccount, msg.value, data);
     }
 
     /// @notice Forwards a call to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any registered vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. The trailing data attached and the msg.sender can be used to check if msg.sender is authorized to act on behalf of the passed account and ensure that the account status check for the passed account and vault status check for targetContract are performed.
+    /// @dev This function can be used to interact with any registered vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount.
     /// @param targetContract The address of the contract to be called. It is always a registered vault thus the vault status check is performed.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
     /// @param data The encoded data which is called on the target contract.
@@ -344,7 +356,7 @@ contract EulerConductor is TransientStorage {
     /// @return result Returned data from the call. 
     function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
-        return forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
+        (success, result) = forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
     }
 
 
@@ -374,7 +386,7 @@ contract EulerConductor is TransientStorage {
     /// @dev If in the middle of checks deferral, the account is added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) external {
-        if (checksDeferredState == CHECKS_DEFERRED__INIT) requireAccountStatusCheckInternal(account);
+        if (executionContext.checksDeferredState == CHECKS_DEFERRED__INIT) requireAccountStatusCheckInternal(account);
         else accountStatusChecks.doAddElement(account);
     }
 
@@ -382,7 +394,7 @@ contract EulerConductor is TransientStorage {
     /// @dev If in the middle of checks deferral, the accounts are added to the array of accounts to be checked at the end of the batch. Account status check is performed by calling into selected controller vault and passing the array of currently selected collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(address[] memory accounts) external {
-        bool checksDeferred = checksDeferredState == CHECKS_DEFERRED__INIT;
+        bool checksDeferred = executionContext.checksDeferredState == CHECKS_DEFERRED__INIT;
         for (uint i = 0; i < accounts.length;) {
             if (checksDeferred) accountStatusChecks.doAddElement(accounts[i]);
             else requireAccountStatusCheckInternal(accounts[i]);
@@ -419,27 +431,25 @@ contract EulerConductor is TransientStorage {
     }
 
     function executeInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
-        vaultStatusCheck(targetContract)
-        ownerOrOperator(onBehalfOfAccount)
-        accountStatusCheck(onBehalfOfAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
-        returns (bool success, bytes memory result)
-    {
+    vaultStatusCheck(targetContract)
+    ownerOrOperator(onBehalfOfAccount)
+    accountStatusCheck(onBehalfOfAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
+    returns (bool success, bytes memory result) {
         if (targetContract == address(this)) revert InvalidAddress();
         
-        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferredState != CHECKS_DEFERRED__INIT));
+        (success, result) = targetContract.call{value: msgValue}(data);
     }
 
     function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
-        vaultStatusCheck(targetContract)
-        accountStatusCheck(onBehalfOfAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
-        returns (bool success, bytes memory result)
-    {
+    vaultStatusCheck(targetContract)
+    accountStatusCheck(onBehalfOfAccount)   // TODO: decide if this is enforced here or it's the vault that decides for which accounts the status is checked
+    returns (bool success, bytes memory result) {
         address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
 
         if (controllers.length != 1) revert ControllerViolation(onBehalfOfAccount);
         else if (controllers[0] != msg.sender || !accountCollaterals[onBehalfOfAccount].arrayIncludes(targetContract)) revert NotAuthorized();
 
-        return targetContract.call{value: msgValue}(abi.encodePacked(data, uint160(onBehalfOfAccount), checksDeferredState != CHECKS_DEFERRED__INIT));
+        (success, result) = targetContract.call{value: msgValue}(data);
     }
 
 
