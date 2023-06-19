@@ -5,7 +5,6 @@ pragma solidity ^0.8.0;
 import "./TransientStorage.sol";
 import "./Types.sol";
 import "./Array.sol";
-import "forge-std/console.sol";
 
 
 interface IEulerVaultRegistry {
@@ -14,7 +13,7 @@ interface IEulerVaultRegistry {
 
 interface IEulerVault {
     function checkAccountStatus(address account, address[] memory collaterals) external view returns (bool isValid);
-    function hook(uint hookNumber, bytes memory data) external returns (bytes memory result);
+    function assetStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result);
     error HookViolation(bytes data);
 }
 
@@ -28,9 +27,6 @@ contract EulerConductor is TransientStorage, Types {
 
     uint8 internal constant CHECKS_DEFERRED__INIT = 1;
     uint8 internal constant CHECKS_DEFERRED__BUSY = 2;
-
-    uint internal constant HOOK__VAULT_SNAPSHOT = 0;
-    uint internal constant HOOK__VAULT_FINISH = 1;
 
 
     // Storage
@@ -121,7 +117,7 @@ contract EulerConductor is TransientStorage, Types {
     }
 
     /// @notice A modifier that checks the status of the specified address if it's registered as a vault.
-    /// @dev Checks are performed only once per vault per transaction. First, the snapshot hook is called. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the batch and the snapshot data is stored. If the checks are not deferred, the finish hook is called after the action is performed.
+    /// @dev Checks are performed only once per vault per transaction. First, the assetStatusHook is called with initialCall set to true. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the batch and the snapshot data is stored. If the checks are not deferred, the finish assetStatusHook is called with initialCall set to false after the action is performed.
     /// @param vault The address of the vault to be checked.
     modifier vaultStatusCheck(address vault) {
         bool checksDeferred = executionContext.checksDeferredState != CHECKS_DEFERRED__INIT;
@@ -129,7 +125,7 @@ contract EulerConductor is TransientStorage, Types {
         bytes memory data;
 
         if (isRegistered && !vaultStatusChecks.arrayIncludes(vault)) {
-            data = hookHandler(vault, HOOK__VAULT_SNAPSHOT, abi.encode(0));
+            data = hookHandler(vault, true, abi.encode(0));
 
             if (checksDeferred) {
                 vaultStatusChecks.doAddElement(vault);
@@ -140,7 +136,7 @@ contract EulerConductor is TransientStorage, Types {
         _;
 
         if (isRegistered && !checksDeferred) {
-            data = hookHandler(vault, HOOK__VAULT_FINISH, data);
+            data = hookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
         }
     }
@@ -337,7 +333,7 @@ contract EulerConductor is TransientStorage, Types {
         revert RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
     }
 
-    function batchSimulation(EulerBatchItem[] calldata items) public payable virtual defer
+    function batchSimulation(EulerBatchItem[] calldata items) public payable virtual
     returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult) {        
         (bool success, bytes memory result) = address(this).delegatecall(
             abi.encodeWithSelector(
@@ -557,15 +553,24 @@ contract EulerConductor is TransientStorage, Types {
         if (returnResult) {
             if (bytes4(data) == IEulerVault.HookViolation.selector) result[0].success = false;
             else {
-                data = hookHandler(vault, HOOK__VAULT_FINISH, data);
+                data = hookHandler(vault, false, data);
 
                 if (bytes4(data) == IEulerVault.HookViolation.selector) result[0].success = false;
                 else result[0].success = true;
             }
-            result[0].result = data;
+
+            if (result[0].success) {
+                result[0].result = data;
+            } else {
+                result[0].result = abi.encodeWithSelector(
+                    VaultStatusViolation.selector,
+                    vault,
+                    data
+                );
+            }
         } else {
             vaultStatusViolationHandler(vault, data);
-            data = hookHandler(vault, HOOK__VAULT_FINISH, data);
+            data = hookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
         }
 
@@ -578,15 +583,24 @@ contract EulerConductor is TransientStorage, Types {
             if (returnResult) {
                 if (bytes4(data) == IEulerVault.HookViolation.selector) result[i].success = false;
                 else {
-                    data = hookHandler(vault, HOOK__VAULT_FINISH, data);
+                    data = hookHandler(vault, false, data);
 
                     if (bytes4(data) == IEulerVault.HookViolation.selector) result[i].success = false;
                     else result[i].success = true;
                 }
-                result[i].result = data;
+                
+                if (result[i].success) {
+                    result[i].result = data;
+                } else {
+                    result[i].result = abi.encodeWithSelector(
+                        VaultStatusViolation.selector,
+                        vault,
+                        data
+                    );
+                }
             } else {
                 vaultStatusViolationHandler(vault, data);
-                data = hookHandler(vault, HOOK__VAULT_FINISH, data);
+                data = hookHandler(vault, false, data);
                 vaultStatusViolationHandler(vault, data);
             }
 
@@ -601,8 +615,8 @@ contract EulerConductor is TransientStorage, Types {
 
     // Hook handler
 
-    function hookHandler(address vault, uint hookNumber, bytes memory data) private returns (bytes memory result) {
-        try IEulerVault(vault).hook(hookNumber, data) returns (bytes memory res) {
+    function hookHandler(address vault, bool initialCall, bytes memory data) private returns (bytes memory result) {
+        try IEulerVault(vault).assetStatusHook(initialCall, data) returns (bytes memory res) {
             result = res;
         } catch (bytes memory err) {
             result = err;

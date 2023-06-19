@@ -8,16 +8,18 @@ import "../src/Types.sol";
 import "../src/Array.sol";
 
 contract TargetMock {
-    function executeExample(address conductor, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
+    function executeExample(address conductor, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
         // also tests getExecutionContext() from the conductor
         (bool _checksDeferred, address _onBehalfOfAccount) = EulerConductor(conductor).getExecutionContext();
 
-        require(msg.sender == conductor, "executeExample/invalid-sender");
+        require(msg.sender == msgSender, "executeExample/invalid-sender");
         require(msg.value == msgValue, "executeExample/invalid-msg-value");
         require(_checksDeferred == checksDeferred, "executeExample/invalid-checks-deferred");
         require(_onBehalfOfAccount == onBehalfOfAccount, "executeExample/invalid-on-behalf-of-account");
         return msg.value;
     }
+
+    fallback() external {}
 }
 
 contract EulerRegistryMock is IEulerVaultRegistry {
@@ -29,18 +31,17 @@ contract EulerRegistryMock is IEulerVaultRegistry {
 }
 
 contract EulerVaultMock is IEulerVault, TargetMock, Test {
-    uint public hookToRevert;
+    bool public hookInitialCallRevert;
+    bool public hookFinishCallRevert;
     bool public hookRevertWithStandardError;
     uint internal accountStatusState;
     address[] internal accountStatusChecked;
-    uint[] internal hooksCalled;
-
-    uint internal constant HOOK__VAULT_SNAPSHOT = 0;
-    uint internal constant HOOK__VAULT_FINISH = 1;
+    bool[] internal hooksCalled;
 
     constructor() {
         accountStatusState = 0;
-        hookToRevert = HOOK__VAULT_FINISH + 1;
+        hookInitialCallRevert = false;
+        hookFinishCallRevert = false;
         hookRevertWithStandardError = true;
     }
 
@@ -48,14 +49,20 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         accountStatusState = state;
     }
 
-    function setHookToRevert(uint _hook, bool withStandardError) external {
-        hookToRevert = _hook;
+    function setInitialCallHookRevert(bool withStandardError) external {
+        hookInitialCallRevert = true;
+        hookRevertWithStandardError = withStandardError;
+    }
+
+    function setFinishCallHookRevert(bool withStandardError) external {
+        hookFinishCallRevert = true;
         hookRevertWithStandardError = withStandardError;
     }
 
     function reset() external {
         accountStatusState = 0;
-        hookToRevert = HOOK__VAULT_FINISH + 1;
+        hookInitialCallRevert = false;
+        hookFinishCallRevert = false;
         hookRevertWithStandardError = true;
 
         delete accountStatusChecked;
@@ -70,7 +77,7 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         return accountStatusChecked;
     }
 
-    function getHooksCalled() external view returns (uint[] memory) {
+    function getHooksCalled() external view returns (bool[] memory) {
         return hooksCalled;
     }
 
@@ -80,21 +87,28 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         else revert("invalid");
     }
 
-    function hook(uint hookNumber, bytes memory data) external returns (bytes memory result) {
-        if (hookToRevert == hookNumber) {
-            if (hookRevertWithStandardError) revert HookViolation("hook/standard/violation");
-            else revert("hook/other/violation");
+    function disableController(address conductor, address account, address vault) public payable {
+        EulerConductor(conductor).disableController(account, vault);
+    }
+
+    function assetStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result) {
+        if (hookInitialCallRevert && initialCall) {
+            if (hookRevertWithStandardError) revert HookViolation("hook/initialCall/standard/violation");
+            else revert("hook/initialCall/other/violation");
         }
 
-        if (hookNumber == HOOK__VAULT_SNAPSHOT) {
-            if (abi.decode(data, (uint)) != 0) revert HookViolation("hook/1/violation");
-        } else if (hookNumber == HOOK__VAULT_FINISH) {
-            if (abi.decode(data, (uint)) != 1) revert HookViolation("hook/2/violation");
+        if (hookFinishCallRevert && !initialCall) {
+            if (hookRevertWithStandardError) revert HookViolation("hook/finishCall/standard/violation");
+            else revert("hook/finishCall/other/violation");
+        }
+
+        if (initialCall) {
+            if (abi.decode(data, (uint)) != 0) revert HookViolation("hook/initialCall/input-violation");
         } else {
-            revert("unexpected hook number");
+            if (abi.decode(data, (uint)) != 1) revert HookViolation("hook/finishCall/input-violation");
         }
 
-        hooksCalled.push(hookNumber);
+        hooksCalled.push(initialCall);
         return abi.encode(abi.decode(data, (uint)) + 1);
     }
 
@@ -112,7 +126,7 @@ contract EulerConductorHandler is EulerConductor {
 
     struct VaultStatusCheck {
         address vault;
-        uint[] hooks;
+        bool[] hooks;
     }
 
     using Array for ArrayStorage;
@@ -160,7 +174,7 @@ contract EulerConductorHandler is EulerConductor {
 
     function verifyVaultStatusChecks(VaultStatusCheck[] memory vsc) internal view {
         for (uint i = 0; i < vsc.length; ++i) {
-            uint[] memory hooks = EulerVaultMock(vsc[i].vault).getHooksCalled();
+            bool[] memory hooks = EulerVaultMock(vsc[i].vault).getHooksCalled();
 
             require(hooks.length == vsc[i].hooks.length, "verifyVaultStatusChecks/length");
 
@@ -240,18 +254,12 @@ contract EulerConductorHandler is EulerConductor {
         collateralControllerChecks(account);
     }
 
-    function handlerBatchDispatch(EulerBatchItem[] calldata items, AccountStatusCheck[] memory asc, VaultStatusCheck[] memory vsc) public payable {
-        super.batchDispatch(items);
+    function handlerBatch(EulerBatchItem[] calldata items, AccountStatusCheck[] memory asc, VaultStatusCheck[] memory vsc) public payable {
+        super.batch(items);
 
         verifyStorage(vsc);
         verifyVaultStatusChecks(vsc);
         verifyAccountStatusChecks(asc);
-    }
-
-    function handlerBatchDispatchRevert(EulerBatchItem[] calldata items) public payable
-    returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult)
-    {
-        return super.batchDispatchRevert(items);
     }
 
     function handlerExecute(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable 
@@ -281,9 +289,9 @@ contract EulerConductorHandler is EulerConductor {
             VaultStatusCheck[] memory vsc = new VaultStatusCheck[](1);
 
             vsc[0].vault = targetContract;
-            vsc[0].hooks = new uint[](2);
-            vsc[0].hooks[0] = 0;
-            vsc[0].hooks[1] = 1;
+            vsc[0].hooks = new bool[](2);
+            vsc[0].hooks[0] = true;
+            vsc[0].hooks[1] = false;
 
             verifyStorage(vsc);
             verifyVaultStatusChecks(vsc);
@@ -321,9 +329,9 @@ contract EulerConductorHandler is EulerConductor {
             VaultStatusCheck[] memory vsc = new VaultStatusCheck[](1);
 
             vsc[0].vault = targetContract;
-            vsc[0].hooks = new uint[](2);
-            vsc[0].hooks[0] = 0;
-            vsc[0].hooks[1] = 1;
+            vsc[0].hooks = new bool[](2);
+            vsc[0].hooks[0] = true;
+            vsc[0].hooks[1] = false;
 
             verifyStorage(vsc);
             verifyVaultStatusChecks(vsc);
@@ -972,6 +980,7 @@ contract EulerConductorTest is Test {
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
             address(conductor),
+            address(conductor),
             seed,
             false,
             account
@@ -998,10 +1007,15 @@ contract EulerConductorTest is Test {
         }
 
         // test for both hooks reverting with HookViolation error but not both at a time
-        EulerVaultMock(targetContract).setHookToRevert(seed % 4 == 0 ? 0 : 1, true);
+        if (seed % 4 == 0) {
+            EulerVaultMock(targetContract).setInitialCallHookRevert(true);
+        } else {
+            EulerVaultMock(targetContract).setFinishCallHookRevert(true);
+        }
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
+            address(conductor),
             address(conductor),
             seed,
             false,
@@ -1018,7 +1032,9 @@ contract EulerConductorTest is Test {
                     targetContract,
                     abi.encodeWithSelector(
                         IEulerVault.HookViolation.selector, 
-                        "hook/standard/violation"
+                        seed % 4 == 0 
+                            ? "hook/initialCall/standard/violation"
+                            : "hook/finishCall/standard/violation"
                     )
                 )
             );
@@ -1048,6 +1064,7 @@ contract EulerConductorTest is Test {
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
+            address(conductor),
             address(conductor),
             seed,
             false,
@@ -1083,6 +1100,7 @@ contract EulerConductorTest is Test {
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
+            address(conductor),
             address(conductor),
             seed,
             false,
@@ -1122,6 +1140,7 @@ contract EulerConductorTest is Test {
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
             address(conductor),
+            address(conductor),
             seed,
             false,
             alice
@@ -1157,6 +1176,7 @@ contract EulerConductorTest is Test {
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).executeExample.selector,
             address(conductor),
+            address(conductor),
             seed,
             false,
             alice
@@ -1189,10 +1209,15 @@ contract EulerConductorTest is Test {
         EulerVaultMock(controller).reset();
 
         // test for both hooks reverting with HookViolation error but not both at a time
-        EulerVaultMock(collateral).setHookToRevert(seed % 2 == 0 ? 0 : 1, true);
+        if (seed % 2 == 0) {
+            EulerVaultMock(collateral).setInitialCallHookRevert(true);
+        } else {
+            EulerVaultMock(collateral).setFinishCallHookRevert(true);
+        }
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).executeExample.selector,
+            address(conductor),
             address(conductor),
             seed,
             false,
@@ -1206,7 +1231,9 @@ contract EulerConductorTest is Test {
                 collateral,
                 abi.encodeWithSelector(
                     IEulerVault.HookViolation.selector, 
-                    "hook/standard/violation"
+                    seed % 2 == 0 
+                        ? "hook/initialCall/standard/violation"
+                        : "hook/finishCall/standard/violation"
                 )
             )
         );
@@ -1240,6 +1267,7 @@ contract EulerConductorTest is Test {
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).executeExample.selector,
             address(conductor),
+            address(conductor),
             seed,
             false,
             alice
@@ -1271,10 +1299,10 @@ contract EulerConductorTest is Test {
         conductor.enableCollateral(alice, collateral);
 
         EulerVaultMock(collateral).reset();
-        EulerVaultMock(controller).reset();
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).executeExample.selector,
+            address(conductor),
             address(conductor),
             seed,
             false,
@@ -1282,6 +1310,55 @@ contract EulerConductorTest is Test {
         );
 
         hoax(controller, seed);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                EulerConductor.ControllerViolation.selector,
+                alice
+            )
+        );
+        (bool success,) = conductor.handlerForward{value: seed}(
+            collateral,
+            alice,
+            data
+        );
+
+        assertFalse(success);
+    }
+
+    function test_Forward_RevertIfMultipleControllersEnabled(address alice, uint seed) public {
+        address collateral = address(new EulerVaultMock());
+        address controller_1 = address(new EulerVaultMock());
+        address controller_2 = address(new EulerVaultMock());
+        EulerRegistryMock(registry).setRegistered(collateral, true);
+        EulerRegistryMock(registry).setRegistered(controller_1, true);
+        EulerRegistryMock(registry).setRegistered(controller_2, true);
+
+        // mock checks deferred to enable multiple controllers
+        conductor.setChecksDeferred(true);
+
+        vm.prank(alice);
+        conductor.enableCollateral(alice, collateral);
+
+        vm.prank(alice);
+        conductor.enableController(alice, controller_1);
+
+        vm.prank(alice);
+        conductor.enableController(alice, controller_2);
+
+        EulerVaultMock(collateral).reset();
+        EulerVaultMock(controller_1).reset();
+        EulerVaultMock(controller_2).reset();
+
+        bytes memory data = abi.encodeWithSelector(
+            TargetMock(collateral).executeExample.selector,
+            address(conductor),
+            address(conductor),
+            seed,
+            false,
+            alice
+        );
+
+        hoax(controller_1, seed);
         vm.expectRevert(
             abi.encodeWithSelector(
                 EulerConductor.ControllerViolation.selector,
@@ -1316,6 +1393,7 @@ contract EulerConductorTest is Test {
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).executeExample.selector,
+            address(conductor),
             address(conductor),
             seed,
             false,
@@ -1353,6 +1431,7 @@ contract EulerConductorTest is Test {
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).executeExample.selector,
             address(conductor),
+            address(conductor),
             seed,
             false,
             alice
@@ -1367,5 +1446,402 @@ contract EulerConductorTest is Test {
         );
 
         assertFalse(success);
+    }
+
+    function test_CheckAccountsStatus(address[] memory accounts, bool allStatusesValid) external {
+        for (uint i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+
+            // avoid duplicate entries in the accounts array not to enable multiple
+            // controller for the same account
+            bool seen = false;
+            for (uint j = 0; j < i; j++) {
+                if (accounts[j] == account) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (seen) continue;
+
+            address controller = address(new EulerVaultMock());
+            EulerRegistryMock(registry).setRegistered(controller, true);
+
+            if (!allStatusesValid) {
+                vm.prank(account);
+                conductor.enableController(account, controller);
+                EulerVaultMock(controller).reset();
+            }
+
+            // check all the options: account state is ok, account state is violated with
+            // controller returning false and reverting
+            EulerVaultMock(controller).setAccountStatusState(
+                allStatusesValid
+                ? 0
+                : uint160(account) % 3 == 0
+                    ? 0
+                    : uint160(account) % 3 == 1
+                        ? 1
+                        : 2
+            );
+
+            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
+                assertFalse(conductor.checkAccountStatus(account));
+            } else {
+                assertTrue(conductor.checkAccountStatus(account));
+            }
+        }
+
+        bool[] memory isValid = conductor.checkAccountsStatus(accounts);
+        for (uint i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+
+            if (!(allStatusesValid || uint160(account) % 3 == 0)) assertFalse(isValid[i]);
+            else assertTrue(isValid[i]);
+        }
+    }
+
+    function test_RequireAccountsStatusCheck(address[] memory accounts, bool allStatusesValid) external {
+        for (uint i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+
+            // avoid duplicate entries in the accounts array not to enable multiple
+            // controller for the same account
+            bool seen = false;
+            for (uint j = 0; j < i; j++) {
+                if (accounts[j] == account) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (seen) continue;
+
+            address controller = address(new EulerVaultMock());
+            EulerRegistryMock(registry).setRegistered(controller, true);
+
+            if (!allStatusesValid) {
+                vm.prank(account);
+                conductor.enableController(account, controller);
+                EulerVaultMock(controller).reset();
+            }
+
+            // check all the options: account state is ok, account state is violated with
+            // controller returning false and reverting
+            EulerVaultMock(controller).setAccountStatusState(
+                allStatusesValid
+                ? 0
+                : uint160(account) % 3 == 0
+                    ? 0
+                    : uint160(account) % 3 == 1
+                        ? 1
+                        : 2
+            );
+
+            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
+                vm.expectRevert(abi.encodeWithSelector(
+                    EulerConductor.AccountStatusViolation.selector,
+                    account    
+                ));
+            }
+            conductor.requireAccountStatusCheck(account);
+        }
+
+        // check if there's any invalid status expected
+        bool anyInvalid = false;
+        address invalidAccount;
+        for (uint i = 0; i < accounts.length; i++) {
+            invalidAccount = accounts[i];
+            if (!(allStatusesValid || uint160(invalidAccount) % 3 == 0)) {
+                anyInvalid = true;
+                break;
+            }
+        }
+
+        if (anyInvalid) {
+            vm.expectRevert(abi.encodeWithSelector(
+                EulerConductor.AccountStatusViolation.selector,
+                invalidAccount    
+            ));
+        }
+        conductor.requireAccountsStatusCheck(accounts);
+    }
+
+    function test_Batch(address alice, address bob, uint seed) external {
+        vm.assume(!samePrimaryAccount(alice, bob));
+        vm.assume(seed >= 3);
+
+        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](6);
+        EulerConductorHandler.AccountStatusCheck[] memory asc = new EulerConductorHandler.AccountStatusCheck[](1);
+        EulerConductorHandler.VaultStatusCheck[] memory vsc = new EulerConductorHandler.VaultStatusCheck[](1);
+
+        address controller = address(new EulerVaultMock());
+        address targetContract = address(new TargetMock());
+
+        vm.assume(bob != controller);
+
+        // -------------- FIRST BATCH -------------------------
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = registry;
+        items[0].msgValue = 0;
+        items[0].data = abi.encodeWithSelector(
+            EulerRegistryMock.setRegistered.selector,
+            controller,
+            true
+        );
+
+        items[1].allowError = false;
+        items[1].onBehalfOfAccount = alice;
+        items[1].targetContract = address(conductor);
+        items[1].msgValue = 0;
+        items[1].data = abi.encodeWithSelector(
+            EulerConductor.enableController.selector,
+            alice,
+            controller
+        );
+
+        items[2].allowError = false;
+        items[2].onBehalfOfAccount = alice;
+        items[2].targetContract = address(conductor);
+        items[2].msgValue = 0;
+        items[2].data = abi.encodeWithSelector(
+            EulerConductor.setAccountOperator.selector,
+            alice,
+            bob,
+            true
+        );
+
+        items[3].allowError = false;
+        items[3].onBehalfOfAccount = alice;
+        items[3].targetContract = controller;
+        items[3].msgValue = 0;
+        items[3].data = abi.encodeWithSelector(
+            EulerVaultMock.call.selector,
+            targetContract,
+            ""
+        );
+
+        items[4].allowError = false;
+        items[4].onBehalfOfAccount = alice;
+        items[4].targetContract = controller;
+        items[4].msgValue = seed / 3;
+        items[4].data = abi.encodeWithSelector(
+            EulerVaultMock.call.selector,
+            targetContract,
+            abi.encodeWithSelector(
+                TargetMock.executeExample.selector,
+                address(conductor),
+                controller,
+                seed / 3,
+                true,
+                alice
+            )
+        );
+
+        items[5].allowError = false;
+        items[5].onBehalfOfAccount = alice;
+        items[5].targetContract = targetContract;
+        items[5].msgValue = seed - seed / 3;
+        items[5].data = abi.encodeWithSelector(
+            TargetMock.executeExample.selector,
+            address(conductor),
+            address(conductor),
+            seed - seed / 3,
+            true,
+            alice
+        );
+
+        // the following proves that the checks were deferred. hook was called only twice -
+        // at snapshot and at finish, as well as account status was checked only once
+        asc[0].vault = controller;
+        asc[0].accounts = new address[](1);
+        asc[0].accounts[0] = alice;
+
+        vsc[0].vault = controller;
+        vsc[0].hooks = new bool[](2);
+        vsc[0].hooks[0] = true;
+        vsc[0].hooks[1] = false;
+
+        hoax(alice, seed);
+        conductor.handlerBatch{value: seed}(items, asc, vsc);
+
+        assertTrue(EulerRegistryMock(registry).isRegistered(controller));
+        assertTrue(conductor.isControllerEnabled(alice, controller));
+        assertTrue(conductor.accountOperators(alice, bob));
+        assertEq(address(targetContract).balance, seed);
+        EulerVaultMock(controller).reset();
+
+        // -------------- SECOND BATCH -------------------------
+        items = new Types.EulerBatchItem[](1);
+        asc = new EulerConductorHandler.AccountStatusCheck[](0);
+        vsc = new EulerConductorHandler.VaultStatusCheck[](0);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = address(conductor);
+        items[0].msgValue = 0;
+        items[0].data= abi.encodeWithSelector(
+            EulerConductor.disableController.selector,
+            alice,
+            controller
+        );
+
+        vm.prank(bob);
+        vm.expectRevert(EulerConductor.NotAuthorized.selector);
+        conductor.handlerBatch(items, asc, vsc);
+
+        // -------------- THIRD BATCH -------------------------
+        items = new Types.EulerBatchItem[](1);
+        asc = new EulerConductorHandler.AccountStatusCheck[](0);
+        vsc = new EulerConductorHandler.VaultStatusCheck[](0);
+
+        items[0].allowError = true;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = address(conductor);
+        items[0].msgValue = 0;
+        items[0].data= abi.encodeWithSelector(
+            EulerConductor.disableController.selector,
+            alice,
+            controller
+        );
+
+        vm.prank(bob);
+        conductor.handlerBatch(items, asc, vsc);
+
+        // the batch had no effect as we allowed error
+        assertTrue(conductor.isControllerEnabled(alice, controller));
+
+        // -------------- FOURTH BATCH -------------------------
+        items = new Types.EulerBatchItem[](2);
+        asc = new EulerConductorHandler.AccountStatusCheck[](0);
+        vsc = new EulerConductorHandler.VaultStatusCheck[](1);
+
+        items[0].allowError = true;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = address(conductor);
+        items[0].msgValue = 0;
+        items[0].data= abi.encodeWithSelector(
+            EulerConductor.disableController.selector,
+            alice,
+            controller
+        );
+
+        items[1].allowError = false;
+        items[1].onBehalfOfAccount = alice;
+        items[1].targetContract = controller;
+        items[1].msgValue = 0;
+        items[1].data= abi.encodeWithSelector(
+            EulerVaultMock.disableController.selector,
+            address(conductor),
+            alice,
+            controller
+        );
+
+        vsc[0].vault = controller;
+        vsc[0].hooks = new bool[](2);
+        vsc[0].hooks[0] = true;
+        vsc[0].hooks[1] = false;
+
+        vm.prank(bob);
+        conductor.handlerBatch(items, asc, vsc);
+        assertFalse(conductor.isControllerEnabled(alice, controller));
+    }
+
+    function test_Batch_RevertIfReenters(address alice) external {
+        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](1);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = address(conductor);
+        items[0].msgValue = 0;
+        items[0].data= abi.encodeWithSelector(
+            EulerConductor.batch.selector,
+            new Types.EulerBatchItem[](0)
+        );
+
+        vm.prank(alice);
+        vm.expectRevert(EulerConductor.DeferralViolation.selector);
+        conductor.batch(items);
+    }
+
+    function test_BatchRevert_AND_BatchSimulation(address alice) external {
+        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](1);
+        Types.EulerResult[] memory expectedBatchItemsResult = new Types.EulerResult[](1);
+        Types.EulerResult[] memory expectedAccountsStatusResult = new Types.EulerResult[](1);
+        Types.EulerResult[] memory expectedVaultsStatusResult = new Types.EulerResult[](1);
+
+        address controller = address(new EulerVaultMock());
+        EulerRegistryMock(registry).setRegistered(controller, true);
+
+        vm.prank(alice);
+        conductor.enableController(alice, controller);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = controller;
+        items[0].msgValue = 0;
+        items[0].data = "";
+
+        expectedBatchItemsResult[0].success = true;
+        expectedBatchItemsResult[0].result = "";
+
+        expectedAccountsStatusResult[0].success = true;
+        expectedAccountsStatusResult[0].result = "";
+
+        expectedVaultsStatusResult[0].success = true;
+        expectedVaultsStatusResult[0].result = abi.encode(2);
+
+        // regular batch doesn't revert
+        vm.prank(alice);
+        conductor.batch(items);
+
+        {
+            vm.prank(alice);
+            try conductor.batchRevert(items) {
+                assertTrue(false);
+            } catch (bytes memory err) {
+                assertEq(bytes4(err), EulerConductor.RevertedBatchResult.selector);
+
+                assembly { err := add(err, 4) }
+                (
+                    Types.EulerResult[] memory batchItemsResult,
+                    Types.EulerResult[] memory accountsStatusResult,
+                    Types.EulerResult[] memory vaultsStatusResult 
+                ) = abi.decode(err, (Types.EulerResult[], Types.EulerResult[], Types.EulerResult[]));
+                
+                assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
+                assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
+                assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
+
+                assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
+                assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
+                assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+
+                assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
+                assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
+                assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+            }
+        }
+
+        {
+            EulerVaultMock(controller).reset();
+            vm.prank(alice);
+            (
+                Types.EulerResult[] memory batchItemsResult,
+                Types.EulerResult[] memory accountsStatusResult,
+                Types.EulerResult[] memory vaultsStatusResult 
+            ) = conductor.batchSimulation(items);
+
+            assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
+            assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
+            assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
+
+            assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
+            assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
+            assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+
+            assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
+            assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
+            assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+        }
     }
 }
