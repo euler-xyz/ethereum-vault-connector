@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 
 import "./Types.sol";
 
-abstract contract TransientStorage is Types {
-    ArrayStorage internal accountStatusChecks;
-    ArrayStorage internal vaultStatusChecks;
+abstract contract TransientStorage {
+    Types.ArrayStorage internal accountStatusChecks;
+    Types.ArrayStorage internal vaultStatusChecks;
     mapping(address => bytes) internal vaultStatuses;
 }

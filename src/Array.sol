@@ -7,7 +7,7 @@ import "./Types.sol";
 library Array {
     error TooManyElements();
 
-    uint internal constant MAX_PRESENT_ELEMENTS = 20;
+    uint internal constant MAX_PRESENT_ELEMENTS = 10;
 
     /// @notice Adds an element to the end of an array storage and returns whether the operation was successful or not. 
     /// @dev This function checks if the element is already in the array storage and if there is enough space to add it. 
@@ -31,7 +31,7 @@ library Array {
         if (numElements == 0) arrayStorage.firstElement = element;
         else arrayStorage.elements[numElements] = element;
 
-        arrayStorage.numElements = numElements + 1;
+        unchecked { arrayStorage.numElements = numElements + 1; }
 
         return true;
     }

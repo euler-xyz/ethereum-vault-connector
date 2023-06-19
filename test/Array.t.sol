@@ -20,7 +20,7 @@ contract ArrayTest is Test {
 
         // count added elements not to exceed the limit
         uint expectedNumElements;
-        for (uint i = 0; i < elements.length && expectedNumElements < 20; ++i) {
+        for (uint i = 0; i < elements.length && expectedNumElements < 10; ++i) {
             if (arrayStorage.doAddElement(elements[i])) ++expectedNumElements;
         }
         
@@ -73,7 +73,7 @@ contract ArrayTest is Test {
     }
 
     function test_AddRevertIfTooManyElements() public {
-        for (uint i = 0; i < 20; ++i) {
+        for (uint i = 0; i < 10; ++i) {
             assertEq(arrayStorage.doAddElement(address(uint160(i))), true);
         }
 
