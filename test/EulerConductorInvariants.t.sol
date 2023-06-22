@@ -14,11 +14,13 @@ contract EulerRegistryMock is IEulerVaultRegistry {
 }
 
 contract EulerVaultMock is IEulerVault {
+    function disableController(address account) public payable {}
+
     function checkAccountStatus(address, address[] memory) external pure returns (bool) {
         return true;
     }
 
-    function assetStatusHook(bool, bytes memory data) external pure returns (bytes memory result) {
+    function vaultStatusHook(bool, bytes memory data) external pure returns (bytes memory result) {
         return data;
     }
     
