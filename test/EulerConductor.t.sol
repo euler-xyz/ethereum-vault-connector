@@ -82,33 +82,35 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         return hooksCalled;
     }
 
+    function disableControllerOnConductor(address conductor, address account) public payable {
+        EulerConductor(conductor).disableController(account, address(this));
+    }
+
+    function disableController(address account) public payable {}
+
     function checkAccountStatus(address, address[] memory) external view returns (bool isValid) {
         if (accountStatusState == 0) return true;
         else if (accountStatusState == 1) return false;
         else revert("invalid");
     }
 
-    function disableController(address conductor, address account, address vault) public payable {
-        EulerConductor(conductor).disableController(account, vault);
-    }
-
-    function assetStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result) {
+    function vaultStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result) {
         if (hookInitialCallRevert && initialCall) {
-            if (hookRevertWithStandardError) revert HookViolation("hook/initialCall/standard/violation");
+            if (hookRevertWithStandardError) revert VaultStatusHookViolation("hook/initialCall/standard/violation");
             else revert("hook/initialCall/other/violation");
         }
 
         if (hookFinishCallRevert && !initialCall) {
-            if (hookRevertWithStandardError) revert HookViolation("hook/finishCall/standard/violation");
+            if (hookRevertWithStandardError) revert VaultStatusHookViolation("hook/finishCall/standard/violation");
             else revert("hook/finishCall/other/violation");
         }
 
         if (initialCall) {
             console.log("initialCall", abi.decode(data, (uint)));
-            if (abi.decode(data, (uint)) != 0) revert HookViolation("hook/initialCall/input-violation");
+            if (abi.decode(data, (uint)) != 0) revert VaultStatusHookViolation("hook/initialCall/input-violation");
         } else {
             console.log("not initialCall", abi.decode(data, (uint)));
-            if (abi.decode(data, (uint)) != 1) revert HookViolation("hook/finishCall/input-violation");
+            if (abi.decode(data, (uint)) != 1) revert VaultStatusHookViolation("hook/finishCall/input-violation");
         }
 
         hooksCalled.push(initialCall);
@@ -1011,7 +1013,7 @@ contract EulerConductorTest is Test {
             EulerRegistryMock(registry).setRegistered(targetContract, true);
         }
 
-        // test for both hooks reverting with HookViolation error but not both at a time
+        // test for both hooks reverting with VaultStatusHookViolation error but not both at a time
         if (seed % 4 == 0) {
             EulerVaultMock(targetContract).setInitialCallHookRevert(true);
         } else {
@@ -1036,7 +1038,7 @@ contract EulerConductorTest is Test {
                     EulerConductor.VaultStatusViolation.selector,
                     targetContract,
                     abi.encodeWithSelector(
-                        IEulerVault.HookViolation.selector, 
+                        IEulerVault.VaultStatusHookViolation.selector, 
                         seed % 4 == 0 
                             ? "hook/initialCall/standard/violation"
                             : "hook/finishCall/standard/violation"
@@ -1213,7 +1215,7 @@ contract EulerConductorTest is Test {
         EulerVaultMock(collateral).reset();
         EulerVaultMock(controller).reset();
 
-        // test for both hooks reverting with HookViolation error but not both at a time
+        // test for both hooks reverting with VaultStatusHookViolation error but not both at a time
         if (seed % 2 == 0) {
             EulerVaultMock(collateral).setInitialCallHookRevert(true);
         } else {
@@ -1235,7 +1237,7 @@ contract EulerConductorTest is Test {
                 EulerConductor.VaultStatusViolation.selector,
                 collateral,
                 abi.encodeWithSelector(
-                    IEulerVault.HookViolation.selector, 
+                    IEulerVault.VaultStatusHookViolation.selector, 
                     seed % 2 == 0 
                         ? "hook/initialCall/standard/violation"
                         : "hook/finishCall/standard/violation"
@@ -1792,10 +1794,9 @@ contract EulerConductorTest is Test {
         items[1].targetContract = controller;
         items[1].msgValue = 0;
         items[1].data= abi.encodeWithSelector(
-            EulerVaultMock.disableController.selector,
+            EulerVaultMock.disableControllerOnConductor.selector,
             address(conductor),
-            alice,
-            controller
+            alice
         );
 
         vsc[0].vault = controller;

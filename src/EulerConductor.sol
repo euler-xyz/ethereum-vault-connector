@@ -5,20 +5,12 @@ pragma solidity ^0.8.0;
 import "./TransientStorage.sol";
 import "./Types.sol";
 import "./Array.sol";
+import "./interfaces/IEulerConductor.sol";
+import "./interfaces/IEulerVaultRegistry.sol";
+import "./interfaces/IEulerVault.sol";
 
 
-interface IEulerVaultRegistry {
-    function isRegistered(address vault) external returns (bool);
-}
-
-interface IEulerVault {
-    function checkAccountStatus(address account, address[] calldata collaterals) external view returns (bool isValid);
-    function assetStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result);
-    error HookViolation(bytes data);
-}
-
-
-contract EulerConductor is TransientStorage, Types {
+contract EulerConductor is IEulerConductor, TransientStorage, Types {
     using Array for ArrayStorage;
 
     // Constants
@@ -114,7 +106,7 @@ contract EulerConductor is TransientStorage, Types {
     }
 
     /// @notice A modifier that checks the status of the specified address if it's registered as a vault.
-    /// @dev Checks are performed only once per vault per transaction. First, the assetStatusHook is called with initialCall set to true. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the batch and the snapshot data is stored. If the checks are not deferred, the finish assetStatusHook is called with initialCall set to false after the action is performed.
+    /// @dev Checks are performed only once per vault per transaction. First, the vaultStatusHook is called with initialCall set to true. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the batch and the snapshot data is stored. If the checks are not deferred, the finish vaultStatusHook is called with initialCall set to false after the action is performed.
     /// @param vault The address of the vault to be checked.
     modifier vaultStatusCheck(address vault) {
         bool checksDeferred = executionContext.checksDeferredState != CHECKS_DEFERRED_STATE__INIT;
@@ -124,7 +116,7 @@ contract EulerConductor is TransientStorage, Types {
         if (isRegistered && !vaultStatusChecks.arrayIncludes(vault)) {
             // if calling for the first time, indicate it's an initial call so that
             // the vault can make a snapshot
-            data = assetStatusHookHandler(vault, true, abi.encode(0));
+            data = vaultStatusHookHandler(vault, true, abi.encode(0));
 
             // if checks are deferred, save the data for later, otherwise check the
             // vault status violation immediately and revert if needed
@@ -139,7 +131,7 @@ contract EulerConductor is TransientStorage, Types {
         // if checks are not deferred, at this point we know that there's no vault status
         // violation from the initial call. proceed with the finish call and check status
         if (isRegistered && !checksDeferred) {
-            data = assetStatusHookHandler(vault, false, data);
+            data = vaultStatusHookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
         }
     }
@@ -554,10 +546,10 @@ contract EulerConductor is TransientStorage, Types {
             bytes memory data = vaultStatuses[vault];
 
             if (returnResult) {
-                if (bytes4(data) != IEulerVault.HookViolation.selector) {
-                    data = assetStatusHookHandler(vault, false, data);
+                if (bytes4(data) != IEulerVault.VaultStatusHookViolation.selector) {
+                    data = vaultStatusHookHandler(vault, false, data);
 
-                    if (bytes4(data) != IEulerVault.HookViolation.selector) result[i].success = true;
+                    if (bytes4(data) != IEulerVault.VaultStatusHookViolation.selector) result[i].success = true;
                 }
 
                 if (result[i].success) result[i].result = data;
@@ -572,7 +564,7 @@ contract EulerConductor is TransientStorage, Types {
                 // first, check whether the vault status from the initial call was violated.
                 // it hasn't been checked before not to revert at the beginning of the transaction
                 vaultStatusViolationHandler(vault, data);
-                data = assetStatusHookHandler(vault, false, data);
+                data = vaultStatusHookHandler(vault, false, data);
                 vaultStatusViolationHandler(vault, data);
             }
 
@@ -587,11 +579,11 @@ contract EulerConductor is TransientStorage, Types {
 
     // Asset status hook handler
 
-    function assetStatusHookHandler(address vault, bool initialCall, bytes memory data) private returns (bytes memory result) {
+    function vaultStatusHookHandler(address vault, bool initialCall, bytes memory data) private returns (bytes memory result) {
         bool success;
         (success, result) = vault.call(
             abi.encodeWithSelector(
-                IEulerVault.assetStatusHook.selector,
+                IEulerVault.vaultStatusHook.selector,
                 initialCall,
                 data
             )
@@ -601,7 +593,7 @@ contract EulerConductor is TransientStorage, Types {
     }
 
     function vaultStatusViolationHandler(address vault, bytes memory data) private pure {
-        if (bytes4(data) == IEulerVault.HookViolation.selector) revert VaultStatusViolation(vault, data);
+        if (bytes4(data) == IEulerVault.VaultStatusHookViolation.selector) revert VaultStatusViolation(vault, data);
     }
 
 
