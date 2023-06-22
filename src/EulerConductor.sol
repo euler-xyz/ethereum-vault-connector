@@ -17,6 +17,8 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     string public constant name = "Euler Conductor";
 
+    address internal constant ERC1820_REGISTRY = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
+
     uint8 internal constant CHECKS_DEFERRED_STATE__INIT = 1;
     uint8 internal constant CHECKS_DEFERRED_STATE__BUSY = 2;
 
@@ -451,7 +453,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     ownerOrOperator(onBehalfOfAccount)
     accountStatusCheck(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
-        if (targetContract == address(this)) revert InvalidAddress();
+        if (targetContract == address(this) || targetContract == ERC1820_REGISTRY) revert InvalidAddress();
         
         (success, result) = targetContract.call{value: msgValue}(data);
     }

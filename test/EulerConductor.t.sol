@@ -106,10 +106,8 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         }
 
         if (initialCall) {
-            console.log("initialCall", abi.decode(data, (uint)));
             if (abi.decode(data, (uint)) != 0) revert VaultStatusHookViolation("hook/initialCall/input-violation");
         } else {
-            console.log("not initialCall", abi.decode(data, (uint)));
             if (abi.decode(data, (uint)) != 1) revert VaultStatusHookViolation("hook/finishCall/input-violation");
         }
 
@@ -1139,15 +1137,14 @@ contract EulerConductorTest is Test {
         }
     }
 
-    function test_Execute_RevertIfTargetContractIsConductor(address alice, uint seed) public {
+    function test_Execute_RevertIfTargetContractInvalid(address alice, uint seed) public {
+        // target contract is the conductor
         address targetContract = address(conductor);
-
-        EulerRegistryMock(registry).setRegistered(targetContract, true);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
             address(conductor),
-            address(conductor),
+            targetContract,
             seed,
             false,
             alice
@@ -1157,6 +1154,32 @@ contract EulerConductorTest is Test {
         vm.expectRevert(EulerConductor.InvalidAddress.selector);
 
         (bool success,) = conductor.handlerExecute{value: seed}(
+            targetContract,
+            alice,
+            data
+        );
+
+        assertFalse(success);
+
+        // target contract is the ERC1820 registry
+        targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
+        address dummyTarget = address(new TargetMock());
+
+        vm.etch(targetContract, dummyTarget.code);
+
+        data = abi.encodeWithSelector(
+            TargetMock(targetContract).executeExample.selector,
+            address(conductor),
+            targetContract,
+            seed,
+            false,
+            alice
+        );
+
+        hoax(alice, seed);
+        vm.expectRevert(EulerConductor.InvalidAddress.selector);
+
+        (success,) = conductor.handlerExecute{value: seed}(
             targetContract,
             alice,
             data
