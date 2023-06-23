@@ -82,13 +82,13 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         return hooksCalled;
     }
 
-    function disableControllerOnConductor(address conductor, address account) public payable {
+    function disableControllerOnConductor(address conductor, address account) public {
         EulerConductor(conductor).disableController(account, address(this));
     }
 
-    function disableController(address account) public payable {}
+    function disableController(address account) external override {}
 
-    function checkAccountStatus(address, address[] memory) external view returns (bool isValid) {
+    function checkAccountStatus(address, address[] memory) external view override returns (bool isValid) {
         if (accountStatusState == 0) return true;
         else if (accountStatusState == 1) return false;
         else revert("invalid");
@@ -106,10 +106,9 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         }
 
         if (initialCall) {
-            console.log("initialCall", abi.decode(data, (uint)));
             if (abi.decode(data, (uint)) != 0) revert VaultStatusHookViolation("hook/initialCall/input-violation");
         } else {
-            console.log("not initialCall", abi.decode(data, (uint)));
+
             if (abi.decode(data, (uint)) != 1) revert VaultStatusHookViolation("hook/finishCall/input-violation");
         }
 
@@ -139,9 +138,8 @@ contract EulerConductorHandler is EulerConductor {
 
     constructor(address admin, address registry) EulerConductor(admin, registry) {}
 
-    function setChecksDeferred(bool deferred) external {
-        if (deferred) executionContext.checksDeferredState = CHECKS_DEFERRED_STATE__BUSY;
-        else executionContext.checksDeferredState = CHECKS_DEFERRED_STATE__INIT;
+    function setChecksDeferredDepth(uint8 depth) external {
+        executionContext.checksDeferredDepth = depth;
     }
 
     function setOnBehalfOfAccount(address account) external {
@@ -156,7 +154,7 @@ contract EulerConductorHandler is EulerConductor {
     }
 
     function verifyStorage(VaultStatusCheck[] memory vsc) internal view {
-        require(executionContext.checksDeferredState == CHECKS_DEFERRED_STATE__INIT, "verifyStorage/checks-deferred");
+        require(executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT, "verifyStorage/checks-deferred");
         require(executionContext.onBehalfOfAccount == address(0), "verifyStorage/checks-deferred");
         require(accountStatusChecks.numElements == 0, "verifyStorage/account-status-checks/numElements");
         require(accountStatusChecks.firstElement == address(0), "verifyStorage/account-status-checks/firstElement");
@@ -216,7 +214,7 @@ contract EulerConductorHandler is EulerConductor {
     }
 
     function collateralControllerChecks(address account) internal {
-        if (executionContext.checksDeferredState != CHECKS_DEFERRED_STATE__INIT) return;
+        if (executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) return;
 
         address[] memory controllers = accountControllers[account].getArray();
 
@@ -271,7 +269,7 @@ contract EulerConductorHandler is EulerConductor {
     returns (bool success, bytes memory result) {
         (success, result) = super.execute(targetContract, onBehalfOfAccount, data);
 
-        if (executionContext.checksDeferredState == CHECKS_DEFERRED_STATE__INIT) {
+        if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
             address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
             require(controllers.length <= 1, "handlerExecute/length");
 
@@ -287,7 +285,7 @@ contract EulerConductorHandler is EulerConductor {
         }
         
         if (
-            executionContext.checksDeferredState == CHECKS_DEFERRED_STATE__INIT && 
+            executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT && 
             EulerRegistryMock(eulerVaultRegistry).isRegistered(targetContract) &&
             !EulerVaultMock(targetContract).hookRevertWithStandardError()
         ) {
@@ -312,7 +310,7 @@ contract EulerConductorHandler is EulerConductor {
     returns (bool success, bytes memory result) {
         (success, result) = super.forward(targetContract, onBehalfOfAccount, data);
 
-        if (executionContext.checksDeferredState == CHECKS_DEFERRED_STATE__INIT) {
+        if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
             address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
             require(controllers.length <= 1, "handlerExecute/length");
 
@@ -328,7 +326,7 @@ contract EulerConductorHandler is EulerConductor {
         }
 
         if (
-            executionContext.checksDeferredState == CHECKS_DEFERRED_STATE__INIT && 
+            executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT && 
             !EulerVaultMock(targetContract).hookRevertWithStandardError()
         ) {
             VaultStatusCheck[] memory vsc = new VaultStatusCheck[](1);
@@ -463,7 +461,7 @@ contract EulerConductorTest is Test {
         assertFalse(checksDeferred);
         assertEq(onBehalfOfAccount, address(0));
         
-        conductor.setChecksDeferred(deferred);
+        conductor.setChecksDeferredDepth(deferred ? 2 : 1);
         conductor.setOnBehalfOfAccount(account);
 
         (checksDeferred, onBehalfOfAccount) = conductor.getExecutionContext();
@@ -493,7 +491,7 @@ contract EulerConductorTest is Test {
             conductor.enableController(account, controller);
         }
 
-        conductor.setChecksDeferred(seed % 3 == 0 ? true : false);
+        conductor.setChecksDeferredDepth(seed % 3 == 0 ? 2 : 1);
         conductor.setOnBehalfOfAccount(account);
 
         if (seed % 3 == 0) vm.prank(controller);
@@ -519,7 +517,7 @@ contract EulerConductorTest is Test {
         vm.prank(account);
         conductor.enableController(account, controller);
         
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(2);
         conductor.setOnBehalfOfAccount(account);
 
         vm.expectRevert(EulerConductor.DeferralViolation.selector);
@@ -537,18 +535,18 @@ contract EulerConductorTest is Test {
     }
 
     function test_GetCollaterals(address alice) public {
-        conductor.setChecksDeferred(false);
+        conductor.setChecksDeferredDepth(1);
         conductor.getCollaterals(alice);
     }
 
     function test_GetCollaterals_RevertIfChecksDeferred(address alice) public {
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(2);
         vm.expectRevert(EulerConductor.DeferralViolation.selector);
         conductor.getCollaterals(alice);
     }
 
     function test_IsCollateralEnabled(address alice, address vault) public {
-        conductor.setChecksDeferred(false);
+        conductor.setChecksDeferredDepth(1);
         conductor.isCollateralEnabled(alice, vault);
     }
 
@@ -556,7 +554,7 @@ contract EulerConductorTest is Test {
         address alice,
         address vault
     ) public {
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(2);
         vm.expectRevert(EulerConductor.DeferralViolation.selector);
         conductor.isCollateralEnabled(alice, vault);
     }
@@ -725,24 +723,24 @@ contract EulerConductorTest is Test {
     }
 
     function test_GetControllers(address alice) public {
-        conductor.setChecksDeferred(false);
+        conductor.setChecksDeferredDepth(1);
         conductor.getControllers(alice);
     }
 
     function test_GetControllers_RevertIfChecksDeferred(address alice) public {
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(2);
         vm.expectRevert(EulerConductor.DeferralViolation.selector);
         conductor.getControllers(alice);
     }
 
     function test_IsControllerEnabled(address alice) public {
         address vault = address(new EulerVaultMock());
-        conductor.setChecksDeferred(false);
+        conductor.setChecksDeferredDepth(1);
         conductor.isControllerEnabled(alice, vault);
 
         // even though checks are deferred, the function succeeds if called by the vault asking if vault enabled
         // as a controller
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(1);
         EulerVaultMock(vault).call(
             address(conductor),
             abi.encodeWithSelector(
@@ -756,7 +754,7 @@ contract EulerConductorTest is Test {
     function test_IsControllerEnabled_RevertIfChecksDeferredAndMsgSenderNotVault(address alice, address vault) public {
         vm.assume(address(this) != vault);
 
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(2);
         vm.expectRevert(EulerConductor.DeferralViolation.selector);
         conductor.isControllerEnabled(alice, vault);
     }
@@ -1139,15 +1137,14 @@ contract EulerConductorTest is Test {
         }
     }
 
-    function test_Execute_RevertIfTargetContractIsConductor(address alice, uint seed) public {
+    function test_Execute_RevertIfTargetContractInvalid(address alice, uint seed) public {
+        // target contract is the conductor
         address targetContract = address(conductor);
-
-        EulerRegistryMock(registry).setRegistered(targetContract, true);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).executeExample.selector,
             address(conductor),
-            address(conductor),
+            targetContract,
             seed,
             false,
             alice
@@ -1157,6 +1154,32 @@ contract EulerConductorTest is Test {
         vm.expectRevert(EulerConductor.InvalidAddress.selector);
 
         (bool success,) = conductor.handlerExecute{value: seed}(
+            targetContract,
+            alice,
+            data
+        );
+
+        assertFalse(success);
+
+        // target contract is the ERC1820 registry
+        targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
+        address dummyTarget = address(new TargetMock());
+
+        vm.etch(targetContract, dummyTarget.code);
+
+        data = abi.encodeWithSelector(
+            TargetMock(targetContract).executeExample.selector,
+            address(conductor),
+            targetContract,
+            seed,
+            false,
+            alice
+        );
+
+        hoax(alice, seed);
+        vm.expectRevert(EulerConductor.InvalidAddress.selector);
+
+        (success,) = conductor.handlerExecute{value: seed}(
             targetContract,
             alice,
             data
@@ -1341,7 +1364,7 @@ contract EulerConductorTest is Test {
         EulerRegistryMock(registry).setRegistered(controller_2, true);
 
         // mock checks deferred to enable multiple controllers
-        conductor.setChecksDeferred(true);
+        conductor.setChecksDeferredDepth(2);
 
         vm.prank(alice);
         conductor.enableCollateral(alice, collateral);
@@ -1589,7 +1612,7 @@ contract EulerConductorTest is Test {
             }
             if (seen) continue;
 
-            conductor.setChecksDeferred(false);
+            conductor.setChecksDeferredDepth(1);
 
             address controller = address(new EulerVaultMock());
             EulerRegistryMock(registry).setRegistered(controller, true);
@@ -1599,7 +1622,7 @@ contract EulerConductorTest is Test {
             EulerVaultMock(controller).reset();
             EulerVaultMock(controller).setAccountStatusState(2);
 
-            conductor.setChecksDeferred(true);
+            conductor.setChecksDeferredDepth(2);
 
             // even though the account status state was set to 2 which should revert,
             // it doesn't because in checks deferral we only add the accounts to the array
@@ -1809,21 +1832,40 @@ contract EulerConductorTest is Test {
         assertFalse(conductor.isControllerEnabled(alice, controller));
     }
 
-    function test_Batch_RevertIfReenters(address alice) external {
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](1);
+    function test_Batch_RevertIfDeferralDepthExceeded(address alice) external {
+        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](10);
 
-        items[0].allowError = false;
-        items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = address(conductor);
-        items[0].msgValue = 0;
-        items[0].data= abi.encodeWithSelector(
-            EulerConductor.batch.selector,
-            new Types.EulerBatchItem[](0)
-        );
+        for (int i = int(items.length - 1); i >= 0; --i) {
+            uint j = uint(i);
+            items[j].allowError = false;
+            items[j].onBehalfOfAccount = alice;
+            items[j].targetContract = address(conductor);
+            items[j].msgValue = 0;
+
+            if (j == items.length - 1) {
+                items[j].data = abi.encodeWithSelector(
+                    EulerConductor.batch.selector,
+                    new Types.EulerBatchItem[](0)
+                );
+            } else {
+                Types.EulerBatchItem[] memory nestedItems = new Types.EulerBatchItem[](1);
+                nestedItems[0] = items[j+1];
+
+                items[j].data = abi.encodeWithSelector(
+                    EulerConductor.batch.selector,
+                    nestedItems
+                );
+            }
+        }
 
         vm.prank(alice);
         vm.expectRevert(EulerConductor.DeferralViolation.selector);
-        conductor.batch(items);
+        (bool success, ) = address(conductor).call(abi.encodeWithSelector(
+            EulerConductor.batch.selector,
+            items
+        ));
+
+        assertTrue(success); // is true because of vm.expectRevert() above
     }
 
     function test_BatchRevert_AND_BatchSimulation(address alice) external {

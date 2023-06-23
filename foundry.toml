@@ -3,6 +3,6 @@ src = "src"
 out = "out"
 libs = ["lib"]
 ignored_error_codes = ["unreachable"]
-remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/"]
+remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/","solmate/=lib/solmate/src"]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

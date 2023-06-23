@@ -14,7 +14,7 @@ contract EulerRegistryMock is IEulerVaultRegistry {
 }
 
 contract EulerVaultMock is IEulerVault {
-    function disableController(address account) public payable {}
+    function disableController(address account) public override {}
 
     function checkAccountStatus(address, address[] memory) external pure returns (bool) {
         return true;
