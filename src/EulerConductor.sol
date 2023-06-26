@@ -629,6 +629,9 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         revert("e/empty-error");
     }
 
+
+    // Formal verification
+
     function inv() external view {
         assert(executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT);
         assert(executionContext.onBehalfOfAccount == address(0));

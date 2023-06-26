@@ -4,10 +4,12 @@ out = "out"
 libs = ["lib"]
 ignored_error_codes = ["unreachable"]
 remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/","solmate/=lib/solmate/src"]
+
+[profile.smt]
 model_checker.engine = "chc"
-model_checker.targets = ["constantCondition"]
+model_checker.targets = ["assert"]
+model_checker.timeout = 0
 model_checker.contracts = {"./src/EulerConductor.sol" = ["EulerConductor"]}
 model_checker.invariants = ["contract", "reentrancy"]
-model_checker.showUnproved = true
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
