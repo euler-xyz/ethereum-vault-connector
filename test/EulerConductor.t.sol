@@ -74,6 +74,10 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         accountStatusChecked.push(account);
     }
 
+    function pushHooksCalled(bool initialCall) external {
+        hooksCalled.push(initialCall);
+    }
+
     function getAccountStatusChecked() external view returns (address[] memory) {
         return accountStatusChecked;
     }
@@ -94,7 +98,7 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
         else revert("invalid");
     }
 
-    function vaultStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result) {
+    function vaultStatusHook(bool initialCall, bytes memory data) external view returns (bytes memory result) {
         if (hookInitialCallRevert && initialCall) {
             if (hookRevertWithStandardError) revert VaultStatusHookViolation("hook/initialCall/standard/violation");
             else revert("hook/initialCall/other/violation");
@@ -112,7 +116,6 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
             if (abi.decode(data, (uint)) != 1) revert VaultStatusHookViolation("hook/finishCall/input-violation");
         }
 
-        hooksCalled.push(initialCall);
         return abi.encode(abi.decode(data, (uint)) + 1);
     }
 
@@ -151,6 +154,13 @@ contract EulerConductorHandler is EulerConductor {
 
         address[] memory controllers = accountControllers[account].getArray();
         if (controllers.length == 1) EulerVaultMock(controllers[0]).pushAccountStatusChecked(account);
+    }
+
+    function vaultStatusHookHandler(address vault, bool initialCall, bytes memory data) internal override 
+    returns (bytes memory result) {
+        result = super.vaultStatusHookHandler(vault, initialCall, data);
+
+        EulerVaultMock(vault).pushHooksCalled(initialCall);
     }
 
     function verifyStorage(VaultStatusCheck[] memory vsc) internal view {
@@ -362,6 +372,9 @@ contract EulerConductorTest is Test {
 
     function setUp() public {
         registry = address(new EulerRegistryMock());
+        vm.assume(governor != address(0));
+        vm.assume(registry != address(0));
+        
         conductor = new EulerConductorHandler(governor, registry);
     }
 
@@ -1833,7 +1846,7 @@ contract EulerConductorTest is Test {
     }
 
     function test_Batch_RevertIfDeferralDepthExceeded(address alice) external {
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](10);
+        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](9);
 
         for (int i = int(items.length - 1); i >= 0; --i) {
             uint j = uint(i);

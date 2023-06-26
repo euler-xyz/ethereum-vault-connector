@@ -6,5 +6,5 @@ interface IEulerVault {
     error VaultStatusHookViolation(bytes data);
     function disableController(address account) external;
     function checkAccountStatus(address account, address[] calldata collaterals) external view returns (bool isValid);
-    function vaultStatusHook(bool initialCall, bytes memory data) external returns (bytes memory result);
+    function vaultStatusHook(bool initialCall, bytes memory data) external view returns (bytes memory result);
 }

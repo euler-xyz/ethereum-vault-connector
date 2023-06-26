@@ -122,7 +122,7 @@ abstract contract EulerVaultBase is IEulerVault {
 
     function checkAccountStatusInternal(address, address[] calldata) internal view virtual returns (bool isValid);
 
-    function vaultStatusHook(bool initialCall, bytes memory data) public virtual returns (bytes memory result);
+    function vaultStatusHook(bool initialCall, bytes memory data) public view virtual returns (bytes memory result);
 
     function disableController(address account) external virtual;
 }

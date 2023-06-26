@@ -177,6 +177,9 @@ contract EulerConductorTest is Test {
 
     function setUp() public {
         registry = address(new EulerRegistryMock());
+        vm.assume(governor != address(0));
+        vm.assume(registry != address(0));
+
         conductor = new EulerConductorHandler(governor, registry);
 
         targetContract(address(conductor));

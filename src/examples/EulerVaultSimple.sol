@@ -46,7 +46,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
         revert("NOT_BORROWABLE");
     }
 
-    function vaultStatusHook(bool initialCall, bytes memory data) public virtual override
+    function vaultStatusHook(bool initialCall, bytes memory data) public view virtual override
     returns (bytes memory result) {
         if (initialCall) {
             // make i.e. a supply snapshot here and return it: 

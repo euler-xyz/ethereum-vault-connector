@@ -19,7 +19,6 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     address internal constant ERC1820_REGISTRY = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
-    uint8 internal constant CHECKS_DEFERRED_DEPTH__INVALID = 0;
     uint8 internal constant CHECKS_DEFERRED_DEPTH__INIT = 1;
     uint8 internal constant CHECKS_DEFERRED_DEPTH__MAX = 10;
 
@@ -55,11 +54,13 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // Constructor
 
     constructor(address admin, address registry) {
-        emit Genesis();
+        if (admin == address(0) || registry == address(0)) revert InvalidAddress();
 
         executionContext.checksDeferredDepth = CHECKS_DEFERRED_DEPTH__INIT;
         governorAdmin = admin;
         eulerVaultRegistry = registry;
+
+        emit Genesis();
     }
 
 
@@ -112,7 +113,6 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @dev Checks are performed only once per vault per transaction. First, the vaultStatusHook is called with initialCall set to true. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the batch and the snapshot data is stored. If the checks are not deferred, the finish vaultStatusHook is called with initialCall set to false after the action is performed.
     /// @param vault The address of the vault to be checked.
     modifier vaultStatusCheck(address vault) {
-        bool checksDeferred = executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT;
         bool isRegistered = IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault);
         bytes memory data;
 
@@ -123,7 +123,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
             // if checks are deferred, save the data for later, otherwise check the
             // vault status violation immediately and revert if needed
-            if (checksDeferred) {
+            if (executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) {
                 vaultStatusChecks.doAddElement(vault);
                 vaultStatuses[vault] = data;
             } else vaultStatusViolationHandler(vault, data);
@@ -133,7 +133,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
         // if checks are not deferred, at this point we know that there's no vault status
         // violation from the initial call. proceed with the finish call and check status
-        if (isRegistered && !checksDeferred) {
+        if (isRegistered && executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
             data = vaultStatusHookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
         }
@@ -143,11 +143,14 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @dev Checks are performed only once per account per transaction. If the checks are deferred, the account is added to the list of the accounts to check at the end of the batch. If the checks are not deferred, the check is performed immediately after the action is performed.
     /// @param account The address of the account to be checked.
     modifier accountStatusCheck(address account) {
+        // must be cached in case of reentrancy
+        address onBehalfOfAccountCache = executionContext.onBehalfOfAccount;
+
         executionContext.onBehalfOfAccount = account;
 
         _;
 
-        executionContext.onBehalfOfAccount = address(0);
+        executionContext.onBehalfOfAccount = onBehalfOfAccountCache;
 
         if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) requireAccountStatusCheckInternal(account);
         else accountStatusChecks.doAddElement(account);
@@ -333,9 +336,9 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
             accountsStatusResult= checkAccountStatusAll(true);
             vaultsStatusResult= checkVaultStatusAll(true);
-
-            revert RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
         }
+
+        revert RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
     }
 
     function batchSimulation(EulerBatchItem[] calldata items) public payable virtual
@@ -469,10 +472,13 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     vaultStatusCheck(targetContract)
     accountStatusCheck(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
-        address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
+        ArrayStorage memory controllers = accountControllers[onBehalfOfAccount];
 
-        if (controllers.length != 1) revert ControllerViolation(onBehalfOfAccount);
-        else if (controllers[0] != msg.sender || !accountCollaterals[onBehalfOfAccount].arrayIncludes(targetContract)) revert NotAuthorized();
+        if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
+        else if (
+            controllers.firstElement != msg.sender || 
+            !accountCollaterals[onBehalfOfAccount].arrayIncludes(targetContract)
+        ) revert NotAuthorized();
 
         (success, result) = targetContract.call{value: msgValue}(data);
     }
@@ -481,14 +487,14 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // Account Status Check internals
 
     function checkAccountStatusInternal(address account) internal view returns (bool) {
-        address[] memory controllers = accountControllers[account].getArray();
+        ArrayStorage memory controllers = accountControllers[account];
         
-        if (controllers.length == 0) return true;
-        else if (controllers.length > 1) revert ControllerViolation(account);
+        if (controllers.numElements == 0) return true;
+        else if (controllers.numElements > 1) revert ControllerViolation(account);
         
         address[] memory collaterals = accountCollaterals[account].getArray();
 
-        (bool success, bytes memory result) = controllers[0].staticcall(
+        (bool success, bytes memory result) = controllers.firstElement.staticcall(
             abi.encodeWithSelector(
                 IEulerVault.checkAccountStatus.selector,
                 account,
@@ -500,10 +506,12 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         else return false;
     }
 
+    /// @dev The only reason why this function is non-view is for testing purposes
     function requireAccountStatusCheckInternal(address account) internal virtual {
         if (!checkAccountStatusInternal(account)) revert AccountStatusViolation(account);
     }
 
+    /// @dev Make sure that the functions called here do not modify the state otherwise this can lead to reentrancy
     function checkAccountStatusAll(bool returnResult) private returns (EulerResult[] memory result) {
         address firstElement = accountStatusChecks.firstElement;
         uint8 numElements = accountStatusChecks.numElements;
@@ -538,6 +546,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     // Vault status check internals
 
+    /// @dev Make sure that the functions called here do not modify the state otherwise this can lead to reentrancy
     function checkVaultStatusAll(bool returnResult) private returns (EulerResult[] memory result) {
         address firstElement = vaultStatusChecks.firstElement;
         uint8 numElements = vaultStatusChecks.numElements;
@@ -588,9 +597,11 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     // Asset status hook handler
 
-    function vaultStatusHookHandler(address vault, bool initialCall, bytes memory data) private returns (bytes memory result) {
+    /// @dev The only reason why this function is non-view is for testing purposes
+    function vaultStatusHookHandler(address vault, bool initialCall, bytes memory data) internal virtual 
+    returns (bytes memory result) {
         bool success;
-        (success, result) = vault.call(
+        (success, result) = vault.staticcall(
             abi.encodeWithSelector(
                 IEulerVault.vaultStatusHook.selector,
                 initialCall,
@@ -616,5 +627,16 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         }
 
         revert("e/empty-error");
+    }
+
+    function inv() external view {
+        assert(executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT);
+        assert(executionContext.onBehalfOfAccount == address(0));
+
+        assert(accountStatusChecks.numElements == 0);
+        assert(accountStatusChecks.firstElement == address(0));
+
+        assert(vaultStatusChecks.numElements == 0);
+        assert(vaultStatusChecks.firstElement == address(0));
     }
 }
