@@ -103,7 +103,7 @@ abstract contract EulerVaultBase is IEulerVault {
 
     function postVaultStatusCheck(ConductorContext memory context) internal {
         if (!context.conductorCalling) {
-            transientBytes = vaultStatusHook(true, abi.encode(0));
+            vaultStatusHook(false, transientBytes);
             delete transientBytes;
         }
     }

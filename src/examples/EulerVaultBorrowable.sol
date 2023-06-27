@@ -85,7 +85,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
             ) revert VaultStatusHookViolation("borrow cap exceeded");
 
             // i.e. if 90% of the assets were withdrawn, revert the transaction
-            if (finalSupply < initialSupply / 10) revert VaultStatusHookViolation("withdrawal too large");
+            //if (finalSupply < initialSupply / 10) revert VaultStatusHookViolation("withdrawal too large");
         }
 
         return "";

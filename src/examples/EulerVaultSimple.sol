@@ -64,7 +64,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
             ) revert VaultStatusHookViolation("supply cap exceeded");
 
             // i.e. if 90% of the assets were withdrawn, revert the transaction
-            if (finalSupply < initialSupply / 10) revert VaultStatusHookViolation("withdrawal too large");
+            //if (finalSupply < initialSupply / 10) revert VaultStatusHookViolation("withdrawal too large");
         }
 
         return "";
@@ -120,13 +120,12 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
     function deposit(uint256 assets, address receiver) public override
     returns (uint256 shares) {
-        shares = deposit(assets, msg.sender, receiver);
+        shares = deposit(assets, receiver, msg.sender);
     }
 
     function deposit(uint256 assets, address receiver, address owner) public
     returns (uint256 shares) {
-        // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+        shares = previewDeposit(assets);
         mintInternal(shares, receiver, owner);
     }
 
@@ -142,7 +141,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
     function withdraw(uint256 assets, address receiver, address owner) public override
     returns (uint256 shares) {
-        shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
+        shares = previewWithdraw(assets);
         burnInternal(shares, receiver, owner);
     }
 
@@ -178,6 +177,8 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function mintInternal(uint256 shares, address receiver, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
+        require(shares > 0, "ZERO_SHARES");
+
         ConductorContext memory context = conductorContext();
         preVaultStatusCheck(context);
 
