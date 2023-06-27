@@ -42,8 +42,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
     function checkAccountStatusInternal(address, address[] calldata) internal view virtual override
     returns (bool isValid) {
-        isValid = false;
-        revert("NOT_BORROWABLE");
+        isValid = true;
     }
 
     function vaultStatusHook(bool initialCall, bytes memory data) public view virtual override

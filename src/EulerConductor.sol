@@ -126,7 +126,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             if (executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) {
                 vaultStatusChecks.doAddElement(vault);
                 vaultStatuses[vault] = data;
-            } else vaultStatusViolationHandler(vault, data);
+            }
         }
 
         _;
@@ -134,6 +134,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         // if checks are not deferred, at this point we know that there's no vault status
         // violation from the initial call. proceed with the finish call and check status
         if (isRegistered && executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
+            vaultStatusViolationHandler(vault, data);
             data = vaultStatusHookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
         }
