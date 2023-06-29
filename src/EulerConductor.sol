@@ -396,7 +396,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     // REVIEW Also to discuss - currently vaults have no way of knowing through the context if operation is initiated by a user or by liability. It's elegant, but
     // maybe there should be a flag in the context. Even if for increased vault security - only accept operations genuinly required for whatever behaviour is expected
-    // like in our case transfer or withdraw in liquidation. OTOH it might limit unforseen use cases.
+    // like in our case transfer or withdraw in liquidation (OTOH it might limit unforseen use cases, so not necessarily advocating to do this). Or for better logging etc.
     function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
         (success, result) = forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
