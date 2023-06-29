@@ -124,6 +124,15 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             // what if no data was stored on conductor? The hook would need to be a regular call if possible (there could also be other interesting use cases for writing on a hook
             // like caching expensive precomputes, logging, updating accumulators etc.) Or radically, calls initiated on vaults could be directed back
             // through the conductor. The need for dual implementation seems sub-optimal atm.
+
+            // REVIEW RESPONSE It was Doug's idea initially to return the snapshot data from the hook and store it in the conductor, but I think that back in a day
+            // we didn't fully understand how the system is going to work and that's why it was proposed. however, nice side effect of it is the fact that the hook
+            // can be a view function which prevents reentrancy attack. if we were to change that, we must remember that checkVaultStatusAll() is not protected
+            // and having a non-view hook makes it possible to reenter the conductor and bypass both the vault and the account checks for chosen addresses. it would
+            // be a critical vulnerability, so we must be careful with that and checkVaultStatusAll() would need to be reworked to prevent that. also, it should be
+            // considered if it wouldn't open reentrancy vulnerability somewhere else.
+            // having said that, when checks are deferred we need to store the data returned (or at least a flag indicating that VaultStatusHookViolation has occured) until 
+            // the end of the execution flow in order to revert at the very end of the transaction (mostly for simulation purposes)
             data = vaultStatusHookHandler(vault, true, abi.encode(0));
 
             // if checks are deferred, save the data for later, otherwise check the
@@ -140,6 +149,10 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         // violation from the initial call. proceed with the finish call and check status
         if (isRegistered && executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
             // REVIEW what about simply reverting only if the final hook throws error? I.e. remove the next line?
+
+            // REVIEW RESPONSE hooks can be useful for i.e. implementing emergency pause functionality or something in similar fashion.
+            // if we were to revert only on the latter call, the vault would need to be aware of that at all times. I'm not opposing
+            // but it seems safer if we always revert on the error specified, not only for the subseqent call
             vaultStatusViolationHandler(vault, data);
             data = vaultStatusHookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
@@ -187,6 +200,10 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // Account operators
 
     // REVIEW Would it make sense to also add per-primary operator (vs sub-account)
+
+    // REVIEW RESPONSE as an additional mapping? if so, it might be a good idea. however, I'd leave this granular because it enables
+    // functionality like "allow this operator to act only on behalf of my sub-account id 100" which is quite neat. imagine there's 
+    // a rebalancer protocol. you deposit to your sub-account 100 and enable the operator only for that sub-account
     /// @notice Sets or unsets an operator for an account.
     /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. 
     /// @param account The address of the account whose operator is being set or unset.
@@ -312,6 +329,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param vault The address of the controller being disabled.
     function disableController(address account, address vault) public payable virtual
     // REVIEW vaultOnly - if this is the only use of the modifier, then possibly no need for it. In it's place the function might not be taking vault as argument and just remove msg.sender
+    // REVIEW RESPONSE agree, will fix in master
     vaultOnly(vault) 
     accountStatusCheck(account) {
         accountControllers[account].doRemoveElement(vault);
@@ -394,9 +412,18 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // REVIEW I'm wondering if there is possibly a better name for the function. Forward is ok, but What it really does - it allows the controller to 
     // act on the vault on behalf of the user. The vault doesn't even know. To make it more obvious: executeAs, executeOnCollateralAs. callCollateralOnBehalf. executeOnUserCollateral...
 
+    // REVIEW RESPONSE tbh I was thinking about renaming both functions - execute and forward. 
+    // execute can become call (same as low level call hence self-explanatory)
+    // forward can become callCollateralFromController (also self-explanatory)
+    // what do you think?
+
     // REVIEW Also to discuss - currently vaults have no way of knowing through the context if operation is initiated by a user or by liability. It's elegant, but
     // maybe there should be a flag in the context. Even if for increased vault security - only accept operations genuinly required for whatever behaviour is expected
     // like in our case transfer or withdraw in liquidation (OTOH it might limit unforseen use cases, so not necessarily advocating to do this). Or for better logging etc.
+    
+    // REVIEW RESPONSE let's discuss with Doug. neat thing about how things work right now is that the conductor is transparent to the vault. the vault does not have to care 
+    // at all whether it's the liability calling or something else. we still have some space in the context storage slot so it can be stored and returned in the getContext
+    // functions, but the only use case I see for this right now is the scam collateral vault that checks if it's liability calling and if so prevents liquidation ;)
     function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
         (success, result) = forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
@@ -462,6 +489,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
                 (success, result) = targetContract.delegatecall(item.data);
             } else {
                 // REVIEW should sum of msgValue be tracked and revert explicitly if over actual provided?
+                // REVIEW RESPONSE already discussed in slack
                 (success, result) = executeInternal(targetContract, item.onBehalfOfAccount, item.msgValue, item.data);
             }
 
@@ -480,6 +508,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     accountStatusCheck(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
         // REVIEW address(this) is checked in batchInternal, so for batches it will be redundant. Maybe add a check in execute() and remove here?
+        // REVIEW RESPONSE agree, will be fixed in master
         if (targetContract == address(this) || targetContract == ERC1820_REGISTRY) revert InvalidAddress();
         
         (success, result) = targetContract.call{value: msgValue}(data);
@@ -488,17 +517,27 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
     // REVIEW Just a note for the vault dev docs maybe: If violator can set himself such that the vault hooks revert on his liquidation, he can prevent it.
     // Shouldn't be an issue with our borrow / supply caps.
+
+    // REVIEW RESPONSE yes, it all depends how the hook is be implemented. I'll add this as a dev note, but I'm wondering how this could be prevented. any idea?
     vaultStatusCheck(targetContract)
     // REVIEW in liquidation flow, liability acts as onBehalf user and orders transfer of collateral from violator. The resulting account state could still be unhealthy
     // and the accountStatusCheck will fail. If only controller can forward, then the check will be directed back to it anyway - so the vault can do whatever checks it needs when it calls forward
     // So maybe the account check modifier should be removed here. There could be a batch with some other operations on the account, like liquidator with allowance also does transferFrom from the violator.
     // In this case the account will be checked, which looks ok 
+
+    // REVIEW RESPONSE we already discussed that during the BE meet. accountStatusCheck will be removed from here and from the execute function
     accountStatusCheck(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
         // REVIEW gas savings ~600k for not reading and copying fixed size address array from storage
+
+        // REVIEW RESPONSE hm, does it load the array if it's storage variable? it's just a storage pointer. 
+        // if it was memory, I guess it would be bad
         ArrayStorage storage controllers = accountControllers[onBehalfOfAccount];
 
         // REVIEW discuss adding a mapping address => isInArray to collaterals struct (special case). 2x cost of adding/removing a collateral vs flat read cost for arrayIncludes()
+
+        // REVIEW RESPONSE I had that in the initial implementation and decided to get rid of it. first of all, it complicates the logic. second, this function will be mostly
+        // used for liquididations. it means that you'd be forcing everyone to write to that mapping while it's only used here in the forward function
         if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
         else if (
             controllers.firstElement != msg.sender || 
@@ -513,6 +552,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     function checkAccountStatusInternal(address account) internal view returns (bool) {
         // REVIW gas savings - like above
+        // REVIW RESPONSE like above
         ArrayStorage storage controllers = accountControllers[account];
 
         uint numElements = controllers.numElements;
@@ -530,6 +570,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         );
 
         // REVIEW ternary?
+        // REVIEW RESPONSE agree, will be fixed in master
         if (success) return abi.decode(result, (bool));
         else return false;
     }
@@ -552,6 +593,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             address account;
 
             // REVIEW ternary?
+            // REVIEW RESPONSE agree, will be fixed in master
             if (i == 0) account = firstElement;
             else account = accountStatusChecks.elements[i];
 
@@ -588,6 +630,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             address vault;
 
             // REVIEW ternary?
+            // REVIEW RESPONSE agree, will be fixed in master
             if (i == 0) vault = firstElement;
             else vault = vaultStatusChecks.elements[i];
 
@@ -601,6 +644,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
                 }
 
                 // REVIEW ternary?
+                // REVIEW RESPONSE agree, will be fixed in master
                 if (result[i].success) result[i].result = data;
                 else {
                     result[i].result = abi.encodeWithSelector(
