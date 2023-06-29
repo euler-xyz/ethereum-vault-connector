@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "../src/EulerConductor.sol";
 import "../src/Types.sol";
-import "../src/Array.sol";
+import "../src/Set.sol";
 
 contract TargetMock {
     function executeExample(address conductor, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
@@ -136,8 +136,8 @@ contract EulerConductorHandler is EulerConductor {
         bool[] hooks;
     }
 
-    using Array for ArrayStorage;
-    Types.ArrayStorage internal helperArray;
+    using Set for SetStorage;
+    SetStorage internal helperSet;
 
     constructor(address admin, address registry) EulerConductor(admin, registry) {}
 
@@ -152,7 +152,7 @@ contract EulerConductorHandler is EulerConductor {
     function requireAccountStatusCheckInternal(address account) internal override {
         super.requireAccountStatusCheckInternal(account);
 
-        address[] memory controllers = accountControllers[account].getArray();
+        address[] memory controllers = accountControllers[account].get();
         if (controllers.length == 1) EulerVaultMock(controllers[0]).pushAccountStatusChecked(account);
     }
 
@@ -212,13 +212,13 @@ contract EulerConductorHandler is EulerConductor {
 
             require(accounts.length == asc[i].accounts.length, "verifyAccountStatusChecks/length");
 
-            // copy the accounts to the helper array
+            // copy the accounts to the helper set
             for (uint j = 0; j < accounts.length; ++j) {
-                require(helperArray.doAddElement(accounts[j]), "verifyAccountStatusChecks/add");
+                require(helperSet.insert(accounts[j]), "verifyAccountStatusChecks/add");
             }
 
             for (uint j = 0; j < asc[i].accounts.length; ++j) {
-                require(helperArray.doRemoveElement(asc[i].accounts[j]), "verifyAccountStatusChecks/remove");
+                require(helperSet.remove(asc[i].accounts[j]), "verifyAccountStatusChecks/remove");
             }
         }
     }
@@ -226,7 +226,7 @@ contract EulerConductorHandler is EulerConductor {
     function collateralControllerChecks(address account) internal {
         if (executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) return;
 
-        address[] memory controllers = accountControllers[account].getArray();
+        address[] memory controllers = accountControllers[account].get();
 
         require(controllers.length <= 1, "collateralControllerChecks/length");
 
@@ -280,7 +280,7 @@ contract EulerConductorHandler is EulerConductor {
         (success, result) = super.execute(targetContract, onBehalfOfAccount, data);
 
         if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
-            address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
+            address[] memory controllers = accountControllers[onBehalfOfAccount].get();
             require(controllers.length <= 1, "handlerExecute/length");
 
             if (controllers.length == 1) {
@@ -321,7 +321,7 @@ contract EulerConductorHandler is EulerConductor {
         (success, result) = super.forward(targetContract, onBehalfOfAccount, data);
 
         if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
-            address[] memory controllers = accountControllers[onBehalfOfAccount].getArray();
+            address[] memory controllers = accountControllers[onBehalfOfAccount].get();
             require(controllers.length <= 1, "handlerExecute/length");
 
             if (controllers.length == 1) {
@@ -964,7 +964,7 @@ contract EulerConductorTest is Test {
         conductor.handlerEnableCollateral(alice, vault);
     }
 
-    function test_Execute(address alice, uint seed) public {
+    function test_Execute(address alice, uint96 seed) public {
         address account;
         if (seed % 2 == 0) {
             // in this case the account is not alice's sub-account thus alice must be an operator
@@ -975,6 +975,8 @@ contract EulerConductorTest is Test {
             // in this case the account is alice's sub-account
             account = address(uint160(uint160(alice) ^ (seed % 256)));
         }
+
+        vm.assume(account != address(0));
 
         address targetContract;
         if (seed % 3 == 0) {
@@ -1013,9 +1015,31 @@ contract EulerConductorTest is Test {
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
+
+        // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
+        data = abi.encodeWithSelector(
+            TargetMock(targetContract).executeExample.selector,
+            address(conductor),
+            address(conductor),
+            seed,
+            false,
+            alice
+        );
+
+        hoax(alice, seed);
+        (success, result) = conductor.handlerExecute{value: seed}(
+            targetContract,
+            address(0),
+            data
+        );
+
+        assertTrue(success);
+        assertEq(abi.decode(result, (uint)), seed);
     }
 
     function test_Execute_RevertIfVaultStatusViolated(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         address targetContract = address(new EulerVaultMock());
         vm.assume(targetContract != address(conductor));
 
@@ -1074,6 +1098,7 @@ contract EulerConductorTest is Test {
 
     function test_Execute_RevertIfNotOwnerOrOperator(address alice, address bob, uint seed) public {
         vm.assume(!samePrimaryAccount(alice, bob));
+        vm.assume(bob != address(0));
         
         address targetContract = address(new EulerVaultMock());
         vm.assume(targetContract != address(conductor));
@@ -1101,6 +1126,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Execute_RevertIfAccountStatusViolated(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         address targetContract = address(new EulerVaultMock());
         vm.assume(targetContract != address(conductor));
 
@@ -1151,6 +1178,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Execute_RevertIfTargetContractInvalid(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         // target contract is the conductor
         address targetContract = address(conductor);
 
@@ -1201,7 +1230,9 @@ contract EulerConductorTest is Test {
         assertFalse(success);
     }
 
-    function test_Forward(address alice, uint seed) public {
+    function test_Forward(address alice, uint96 seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(collateral, true);
@@ -1234,9 +1265,38 @@ contract EulerConductorTest is Test {
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
+
+        // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
+        // note that in this case the controller tries to act on behalf itself
+        vm.prank(controller);
+        conductor.enableCollateral(controller, collateral);
+
+        vm.prank(controller);
+        conductor.enableController(controller, controller);
+
+        data = abi.encodeWithSelector(
+            TargetMock(collateral).executeExample.selector,
+            address(conductor),
+            address(conductor),
+            seed,
+            false,
+            controller
+        );
+
+        hoax(controller, seed);
+        (success, result) = conductor.handlerForward{value: seed}(
+            collateral,
+            address(0),
+            data
+        );
+
+        assertTrue(success);
+        assertEq(abi.decode(result, (uint)), seed);
     }
 
     function test_Forward_RevertIfVaultStatusViolated(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(collateral, true);
@@ -1290,6 +1350,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Forward_RevertIfAccountStatusViolated(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(collateral, true);
@@ -1333,6 +1395,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Forward_RevertIfNoControllerEnabled(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(collateral, true);
@@ -1369,6 +1433,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Forward_RevertIfMultipleControllersEnabled(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller_1 = address(new EulerVaultMock());
         address controller_2 = address(new EulerVaultMock());
@@ -1418,6 +1484,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Forward_RevertIfMsgSenderIsNotEnabledController(address alice, address randomAddress, uint seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(collateral, true);
@@ -1455,6 +1523,8 @@ contract EulerConductorTest is Test {
     }
 
     function test_Forward_RevertIfTargetContractIsNotEnabledCollateral(address alice, address targetContract, uint seed) public {
+        vm.assume(alice != address(0));
+
         address collateral = address(new EulerVaultMock());
         address controller = address(new EulerVaultMock());
         EulerRegistryMock(registry).setRegistered(collateral, true);
@@ -1638,7 +1708,7 @@ contract EulerConductorTest is Test {
             conductor.setChecksDeferredDepth(2);
 
             // even though the account status state was set to 2 which should revert,
-            // it doesn't because in checks deferral we only add the accounts to the array
+            // it doesn't because in checks deferral we only add the accounts to the set
             // so that the checks can be performed later
             conductor.requireAccountStatusCheck(account);
         }
@@ -1674,7 +1744,7 @@ contract EulerConductorTest is Test {
         );
 
         items[1].allowError = false;
-        items[1].onBehalfOfAccount = alice;
+        items[1].onBehalfOfAccount = address(0);
         items[1].targetContract = address(conductor);
         items[1].msgValue = 0;
         items[1].data = abi.encodeWithSelector(
@@ -1705,7 +1775,7 @@ contract EulerConductorTest is Test {
         );
 
         items[4].allowError = false;
-        items[4].onBehalfOfAccount = alice;
+        items[4].onBehalfOfAccount = address(0);
         items[4].targetContract = controller;
         items[4].msgValue = seed / 3;
         items[4].data = abi.encodeWithSelector(
@@ -1724,7 +1794,7 @@ contract EulerConductorTest is Test {
         items[5].allowError = false;
         items[5].onBehalfOfAccount = alice;
         items[5].targetContract = otherVault;
-        items[5].msgValue = seed - seed / 3;
+        items[5].msgValue = type(uint).max;
         items[5].data = abi.encodeWithSelector(
             TargetMock.executeExample.selector,
             address(conductor),

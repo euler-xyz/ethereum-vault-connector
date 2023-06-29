@@ -8,7 +8,7 @@ abstract contract Types {
         address onBehalfOfAccount;
     }
 
-    struct ArrayStorage {
+    struct SetStorage {
         uint8 numElements;
         address firstElement;
         address[2**8] elements;

@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "../src/EulerConductor.sol";
 import "../src/Types.sol";
-import "../src/Array.sol";
+import "../src/Set.sol";
 
 contract EulerRegistryMock is IEulerVaultRegistry {
     function isRegistered(address vault) external pure returns (bool) {
@@ -32,7 +32,7 @@ contract EulerVaultMock is IEulerVault {
 }
 
 contract EulerConductorHandler is EulerConductor, Test {
-    using Array for ArrayStorage;
+    using Set for SetStorage;
     
     address vaultMock;
     address[] public touchedAccounts;
@@ -147,8 +147,8 @@ contract EulerConductorHandler is EulerConductor, Test {
         if (targetContract == eulerVaultRegistry) return (true, "");
         setup(onBehalfOfAccount, msg.sender);
         setup(onBehalfOfAccount, targetContract);
-        accountControllers[onBehalfOfAccount].doAddElement(msg.sender);
-        accountCollaterals[onBehalfOfAccount].doAddElement(targetContract);
+        accountControllers[onBehalfOfAccount].insert(msg.sender);
+        accountCollaterals[onBehalfOfAccount].insert(targetContract);
         return super.forwardInternal(targetContract, onBehalfOfAccount, msgValue, data);
     }
 
@@ -157,15 +157,15 @@ contract EulerConductorHandler is EulerConductor, Test {
         super.requireAccountsStatusCheck(accounts);
     }
 
-    function exposeAccountCollaterals(address account) external view returns (ArrayStorage memory) {
+    function exposeAccountCollaterals(address account) external view returns (SetStorage memory) {
         return accountControllers[account];
     }
 
-    function exposeAccountControllers(address account) external view returns (ArrayStorage memory) {
+    function exposeAccountControllers(address account) external view returns (SetStorage memory) {
         return accountControllers[account];
     }
 
-    function exposeTransientStorage() external view returns (ArrayStorage memory, ArrayStorage memory) {
+    function exposeTransientStorage() external view returns (SetStorage memory, SetStorage memory) {
         return (accountStatusChecks, vaultStatusChecks);
     }
 }
@@ -193,8 +193,8 @@ contract EulerConductorTest is Test {
 
     function invariant_transientStorage() external {     
         (
-            Types.ArrayStorage memory accountStatusChecks, 
-            Types.ArrayStorage memory vaultStatusChecks
+            Types.SetStorage memory accountStatusChecks, 
+            Types.SetStorage memory vaultStatusChecks
         ) = conductor.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
@@ -206,7 +206,7 @@ contract EulerConductorTest is Test {
     function invariant_controllers() external {
         address[] memory touchedAccounts = conductor.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.ArrayStorage memory accountControllers = conductor.exposeAccountControllers(touchedAccounts[i]);
+            Types.SetStorage memory accountControllers = conductor.exposeAccountControllers(touchedAccounts[i]);
             address[] memory accountControllersArray = conductor.getControllers(touchedAccounts[i]);
         
             assertTrue(accountControllers.numElements == 0 || accountControllers.numElements == 1);
@@ -224,7 +224,7 @@ contract EulerConductorTest is Test {
     function invariant_collaterals() external {
         address[] memory touchedAccounts = conductor.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.ArrayStorage memory accountCollaterals = conductor.exposeAccountCollaterals(touchedAccounts[i]);
+            Types.SetStorage memory accountCollaterals = conductor.exposeAccountCollaterals(touchedAccounts[i]);
             address[] memory accountCollateralsArray = conductor.getCollaterals(touchedAccounts[i]);
 
             assertTrue(accountCollaterals.numElements <= 10);

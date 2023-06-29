@@ -3,15 +3,15 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../src/Array.sol";
+import "../src/Set.sol";
 import "../src/Types.sol";
 
-contract ArrayTest is Test {
-    using Array for Types.ArrayStorage;
-    Types.ArrayStorage arrayStorage;
+contract SetTest is Test {
+    using Set for Types.SetStorage;
+    Types.SetStorage setStorage;
     uint counter;
 
-    function test_AddRemove(address[] memory elements, uint64 seed) public {
+    function test_InsertRemove(address[] memory elements, uint64 seed) public {
         // ------------------ ADDING ------------------
         // make the first two elements identical to exercise an edge case
         if (++counter % 10 == 0 && elements.length >= 2) {
@@ -21,11 +21,11 @@ contract ArrayTest is Test {
         // count added elements not to exceed the limit
         uint expectedNumElements;
         for (uint i = 0; i < elements.length && expectedNumElements < 10; ++i) {
-            if (arrayStorage.doAddElement(elements[i])) ++expectedNumElements;
+            if (setStorage.insert(elements[i])) ++expectedNumElements;
         }
         
         // check the number of elements
-        address[] memory array = arrayStorage.getArray();
+        address[] memory array = setStorage.get();
         assertEq(array.length, expectedNumElements);
 
         // check the elements
@@ -51,33 +51,33 @@ contract ArrayTest is Test {
 
         // ------------------ REMOVING ------------------
         uint cnt;
-        while(arrayStorage.getArray().length > 0) {
-            uint lengthBeforeRemoval = arrayStorage.getArray().length;
+        while(setStorage.get().length > 0) {
+            uint lengthBeforeRemoval = setStorage.get().length;
             uint indexToBeRemoved = seed % lengthBeforeRemoval;
-            address elementToBeRemoved = arrayStorage.getArray()[indexToBeRemoved];
+            address elementToBeRemoved = setStorage.get()[indexToBeRemoved];
 
             // try to remove non-existent element to exercise an edge case
             if (++cnt % 5 == 0) {
                 address candidate = address(uint160(cnt));
 
-                if (!arrayStorage.arrayIncludes(candidate)) {
-                    assertEq(arrayStorage.doRemoveElement(candidate), false);
-                    assertEq(arrayStorage.getArray().length, lengthBeforeRemoval);
+                if (!setStorage.contains(candidate)) {
+                    assertEq(setStorage.remove(candidate), false);
+                    assertEq(setStorage.get().length, lengthBeforeRemoval);
                 }
             } else {
-                assertEq(arrayStorage.arrayIncludes(elementToBeRemoved), true);
-                assertEq(arrayStorage.doRemoveElement(elementToBeRemoved), true);
-                assertEq(arrayStorage.getArray().length, lengthBeforeRemoval - 1);
+                assertEq(setStorage.contains(elementToBeRemoved), true);
+                assertEq(setStorage.remove(elementToBeRemoved), true);
+                assertEq(setStorage.get().length, lengthBeforeRemoval - 1);
             }
         }
     }
 
-    function test_AddRevertIfTooManyElements() public {
+    function test_InsertRevertIfTooManyElements() public {
         for (uint i = 0; i < 10; ++i) {
-            assertEq(arrayStorage.doAddElement(address(uint160(i))), true);
+            assertEq(setStorage.insert(address(uint160(i))), true);
         }
 
-        vm.expectRevert(Array.TooManyElements.selector);
-        arrayStorage.doAddElement(address(uint160(100)));
+        vm.expectRevert(Set.TooManyElements.selector);
+        setStorage.insert(address(uint160(100)));
     }
 }
