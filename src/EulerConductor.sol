@@ -27,10 +27,10 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     ExecutionContext internal executionContext;
     address public governorAdmin;
     address public eulerVaultRegistry;
-    mapping(address => mapping(address => bool)) public accountOperators; // account => operator => isOperator
+    mapping(address account => mapping(address operator => bool isOperator)) public accountOperators;
 
-    mapping(address => ArrayStorage) internal accountCollaterals;
-    mapping(address => ArrayStorage) internal accountControllers;
+    mapping(address account => ArrayStorage) internal accountCollaterals;
+    mapping(address account => ArrayStorage) internal accountControllers;
 
 
     // Events, Errors
