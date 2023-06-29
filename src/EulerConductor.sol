@@ -121,6 +121,11 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         if (isRegistered && !vaultStatusChecks.arrayIncludes(vault)) {
             // if calling for the first time, indicate it's an initial call so that
             // the vault can make a snapshot
+
+            // REVIEW Since the vaults will need to store transient data (from init hook) themselves if called directly and not through conductor, as in the example vault,
+            // what if no data was stored on conductor? The hook would need to be a regular call if possible (there could also be other interesting use cases for writing on a hook
+            // like caching expensive precomputes, logging, updating accumulators etc.) Or radically, calls initiated on vaults could be directed back
+            // through the conductor. The need for dual implementation seems sub-optimal atm.
             data = vaultStatusHookHandler(vault, true, abi.encode(0));
 
             // if checks are deferred, save the data for later, otherwise check the
@@ -136,6 +141,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         // if checks are not deferred, at this point we know that there's no vault status
         // violation from the initial call. proceed with the finish call and check status
         if (isRegistered && executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
+            // REVIEW what about simply reverting only if the final hook throws error? I.e. remove the next line?
             vaultStatusViolationHandler(vault, data);
             data = vaultStatusHookHandler(vault, false, data);
             vaultStatusViolationHandler(vault, data);
@@ -182,6 +188,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     // Account operators
 
+    // REVIEW Would it make sense to also add per-primary operator (vs sub-account)
     /// @notice Sets or unsets an operator for an account.
     /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. 
     /// @param account The address of the account whose operator is being set or unset.
@@ -301,6 +308,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         accountControllers[account].doAddElement(vault);
     }
 
+    // REVIEW vaultOnly - if this is the only use of the modifier, then possibly no need for it. In it's place the function might not be taking vault as argument and just remove msg.sender
     /// @notice Disables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function. Account status checks are performed.
     /// @param account The address for which the controller is being disabled.
@@ -449,6 +457,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             if (targetContract == address(this)) {
                 (success, result) = targetContract.delegatecall(item.data);
             } else {
+                // REVIEW should sum of msgValue be tracked and revert explicitly if over actual provided?
                 (success, result) = executeInternal(targetContract, item.onBehalfOfAccount, item.msgValue, item.data);
             }
 
@@ -466,17 +475,26 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     ownerOrOperator(onBehalfOfAccount)
     accountStatusCheck(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
+        // REVIEW address(this) is checked in batchInternal, so for batches it will be redundant. Maybe add a check in execute() and remove here?
         if (targetContract == address(this) || targetContract == ERC1820_REGISTRY) revert InvalidAddress();
         
         (success, result) = targetContract.call{value: msgValue}(data);
     }
 
     function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
+    // REVIEW Just a note for the vault dev docs maybe: If violator can set himself such that the vault hooks revert on his liquidation, he can prevent it.
+    // Shouldn't be an issue with our borrow / supply caps.
     vaultStatusCheck(targetContract)
+    // REVIEW in liquidation flow, liability acts as onBehalf user and orders transfer of collateral from violator. The resulting account state could still be unhealthy
+    // and the accountStatusCheck will fail. If only controller can forward, then the check will be directed back to it anyway - so the vault can do whatever checks it needs when it calls forward
+    // So maybe the account check modifier should be removed here. There could be a batch with some other operations on the account, like liquidator with allowance also does transferFrom from the violator.
+    // In this case the account will be checked, which looks ok 
     accountStatusCheck(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
-        ArrayStorage memory controllers = accountControllers[onBehalfOfAccount];
+        // REVIEW gas savings ~600k for not reading and copying fixed size address array from storage
+        ArrayStorage storage controllers = accountControllers[onBehalfOfAccount];
 
+        // REVIEW discuss adding a mapping address => isInArray to collaterals struct (special case). 2x cost of adding/removing a collateral vs flat read cost for arrayIncludes()
         if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
         else if (
             controllers.firstElement != msg.sender || 
@@ -490,11 +508,13 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // Account Status Check internals
 
     function checkAccountStatusInternal(address account) internal view returns (bool) {
-        ArrayStorage memory controllers = accountControllers[account];
-        
-        if (controllers.numElements == 0) return true;
-        else if (controllers.numElements > 1) revert ControllerViolation(account);
-        
+        // REVIW gas savings - like above
+        ArrayStorage storage controllers = accountControllers[account];
+
+        uint numElements = controllers.numElements;
+        if (numElements == 0) return true;
+        else if (numElements > 1) revert ControllerViolation(account);
+
         address[] memory collaterals = accountCollaterals[account].getArray();
 
         (bool success, bytes memory result) = controllers.firstElement.staticcall(
@@ -505,6 +525,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             )
         );
 
+        // REVIEW ternary?
         if (success) return abi.decode(result, (bool));
         else return false;
     }
@@ -525,7 +546,8 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         
         for (uint i = 0; i < numElements;) {
             address account;
-            
+
+            // REVIEW ternary?
             if (i == 0) account = firstElement;
             else account = accountStatusChecks.elements[i];
 
