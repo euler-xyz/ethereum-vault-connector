@@ -135,7 +135,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
     function borrowInternal(uint256 assets, address receiver, address owner) internal virtual 
     nonReentrant {
-        ConductorContext memory context = conductorAuthenticate(owner, true);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, owner, true);
         preVaultStatusCheck(context);
         
         if (!context.conductorCalling && msg.sender != owner) revert NotAuthorized();
@@ -154,7 +154,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
     function repayInternal(uint256 assets, address receiver, address owner) internal virtual 
     nonReentrant {
-        ConductorContext memory context = conductorContext();
+        ConductorContext memory context = conductorContext(msg.sender);
         preVaultStatusCheck(context);
         
         asset.safeTransferFrom(owner, address(this), assets);
@@ -174,7 +174,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
     function windInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant
     returns (uint shares) {
-        ConductorContext memory context = conductorAuthenticate(receiver, true);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, receiver, true);
 
         if (!context.conductorCalling && msg.sender != receiver) revert NotAuthorized();
         
@@ -196,7 +196,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
     function unwindInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant
     returns (uint shares) {
-        ConductorContext memory context = conductorAuthenticate(receiver, true);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, receiver, true);
         
         if (!context.conductorCalling && msg.sender != receiver) revert NotAuthorized();
         
@@ -219,7 +219,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
     function transferDebtInternal(address from, address to, uint256 amount) internal virtual 
     nonReentrant {
-        ConductorContext memory context = conductorAuthenticate(to, true);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, to, true);
         
         if (!context.conductorCalling && msg.sender != to) revert NotAuthorized();
         

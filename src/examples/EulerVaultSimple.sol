@@ -97,7 +97,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function transferFrom(address from, address to, uint256 amount) public override 
     nonReentrant
     returns (bool) {
-        ConductorContext memory context = conductorAuthenticate(from, false);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, from, false);
 
         if (!context.conductorCalling && msg.sender != from) {
             uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
@@ -178,7 +178,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     returns (uint256 assets) {
         require(shares > 0, "ZERO_SHARES");
 
-        ConductorContext memory context = conductorContext();
+        ConductorContext memory context = conductorContext(msg.sender);
         preVaultStatusCheck(context);
 
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
@@ -200,7 +200,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function burnInternal(uint256 shares, address receiver, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        ConductorContext memory context = conductorAuthenticate(owner, false);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, owner, false);
         preVaultStatusCheck(context);
 
         if (
@@ -233,7 +233,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function donateInternal(uint256 shares, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        ConductorContext memory context = conductorAuthenticate(owner, false);
+        ConductorContext memory context = conductorAuthenticate(msg.sender, owner, false);
 
         if (!context.conductorCalling && msg.sender != owner) {
             uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.

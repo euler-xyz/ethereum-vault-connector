@@ -47,8 +47,8 @@ abstract contract EulerVaultBase is IEulerVault {
         _;
     }
 
-    function conductorContext() internal view returns (ConductorContext memory context) {
-        context.conductorCalling = msg.sender == eulerConductor;
+    function conductorContext(address msgSender) internal view returns (ConductorContext memory context) {
+        context.conductorCalling = msgSender == eulerConductor;
 
         if (context.conductorCalling) {
             (
@@ -58,9 +58,9 @@ abstract contract EulerVaultBase is IEulerVault {
         }
     }
 
-    function conductorAuthenticate(address account, bool controllerEnabledCheck) internal view
+    function conductorAuthenticate(address msgSender, address account, bool controllerEnabledCheck) internal view
     returns (ConductorContext memory context) {
-        context.conductorCalling = msg.sender == eulerConductor;
+        context.conductorCalling = msgSender == eulerConductor;
 
         if (context.conductorCalling) {
             context.contextExtended = controllerEnabledCheck;
