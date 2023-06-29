@@ -581,6 +581,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         for (uint i = 0; i < numElements;) {
             address vault;
 
+            // REVIEW ternary?
             if (i == 0) vault = firstElement;
             else vault = vaultStatusChecks.elements[i];
 
@@ -593,6 +594,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
                     if (bytes4(data) != IEulerVault.VaultStatusHookViolation.selector) result[i].success = true;
                 }
 
+                // REVIEW ternary?
                 if (result[i].success) result[i].result = data;
                 else {
                     result[i].result = abi.encodeWithSelector(
