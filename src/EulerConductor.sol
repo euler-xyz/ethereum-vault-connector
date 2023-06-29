@@ -393,6 +393,10 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @return result Returned data from the call. 
     // REVIEW I'm wondering if there is possibly a better name for the function. Forward is ok, but What it really does - it allows the controller to 
     // act on the vault on behalf of the user. The vault doesn't even know. To make it more obvious: executeAs, executeOnCollateralAs. callCollateralOnBehalf. executeOnUserCollateral...
+
+    // REVIEW Also to discuss - currently vaults have no way of knowing through the context if operation is initiated by a user or by liability. It's elegant, but
+    // maybe there should be a flag in the context. Even if for increased vault security - only accept operations genuinly required for whatever behaviour is expected
+    // like in our case transfer or withdraw in liquidation. OTOH it might limit unforseen use cases.
     function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
         (success, result) = forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
