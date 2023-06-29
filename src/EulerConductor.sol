@@ -1,5 +1,3 @@
-// REVIEW
-
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 pragma solidity ^0.8.0;
@@ -308,12 +306,12 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         accountControllers[account].doAddElement(vault);
     }
 
-    // REVIEW vaultOnly - if this is the only use of the modifier, then possibly no need for it. In it's place the function might not be taking vault as argument and just remove msg.sender
     /// @notice Disables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function. Account status checks are performed.
     /// @param account The address for which the controller is being disabled.
     /// @param vault The address of the controller being disabled.
     function disableController(address account, address vault) public payable virtual
+    // REVIEW vaultOnly - if this is the only use of the modifier, then possibly no need for it. In it's place the function might not be taking vault as argument and just remove msg.sender
     vaultOnly(vault) 
     accountStatusCheck(account) {
         accountControllers[account].doRemoveElement(vault);
