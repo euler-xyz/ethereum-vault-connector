@@ -40,33 +40,39 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
         emit SupplyCapSet(newSupplyCap);
     }
 
-    function checkAccountStatusInternal(address, address[] calldata) internal view virtual override
-    returns (bool isValid) {
-        isValid = true;
+    function doVaultStatusSnapshot() internal view virtual override returns (bytes memory snapshot) {
+        // make i.e. a supply snapshot here and return it: 
+        snapshot = abi.encode(convertToAssets(totalSupply));
     }
 
-    function vaultStatusHook(bool initialCall, bytes memory data) public view virtual override
-    returns (bytes memory result) {
-        if (initialCall) {
-            // make i.e. a supply snapshot here and return it: 
-            return abi.encode(convertToAssets(totalSupply));
-        } else {
-            // validate the vault state here, i.e.:
-            uint initialSupply = abi.decode(data, (uint));
-            uint finalSupply = convertToAssets(totalSupply);
+    function doCheckVaultStatus(bytes memory snapshot) internal virtual override returns (bool isValid, bytes memory data) {
+        isValid = true;
 
-            // i.e. supply cap can be implemented like this
-            if (
-                supplyCap != 0 && 
-                finalSupply > supplyCap && 
-                finalSupply > initialSupply
-            ) revert VaultStatusHookViolation("supply cap exceeded");
+        // validate the vault state here, i.e.:
+        uint initialSupply = abi.decode(snapshot, (uint));
+        uint finalSupply = convertToAssets(totalSupply);
 
-            // i.e. if 90% of the assets were withdrawn, revert the transaction
-            //if (finalSupply < initialSupply / 10) revert VaultStatusHookViolation("withdrawal too large");
+        // i.e. supply cap can be implemented like this
+        if (
+            supplyCap != 0 && 
+            finalSupply > supplyCap && 
+            finalSupply > initialSupply
+        ) {
+            isValid = false;
+            data = "supply cap exceeded";
         }
 
-        return "";
+        // i.e. if 90% of the assets were withdrawn, revert the transaction
+        //if (finalSupply < initialSupply / 10) {
+        //    isValid = false;
+        //    data = "withdrawal too large";
+        //}
+    }
+
+    function doCheckAccountStatus(address, address[] calldata) internal view virtual override
+    returns (bool isValid, bytes memory data) {
+        isValid = true;
+        data = "";
     }
 
     function disableController(address account) external virtual override 
@@ -97,9 +103,9 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function transferFrom(address from, address to, uint256 amount) public override 
     nonReentrant
     returns (bool) {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, from, false);
+        conductorAuthenticate(msg.sender, from, false);
 
-        if (!context.conductorCalling && msg.sender != from) {
+        if (msg.sender != eulerConductor && msg.sender != from) {
             uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
 
             if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
@@ -111,8 +117,10 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
         emit Transfer(from, to, amount);
 
-        accountStatusCheck(from, context);
-        accountStatusCheck(to, context);
+        address[] memory accounts = new address[](2);
+        accounts[0] = from;
+        accounts[1] = to;
+        requireAccountsStatusCheck(accounts);
 
         return true;
     }
@@ -178,8 +186,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     returns (uint256 assets) {
         require(shares > 0, "ZERO_SHARES");
 
-        ConductorContext memory context = conductorContext(msg.sender);
-        preVaultStatusCheck(context);
+        vaultStatusSnapshot();
 
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
@@ -193,18 +200,18 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
         afterDeposit(assets, shares);
 
-        accountStatusCheck(receiver, context);
-        postVaultStatusCheck(context);
+        requireAccountStatusCheck(receiver);
+        requireVaultStatusCheck();
     }
 
     function burnInternal(uint256 shares, address receiver, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, owner, false);
-        preVaultStatusCheck(context);
+        conductorAuthenticate(msg.sender, owner, false);
+        vaultStatusSnapshot();
 
         if (
-            !context.conductorCalling && 
+            msg.sender != eulerConductor && 
             msg.sender != owner && 
             msg.sender != vaultOwner && // allows withdrawing reserves by the vault owner
             owner != address(this) // allows withdrawing reserves by the vault owner
@@ -226,16 +233,16 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
         asset.safeTransfer(receiver, assets);
 
-        accountStatusCheck(owner, context);
-        postVaultStatusCheck(context);
+        requireAccountStatusCheck(owner);
+        requireVaultStatusCheck();
     }
 
     function donateInternal(uint256 shares, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, owner, false);
+        conductorAuthenticate(msg.sender, owner, false);
 
-        if (!context.conductorCalling && msg.sender != owner) {
+        if (msg.sender != eulerConductor && msg.sender != owner) {
             uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
 
             if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
@@ -258,7 +265,7 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
         afterDeposit(assets, shares);
 
-        accountStatusCheck(owner, context);
+        requireAccountStatusCheck(owner);
     }
 
     function totalAssets() public view override returns (uint256) {

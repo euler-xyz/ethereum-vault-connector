@@ -57,11 +57,12 @@ contract EulerVaultSimpleTest is DSTestPlus {
         assertTrue(!EulerConductor(conductor).isControllerEnabled(alice, address(vault)));
 
         // the account status check must return true because alice doesn't have any debt
-        assertTrue(vault.checkAccountStatus(alice, new address[](0)));
+        (bool isValid,) = vault.checkAccountStatus(alice, new address[](0));
+        assertTrue(isValid);
 
         // check vault status hooks
-        bytes memory snapshot = vault.vaultStatusHook(true, abi.encode(0));
-        vault.vaultStatusHook(false, snapshot);
+        hevm.prank(conductor);
+        vault.checkVaultStatus();
     }
         
     function testDepositDoesntAuthenticateConductor(address alice, address bob) external {
@@ -71,7 +72,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(0x6e553f65, 10, bob));  // deposit(uint256,address)
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x6e553f65, 10, bob));  // deposit(uint256,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -79,7 +80,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, bob, address(0)));  // deposit(uint256,address,address)
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, bob, address(0)));  // deposit(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -87,7 +88,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, address(0), bob));  // deposit(uint256,address,address)
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, address(0), bob));  // deposit(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
     }
@@ -99,7 +100,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(0x94bf804d, 10, bob));  // mint(uint256,address)
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x94bf804d, 10, bob));  // mint(uint256,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -107,7 +108,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, bob, address(0)));  // mint(uint256,address,address)
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, bob, address(0)));  // mint(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -115,7 +116,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, address(0), bob));  // mint(uint256,address,address)
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, address(0), bob));  // mint(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
     }
@@ -127,7 +128,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.transfer.selector, address(0), 10));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.transfer.selector, address(0), 10));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -140,7 +141,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.transferFrom.selector, bob, address(0), 10));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.transferFrom.selector, bob, address(0), 10));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -153,7 +154,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.withdraw.selector, 10, address(0), bob));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.withdraw.selector, 10, address(0), bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -166,7 +167,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.redeem.selector, 10, address(0), bob));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.redeem.selector, 10, address(0), bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -179,7 +180,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.withdrawToReserves.selector, 10, bob));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.withdrawToReserves.selector, 10, bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -192,7 +193,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.redeemToReserves.selector, 10, bob));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.redeemToReserves.selector, 10, bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -203,7 +204,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.withdrawReserves.selector, 10, address(0)));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.withdrawReserves.selector, 10, address(0)));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -214,7 +215,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).execute(address(vault), alice, abi.encodeWithSelector(vault.redeemReserves.selector, 10, address(0)));
+        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.redeemReserves.selector, 10, address(0)));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
@@ -250,7 +251,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             aliceShareAmount = vault.deposit(aliceUnderlyingAmount, alice, alice);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).execute(
+            (bool success, bytes memory result) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -278,7 +279,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.withdraw(aliceUnderlyingAmount, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -319,7 +320,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             aliceUnderlyingAmount = vault.mint(aliceShareAmount, alice, alice);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).execute(
+            (bool success, bytes memory result) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -347,7 +348,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.redeem(aliceShareAmount, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -447,7 +448,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             aliceUnderlyingAmount = vault.mint(2000, alice, alice);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).execute(
+            (bool success, bytes memory result) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -484,7 +485,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             bobShareAmount = vault.deposit(4000, bob, bob);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).execute(
+            (bool success, bytes memory result) = EulerConductor(conductor).call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
@@ -543,7 +544,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             vault.deposit(2000, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -571,7 +572,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             vault.mint(2000, bob, bob);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
@@ -609,7 +610,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.redeem(1333, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -635,7 +636,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.withdraw(2929, bob, bob);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
@@ -662,7 +663,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.withdraw(3643, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -688,7 +689,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.redeem(4392, bob, bob);
         } else {
-            (bool success,) = EulerConductor(conductor).execute(
+            (bool success,) = EulerConductor(conductor).call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(

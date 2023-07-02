@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "./Types.sol";
 
 abstract contract TransientStorage {
+    enum SetType { Account, Vault }
     Types.SetStorage internal accountStatusChecks;
     Types.SetStorage internal vaultStatusChecks;
-    mapping(address => bytes) internal vaultStatuses;
 }

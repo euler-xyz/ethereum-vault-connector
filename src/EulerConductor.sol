@@ -18,16 +18,16 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     address internal constant ERC1820_REGISTRY = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
-    uint8 internal constant CHECKS_DEFERRED_DEPTH__INIT = 1;
-    uint8 internal constant CHECKS_DEFERRED_DEPTH__MAX = 10;
+    uint8 internal constant BATCH_DEPTH__INIT = 1;
+    uint8 internal constant BATCH_DEPTH__MAX = 10;
 
 
     // Storage
-    ExecutionContext internal executionContext;
     address public governorAdmin;
     address public eulerVaultRegistry;
     mapping(address account => mapping(address operator => bool isOperator)) public accountOperators;
 
+    ExecutionContext internal executionContext;
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
@@ -41,11 +41,13 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     error NotAuthorized();
     error InvalidAddress();
+    error ChecksReentrancy();
     error DeferralViolation();
+    error BatchDepthViolation();
     error RegistryViolation(address vault);
-    error AccountStatusViolation(address account);
-    error VaultStatusViolation(address vault, bytes data);
     error ControllerViolation(address account);
+    error AccountStatusViolation(address account, bytes data);
+    error VaultStatusViolation(address vault, bytes data);
     error RevertedBatchResult(EulerResult[] batchItemsResult, EulerResult[] accountsStatusResult, EulerResult[] vaultsStatusResult);
     error BatchPanic();
 
@@ -55,7 +57,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     constructor(address admin, address registry) {
         if (admin == address(0) || registry == address(0)) revert InvalidAddress();
 
-        executionContext.checksDeferredDepth = CHECKS_DEFERRED_DEPTH__INIT;
+        executionContext.batchDepth = BATCH_DEPTH__INIT;
         governorAdmin = admin;
         eulerVaultRegistry = registry;
 
@@ -90,70 +92,21 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         _;
     }
 
-    /// @notice A modifier that prevents the function from being called when the execution context is in checks deferral state.
-    modifier notInDeferral {
-        if (executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) revert DeferralViolation();
-        _;
-    }
-
-    /// @notice A modifier that puts the execution context into checks deferral state.
-    /// @dev It's possible to have nested batches.
-    modifier defer() {
-        if (executionContext.checksDeferredDepth >= CHECKS_DEFERRED_DEPTH__MAX) revert DeferralViolation();
-
-        unchecked { ++executionContext.checksDeferredDepth; }
-
-        _;
-
-        unchecked { --executionContext.checksDeferredDepth; }
-    }
-
-    /// @notice A modifier that checks the status of the specified address if it's registered as a vault.
-    /// @dev Checks are performed only once per vault per execution flow. First, the vaultStatusHook is called with initialCall set to true. If the checks are deferred, the vault is added to the list of the vaults to check at the end of the execution flow and the snapshot data is stored. If the checks are not deferred, the finish vaultStatusHook is called with initialCall set to false after the action is performed.
-    /// @param vault The address of the vault to be checked.
-    modifier vaultStatusCheck(address vault) {
-        bool isRegistered = IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault);
-        bytes memory data;
-
-        if (isRegistered && !vaultStatusChecks.contains(vault)) {
-            // if calling for the first time, indicate it's an initial call so that
-            // the vault can make a snapshot
-            data = vaultStatusHookHandler(vault, true, abi.encode(0));
-
-            // if checks are deferred, save the data for later, otherwise check the
-            // vault status violation immediately and revert if needed
-            if (executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) {
-                vaultStatusChecks.insert(vault);
-                vaultStatuses[vault] = data;
-            }
-        }
-
-        _;
-
-        // if checks are not deferred, at this point we know that there's no vault status
-        // violation from the initial call. proceed with the finish call and check status
-        if (isRegistered && executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
-            vaultStatusViolationHandler(vault, data);
-            data = vaultStatusHookHandler(vault, false, data);
-            vaultStatusViolationHandler(vault, data);
-        }
-    }
-
-    /// @notice A modifier that checks the status of the specified account.
-    /// @dev Checks are performed only once per account per execution flow. If the checks are deferred, the account is added to the list of the accounts to check at the end of the execution flow. If the checks are not deferred, the check is performed immediately after the action is performed.
-    /// @param account The address of the account to be checked.
-    modifier accountStatusCheck(address account) {
-        // must be cached in case of reentrancy
+    /// @notice A modifier sets onBehalfOfAccount in the execution context to the specified account.
+    /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
+    modifier onBehalfOfAccountContext(address account) {
+        // must be cached in case of conductor reentrancy
         address onBehalfOfAccountCache = executionContext.onBehalfOfAccount;
 
         executionContext.onBehalfOfAccount = account;
-
         _;
-
         executionContext.onBehalfOfAccount = onBehalfOfAccountCache;
+    }
 
-        if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) requireAccountStatusCheckInternal(account);
-        else accountStatusChecks.insert(account);
+    /// @notice A modifier that prevents the function from being called when checks are deferred (which happens when the execution context is in a batch).
+    modifier notInDeferral() {
+        if (executionContext.batchDepth != BATCH_DEPTH__INIT) revert DeferralViolation();
+        _;
     }
 
 
@@ -198,17 +151,17 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // Execution context
 
     /// @notice Returns the current execution context.
-    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment.
+    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. Checks are deferred if the execution flow is currently in a batch.
     /// @return checksDeferred A boolean flag that indicates whether the checks are deferred or not.
     /// @return onBehalfOfAccount The address of the account on behalf of which the execution flow is being executed at the moment.
     function getExecutionContext() external view returns (bool checksDeferred, address onBehalfOfAccount) {
         ExecutionContext memory context = executionContext;
-        checksDeferred = context.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT;
+        checksDeferred = context.batchDepth != BATCH_DEPTH__INIT;
         onBehalfOfAccount = context.onBehalfOfAccount;
     }
 
     /// @notice Returns the current execution context extended with information whether a controller is enabled for an account.
-    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. If msg.sender is not a vault itself, this function cannot be called when the execution context is in checks deferral state, as the controllers may change during the execution flow thus cannot be relied on within a batch.
+    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. Checks are deferred if the execution flow is currently in a batch. If msg.sender is not a vault itself, this function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
     /// @param account The address of the account for which controller is being checked.
     /// @param vault The address of the controller that is being checked.
     /// @return checksDeferred A boolean flag that indicates whether the checks are deferred or not.
@@ -217,7 +170,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     function getExecutionContextExtended(address account, address vault) external view 
     returns (bool checksDeferred, address onBehalfOfAccount, bool controllerEnabled) {
         ExecutionContext memory context = executionContext;
-        checksDeferred = context.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT;
+        checksDeferred = context.batchDepth != BATCH_DEPTH__INIT;
 
         if (msg.sender != vault && checksDeferred) revert DeferralViolation();
 
@@ -229,7 +182,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     // Collaterals management
 
     /// @notice Returns an array of collaterals for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the execution context is in deferral state, as the collaterals may change during the execution flow thus cannot be relied on within a batch.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the execution context is in a batch, as the collaterals may change during the execution flow.
     /// @param account The address of the account whose collaterals are being queried.
     /// @return An array of addresses that are the collaterals for the account.
     function getCollaterals(address account) external view notInDeferral returns (address[] memory) {
@@ -237,7 +190,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     }
 
     /// @notice Returns whether a collateral is enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the execution context is in deferral state, as the collaterals may change during the execution flow thus cannot be relied on within a batch.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the execution context is in a batch, as the collaterals may change during the execution flow.
     /// @param account The address of the account that is being checked.
     /// @param vault The address of the collateral that is being checked.
     /// @return A boolean value that indicates whether the vault is collateral for the account or not.
@@ -250,10 +203,11 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param account The address for which the collateral is being enabled.
     /// @param vault The address of the collateral being enabled.
     function enableCollateral(address account, address vault) public payable virtual
-    ownerOrOperator(account) 
-    accountStatusCheck(account) {
+    ownerOrOperator(account) {
         if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
+
         accountCollaterals[account].insert(vault);
+        requireAccountStatusCheck(account);
     }
 
     /// @notice Disables a collateral for an account.
@@ -261,16 +215,16 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param account The address for which the collateral is being disabled.
     /// @param vault The address of the collateral being disabled. 
     function disableCollateral(address account, address vault) public payable virtual
-    ownerOrOperator(account) 
-    accountStatusCheck(account) {
+    ownerOrOperator(account) {
         accountCollaterals[account].remove(vault);
+        requireAccountStatusCheck(account);
     }
 
 
     // Controllers management
 
     /// @notice Returns an array of controllers for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers during checks deferred state (within a batch), but only one (or none) can be selected when the account status check is made. This function cannot be called when the execution context is in deferral state, as the controllers may change during the execution flow thus cannot be relied on within a batch.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers within a batch execution, but only one (or none) can be selected when the account status check is performed upon the batch exit. This function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
     /// @param account The address of the account whose controllers are being queried.
     /// @return An array of addresses that are the controllers for the account.
     function getControllers(address account) external view notInDeferral returns (address[] memory) {
@@ -278,12 +232,12 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     }
 
     /// @notice Returns whether a controller is enabled for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. If msg.sender is not a vault itself, this function cannot be called when the execution context is in deferral state, as the controllers may change during the execution flow thus cannot be relied on within a batch.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. If msg.sender is not a vault itself, this function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
     /// @param account The address of the account that is being checked.
     /// @param vault The address of the controller that is being checked.
     /// @return A boolean value that indicates whether the vault is controller for the account or not.
     function isControllerEnabled(address account, address vault) external view returns (bool) {
-        if (msg.sender != vault && executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT) revert DeferralViolation();
+        if (msg.sender != vault && executionContext.batchDepth != BATCH_DEPTH__INIT) revert DeferralViolation();
         return accountControllers[account].contains(vault);
     }
 
@@ -292,10 +246,11 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param account The address for which the controller is being enabled.
     /// @param vault The address of the controller being enabled. 
     function enableController(address account, address vault) public payable virtual
-    ownerOrOperator(account) 
-    accountStatusCheck(account) {
+    ownerOrOperator(account) {
         if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
+        
         accountControllers[account].insert(vault);
+        requireAccountStatusCheck(account);
     }
 
     /// @notice Disables a controller for an account.
@@ -303,23 +258,64 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param account The address for which the controller is being disabled.
     /// @param vault The address of the controller being disabled.
     function disableController(address account, address vault) public payable virtual
-    vaultOnly(vault) 
-    accountStatusCheck(account) {
+    vaultOnly(vault) {
         accountControllers[account].remove(vault);
+        requireAccountStatusCheck(account);
+    }
+
+
+    // Call forwarding
+
+    /// @notice Calls to a target contract as per data encoded.
+    /// @dev This function can be used to interact with any contract. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
+    /// @param targetContract The address of the contract to be called.
+    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
+    /// @param data The encoded data which is called on the target contract.
+    /// @return success A boolean value that indicates whether the call succeeded or not.
+    /// @return result Returned data from the call.
+    function call(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
+    returns (bool success, bytes memory result) {
+        if (targetContract == address(this)) revert InvalidAddress();
+
+        onBehalfOfAccount = onBehalfOfAccount == address(0) ? msg.sender : onBehalfOfAccount;
+        (success, result) = callInternal(targetContract, onBehalfOfAccount, msg.value, data);
+    }
+
+    /// @notice Calls to one of the enabled collateral vaults from currently enabled controller vault.
+    /// @dev This function can be used to interact with any registered vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
+    /// @param targetContract The address of the contract to be called.
+    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
+    /// @param data The encoded data which is called on the target contract.
+    /// @return success A boolean value that indicates whether the call succeeded or not.
+    /// @return result Returned data from the call. 
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
+    returns (bool success, bytes memory result) {
+        onBehalfOfAccount = onBehalfOfAccount == address(0) ? msg.sender : onBehalfOfAccount;
+        (success, result) = callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, msg.value, data);
     }
 
 
     // Batching
 
     /// @notice Defers the account and vault checks until the end of the execution flow and executes a batch of batch items.
-    /// @dev Accounts status checks and vault status checks are performed after all the batch items have been executed.
+    /// @dev Accounts status checks and vault status checks are performed after all the batch items have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.
     /// @param items An array of batch items to be executed.
     function batch(EulerBatchItem[] calldata items) public payable virtual {
-        batchInternal(items, false);
+        ExecutionContext memory context = executionContext;
+        if (context.checksInProgressLock) revert ChecksReentrancy();
+        else if (context.batchDepth >= BATCH_DEPTH__MAX) revert BatchDepthViolation();
 
-        if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
-            checkAccountStatusAll(false);
-            checkVaultStatusAll(false);
+        unchecked { ++executionContext.batchDepth; }
+        batchInternal(items, false);
+        unchecked { --executionContext.batchDepth; }
+
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+            executionContext.checksInProgressLock = true;
+            checkStatusAll(SetType.Account, false);
+            checkStatusAll(SetType.Vault, false);
+            executionContext.checksInProgressLock = false;
+
+            invariantsCheck();
         }
     }
 
@@ -331,11 +327,21 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @return vaultsStatusResult An array of vault status results for each vault.
     function batchRevert(EulerBatchItem[] calldata items) public payable virtual
     returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult) {
-        batchItemsResult = batchInternal(items, true);
+        ExecutionContext memory context = executionContext;
+        if (context.checksInProgressLock) revert ChecksReentrancy();
+        else if (context.batchDepth >= BATCH_DEPTH__MAX) revert BatchDepthViolation();
 
-        if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) {
-            accountsStatusResult= checkAccountStatusAll(true);
-            vaultsStatusResult= checkVaultStatusAll(true);
+        unchecked { ++executionContext.batchDepth; }
+        batchItemsResult = batchInternal(items, true);
+        unchecked { --executionContext.batchDepth; }
+
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+            executionContext.checksInProgressLock = true;
+            accountsStatusResult= checkStatusAll(SetType.Account, true);
+            vaultsStatusResult= checkStatusAll(SetType.Vault, true);
+            executionContext.checksInProgressLock = false;
+
+            invariantsCheck();
         }
 
         revert RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
@@ -361,43 +367,14 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     }
 
 
-    // Call forwarding
-
-    /// @notice Executes a call to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any contract. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
-    /// @param targetContract The address of the contract to be called. If it is a registered vault, the vault status check is performed.
-    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
-    /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
-    function execute(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
-    returns (bool success, bytes memory result) {
-        onBehalfOfAccount = onBehalfOfAccount == address(0) ? msg.sender : onBehalfOfAccount;
-        (success, result) = executeInternal(targetContract, onBehalfOfAccount, msg.value, data);
-    }
-
-    /// @notice Forwards a call to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any registered vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
-    /// @param targetContract The address of the contract to be called. It is always a registered vault thus the vault status check is performed.
-    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf. Account status check is performed for this account.
-    /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call. 
-    function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
-    returns (bool success, bytes memory result) {
-        onBehalfOfAccount = onBehalfOfAccount == address(0) ? msg.sender : onBehalfOfAccount;
-        (success, result) = forwardInternal(targetContract, onBehalfOfAccount, msg.value, data);
-    }
-
-
-    // Account Status check
+    // Account Status Check
 
     /// @notice Checks the status of an account and returns whether it is valid or not.
     /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
     /// @param account The address of the account to be checked.
     /// @return isValid A boolean value that indicates whether the account is valid or not.
     function checkAccountStatus(address account) public view returns (bool isValid) {
-        return checkAccountStatusInternal(account);
+        (isValid,) = checkAccountStatusInternal(account);
     }
 
     /// @notice Checks the status of multiple accounts and returns an array of boolean values that indicate whether each account is valid or not. 
@@ -407,24 +384,24 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     function checkAccountsStatus(address[] calldata accounts) public view returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
         for (uint i = 0; i < accounts.length;) {
-            isValid[i] = checkAccountStatusInternal(accounts[i]);
+            (isValid[i],) = checkAccountStatusInternal(accounts[i]);
             unchecked { ++i; }
         }
     }
 
     /// @notice Checks the status of an account and reverts if it is not valid.
-    /// @dev If in the middle of checks deferral, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
+    /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
-    function requireAccountStatusCheck(address account) public {
-        if (executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT) requireAccountStatusCheckInternal(account);
+    function requireAccountStatusCheck(address account) public virtual {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(account);
         else accountStatusChecks.insert(account);
     }
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev If in the middle of checks deferral, the accounts are added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
+    /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(address[] calldata accounts) public virtual {
-        bool checksDeferred = executionContext.checksDeferredDepth != CHECKS_DEFERRED_DEPTH__INIT;
+        bool checksDeferred = executionContext.batchDepth != BATCH_DEPTH__INIT;
         for (uint i = 0; i < accounts.length;) {
             if (checksDeferred) accountStatusChecks.insert(accounts[i]);
             else requireAccountStatusCheckInternal(accounts[i]);
@@ -432,10 +409,46 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         }
     }
 
+    // Vault Status Check
+
+    /// @notice Checks the status of a vault and reverts if it is not valid.
+    /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the execution flow. This function can only be called by the vault itself.
+    /// @param vault The address of the vault to be checked.
+    function requireVaultStatusCheck(address vault) public virtual 
+    vaultOnly(vault) {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) requireVaultStatusCheckInternal(vault);
+        else vaultStatusChecks.insert(vault);
+    }
+
 
     // INTERNAL FUNCTIONS
 
-    function batchInternal(EulerBatchItem[] calldata items, bool returnResult) internal defer
+    function callInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
+    ownerOrOperator(onBehalfOfAccount)
+    onBehalfOfAccountContext(onBehalfOfAccount)
+    returns (bool success, bytes memory result) {
+        if (targetContract == ERC1820_REGISTRY) revert InvalidAddress();
+
+        msgValue = msgValue == type(uint).max ? address(this).balance : msgValue;
+        (success, result) = targetContract.call{value: msgValue}(data);
+    }
+
+    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
+    onBehalfOfAccountContext(onBehalfOfAccount)
+    returns (bool success, bytes memory result) {
+        SetStorage storage controllers = accountControllers[onBehalfOfAccount];
+
+        if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
+        else if (
+            controllers.firstElement != msg.sender || 
+            !accountCollaterals[onBehalfOfAccount].contains(targetContract)
+        ) revert NotAuthorized();
+
+        msgValue = msgValue == type(uint).max ? address(this).balance : msgValue;
+        (success, result) = targetContract.call{value: msgValue}(data);
+    }
+
+    function batchInternal(EulerBatchItem[] calldata items, bool returnResult) internal
     returns (EulerResult[] memory batchItemsResult) {
         if (returnResult) batchItemsResult = new EulerResult[](items.length);
 
@@ -449,7 +462,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
                 (success, result) = targetContract.delegatecall(item.data);
             } else {
                 address onBehalfOfAccount = item.onBehalfOfAccount == address(0) ? msg.sender : item.onBehalfOfAccount;
-                (success, result) = executeInternal(targetContract, onBehalfOfAccount, item.msgValue, item.data);
+                (success, result) = callInternal(targetContract, onBehalfOfAccount, item.msgValue, item.data);
             }
 
             if (returnResult) {
@@ -461,42 +474,11 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         }
     }
 
-    function executeInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
-    vaultStatusCheck(targetContract)
-    ownerOrOperator(onBehalfOfAccount)
-    accountStatusCheck(onBehalfOfAccount)
-    returns (bool success, bytes memory result) {
-        if (targetContract == address(this) || targetContract == ERC1820_REGISTRY) revert InvalidAddress();
-
-        msgValue = msgValue == type(uint).max ? address(this).balance : msgValue;
-
-        (success, result) = targetContract.call{value: msgValue}(data);
-    }
-
-    function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
-    vaultStatusCheck(targetContract)
-    accountStatusCheck(onBehalfOfAccount)
-    returns (bool success, bytes memory result) {
-        SetStorage memory controllers = accountControllers[onBehalfOfAccount];
-
-        if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
-        else if (
-            controllers.firstElement != msg.sender || 
-            !accountCollaterals[onBehalfOfAccount].contains(targetContract)
-        ) revert NotAuthorized();
-
-        msgValue = msgValue == type(uint).max ? address(this).balance : msgValue;
-
-        (success, result) = targetContract.call{value: msgValue}(data);
-    }
-
-
-    // Account Status Check internals
-
-    function checkAccountStatusInternal(address account) internal view returns (bool) {
-        SetStorage memory controllers = accountControllers[account];
+    function checkAccountStatusInternal(address account) internal view 
+    returns (bool isValid, bytes memory data) {
+        SetStorage storage controllers = accountControllers[account];
         
-        if (controllers.numElements == 0) return true;
+        if (controllers.numElements == 0) return (true, "");
         else if (controllers.numElements > 1) revert ControllerViolation(account);
         
         address[] memory collaterals = accountCollaterals[account].get();
@@ -509,118 +491,83 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
             )
         );
 
-        if (success) return abi.decode(result, (bool));
-        else return false;
+        if (success) (isValid, data) = abi.decode(result, (bool, bytes));
+        else isValid = false;
     }
 
-    /// @dev The only reason why this function is non-view is for testing purposes
     function requireAccountStatusCheckInternal(address account) internal virtual {
-        if (!checkAccountStatusInternal(account)) revert AccountStatusViolation(account);
+        (bool isValid, bytes memory data) = checkAccountStatusInternal(account);
+
+        if (!isValid) revert AccountStatusViolation(account, data);
     }
 
-    /// @dev Make sure that the functions called here do not modify the state otherwise this can lead to reentrancy
-    function checkAccountStatusAll(bool returnResult) private returns (EulerResult[] memory result) {
-        address firstElement = accountStatusChecks.firstElement;
-        uint8 numElements = accountStatusChecks.numElements;
-
-        if (returnResult) result = new EulerResult[](numElements);
-
-        if (numElements == 0) return result;
+    function checkVaultStatusInternal(address vault) internal 
+    returns (bool isValid, bytes memory data) {
+        (bool success, bytes memory result) = vault.call(
+            abi.encodeWithSelector(
+                IEulerVault.checkVaultStatus.selector
+            )
+        );
         
-        for (uint i = 0; i < numElements;) {
-            address account;
-            
-            if (i == 0) account = firstElement;
-            else account = accountStatusChecks.elements[i];
+        if (success) (isValid, data) = abi.decode(result, (bool, bytes));
+        else isValid = false;
+    }
 
-            if (returnResult) {
-                if (checkAccountStatusInternal(account)) result[i].success = true;
-                else {
-                    result[i].result = abi.encodeWithSelector(
-                        AccountStatusViolation.selector,
-                        account
-                    );
-                }
-            } else requireAccountStatusCheckInternal(account);
-            
-            delete accountStatusChecks.elements[i];
-            unchecked { ++i; }
+    function requireVaultStatusCheckInternal(address vault) internal virtual {
+        (bool isValid, bytes memory data) = checkVaultStatusInternal(vault);
+
+        if (!isValid) revert VaultStatusViolation(vault, data);
+    }
+
+    function checkStatusAll(SetType setType, bool returnResult) private 
+    returns (EulerResult[] memory result) {
+        function (address) returns (bool, bytes memory) checkStatus;
+        function (address) requireStatusCheck;
+        SetStorage storage setStorage;
+
+        if (setType == SetType.Account) {
+            checkStatus = checkAccountStatusInternal;
+            requireStatusCheck = requireAccountStatusCheckInternal;
+            setStorage = accountStatusChecks;
+        } else {
+            checkStatus = checkVaultStatusInternal;
+            requireStatusCheck = requireVaultStatusCheckInternal;
+            setStorage = vaultStatusChecks;
         }
 
-        delete accountStatusChecks;
-    }
+        address firstElement = setStorage.firstElement;
+        uint8 numElements = setStorage.numElements;
 
-
-    // Vault status check internals
-
-    /// @dev Make sure that the functions called here do not modify the state otherwise this can lead to reentrancy
-    function checkVaultStatusAll(bool returnResult) private returns (EulerResult[] memory result) {
-        address firstElement = vaultStatusChecks.firstElement;
-        uint8 numElements = vaultStatusChecks.numElements;
-        
         if (returnResult) result = new EulerResult[](numElements);
-
-        if (numElements == 0) return result;
         
+        if (numElements == 0) return result;
+
         for (uint i = 0; i < numElements;) {
-            address vault;
-
-            if (i == 0) vault = firstElement;
-            else vault = vaultStatusChecks.elements[i];
-
-            bytes memory data = vaultStatuses[vault];
-
+            address addr = i == 0 ? firstElement : setStorage.elements[i];
+            
             if (returnResult) {
-                if (bytes4(data) != IEulerVault.VaultStatusHookViolation.selector) {
-                    data = vaultStatusHookHandler(vault, false, data);
+                bytes memory data;
+                (result[i].success, data) = checkStatus(addr);
 
-                    if (bytes4(data) != IEulerVault.VaultStatusHookViolation.selector) result[i].success = true;
-                }
+                if (!result[i].success) {
+                    bytes4 violationSelector = setType == SetType.Account 
+                        ? AccountStatusViolation.selector 
+                        : VaultStatusViolation.selector;
 
-                if (result[i].success) result[i].result = data;
-                else {
                     result[i].result = abi.encodeWithSelector(
-                        VaultStatusViolation.selector,
-                        vault,
+                        violationSelector,
+                        addr,
                         data
                     );
                 }
-            } else {
-                // first, check whether the vault status from the initial call was violated.
-                // it hasn't been checked before not to revert at the beginning of the execution flow
-                vaultStatusViolationHandler(vault, data);
-                data = vaultStatusHookHandler(vault, false, data);
-                vaultStatusViolationHandler(vault, data);
-            }
-
-            delete vaultStatuses[vault];
-            delete vaultStatusChecks.elements[i];
+            } else requireStatusCheck(addr);
+            
+            delete setStorage.elements[i];
             unchecked { ++i; }
         }
 
-        delete vaultStatusChecks;
-    }
-
-
-    // Asset status hook handler
-
-    /// @dev The only reason why this function is non-view is for testing purposes
-    function vaultStatusHookHandler(address vault, bool initialCall, bytes memory data) internal virtual 
-    returns (bytes memory result) {
-        bool success;
-        (success, result) = vault.staticcall(
-            abi.encodeWithSelector(
-                IEulerVault.vaultStatusHook.selector,
-                initialCall,
-                data
-            )
-        );
-
-        if (success) result = abi.decode(result, (bytes));
-    }
-
-    function vaultStatusViolationHandler(address vault, bytes memory data) private pure {
-        if (bytes4(data) == IEulerVault.VaultStatusHookViolation.selector) revert VaultStatusViolation(vault, data);
+        if (setType == SetType.Account) delete accountStatusChecks;
+        else delete vaultStatusChecks;
     }
 
 
@@ -632,21 +579,24 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
                 revert(add(32, errMsg), mload(errMsg))
             }
         }
-
         revert("e/empty-error");
     }
 
 
     // Formal verification
 
-    function inv() external view {
-        assert(executionContext.checksDeferredDepth == CHECKS_DEFERRED_DEPTH__INIT);
-        assert(executionContext.onBehalfOfAccount == address(0));
+    function invariantsCheck() public view {
+        ExecutionContext memory context = executionContext;
+        assert(context.batchDepth == BATCH_DEPTH__INIT);
+        assert(context.checksInProgressLock == false);
+        assert(context.onBehalfOfAccount == address(0));
 
-        assert(accountStatusChecks.numElements == 0);
-        assert(accountStatusChecks.firstElement == address(0));
+        SetStorage storage asChecks = accountStatusChecks;
+        assert(asChecks.numElements == 0);
+        assert(asChecks.firstElement == address(0));
 
-        assert(vaultStatusChecks.numElements == 0);
-        assert(vaultStatusChecks.firstElement == address(0));
+        SetStorage storage vsChecks = vaultStatusChecks;
+        assert(vsChecks.numElements == 0);
+        assert(vsChecks.firstElement == address(0));
     }
 }

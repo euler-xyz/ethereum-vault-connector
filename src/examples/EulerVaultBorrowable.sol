@@ -35,9 +35,52 @@ contract EulerVaultBorrowable is EulerVaultSimple {
         emit BorrowCapSet(newBorrowCap);
     }
 
-    function checkAccountStatusInternal(address account, address[] calldata collaterals) internal view override
-    returns (bool isValid) {
-        if (owed[account] == 0) return true;
+    function doVaultStatusSnapshot() internal view override returns (bytes memory snapshot) {
+        snapshot = abi.encode(
+            convertToAssets(totalSupply),
+            totalBorrowed
+        );
+    }
+
+    function doCheckVaultStatus(bytes memory snapshot) internal virtual override returns (bool isValid, bytes memory data) {
+        isValid = true;
+
+        // validate the vault state here, i.e.:
+        (uint initialSupply, uint initialBorrows) = abi.decode(snapshot, (uint, uint));
+        uint finalSupply = convertToAssets(totalSupply);
+
+        // i.e. supply cap can be implemented like this
+        if (
+            supplyCap != 0 && 
+            finalSupply > supplyCap && 
+            finalSupply > initialSupply
+        ) {
+            isValid = false;
+            data = "supply cap exceeded";
+        }
+
+        // or borrow cap can be implemented like this
+        if (
+            borrowCap != 0 && 
+            totalBorrowed > borrowCap &&
+            totalBorrowed > initialBorrows
+        ) {
+            isValid = false;
+            data = "borrow cap exceeded";
+        }
+
+        // i.e. if 90% of the assets were withdrawn, revert the transaction
+        //if (finalSupply < initialSupply / 10) {
+        //    isValid = false;
+        //    data = "withdrawal too large";
+        //}
+    }
+
+    function doCheckAccountStatus(address account, address[] calldata collaterals) internal view override
+    returns (bool isValid, bytes memory data) {
+        isValid = true;
+
+        if (owed[account] == 0) return (isValid, data);
 
         // TODO: here the risk manager should be plugged in that checks if the account is still solvent
         // based on the amount borrowed, amount of collaterals provided, borrow factors, collateral 
@@ -50,45 +93,15 @@ contract EulerVaultBorrowable is EulerVaultSimple {
                 uint collateral = convertToAssets(balanceOf[account]);
                 uint borrowable = collateral * 9 / 10;
 
-                if (owed[account] <= borrowable) isValid = true;
-                else isValid = false;
+                if (owed[account] > borrowable) {
+                    isValid = false;
+                    data = "collateral violation";
+                }
 
                 break;
             }
-
             unchecked { ++i; }
         }
-    }
-
-    function vaultStatusHook(bool initialCall, bytes memory data) public view override 
-    returns (bytes memory result) {
-        if (initialCall) {
-            return abi.encode(
-                convertToAssets(totalSupply),
-                totalBorrowed
-            );
-        } else {
-            // validate the vault state here, i.e.:
-            (uint initialSupply, uint initialBorrows) = abi.decode(data, (uint, uint));
-            uint finalSupply = convertToAssets(totalSupply);
-
-            if (
-                supplyCap != 0 && 
-                finalSupply > supplyCap && 
-                finalSupply > initialSupply
-            ) revert VaultStatusHookViolation("supply cap exceeded");
-
-            if (
-                borrowCap != 0 && 
-                totalBorrowed > borrowCap &&
-                totalBorrowed > initialBorrows
-            ) revert VaultStatusHookViolation("borrow cap exceeded");
-
-            // i.e. if 90% of the assets were withdrawn, revert the transaction
-            //if (finalSupply < initialSupply / 10) revert VaultStatusHookViolation("withdrawal too large");
-        }
-
-        return "";
     }
 
     function disableController(address account) external override nonReentrant {
@@ -135,10 +148,10 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
     function borrowInternal(uint256 assets, address receiver, address owner) internal virtual 
     nonReentrant {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, owner, true);
-        preVaultStatusCheck(context);
+        conductorAuthenticate(msg.sender, owner, true);
+        vaultStatusSnapshot();
         
-        if (!context.conductorCalling && msg.sender != owner) revert NotAuthorized();
+        if (msg.sender != eulerConductor && msg.sender != owner) revert NotAuthorized();
 
         asset.safeTransfer(receiver, assets);
 
@@ -148,14 +161,13 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
         emit Borrow(msg.sender, owner, assets);
 
-        accountStatusCheck(owner, context);
-        postVaultStatusCheck(context);
+        requireAccountStatusCheck(owner);
+        requireVaultStatusCheck();
     }
 
     function repayInternal(uint256 assets, address receiver, address owner) internal virtual 
     nonReentrant {
-        ConductorContext memory context = conductorContext(msg.sender);
-        preVaultStatusCheck(context);
+        vaultStatusSnapshot();
         
         asset.safeTransferFrom(owner, address(this), assets);
 
@@ -167,16 +179,16 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
         if (owed[receiver] == 0) IEulerConductor(eulerConductor).disableController(receiver, address(this));
 
-        accountStatusCheck(receiver, context);
-        postVaultStatusCheck(context);
+        requireAccountStatusCheck(receiver);
+        requireVaultStatusCheck();
     }
 
     function windInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant
     returns (uint shares) {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, receiver, true);
+        conductorAuthenticate(msg.sender, receiver, true);
 
-        if (!context.conductorCalling && msg.sender != receiver) revert NotAuthorized();
+        if (msg.sender != eulerConductor && msg.sender != receiver) revert NotAuthorized();
         
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
         assets = previewMint(shares);
@@ -190,15 +202,15 @@ contract EulerVaultBorrowable is EulerVaultSimple {
         emit Deposit(msg.sender, receiver, assets, shares);
         emit Borrow(msg.sender, receiver, assets);
 
-        accountStatusCheck(receiver, context);
+        requireAccountStatusCheck(receiver);
     }
 
     function unwindInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant
     returns (uint shares) {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, receiver, true);
+        conductorAuthenticate(msg.sender, receiver, true);
         
-        if (!context.conductorCalling && msg.sender != receiver) revert NotAuthorized();
+        if (msg.sender != eulerConductor && msg.sender != receiver) revert NotAuthorized();
         
         shares = previewWithdraw(assets);
         require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
@@ -214,14 +226,14 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
         if (owed[receiver] == 0) IEulerConductor(eulerConductor).disableController(receiver, address(this));
 
-        accountStatusCheck(receiver, context);
+        requireAccountStatusCheck(receiver);
     }
 
     function transferDebtInternal(address from, address to, uint256 amount) internal virtual 
     nonReentrant {
-        ConductorContext memory context = conductorAuthenticate(msg.sender, to, true);
+        conductorAuthenticate(msg.sender, to, true);
         
-        if (!context.conductorCalling && msg.sender != to) revert NotAuthorized();
+        if (msg.sender != eulerConductor && msg.sender != to) revert NotAuthorized();
         
         owed[from] -= amount;    
 
@@ -232,7 +244,9 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
         if (owed[from] == 0) IEulerConductor(eulerConductor).disableController(from, address(this));
         
-        accountStatusCheck(to, context);
-        accountStatusCheck(from, context);
+        address[] memory accounts = new address[](2);
+        accounts[0] = from;
+        accounts[1] = to;
+        requireAccountsStatusCheck(accounts);
     }
 }

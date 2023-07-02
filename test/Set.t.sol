@@ -12,7 +12,7 @@ contract SetTest is Test {
     uint counter;
 
     function test_InsertRemove(address[] memory elements, uint64 seed) public {
-        // ------------------ ADDING ------------------
+        // ------------------ INSERTING ------------------
         // make the first two elements identical to exercise an edge case
         if (++counter % 10 == 0 && elements.length >= 2) {
             elements[0] = elements[1];

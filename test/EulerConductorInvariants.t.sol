@@ -9,22 +9,30 @@ import "../src/Set.sol";
 
 contract EulerRegistryMock is IEulerVaultRegistry {
     function isRegistered(address vault) external pure returns (bool) {
-        return uint160(vault) % 7 == 0 ? false : true;
+        return vault == address(0) ? false : true;
     }
 }
 
 contract EulerVaultMock is IEulerVault {
-    function disableController(address account) public override {}
+    address public immutable eulerConductor;
 
-    function checkAccountStatus(address, address[] memory) external pure returns (bool) {
-        return true;
+    constructor(address _eulerConductor) {
+        eulerConductor = _eulerConductor;
     }
 
-    function vaultStatusHook(bool, bytes memory data) external pure returns (bytes memory result) {
-        return data;
+    function disableController(address account) public override {}
+
+    function checkAccountStatus(address, address[] memory) external pure override returns (bool, bytes memory) {
+        return (true, "");
+    }
+
+    function checkVaultStatus() external pure override returns (bool, bytes memory) {
+        return (true, "");
     }
     
     fallback(bytes calldata) external payable returns (bytes memory) {
+        IEulerConductor(eulerConductor).requireAccountStatusCheck(address(0));
+        IEulerConductor(eulerConductor).requireVaultStatusCheck(address(this));
         return "";
     }
 
@@ -48,7 +56,7 @@ contract EulerConductorHandler is EulerConductor, Test {
     }
 
     constructor(address admin, address registry) EulerConductor(admin, registry) {
-        vaultMock = address(new EulerVaultMock());
+        vaultMock = address(new EulerVaultMock(address(this)));
     }
 
     function setGovernorAdmin(address newGovernorAdmin) public payable override {
@@ -128,16 +136,17 @@ contract EulerConductorHandler is EulerConductor, Test {
         return (x, x, x);
     }
 
-    function executeInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
+    function callInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
     returns (bool success, bytes memory result) {
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
         if (targetContract == eulerVaultRegistry) return (true, "");
+        if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
         setup(onBehalfOfAccount, targetContract);
-        return super.executeInternal(targetContract, onBehalfOfAccount, msgValue, data);
+        return super.callInternal(targetContract, onBehalfOfAccount, msgValue, data);
     }
 
-    function forwardInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
+    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
     returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (msg.sender == address(this)) return (true, "");
@@ -145,16 +154,22 @@ contract EulerConductorHandler is EulerConductor, Test {
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
         if (targetContract == eulerVaultRegistry) return (true, "");
+        if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
         setup(onBehalfOfAccount, msg.sender);
         setup(onBehalfOfAccount, targetContract);
         accountControllers[onBehalfOfAccount].insert(msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
-        return super.forwardInternal(targetContract, onBehalfOfAccount, msgValue, data);
+        return super.callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, msgValue, data);
     }
 
     function requireAccountsStatusCheck(address[] calldata accounts) public override {
         if (accounts.length > 10) return;
         super.requireAccountsStatusCheck(accounts);
+    }
+
+    function requireVaultStatusCheck(address vault) public override {
+        vault = msg.sender;
+        super.requireVaultStatusCheck(vault);
     }
 
     function exposeAccountCollaterals(address account) external view returns (SetStorage memory) {
@@ -170,7 +185,7 @@ contract EulerConductorHandler is EulerConductor, Test {
     }
 }
 
-contract EulerConductorTest is Test {
+contract EulerConductorInvariants is Test {
     address governor = makeAddr("governor");
     address registry;
     EulerConductorHandler conductor;

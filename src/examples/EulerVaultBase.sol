@@ -6,26 +6,19 @@ import "../interfaces/IEulerVault.sol";
 import "../interfaces/IEulerConductor.sol";
 
 abstract contract EulerVaultBase is IEulerVault {
-    struct ConductorContext {
-        bool conductorCalling;
-        bool checksDeferred;
-        bool contextExtended;
-        bool controllerEnabled;
-        address onBehalfOfAccount;
-    }
-
     error Reentrancy();
-    error ReentrancyOrderViolation();
+    error MustBeNonReentrant();
     error NotAuthorized();
     error ControllerDisabled();
 
-    uint private reentrancyGuard;
-    bytes internal transientBytes;
     address public immutable eulerConductor;
-
+    uint private reentrancyGuard;
+    bytes private transientBytes;
+    
+    bytes32 constant private EMPTY_BYTES = keccak256(bytes(""));
     uint constant private REENTRANCY_GUARD_INIT = 1;
     uint constant private REENTRANCY_GUARD_BUSY = 2;
-    uint constant private REENTRANCY_GUARD_ACCOUNT_STATUS_CHECK = 3;
+    uint constant private REENTRANCY_GUARD_CHECKS_IN_PROGRESS = 3;
     
     constructor(address _eulerConductor) {
         eulerConductor = _eulerConductor;
@@ -36,10 +29,18 @@ abstract contract EulerVaultBase is IEulerVault {
         if (reentrancyGuard != REENTRANCY_GUARD_INIT) revert Reentrancy();
 
         reentrancyGuard = REENTRANCY_GUARD_BUSY;
-
         _;
-
         reentrancyGuard = REENTRANCY_GUARD_INIT;
+
+        delete transientBytes;
+    }
+
+    modifier checksInProgress() {
+        if (reentrancyGuard != REENTRANCY_GUARD_BUSY) revert MustBeNonReentrant();
+
+        reentrancyGuard = REENTRANCY_GUARD_CHECKS_IN_PROGRESS;
+        _;
+        reentrancyGuard = REENTRANCY_GUARD_BUSY;
     }
 
     modifier nonReentrantRO() {
@@ -47,82 +48,83 @@ abstract contract EulerVaultBase is IEulerVault {
         _;
     }
 
-    function conductorContext(address msgSender) internal view returns (ConductorContext memory context) {
-        context.conductorCalling = msgSender == eulerConductor;
-
-        if (context.conductorCalling) {
-            (
-                context.checksDeferred, 
-                context.onBehalfOfAccount
-            ) = IEulerConductor(eulerConductor).getExecutionContext();
-        }
+    modifier conductorOnly() {
+        if (msg.sender != eulerConductor) revert NotAuthorized();
+        _;
     }
 
-    function conductorAuthenticate(address msgSender, address account, bool controllerEnabledCheck) internal view
-    returns (ConductorContext memory context) {
-        context.conductorCalling = msgSender == eulerConductor;
-
-        if (context.conductorCalling) {
-            context.contextExtended = controllerEnabledCheck;
-
+    function conductorAuthenticate(address msgSender, address account, bool controllerEnabledCheck) internal view {
+        if (msgSender == eulerConductor) {
+            bool checksDeferred;
+            bool controllerEnabled;
+            address onBehalfOfAccount;
             if (controllerEnabledCheck) {
                 (
-                    context.checksDeferred, 
-                    context.onBehalfOfAccount, 
-                    context.controllerEnabled
+                    checksDeferred, 
+                    onBehalfOfAccount, 
+                    controllerEnabled
                 ) = IEulerConductor(eulerConductor).getExecutionContextExtended(account, address(this));
             } else {
                 (
-                    context.checksDeferred, 
-                    context.onBehalfOfAccount
+                    checksDeferred, 
+                    onBehalfOfAccount
                 ) = IEulerConductor(eulerConductor).getExecutionContext();
             }
 
-            if (context.onBehalfOfAccount != account) revert NotAuthorized();
-            if (controllerEnabledCheck && !context.controllerEnabled) revert ControllerDisabled();
+            if (onBehalfOfAccount != account) revert NotAuthorized();
+            if (controllerEnabledCheck && !controllerEnabled) revert ControllerDisabled();
         } else if (controllerEnabledCheck) {
             if (!IEulerConductor(eulerConductor).isControllerEnabled(account, address(this))) revert ControllerDisabled();
         }
     }
 
-    function accountStatusCheck(address account, ConductorContext memory context) internal {
-        if (reentrancyGuard != REENTRANCY_GUARD_BUSY) revert ReentrancyOrderViolation();
-
-        if (!context.checksDeferred || context.onBehalfOfAccount != account) {
-            reentrancyGuard = REENTRANCY_GUARD_ACCOUNT_STATUS_CHECK;
-
-            IEulerConductor(eulerConductor).requireAccountStatusCheck(account);
-
-            reentrancyGuard = REENTRANCY_GUARD_BUSY;
-        }
+    function vaultStatusSnapshot() internal {
+        if (reentrancyGuard != REENTRANCY_GUARD_BUSY) revert MustBeNonReentrant();
+        if (keccak256(transientBytes) == EMPTY_BYTES) transientBytes = doVaultStatusSnapshot();
     }
 
-    function preVaultStatusCheck(ConductorContext memory context) internal {
-        if (!context.conductorCalling) transientBytes = vaultStatusHook(true, abi.encode(0));
+    function requireVaultStatusCheck() internal checksInProgress {
+        IEulerConductor(eulerConductor).requireVaultStatusCheck(address(this));
     }
 
-    function postVaultStatusCheck(ConductorContext memory context) internal {
-        if (!context.conductorCalling) {
-            vaultStatusHook(false, transientBytes);
-            delete transientBytes;
-        }
+    function requireAccountStatusCheck(address account) internal checksInProgress {
+        IEulerConductor(eulerConductor).requireAccountStatusCheck(account);
+    }
+
+    function requireAccountsStatusCheck(address[] memory accounts) internal checksInProgress {
+        IEulerConductor(eulerConductor).requireAccountsStatusCheck(accounts);
     }
 
     function checkAccountStatus(address account, address[] calldata collaterals) external view 
-    returns (bool isValid) {
+    returns (bool isValid, bytes memory data) {
         uint reentrancyGuardCache = reentrancyGuard;
 
         if (
             reentrancyGuardCache != REENTRANCY_GUARD_INIT && 
-            reentrancyGuardCache != REENTRANCY_GUARD_ACCOUNT_STATUS_CHECK
+            reentrancyGuardCache != REENTRANCY_GUARD_CHECKS_IN_PROGRESS
         ) revert Reentrancy();
 
-        isValid = checkAccountStatusInternal(account, collaterals);
+        (isValid, data) = doCheckAccountStatus(account, collaterals);
     }
 
-    function checkAccountStatusInternal(address, address[] calldata) internal view virtual returns (bool isValid);
+    function checkVaultStatus() external conductorOnly returns (bool isValid, bytes memory data) {
+        uint reentrancyGuardCache = reentrancyGuard;
 
-    function vaultStatusHook(bool initialCall, bytes memory data) public view virtual returns (bytes memory result);
+        if (
+            reentrancyGuardCache != REENTRANCY_GUARD_INIT && 
+            reentrancyGuardCache != REENTRANCY_GUARD_CHECKS_IN_PROGRESS
+        ) revert Reentrancy();
+
+        if (keccak256(transientBytes) == EMPTY_BYTES) return (true, data);
+
+        (isValid, data) = doCheckVaultStatus(transientBytes);
+    }
+
+    function doVaultStatusSnapshot() internal view virtual returns (bytes memory snapshot);
+
+    function doCheckVaultStatus(bytes memory snapshot) internal virtual returns (bool isValid, bytes memory data);
+
+    function doCheckAccountStatus(address, address[] calldata) internal view virtual returns (bool isValid, bytes memory data);
 
     function disableController(address account) external virtual;
 }

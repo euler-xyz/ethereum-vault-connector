@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 
 abstract contract Types {
     struct ExecutionContext {
-        uint8 checksDeferredDepth;
+        uint8 batchDepth;
+        bool checksInProgressLock;
         address onBehalfOfAccount;
     }
 

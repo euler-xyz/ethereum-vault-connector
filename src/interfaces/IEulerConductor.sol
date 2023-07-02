@@ -22,12 +22,13 @@ interface IEulerConductor {
         returns (Types.EulerResult[] memory batchItemsResult, Types.EulerResult[] memory accountsStatusResult, Types.EulerResult[] memory vaultsStatusResult);
     function batchSimulation(Types.EulerBatchItem[] calldata items) external payable
         returns (Types.EulerResult[] memory batchItemsResult, Types.EulerResult[] memory accountsStatusResult, Types.EulerResult[] memory vaultsStatusResult);
-    function execute(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
+    function call(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
         returns (bool success, bytes memory result);
-    function forward(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
         returns (bool success, bytes memory result);
     function checkAccountStatus(address account) external view returns (bool isValid);
     function checkAccountsStatus(address[] calldata accounts) external view returns (bool[] memory isValid);
     function requireAccountStatusCheck(address account) external;
     function requireAccountsStatusCheck(address[] calldata accounts) external;
+    function requireVaultStatusCheck(address vault) external;
 }   
