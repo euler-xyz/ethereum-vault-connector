@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "../Types.sol";
 
-interface IEulerConductor {
+interface ICVP {
     function setAccountOperator(address account, address operator, bool isAuthorized) external payable;
     function getExecutionContext() external view returns (bool checksDeferred, address onBehalfOfAccount);
     function getExecutionContextExtended(address account, address vault) external view 
@@ -17,11 +17,11 @@ interface IEulerConductor {
     function isControllerEnabled(address account, address vault) external view returns (bool);
     function enableController(address account, address vault) external payable;
     function disableController(address account, address vault) external payable;
-    function batch(Types.EulerBatchItem[] calldata items) external payable;
-    function batchRevert(Types.EulerBatchItem[] calldata items) external payable
-        returns (Types.EulerResult[] memory batchItemsResult, Types.EulerResult[] memory accountsStatusResult, Types.EulerResult[] memory vaultsStatusResult);
-    function batchSimulation(Types.EulerBatchItem[] calldata items) external payable
-        returns (Types.EulerResult[] memory batchItemsResult, Types.EulerResult[] memory accountsStatusResult, Types.EulerResult[] memory vaultsStatusResult);
+    function batch(Types.BatchItem[] calldata items) external payable;
+    function batchRevert(Types.BatchItem[] calldata items) external payable
+        returns (Types.BatchResult[] memory batchItemsResult, Types.BatchResult[] memory accountsStatusResult, Types.BatchResult[] memory vaultsStatusResult);
+    function batchSimulation(Types.BatchItem[] calldata items) external payable
+        returns (Types.BatchResult[] memory batchItemsResult, Types.BatchResult[] memory accountsStatusResult, Types.BatchResult[] memory vaultsStatusResult);
     function call(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
         returns (bool success, bytes memory result);
     function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable

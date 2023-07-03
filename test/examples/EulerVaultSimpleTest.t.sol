@@ -4,10 +4,10 @@ pragma solidity ^0.8.0;
 import {DSTestPlus} from "solmate/test/utils/DSTestPlus.sol";
 import {MockERC20} from "solmate/test/utils/mocks/MockERC20.sol";
 import "forge-std/Test.sol";
-import "../../src/examples/EulerVaultSimple.sol";
-import "../../src/EulerConductor.sol";
+import "../../src/examples/CreditVaultSimple.sol";
+import "../../src/CreditVaultProtocol.sol";
 
-contract EulerRegistryMock is IEulerVaultRegistry {
+contract RegistryMock is ICreditVaultRegistry {
     mapping(address => bool) public isRegistered;
 
     function setRegistered(address vault, bool registered) external {
@@ -15,23 +15,23 @@ contract EulerRegistryMock is IEulerVaultRegistry {
     }
 }
 
-contract EulerVaultSimpleTest is DSTestPlus {
+contract CreditVaultSimpleTest is DSTestPlus {
     address governor = address(uint160(uint256(keccak256(abi.encodePacked("governor")))));
     address registry;
-    address conductor;
+    ICVP cvp;
     MockERC20 underlying;
-    EulerVaultSimple vault;
+    CreditVaultSimple vault;
 
     error NotAuthorized();
     error ControllerDisabled();
     
     function setUp() public {
-        registry = address(new EulerRegistryMock());
-        conductor = address(new EulerConductor(governor, registry));
+        registry = address(new RegistryMock());
+        cvp = new CreditVaultProtocol(governor, registry);
         underlying = new MockERC20("Mock Token", "TKN", 18);
-        vault = new EulerVaultSimple(conductor, underlying, "Mock Token Vault", "vwTKN");
+        vault = new CreditVaultSimple(cvp, underlying, "Mock Token Vault", "vwTKN");
 
-        EulerRegistryMock(registry).setRegistered(address(vault), true);
+        RegistryMock(registry).setRegistered(address(vault), true);
     }
 
     function invariantMetadata() public {
@@ -40,39 +40,39 @@ contract EulerVaultSimpleTest is DSTestPlus {
         assertEq(vault.decimals(), 18);
     }
 
-    function testConductorIntegration(address alice, address bob) public {
+    function testCVPIntegration(address alice, address bob) public {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         // check if possible to enable and disable controller right away
-        assertTrue(!EulerConductor(conductor).isControllerEnabled(alice, address(vault)));
+        assertTrue(!cvp.isControllerEnabled(alice, address(vault)));
 
         hevm.prank(alice);
-        EulerConductor(conductor).enableController(alice, address(vault));
-        assertTrue(EulerConductor(conductor).isControllerEnabled(alice, address(vault)));
+        cvp.enableController(alice, address(vault));
+        assertTrue(cvp.isControllerEnabled(alice, address(vault)));
 
         // bob should be able to disable controller on behalf of alice 
         // if she doesn't have any outstanting debt
         hevm.prank(bob);
         vault.disableController(alice);
-        assertTrue(!EulerConductor(conductor).isControllerEnabled(alice, address(vault)));
+        assertTrue(!cvp.isControllerEnabled(alice, address(vault)));
 
         // the account status check must return true because alice doesn't have any debt
         (bool isValid,) = vault.checkAccountStatus(alice, new address[](0));
         assertTrue(isValid);
 
         // check vault status hooks
-        hevm.prank(conductor);
+        hevm.prank(address(cvp));
         vault.checkVaultStatus();
     }
         
-    function testDepositDoesntAuthenticateConductor(address alice, address bob) external {
+    function testDepositDoesntAuthenticateCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x6e553f65, 10, bob));  // deposit(uint256,address)
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x6e553f65, 10, bob));  // deposit(uint256,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -80,7 +80,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, bob, address(0)));  // deposit(uint256,address,address)
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, bob, address(0)));  // deposit(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -88,27 +88,19 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, address(0), bob));  // deposit(uint256,address,address)
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, address(0), bob));  // deposit(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testMintDoesntAuthenticateConductor(address alice, address bob) external {
+    function testMintDoesntAuthenticateCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0x94bf804d, 10, bob));  // mint(uint256,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-
-        hevm.prank(alice);
-        (
-            success, 
-            result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, bob, address(0)));  // mint(uint256,address,address)
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x94bf804d, 10, bob));  // mint(uint256,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
 
@@ -116,114 +108,122 @@ contract EulerVaultSimpleTest is DSTestPlus {
         (
             success, 
             result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, address(0), bob));  // mint(uint256,address,address)
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, bob, address(0)));  // mint(uint256,address,address)
+    
+        assertNotEq(bytes4(result), NotAuthorized.selector);
+
+        hevm.prank(alice);
+        (
+            success, 
+            result
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, address(0), bob));  // mint(uint256,address,address)
     
         assertNotEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testTransferAuthenticatesConductor(address alice) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(conductor )| 0xff);
+    function testTransferAuthenticatesCVP(address alice) external {
+        hevm.assume(uint160(alice )| 0xff != uint160(address(cvp) )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.transfer.selector, address(0), 10));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.transfer.selector, address(0), 10));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testTransferFromAuthenticatesConductor(address alice, address bob) external {
+    function testTransferFromAuthenticatesCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.transferFrom.selector, bob, address(0), 10));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.transferFrom.selector, bob, address(0), 10));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testWithdrawAuthenticatesConductor(address alice, address bob) external {
+    function testWithdrawAuthenticatesCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.withdraw.selector, 10, address(0), bob));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.withdraw.selector, 10, address(0), bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testRedeemAuthenticatesConductor(address alice, address bob) external {
+    function testRedeemAuthenticatesCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.redeem.selector, 10, address(0), bob));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.redeem.selector, 10, address(0), bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testWithdrawToReservesAuthenticatesConductor(address alice, address bob) external {
+    function testWithdrawToReservesAuthenticatesCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.withdrawToReserves.selector, 10, bob));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.withdrawToReserves.selector, 10, bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testRedeemToReservesAuthenticatesConductor(address alice, address bob) external {
+    function testRedeemToReservesAuthenticatesCVP(address alice, address bob) external {
         hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
 
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.redeemToReserves.selector, 10, bob));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.redeemToReserves.selector, 10, bob));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testWithdrawReservesAuthenticatesConductor(address alice) external {
+    function testWithdrawReservesAuthenticatesCVP(address alice) external {
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.withdrawReserves.selector, 10, address(0)));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.withdrawReserves.selector, 10, address(0)));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testRedeemReservesAuthenticatesConductor(address alice) external {
+    function testRedeemReservesAuthenticatesCVP(address alice) external {
         hevm.prank(alice);
         (
             bool success, 
             bytes memory result
-        ) = EulerConductor(conductor).call(address(vault), alice, abi.encodeWithSelector(vault.redeemReserves.selector, 10, address(0)));
+        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.redeemReserves.selector, 10, address(0)));
     
         assertFalse(success);
         assertEq(bytes4(result), NotAuthorized.selector);
     }
 
-    function testMetadata(address conductorAddr, string calldata name, string calldata symbol) public {
-        EulerVaultSimple vlt = new EulerVaultSimple(conductorAddr, underlying, name, symbol);
-        assertEq(vlt.eulerConductor(), conductorAddr);
+    function testMetadata(address cvpAddr, string calldata name, string calldata symbol) public {
+        CreditVaultSimple vlt = new CreditVaultSimple(ICVP(cvpAddr), underlying, name, symbol);
+        assertEq(address(vlt.cvp()), cvpAddr);
         assertEq(vlt.name(), name);
         assertEq(vlt.symbol(), symbol);
         assertEq(address(vlt.asset()), address(underlying));
@@ -251,7 +251,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             aliceShareAmount = vault.deposit(aliceUnderlyingAmount, alice, alice);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).call(
+            (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -279,7 +279,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.withdraw(aliceUnderlyingAmount, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -320,7 +320,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             aliceUnderlyingAmount = vault.mint(aliceShareAmount, alice, alice);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).call(
+            (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -348,7 +348,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.redeem(aliceShareAmount, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -448,7 +448,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             aliceUnderlyingAmount = vault.mint(2000, alice, alice);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).call(
+            (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -485,7 +485,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             bobShareAmount = vault.deposit(4000, bob, bob);
         } else {
-            (bool success, bytes memory result) = EulerConductor(conductor).call(
+            (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
@@ -544,7 +544,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             vault.deposit(2000, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -572,7 +572,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         } else if (seed % 2 == 0) { 
             vault.mint(2000, bob, bob);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
@@ -610,7 +610,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.redeem(1333, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -636,7 +636,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.withdraw(2929, bob, bob);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
@@ -663,7 +663,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.withdraw(3643, alice, alice);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
@@ -689,7 +689,7 @@ contract EulerVaultSimpleTest is DSTestPlus {
         if (seed % 2 == 0) {
             vault.redeem(4392, bob, bob);
         } else {
-            (bool success,) = EulerConductor(conductor).call(
+            (bool success,) = cvp.call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(

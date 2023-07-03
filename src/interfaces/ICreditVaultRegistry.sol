@@ -2,6 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-interface IEulerVaultRegistry {
+interface ICreditVaultRegistry {
     function isRegistered(address vault) external returns (bool);
 }

@@ -3,21 +3,21 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../src/EulerConductor.sol";
+import "../src/CreditVaultProtocol.sol";
 import "../src/Types.sol";
 import "../src/Set.sol";
 
-contract EulerRegistryMock is IEulerVaultRegistry {
+contract RegistryMock is ICreditVaultRegistry {
     function isRegistered(address vault) external pure returns (bool) {
         return vault == address(0) ? false : true;
     }
 }
 
-contract EulerVaultMock is IEulerVault {
-    address public immutable eulerConductor;
+contract VaultMock is ICreditVault {
+    ICVP public immutable cvp;
 
-    constructor(address _eulerConductor) {
-        eulerConductor = _eulerConductor;
+    constructor(ICVP _cvp) {
+        cvp = _cvp;
     }
 
     function disableController(address account) public override {}
@@ -31,15 +31,15 @@ contract EulerVaultMock is IEulerVault {
     }
     
     fallback(bytes calldata) external payable returns (bytes memory) {
-        IEulerConductor(eulerConductor).requireAccountStatusCheck(address(0));
-        IEulerConductor(eulerConductor).requireVaultStatusCheck(address(this));
+        cvp.requireAccountStatusCheck(address(0));
+        cvp.requireVaultStatusCheck(address(this));
         return "";
     }
 
     receive() external payable {}
 }
 
-contract EulerConductorHandler is EulerConductor, Test {
+contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     using Set for SetStorage;
     
     address vaultMock;
@@ -55,8 +55,8 @@ contract EulerConductorHandler is EulerConductor, Test {
         accountOperators[account][msg.sender] = true;
     }
 
-    constructor(address admin, address registry) EulerConductor(admin, registry) {
-        vaultMock = address(new EulerVaultMock(address(this)));
+    constructor(address admin, address registry) CreditVaultProtocol(admin, registry) {
+        vaultMock = address(new VaultMock(ICVP(address(this))));
     }
 
     function setGovernorAdmin(address newGovernorAdmin) public payable override {
@@ -65,10 +65,10 @@ contract EulerConductorHandler is EulerConductor, Test {
         super.setGovernorAdmin(newGovernorAdmin);
     }
 
-    function setEulerVaultRegistry(address newEulerVaultRegistry) public payable override {
+    function setVaultRegistry(address newVaultRegistry) public payable override {
         governorAdmin = msg.sender;
-        newEulerVaultRegistry = eulerVaultRegistry;
-        super.setEulerVaultRegistry(newEulerVaultRegistry);
+        newVaultRegistry = vaultRegistry;
+        super.setVaultRegistry(newVaultRegistry);
     }
 
     function setAccountOperator(address account, address operator, bool isAuthorized) public payable override {
@@ -80,7 +80,7 @@ contract EulerConductorHandler is EulerConductor, Test {
     function enableCollateral(address account, address vault) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == eulerVaultRegistry) return;
+        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.enableCollateral(account, vault);
     }
@@ -88,7 +88,7 @@ contract EulerConductorHandler is EulerConductor, Test {
     function disableCollateral(address account, address vault) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == eulerVaultRegistry) return;
+        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.disableCollateral(account, vault);
     }
@@ -96,7 +96,7 @@ contract EulerConductorHandler is EulerConductor, Test {
     function enableController(address account, address vault) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == eulerVaultRegistry) return;
+        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.enableCollateral(account, vault);
     }
@@ -105,34 +105,34 @@ contract EulerConductorHandler is EulerConductor, Test {
         vault = msg.sender;
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == eulerVaultRegistry) return;
+        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.disableController(account, vault);
     }
 
-    function batch(EulerBatchItem[] calldata items) public payable override {
+    function batch(BatchItem[] calldata items) public payable override {
         if (items.length > 10) return;
         
         for (uint i = 0; i < items.length && i < 10; i++) {
             if (uint160(items[i].msgValue) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
-            if (items[i].targetContract == eulerVaultRegistry) return;
+            if (items[i].targetContract == vaultRegistry) return;
         }
 
         vm.deal(address(this), type(uint).max);
         super.batch(items);
     }
 
-    function batchRevert(EulerBatchItem[] calldata) public payable override
-    returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult) {
-        EulerResult[] memory x;
+    function batchRevert(BatchItem[] calldata) public payable override
+    returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult) {
+        BatchResult[] memory x;
         return (x, x, x);
     }
 
-    function batchSimulation(EulerBatchItem[] calldata) public payable override
-    returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult) {
-        EulerResult[] memory x;
+    function batchSimulation(BatchItem[] calldata) public payable override
+    returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult) {
+        BatchResult[] memory x;
         return (x, x, x);
     }
 
@@ -140,7 +140,7 @@ contract EulerConductorHandler is EulerConductor, Test {
     returns (bool success, bytes memory result) {
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
-        if (targetContract == eulerVaultRegistry) return (true, "");
+        if (targetContract == vaultRegistry) return (true, "");
         if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
         setup(onBehalfOfAccount, targetContract);
         return super.callInternal(targetContract, onBehalfOfAccount, msgValue, data);
@@ -150,10 +150,10 @@ contract EulerConductorHandler is EulerConductor, Test {
     returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (msg.sender == address(this)) return (true, "");
-        if (msg.sender == eulerVaultRegistry) return (true, "");
+        if (msg.sender == vaultRegistry) return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
-        if (targetContract == eulerVaultRegistry) return (true, "");
+        if (targetContract == vaultRegistry) return (true, "");
         if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
         setup(onBehalfOfAccount, msg.sender);
         setup(onBehalfOfAccount, targetContract);
@@ -185,23 +185,23 @@ contract EulerConductorHandler is EulerConductor, Test {
     }
 }
 
-contract EulerConductorInvariants is Test {
+contract CreditVaultProtocolInvariants is Test {
     address governor = makeAddr("governor");
     address registry;
-    EulerConductorHandler conductor;
+    CreditVaultProtocolHandler cvp;
 
     function setUp() public {
-        registry = address(new EulerRegistryMock());
+        registry = address(new RegistryMock());
         vm.assume(governor != address(0));
         vm.assume(registry != address(0));
 
-        conductor = new EulerConductorHandler(governor, registry);
+        cvp = new CreditVaultProtocolHandler(governor, registry);
 
-        targetContract(address(conductor));
+        targetContract(address(cvp));
     }
 
     function invariant_context() external {
-        (bool checksDeferred, address account) = conductor.getExecutionContext();
+        (bool checksDeferred, address account) = cvp.getExecutionContext();
         assertFalse(checksDeferred);
         assertTrue(account == address(0));
     }
@@ -210,7 +210,7 @@ contract EulerConductorInvariants is Test {
         (
             Types.SetStorage memory accountStatusChecks, 
             Types.SetStorage memory vaultStatusChecks
-        ) = conductor.exposeTransientStorage();
+        ) = cvp.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
         assertTrue(accountStatusChecks.firstElement == address(0));
@@ -219,10 +219,10 @@ contract EulerConductorInvariants is Test {
     }
 
     function invariant_controllers() external {
-        address[] memory touchedAccounts = conductor.getTouchedAccounts();
+        address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.SetStorage memory accountControllers = conductor.exposeAccountControllers(touchedAccounts[i]);
-            address[] memory accountControllersArray = conductor.getControllers(touchedAccounts[i]);
+            Types.SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
+            address[] memory accountControllersArray = cvp.getControllers(touchedAccounts[i]);
         
             assertTrue(accountControllers.numElements == 0 || accountControllers.numElements == 1);
             assertTrue(
@@ -237,10 +237,10 @@ contract EulerConductorInvariants is Test {
     }
 
     function invariant_collaterals() external {
-        address[] memory touchedAccounts = conductor.getTouchedAccounts();
+        address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.SetStorage memory accountCollaterals = conductor.exposeAccountCollaterals(touchedAccounts[i]);
-            address[] memory accountCollateralsArray = conductor.getCollaterals(touchedAccounts[i]);
+            Types.SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
+            address[] memory accountCollateralsArray = cvp.getCollaterals(touchedAccounts[i]);
 
             assertTrue(accountCollaterals.numElements <= 10);
             assertTrue(

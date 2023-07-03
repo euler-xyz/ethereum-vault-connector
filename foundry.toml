@@ -9,8 +9,8 @@ remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-st
 [profile.smt]
 model_checker.engine = "chc"
 model_checker.targets = ["assert"]
-model_checker.timeout = 0
-model_checker.contracts = {"./src/EulerConductor.sol" = ["EulerConductor"]}
+model_checker.timeout = 60
+model_checker.contracts = {"./src/CVP.sol" = ["CreditVaultProtocol"]}
 model_checker.invariants = ["contract", "reentrancy"]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

@@ -3,14 +3,14 @@
 pragma solidity ^0.8.0;
 
 import "solmate/utils/SafeTransferLib.sol";
-import "./EulerVaultSimple.sol";
+import "./CreditVaultSimple.sol";
 
 /// @notice Definition of callback method that flashLoan will invoke on your contract
 interface IFlashLoan {
     function onFlashLoan(bytes memory data) external;
 }
 
-contract EulerVaultBorrowable is EulerVaultSimple {
+contract CreditVaultBorrowable is CreditVaultSimple {
     using SafeTransferLib for ERC20;
     
     event BorrowCapSet(uint newBorrowCap);
@@ -24,11 +24,11 @@ contract EulerVaultBorrowable is EulerVaultSimple {
     mapping(address => uint) public owed;
     
     constructor(
-        address _eulerConductor, 
+        ICVP _cvp, 
         ERC20 _asset, 
         string memory _name, 
         string memory _symbol
-    ) EulerVaultSimple(_eulerConductor, _asset, _name, _symbol) {}
+    ) CreditVaultSimple(_cvp, _asset, _name, _symbol) {}
 
     function setBorrowCap(uint newBorrowCap) external onlyOwner {
         borrowCap = newBorrowCap;
@@ -105,7 +105,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
     }
 
     function disableController(address account) external override nonReentrant {
-        if (owed[account] == 0) IEulerConductor(eulerConductor).disableController(account, address(this));
+        if (owed[account] == 0) cvp.disableController(account, address(this));
     }
 
     function flashLoan(uint256 amount, bytes calldata data) external nonReentrant {
@@ -148,10 +148,10 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
     function borrowInternal(uint256 assets, address receiver, address owner) internal virtual 
     nonReentrant {
-        conductorAuthenticate(msg.sender, owner, true);
+        CVPAuthenticate(msg.sender, owner, true);
         vaultStatusSnapshot();
         
-        if (msg.sender != eulerConductor && msg.sender != owner) revert NotAuthorized();
+        if (msg.sender != address(cvp) && msg.sender != owner) revert NotAuthorized();
 
         asset.safeTransfer(receiver, assets);
 
@@ -177,7 +177,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
 
         emit Repay(msg.sender, receiver, owner, assets);
 
-        if (owed[receiver] == 0) IEulerConductor(eulerConductor).disableController(receiver, address(this));
+        if (owed[receiver] == 0) cvp.disableController(receiver, address(this));
 
         requireAccountStatusCheck(receiver);
         requireVaultStatusCheck();
@@ -186,9 +186,9 @@ contract EulerVaultBorrowable is EulerVaultSimple {
     function windInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant
     returns (uint shares) {
-        conductorAuthenticate(msg.sender, receiver, true);
+        CVPAuthenticate(msg.sender, receiver, true);
 
-        if (msg.sender != eulerConductor && msg.sender != receiver) revert NotAuthorized();
+        if (msg.sender != address(cvp) && msg.sender != receiver) revert NotAuthorized();
         
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
         assets = previewMint(shares);
@@ -208,9 +208,9 @@ contract EulerVaultBorrowable is EulerVaultSimple {
     function unwindInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant
     returns (uint shares) {
-        conductorAuthenticate(msg.sender, receiver, true);
+        CVPAuthenticate(msg.sender, receiver, true);
         
-        if (msg.sender != eulerConductor && msg.sender != receiver) revert NotAuthorized();
+        if (msg.sender != address(cvp) && msg.sender != receiver) revert NotAuthorized();
         
         shares = previewWithdraw(assets);
         require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
@@ -224,16 +224,16 @@ contract EulerVaultBorrowable is EulerVaultSimple {
         _burn(receiver, shares);
         emit Withdraw(msg.sender, receiver, receiver, assets, shares);
 
-        if (owed[receiver] == 0) IEulerConductor(eulerConductor).disableController(receiver, address(this));
+        if (owed[receiver] == 0) cvp.disableController(receiver, address(this));
 
         requireAccountStatusCheck(receiver);
     }
 
     function transferDebtInternal(address from, address to, uint256 amount) internal virtual 
     nonReentrant {
-        conductorAuthenticate(msg.sender, to, true);
+        CVPAuthenticate(msg.sender, to, true);
         
-        if (msg.sender != eulerConductor && msg.sender != to) revert NotAuthorized();
+        if (msg.sender != address(cvp) && msg.sender != to) revert NotAuthorized();
         
         owed[from] -= amount;    
 
@@ -242,7 +242,7 @@ contract EulerVaultBorrowable is EulerVaultSimple {
         emit Repay(msg.sender, from, to, amount);
         emit Borrow(msg.sender, to, amount);
 
-        if (owed[from] == 0) IEulerConductor(eulerConductor).disableController(from, address(this));
+        if (owed[from] == 0) cvp.disableController(from, address(this));
         
         address[] memory accounts = new address[](2);
         accounts[0] = from;

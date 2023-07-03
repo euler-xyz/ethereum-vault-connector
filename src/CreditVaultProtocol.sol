@@ -5,16 +5,16 @@ pragma solidity ^0.8.0;
 import "./TransientStorage.sol";
 import "./Types.sol";
 import "./Set.sol";
-import "./interfaces/IEulerConductor.sol";
-import "./interfaces/IEulerVaultRegistry.sol";
-import "./interfaces/IEulerVault.sol";
+import "./interfaces/ICreditVaultProtocol.sol";
+import "./interfaces/ICreditVaultRegistry.sol";
+import "./interfaces/ICreditVault.sol";
 
-contract EulerConductor is IEulerConductor, TransientStorage, Types {
+contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     using Set for SetStorage;
 
     // Constants
 
-    string public constant name = "Euler Conductor";
+    string public constant name = "Credit Vault Protocol - CVP";
 
     address internal constant ERC1820_REGISTRY = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
@@ -24,7 +24,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     // Storage
     address public governorAdmin;
-    address public eulerVaultRegistry;
+    address public vaultRegistry;
     mapping(address account => mapping(address operator => bool isOperator)) public accountOperators;
 
     ExecutionContext internal executionContext;
@@ -36,7 +36,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
     event Genesis();
     event GovernorAdminSet(address indexed admin);
-    event EulerVaultRegistrySet(address indexed registry);
+    event VaultRegistrySet(address indexed registry);
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
 
     error NotAuthorized();
@@ -48,7 +48,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     error ControllerViolation(address account);
     error AccountStatusViolation(address account, bytes data);
     error VaultStatusViolation(address vault, bytes data);
-    error RevertedBatchResult(EulerResult[] batchItemsResult, EulerResult[] accountsStatusResult, EulerResult[] vaultsStatusResult);
+    error RevertedBatchResult(BatchResult[] batchItemsResult, BatchResult[] accountsStatusResult, BatchResult[] vaultsStatusResult);
     error BatchPanic();
 
 
@@ -59,7 +59,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
         executionContext.batchDepth = BATCH_DEPTH__INIT;
         governorAdmin = admin;
-        eulerVaultRegistry = registry;
+        vaultRegistry = registry;
 
         emit Genesis();
     }
@@ -95,7 +95,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @notice A modifier sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) {
-        // must be cached in case of conductor reentrancy
+        // must be cached in case of CVP reentrancy
         address onBehalfOfAccountCache = executionContext.onBehalfOfAccount;
 
         executionContext.onBehalfOfAccount = account;
@@ -120,13 +120,13 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         emit GovernorAdminSet(newGovernorAdmin);
     }
 
-    /// @notice Sets a new Euler vault registry address.
-    /// @dev Only the current governor can call this function. The Euler vault registry is a contract that keeps track of all the vaults that are allowed to interact with the conductor.
-    /// @param newEulerVaultRegistry The address of the new Euler vault registry.
-    function setEulerVaultRegistry(address newEulerVaultRegistry) public payable virtual governorOnly {
-        if (newEulerVaultRegistry == address(0)) revert InvalidAddress();
-        eulerVaultRegistry = newEulerVaultRegistry;
-        emit EulerVaultRegistrySet(newEulerVaultRegistry);
+    /// @notice Sets a new vault registry address.
+    /// @dev Only the current governor can call this function. The vault registry is a contract that keeps track of all the vaults that are allowed to interact with the CVP.
+    /// @param newVaultRegistry The address of the new vault registry.
+    function setVaultRegistry(address newVaultRegistry) public payable virtual governorOnly {
+        if (newVaultRegistry == address(0)) revert InvalidAddress();
+        vaultRegistry = newVaultRegistry;
+        emit VaultRegistrySet(newVaultRegistry);
     }
 
 
@@ -204,7 +204,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param vault The address of the collateral being enabled.
     function enableCollateral(address account, address vault) public payable virtual
     ownerOrOperator(account) {
-        if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
+        if (!ICreditVaultRegistry(vaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
 
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
@@ -247,7 +247,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @param vault The address of the controller being enabled. 
     function enableController(address account, address vault) public payable virtual
     ownerOrOperator(account) {
-        if (!IEulerVaultRegistry(eulerVaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
+        if (!ICreditVaultRegistry(vaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
         
         accountControllers[account].insert(vault);
         requireAccountStatusCheck(account);
@@ -300,7 +300,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @notice Defers the account and vault checks until the end of the execution flow and executes a batch of batch items.
     /// @dev Accounts status checks and vault status checks are performed after all the batch items have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.
     /// @param items An array of batch items to be executed.
-    function batch(EulerBatchItem[] calldata items) public payable virtual {
+    function batch(BatchItem[] calldata items) public payable virtual {
         ExecutionContext memory context = executionContext;
         if (context.checksInProgressLock) revert ChecksReentrancy();
         else if (context.batchDepth >= BATCH_DEPTH__MAX) revert BatchDepthViolation();
@@ -325,8 +325,8 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     /// @return batchItemsResult An array of batch item results for each item.
     /// @return accountsStatusResult An array of account status results for each account.
     /// @return vaultsStatusResult An array of vault status results for each vault.
-    function batchRevert(EulerBatchItem[] calldata items) public payable virtual
-    returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult) {
+    function batchRevert(BatchItem[] calldata items) public payable virtual
+    returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult) {
         ExecutionContext memory context = executionContext;
         if (context.checksInProgressLock) revert ChecksReentrancy();
         else if (context.batchDepth >= BATCH_DEPTH__MAX) revert BatchDepthViolation();
@@ -347,8 +347,8 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         revert RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
     }
 
-    function batchSimulation(EulerBatchItem[] calldata items) public payable virtual
-    returns (EulerResult[] memory batchItemsResult, EulerResult[] memory accountsStatusResult, EulerResult[] memory vaultsStatusResult) {        
+    function batchSimulation(BatchItem[] calldata items) public payable virtual
+    returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult) {        
         (bool success, bytes memory result) = address(this).delegatecall(
             abi.encodeWithSelector(
                 this.batchRevert.selector,
@@ -362,7 +362,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         assembly { result := add(result, 4) }
         (batchItemsResult, accountsStatusResult, vaultsStatusResult) = abi.decode(
             result,
-            (EulerResult[], EulerResult[], EulerResult[])
+            (BatchResult[], BatchResult[], BatchResult[])
         );
     }
 
@@ -448,12 +448,12 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         (success, result) = targetContract.call{value: msgValue}(data);
     }
 
-    function batchInternal(EulerBatchItem[] calldata items, bool returnResult) internal
-    returns (EulerResult[] memory batchItemsResult) {
-        if (returnResult) batchItemsResult = new EulerResult[](items.length);
+    function batchInternal(BatchItem[] calldata items, bool returnResult) internal
+    returns (BatchResult[] memory batchItemsResult) {
+        if (returnResult) batchItemsResult = new BatchResult[](items.length);
 
         for (uint i = 0; i < items.length;) {
-            EulerBatchItem calldata item = items[i];
+            BatchItem calldata item = items[i];
             address targetContract = item.targetContract;
             bool success;
             bytes memory result;
@@ -485,7 +485,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
 
         (bool success, bytes memory result) = controllers.firstElement.staticcall(
             abi.encodeWithSelector(
-                IEulerVault.checkAccountStatus.selector,
+                ICreditVault.checkAccountStatus.selector,
                 account,
                 collaterals
             )
@@ -505,7 +505,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     returns (bool isValid, bytes memory data) {
         (bool success, bytes memory result) = vault.call(
             abi.encodeWithSelector(
-                IEulerVault.checkVaultStatus.selector
+                ICreditVault.checkVaultStatus.selector
             )
         );
         
@@ -520,7 +520,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     }
 
     function checkStatusAll(SetType setType, bool returnResult) private 
-    returns (EulerResult[] memory result) {
+    returns (BatchResult[] memory result) {
         function (address) returns (bool, bytes memory) checkStatus;
         function (address) requireStatusCheck;
         SetStorage storage setStorage;
@@ -538,7 +538,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
         address firstElement = setStorage.firstElement;
         uint8 numElements = setStorage.numElements;
 
-        if (returnResult) result = new EulerResult[](numElements);
+        if (returnResult) result = new BatchResult[](numElements);
         
         if (numElements == 0) return result;
 
@@ -588,7 +588,7 @@ contract EulerConductor is IEulerConductor, TransientStorage, Types {
     function invariantsCheck() public view {
         ExecutionContext memory context = executionContext;
         assert(context.batchDepth == BATCH_DEPTH__INIT);
-        assert(context.checksInProgressLock == false);
+        assert(!context.checksInProgressLock);
         assert(context.onBehalfOfAccount == address(0));
 
         SetStorage storage asChecks = accountStatusChecks;

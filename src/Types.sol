@@ -15,7 +15,7 @@ abstract contract Types {
         address[2**8] elements;
     }
 
-    struct EulerBatchItem {
+    struct BatchItem {
         bool allowError;
         address onBehalfOfAccount;
         address targetContract;
@@ -23,7 +23,7 @@ abstract contract Types {
         bytes data;
     }
 
-    struct EulerResult {
+    struct BatchResult {
         bool success;
         bytes result;
     }

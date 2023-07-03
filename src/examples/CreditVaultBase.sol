@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8.0;
 
-import "../interfaces/IEulerVault.sol";
-import "../interfaces/IEulerConductor.sol";
+import "../interfaces/ICreditVault.sol";
+import "../interfaces/ICreditVaultProtocol.sol";
 
-abstract contract EulerVaultBase is IEulerVault {
+abstract contract CreditVaultBase is ICreditVault {
     error Reentrancy();
     error MustBeNonReentrant();
     error NotAuthorized();
     error ControllerDisabled();
 
-    address public immutable eulerConductor;
+    ICVP public immutable cvp;
     uint private reentrancyGuard;
     bytes private transientBytes;
     
@@ -20,8 +20,8 @@ abstract contract EulerVaultBase is IEulerVault {
     uint constant private REENTRANCY_GUARD_BUSY = 2;
     uint constant private REENTRANCY_GUARD_CHECKS_IN_PROGRESS = 3;
     
-    constructor(address _eulerConductor) {
-        eulerConductor = _eulerConductor;
+    constructor(ICVP _cvp) {
+        cvp = _cvp;
         reentrancyGuard = REENTRANCY_GUARD_INIT;
     }
 
@@ -48,13 +48,13 @@ abstract contract EulerVaultBase is IEulerVault {
         _;
     }
 
-    modifier conductorOnly() {
-        if (msg.sender != eulerConductor) revert NotAuthorized();
+    modifier CVPOnly() {
+        if (msg.sender != address(cvp)) revert NotAuthorized();
         _;
     }
 
-    function conductorAuthenticate(address msgSender, address account, bool controllerEnabledCheck) internal view {
-        if (msgSender == eulerConductor) {
+    function CVPAuthenticate(address msgSender, address account, bool controllerEnabledCheck) internal view {
+        if (msgSender == address(cvp)) {
             bool checksDeferred;
             bool controllerEnabled;
             address onBehalfOfAccount;
@@ -63,18 +63,18 @@ abstract contract EulerVaultBase is IEulerVault {
                     checksDeferred, 
                     onBehalfOfAccount, 
                     controllerEnabled
-                ) = IEulerConductor(eulerConductor).getExecutionContextExtended(account, address(this));
+                ) = cvp.getExecutionContextExtended(account, address(this));
             } else {
                 (
                     checksDeferred, 
                     onBehalfOfAccount
-                ) = IEulerConductor(eulerConductor).getExecutionContext();
+                ) = cvp.getExecutionContext();
             }
 
             if (onBehalfOfAccount != account) revert NotAuthorized();
             if (controllerEnabledCheck && !controllerEnabled) revert ControllerDisabled();
         } else if (controllerEnabledCheck) {
-            if (!IEulerConductor(eulerConductor).isControllerEnabled(account, address(this))) revert ControllerDisabled();
+            if (!cvp.isControllerEnabled(account, address(this))) revert ControllerDisabled();
         }
     }
 
@@ -84,15 +84,15 @@ abstract contract EulerVaultBase is IEulerVault {
     }
 
     function requireVaultStatusCheck() internal checksInProgress {
-        IEulerConductor(eulerConductor).requireVaultStatusCheck(address(this));
+        cvp.requireVaultStatusCheck(address(this));
     }
 
     function requireAccountStatusCheck(address account) internal checksInProgress {
-        IEulerConductor(eulerConductor).requireAccountStatusCheck(account);
+        cvp.requireAccountStatusCheck(account);
     }
 
     function requireAccountsStatusCheck(address[] memory accounts) internal checksInProgress {
-        IEulerConductor(eulerConductor).requireAccountsStatusCheck(accounts);
+        cvp.requireAccountsStatusCheck(accounts);
     }
 
     function checkAccountStatus(address account, address[] calldata collaterals) external view 
@@ -107,7 +107,7 @@ abstract contract EulerVaultBase is IEulerVault {
         (isValid, data) = doCheckAccountStatus(account, collaterals);
     }
 
-    function checkVaultStatus() external conductorOnly returns (bool isValid, bytes memory data) {
+    function checkVaultStatus() external CVPOnly returns (bool isValid, bytes memory data) {
         uint reentrancyGuardCache = reentrancyGuard;
 
         if (

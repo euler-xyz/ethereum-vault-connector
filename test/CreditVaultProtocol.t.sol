@@ -3,14 +3,14 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../src/EulerConductor.sol";
+import "../src/CreditVaultProtocol.sol";
 import "../src/Types.sol";
 import "../src/Set.sol";
 
 contract TargetMock {
-    function func(address conductor, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
-        // also tests getExecutionContext() from the conductor
-        (bool _checksDeferred, address _onBehalfOfAccount) = EulerConductor(conductor).getExecutionContext();
+    function func(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
+        // also tests getExecutionContext() from the CVP
+        (bool _checksDeferred, address _onBehalfOfAccount) = ICVP(cvp).getExecutionContext();
 
         require(msg.sender == msgSender, "func/invalid-sender");
         require(msg.value == msgValue, "func/invalid-msg-value");
@@ -21,7 +21,7 @@ contract TargetMock {
     }
 }
 
-contract EulerRegistryMock is IEulerVaultRegistry {
+contract RegistryMock is ICreditVaultRegistry {
     mapping(address => bool) public isRegistered;
 
     function setRegistered(address vault, bool registered) external {
@@ -29,15 +29,15 @@ contract EulerRegistryMock is IEulerVaultRegistry {
     }
 }
 
-contract EulerVaultMock is IEulerVault, TargetMock, Test {
-    address public immutable eulerConductor;
+contract VaultMock is ICreditVault, TargetMock, Test {
+    ICVP public immutable cvp;
     uint internal vaultStatusState;
     bool[] internal vaultStatusChecked;
     uint internal accountStatusState;
     address[] internal accountStatusChecked;
 
-    constructor(address _eulerConductor) {
-        eulerConductor = _eulerConductor;
+    constructor(ICVP _cvp) {
+        cvp = _cvp;
     }
 
     function setVaultStatusState(uint state) external {
@@ -72,7 +72,7 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
     }
 
     function disableController(address account) external override {
-        EulerConductor(eulerConductor).disableController(account, address(this));
+        cvp.disableController(account, address(this));
     }
 
     function checkVaultStatus() external view override 
@@ -90,8 +90,8 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
     }
 
     function requireChecks(address account) external payable {
-        EulerConductor(eulerConductor).requireAccountStatusCheck(account);
-        EulerConductor(eulerConductor).requireVaultStatusCheck(address(this));
+        cvp.requireAccountStatusCheck(account);
+        cvp.requireVaultStatusCheck(address(this));
     }
 
     function call(address target, bytes memory data) external payable {
@@ -100,17 +100,17 @@ contract EulerVaultMock is IEulerVault, TargetMock, Test {
     }
 }
 
-contract EulerVaultMaliciousMock is IEulerVault {
-    address public immutable eulerConductor;
+contract VaultMaliciousMock is ICreditVault {
+    ICVP public immutable cvp;
 
-    constructor(address _eulerConductor) {
-        eulerConductor = _eulerConductor;
+    constructor(ICVP _cvp) {
+        cvp = _cvp;
     }
 
     function disableController(address account) external override {}
 
     function checkVaultStatus() external override returns (bool, bytes memory) {
-        // try to reenter the conductor batch. if it were possible, one could defer other vaults status checks
+        // try to reenter the CVP batch. if it were possible, one could defer other vaults status checks
         // by entering a batch here and make the checkStatusAll() malfunction. possible attack:
         // - execute a batch with any item that calls checkVaultStatus() on vault A
         // - checkStatusAll() calls checkVaultStatus() on vault A
@@ -118,17 +118,17 @@ contract EulerVaultMaliciousMock is IEulerVault {
         // - because checks are deferred, checkVaultStatus() on vault B is not executed right away
         // - control is handed over back to checkStatusAll() which had numElements = 1 when entering the loop
         // - the loop ends and "delete vaultStatusChecks" is called removing the vault status check scheduled on vault B
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](1);
+        Types.BatchItem[] memory items = new Types.BatchItem[](1);
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(0);
         items[0].msgValue = 0;
         items[0].data = "";
 
-        try EulerConductor(eulerConductor).batch(items) {
+        try cvp.batch(items) {
             assert(false);
         } catch (bytes memory err) {
-            assert(bytes4(err) == EulerConductor.ChecksReentrancy.selector);
+            assert(bytes4(err) == CreditVaultProtocol.ChecksReentrancy.selector);
             return (false, "");
         }
         return (true, "");
@@ -140,18 +140,18 @@ contract EulerVaultMaliciousMock is IEulerVault {
     }
 
     function requireChecks(address account) external payable {
-        EulerConductor(eulerConductor).requireAccountStatusCheck(account);
-        EulerConductor(eulerConductor).requireVaultStatusCheck(address(this));
+        cvp.requireAccountStatusCheck(account);
+        cvp.requireVaultStatusCheck(address(this));
     }
 }
 
-contract EulerConductorHandler is EulerConductor {
+contract CreditVaultProtocolHandler is CreditVaultProtocol {
     address[] expectedAccountsChecked;
     address[] expectedVaultsChecked;
 
     using Set for SetStorage;
 
-    constructor(address admin, address registry) EulerConductor(admin, registry) {}
+    constructor(address admin, address registry) CreditVaultProtocol(admin, registry) {}
 
     function reset() external {
         delete expectedAccountsChecked;
@@ -188,7 +188,7 @@ contract EulerConductorHandler is EulerConductor {
         super.requireAccountStatusCheckInternal(account);
 
         address[] memory controllers = accountControllers[account].get();
-        if (controllers.length == 1) EulerVaultMock(controllers[0]).pushAccountStatusChecked(account);
+        if (controllers.length == 1) VaultMock(controllers[0]).pushAccountStatusChecked(account);
     }
 
     function requireVaultStatusCheck(address vault) public override {
@@ -200,7 +200,7 @@ contract EulerConductorHandler is EulerConductor {
     function requireVaultStatusCheckInternal(address vault) internal override {
         super.requireVaultStatusCheckInternal(vault);
 
-        EulerVaultMock(vault).pushVaultStatusChecked();
+        VaultMock(vault).pushVaultStatusChecked();
     }
 
     function verifyStorage() internal view {
@@ -224,7 +224,7 @@ contract EulerConductorHandler is EulerConductor {
 
     function verifyVaultStatusChecks() internal view {
         for (uint i = 0; i < expectedVaultsChecked.length; ++i) {
-            require(EulerVaultMock(expectedVaultsChecked[i]).getVaultStatusChecked().length == 1, "verifyVaultStatusChecks");
+            require(VaultMock(expectedVaultsChecked[i]).getVaultStatusChecked().length == 1, "verifyVaultStatusChecks");
         }
     }
 
@@ -236,7 +236,7 @@ contract EulerConductorHandler is EulerConductor {
 
             if (controllers.length == 0) continue;
 
-            address[] memory accounts = EulerVaultMock(controllers[0]).getAccountStatusChecked();
+            address[] memory accounts = VaultMock(controllers[0]).getAccountStatusChecked();
 
             uint counter = 0;
             for(uint j = 0; j < accounts.length; ++j) {
@@ -287,7 +287,7 @@ contract EulerConductorHandler is EulerConductor {
         verifyAccountStatusChecks();
     }
 
-    function handlerBatch(EulerBatchItem[] calldata items) public payable {
+    function handlerBatch(BatchItem[] calldata items) public payable {
         super.batch(items);
 
         if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
@@ -316,13 +316,13 @@ contract EulerConductorHandler is EulerConductor {
     }
 }
 
-contract EulerConductorTest is Test {
+contract CreditVaultProtocolTest is Test {
     address governor = makeAddr("governor");
-    EulerConductorHandler conductor;
+    CreditVaultProtocolHandler cvp;
     address registry;
 
     event GovernorAdminSet(address indexed admin);
-    event EulerVaultRegistrySet(address indexed registry);
+    event VaultRegistrySet(address indexed registry);
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
 
     function samePrimaryAccount(address accountOne, address accountTwo) internal pure returns (bool) {
@@ -330,63 +330,63 @@ contract EulerConductorTest is Test {
     }
 
     function setUp() public {
-        registry = address(new EulerRegistryMock());
+        registry = address(new RegistryMock());
         vm.assume(governor != address(0));
         vm.assume(registry != address(0));
         
-        conductor = new EulerConductorHandler(governor, registry);
+        cvp = new CreditVaultProtocolHandler(governor, registry);
     }
 
     function test_SetGovernorAdmin(address newGovernor) public {
-        assertEq(conductor.governorAdmin(), governor);
+        assertEq(cvp.governorAdmin(), governor);
 
         vm.prank(governor);
-        vm.expectEmit(true, false, false, false, address(conductor));
+        vm.expectEmit(true, false, false, false, address(cvp));
         emit GovernorAdminSet(newGovernor);
-        conductor.setGovernorAdmin(newGovernor);
+        cvp.setGovernorAdmin(newGovernor);
 
-        assertEq(conductor.governorAdmin(), newGovernor);
+        assertEq(cvp.governorAdmin(), newGovernor);
     }
 
     function test_SetGovernorAdmin_RevertIfNotGovernor(address newGovernor, address notGovernor) public {
         vm.assume(notGovernor != governor);
 
-        assertEq(conductor.governorAdmin(), governor);
+        assertEq(cvp.governorAdmin(), governor);
 
         vm.prank(notGovernor);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.setGovernorAdmin(newGovernor);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.setGovernorAdmin(newGovernor);
     }
 
-    function test_SetEulerVaultRegistry(address newRegistry) public {
+    function test_SetVaultRegistry(address newRegistry) public {
         vm.assume(newRegistry != address(0));
 
-        assertEq(conductor.eulerVaultRegistry(), registry);
+        assertEq(cvp.vaultRegistry(), registry);
 
         vm.prank(governor);
-        vm.expectEmit(true, false, false, false, address(conductor));
-        emit EulerVaultRegistrySet(newRegistry);
-        conductor.setEulerVaultRegistry(newRegistry);
+        vm.expectEmit(true, false, false, false, address(cvp));
+        emit VaultRegistrySet(newRegistry);
+        cvp.setVaultRegistry(newRegistry);
 
-        assertEq(conductor.eulerVaultRegistry(), newRegistry);
+        assertEq(cvp.vaultRegistry(), newRegistry);
     }
 
-    function test_SetEulerVaultRegistry_RevertIfNotGovernor(address newRegistry, address notGovernor) public {
+    function test_SetVaultRegistry_RevertIfNotGovernor(address newRegistry, address notGovernor) public {
         vm.assume(notGovernor != governor && newRegistry != address(0));
 
-        assertEq(conductor.eulerVaultRegistry(), registry);
+        assertEq(cvp.vaultRegistry(), registry);
 
         vm.prank(notGovernor);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.setEulerVaultRegistry(newRegistry);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.setVaultRegistry(newRegistry);
     }
 
-    function test_SetEulerVaultRegistry_RevertIfZeroAddress() public {
-        assertEq(conductor.eulerVaultRegistry(), registry);
+    function test_SetVaultRegistry_RevertIfZeroAddress() public {
+        assertEq(cvp.vaultRegistry(), registry);
 
         vm.prank(governor);
-        vm.expectRevert(EulerConductor.InvalidAddress.selector);
-        conductor.setEulerVaultRegistry(address(0));
+        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        cvp.setVaultRegistry(address(0));
     }
 
     function test_SetAccountOperator(address alice, address operator) public {
@@ -395,21 +395,21 @@ contract EulerConductorTest is Test {
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
 
-            assertFalse(conductor.accountOperators(account, operator));
+            assertFalse(cvp.accountOperators(account, operator));
 
             vm.prank(alice);
-            vm.expectEmit(true, true, false, true, address(conductor));
+            vm.expectEmit(true, true, false, true, address(cvp));
             emit AccountOperatorSet(account, operator, true);
-            conductor.setAccountOperator(account, operator, true);
+            cvp.setAccountOperator(account, operator, true);
 
-            assertTrue(conductor.accountOperators(account, operator));
+            assertTrue(cvp.accountOperators(account, operator));
 
             vm.prank(alice);
-            vm.expectEmit(true, true, false, true, address(conductor));
+            vm.expectEmit(true, true, false, true, address(cvp));
             emit AccountOperatorSet(account, operator, false);
-            conductor.setAccountOperator(account, operator, false);
+            cvp.setAccountOperator(account, operator, false);
 
-            assertFalse(conductor.accountOperators(account, operator));
+            assertFalse(cvp.accountOperators(account, operator));
         }
     }
 
@@ -418,36 +418,36 @@ contract EulerConductorTest is Test {
 
         address account = address(uint160(uint160(alice) ^ 256));
 
-        assertFalse(conductor.accountOperators(account, operator));
+        assertFalse(cvp.accountOperators(account, operator));
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.setAccountOperator(account, operator, true);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.setAccountOperator(account, operator, true);
     }
 
     function test_SetAccountOperator_RevertIfOperatorIsSenderSubAccount(address alice, uint8 subAccountId) public {
         address operator = address(uint160(uint160(alice) ^ subAccountId));
 
-        assertFalse(conductor.accountOperators(alice, operator));
+        assertFalse(cvp.accountOperators(alice, operator));
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.InvalidAddress.selector);
-        conductor.setAccountOperator(alice, operator, true);
+        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        cvp.setAccountOperator(alice, operator, true);
     }
 
     function test_GetExecutionContext(uint8 depth, address account) external {
         vm.assume(depth > 0);
         vm.assume(account != address(0));
 
-        (bool checksDeferred, address onBehalfOfAccount) = conductor.getExecutionContext();
+        (bool checksDeferred, address onBehalfOfAccount) = cvp.getExecutionContext();
 
         assertFalse(checksDeferred);
         assertEq(onBehalfOfAccount, address(0));
         
-        conductor.setBatchDepth(depth);
-        conductor.setOnBehalfOfAccount(account);
+        cvp.setBatchDepth(depth);
+        cvp.setOnBehalfOfAccount(account);
 
-        (checksDeferred, onBehalfOfAccount) = conductor.getExecutionContext();
+        (checksDeferred, onBehalfOfAccount) = cvp.getExecutionContext();
         
         assertEq(checksDeferred, depth > 1 ? true : false);
         assertEq(onBehalfOfAccount, account);
@@ -456,14 +456,14 @@ contract EulerConductorTest is Test {
     function test_GetExecutionContextExtended(address account, uint seed) external {
         vm.assume(account != address(0));
 
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(controller, true);
 
         (
             bool checksDeferred, 
             address onBehalfOfAccount, 
             bool controllerEnabled
-        ) = conductor.getExecutionContextExtended(account, controller);
+        ) = cvp.getExecutionContextExtended(account, controller);
 
         assertFalse(checksDeferred);
         assertEq(onBehalfOfAccount, address(0));
@@ -471,11 +471,11 @@ contract EulerConductorTest is Test {
         
         if (seed % 2 == 0) {
             vm.prank(account);
-            conductor.enableController(account, controller);
+            cvp.enableController(account, controller);
         }
 
-        conductor.setBatchDepth(seed % 3 == 0 ? 2 : 1);
-        conductor.setOnBehalfOfAccount(account);
+        cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
+        cvp.setOnBehalfOfAccount(account);
 
         if (seed % 3 == 0) vm.prank(controller);
 
@@ -483,7 +483,7 @@ contract EulerConductorTest is Test {
             checksDeferred, 
             onBehalfOfAccount, 
             controllerEnabled
-        ) = conductor.getExecutionContextExtended(account, controller);
+        ) = cvp.getExecutionContextExtended(account, controller);
         
         assertEq(checksDeferred, seed % 3 == 0 ? true : false);
         assertEq(onBehalfOfAccount, account);
@@ -493,42 +493,42 @@ contract EulerConductorTest is Test {
     function test_GetExecutionContextExtended_RevertIfChecksDeferredAndMsgSenderNotVault(address account) external {
         vm.assume(account != address(0));
 
-        address controller = address(new EulerVaultMock(address(conductor)));
+        address controller = address(new VaultMock(cvp));
         vm.assume(account != address(this));
         vm.assume(account != controller);
         
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        RegistryMock(registry).setRegistered(controller, true);
         vm.prank(account);
-        conductor.enableController(account, controller);
+        cvp.enableController(account, controller);
         
-        conductor.setBatchDepth(2);
-        conductor.setOnBehalfOfAccount(account);
+        cvp.setBatchDepth(2);
+        cvp.setOnBehalfOfAccount(account);
 
         vm.prank(account);
-        vm.expectRevert(EulerConductor.DeferralViolation.selector);
-        conductor.getExecutionContextExtended(account, controller);
+        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
+        cvp.getExecutionContextExtended(account, controller);
     }
 
     function test_GetCollaterals(address alice) public {
-        conductor.setBatchDepth(1);
-        conductor.getCollaterals(alice);
+        cvp.setBatchDepth(1);
+        cvp.getCollaterals(alice);
     }
 
     function test_GetCollaterals_RevertIfChecksDeferred(address alice) public {
-        conductor.setBatchDepth(2);
-        vm.expectRevert(EulerConductor.DeferralViolation.selector);
-        conductor.getCollaterals(alice);
+        cvp.setBatchDepth(2);
+        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
+        cvp.getCollaterals(alice);
     }
 
     function test_IsCollateralEnabled(address alice, address vault) public {
-        conductor.setBatchDepth(1);
-        conductor.isCollateralEnabled(alice, vault);
+        cvp.setBatchDepth(1);
+        cvp.isCollateralEnabled(alice, vault);
     }
 
     function test_IsCollateralEnabled_RevertIfChecksDeferred(address alice, address vault) public {
-        conductor.setBatchDepth(2);
-        vm.expectRevert(EulerConductor.DeferralViolation.selector);
-        conductor.isCollateralEnabled(alice, vault);
+        cvp.setBatchDepth(2);
+        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
+        cvp.isCollateralEnabled(alice, vault);
     }
 
     function test_CollateralsManagement(address alice, uint8 subAccountId, uint8 numberOfVaults, uint seed) public {
@@ -542,37 +542,37 @@ contract EulerConductorTest is Test {
         if (seed % 2 == 0 && !samePrimaryAccount(account, address(uint160(seed)))) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            conductor.setAccountOperator(account, msgSender, true);
+            cvp.setAccountOperator(account, msgSender, true);
         }
 
         // enable a controller to check if account status check works properly
-        address controller = address(new EulerVaultMock(address(conductor)));
+        address controller = address(new VaultMock(cvp));
         if (seed % 3 == 0) {
-            EulerRegistryMock(registry).setRegistered(controller, true);
+            RegistryMock(registry).setRegistered(controller, true);
 
             vm.prank(alice);
-            conductor.enableController(account, controller);
+            cvp.enableController(account, controller);
         }
 
         // enabling collaterals
         for (uint i = 1; i <= numberOfVaults; ++i) {
-            conductor.reset();
-            EulerVaultMock(controller).reset();
-            address[] memory collateralsPre = conductor.getCollaterals(account);
+            cvp.reset();
+            VaultMock(controller).reset();
+            address[] memory collateralsPre = cvp.getCollaterals(account);
 
             address vault = i % 5 == 0
                 ? collateralsPre[seed % collateralsPre.length]
-                : address(new EulerVaultMock(address(conductor)));
+                : address(new VaultMock(cvp));
 
-            EulerRegistryMock(registry).setRegistered(vault, true);
-            bool alreadyEnabled = conductor.isCollateralEnabled(account, vault);
+            RegistryMock(registry).setRegistered(vault, true);
+            bool alreadyEnabled = cvp.isCollateralEnabled(account, vault);
 
             assert((alreadyEnabled && i % 5 == 0) || (!alreadyEnabled && i % 5 != 0));
 
             vm.prank(msgSender);
-            conductor.handlerEnableCollateral(account, vault);
+            cvp.handlerEnableCollateral(account, vault);
 
-            address[] memory collateralsPost = conductor.getCollaterals(account);
+            address[] memory collateralsPost = cvp.getCollaterals(account);
 
             if (alreadyEnabled) {
                 assertEq(collateralsPost.length, collateralsPre.length);
@@ -587,16 +587,16 @@ contract EulerConductorTest is Test {
         }
 
         // disabling collaterals
-        while (conductor.getCollaterals(account).length > 0) {
-            conductor.reset();
-            EulerVaultMock(controller).reset();
-            address[] memory collateralsPre = conductor.getCollaterals(account);
+        while (cvp.getCollaterals(account).length > 0) {
+            cvp.reset();
+            VaultMock(controller).reset();
+            address[] memory collateralsPre = cvp.getCollaterals(account);
             address vault = collateralsPre[seed % collateralsPre.length];
 
             vm.prank(msgSender);
-            conductor.handlerDisableCollateral(account, vault);
+            cvp.handlerDisableCollateral(account, vault);
 
-            address[] memory collateralsPost = conductor.getCollaterals(account);
+            address[] memory collateralsPost = cvp.getCollaterals(account);
 
             assertEq(collateralsPost.length, collateralsPre.length - 1);
 
@@ -609,118 +609,118 @@ contract EulerConductorTest is Test {
     function test_CollateralsManagement_RevertIfNotOwnerAndNotOperator(address alice, address bob) public {
         vm.assume(!samePrimaryAccount(alice, bob));
 
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.handlerEnableCollateral(bob, vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.handlerEnableCollateral(bob, vault);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.handlerDisableCollateral(bob, vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.handlerDisableCollateral(bob, vault);
 
         vm.prank(bob);
-        conductor.setAccountOperator(bob, alice, true);
+        cvp.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        conductor.handlerEnableCollateral(bob, vault);
+        cvp.handlerEnableCollateral(bob, vault);
 
         vm.prank(alice);
-        conductor.handlerDisableCollateral(bob, vault);
+        cvp.handlerDisableCollateral(bob, vault);
     }
 
     function test_CollateralsManagement_RevertIfVaultNotRegistered(address alice) public {
-        address vault = address(new EulerVaultMock(address(conductor)));
+        address vault = address(new VaultMock(cvp));
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.RegistryViolation.selector,
+                CreditVaultProtocol.RegistryViolation.selector,
                 vault
             )
         );
-        conductor.handlerEnableCollateral(alice, vault);
+        cvp.handlerEnableCollateral(alice, vault);
 
         vm.prank(alice);
         // does not revert. because only registered collaterals can be enabled it doesn't check for registration here
-        conductor.handlerDisableCollateral(alice, vault);
+        cvp.handlerDisableCollateral(alice, vault);
 
-        EulerRegistryMock(registry).setRegistered(vault, true);
-
-        vm.prank(alice);
-        conductor.handlerEnableCollateral(alice, vault);
+        RegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
-        conductor.handlerDisableCollateral(alice, vault);
+        cvp.handlerEnableCollateral(alice, vault);
+
+        vm.prank(alice);
+        cvp.handlerDisableCollateral(alice, vault);
     }
 
     function test_CollateralsManagement_RevertIfAccountStatusViolated(address alice) public {
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(controller, true);
-
-        vm.prank(alice);
-        conductor.enableController(alice, controller);
-        EulerVaultMock(controller).reset();
-
-        EulerVaultMock(controller).setAccountStatusState(1); // account status is violated
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                EulerConductor.AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
-        conductor.handlerEnableCollateral(alice, vault);
+        cvp.enableController(alice, controller);
+        VaultMock(controller).reset();
+
+        VaultMock(controller).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.AccountStatusViolation.selector,
+                CreditVaultProtocol.AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
         );
-        conductor.handlerDisableCollateral(alice, vault);
-
-        EulerVaultMock(controller).setAccountStatusState(0); // account status is NOT violated
+        cvp.handlerEnableCollateral(alice, vault);
 
         vm.prank(alice);
-        conductor.handlerEnableCollateral(alice, vault);
-        EulerVaultMock(controller).reset(); // reset so that the account status check verification succeeds
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultProtocol.AccountStatusViolation.selector,
+                alice,
+                "account status violation"
+            )
+        );
+        cvp.handlerDisableCollateral(alice, vault);
+
+        VaultMock(controller).setAccountStatusState(0); // account status is NOT violated
 
         vm.prank(alice);
-        conductor.handlerDisableCollateral(alice, vault);
+        cvp.handlerEnableCollateral(alice, vault);
+        VaultMock(controller).reset(); // reset so that the account status check verification succeeds
+
+        vm.prank(alice);
+        cvp.handlerDisableCollateral(alice, vault);
     }
 
     function test_GetControllers(address alice) public {
-        conductor.setBatchDepth(1);
-        conductor.getControllers(alice);
+        cvp.setBatchDepth(1);
+        cvp.getControllers(alice);
     }
 
     function test_GetControllers_RevertIfChecksDeferred(address alice) public {
-        conductor.setBatchDepth(2);
-        vm.expectRevert(EulerConductor.DeferralViolation.selector);
-        conductor.getControllers(alice);
+        cvp.setBatchDepth(2);
+        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
+        cvp.getControllers(alice);
     }
 
     function test_IsControllerEnabled(address alice) public {
-        address vault = address(new EulerVaultMock(address(conductor)));
-        conductor.setBatchDepth(1);
-        conductor.isControllerEnabled(alice, vault);
+        address vault = address(new VaultMock(cvp));
+        cvp.setBatchDepth(1);
+        cvp.isControllerEnabled(alice, vault);
 
         // even though checks are deferred, the function succeeds if called by the vault asking if vault enabled
         // as a controller
-        conductor.setBatchDepth(2);
-        EulerVaultMock(vault).call(
-            address(conductor),
+        cvp.setBatchDepth(2);
+        VaultMock(vault).call(
+            address(cvp),
             abi.encodeWithSelector(
-                EulerConductor.isControllerEnabled.selector,
+                cvp.isControllerEnabled.selector,
                 alice,
                 vault
             )
@@ -731,11 +731,11 @@ contract EulerConductorTest is Test {
         vm.assume(alice != vault);
         vm.assume(address(this) != vault);
 
-        conductor.setBatchDepth(2);
+        cvp.setBatchDepth(2);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.DeferralViolation.selector);
-        conductor.isControllerEnabled(alice, vault);
+        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
+        cvp.isControllerEnabled(alice, vault);
     }
 
     function test_ControllersManagement(address alice, uint8 subAccountId, uint seed) public {
@@ -748,117 +748,117 @@ contract EulerConductorTest is Test {
         if (seed % 2 == 0 && !samePrimaryAccount(account, address(uint160(seed)))) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            conductor.setAccountOperator(account, msgSender, true);
+            cvp.setAccountOperator(account, msgSender, true);
         }
 
         // enabling controller
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
-        assertFalse(conductor.isControllerEnabled(account, vault));
-        address[] memory controllersPre = conductor.getControllers(account);
+        assertFalse(cvp.isControllerEnabled(account, vault));
+        address[] memory controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
-        conductor.handlerEnableController(account, vault);
+        cvp.handlerEnableController(account, vault);
 
-        address[] memory controllersPost = conductor.getControllers(account);
+        address[] memory controllersPost = cvp.getControllers(account);
 
         assertEq(controllersPost.length, controllersPre.length + 1);
         assertEq(controllersPost[controllersPost.length - 1], vault);
-        assertTrue(conductor.isControllerEnabled(account, vault));
+        assertTrue(cvp.isControllerEnabled(account, vault));
 
         // enabling the same controller again should succeed (duplicate will not be added)
-        conductor.reset();
-        EulerVaultMock(vault).reset();
-        assertTrue(conductor.isControllerEnabled(account, vault));
-        controllersPre = conductor.getControllers(account);
+        cvp.reset();
+        VaultMock(vault).reset();
+        assertTrue(cvp.isControllerEnabled(account, vault));
+        controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
-        conductor.handlerEnableController(account, vault);
+        cvp.handlerEnableController(account, vault);
 
-        controllersPost = conductor.getControllers(account);
+        controllersPost = cvp.getControllers(account);
 
         assertEq(controllersPost.length, controllersPre.length);
         assertEq(controllersPost[0], controllersPre[0]);
-        assertTrue(conductor.isControllerEnabled(account, vault));
+        assertTrue(cvp.isControllerEnabled(account, vault));
 
         // trying to enable second controller will throw on the account status check
-        address otherVault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(otherVault, true);
+        address otherVault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(otherVault, true);
 
         vm.prank(msgSender);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.ControllerViolation.selector,
+                CreditVaultProtocol.ControllerViolation.selector,
                 account
             )
         );
-        conductor.handlerEnableController(account, otherVault);
+        cvp.handlerEnableController(account, otherVault);
 
         // only the controller vault can disable itself
-        conductor.reset();
-        EulerVaultMock(vault).reset();
-        assertTrue(conductor.isControllerEnabled(account, vault));
-        controllersPre = conductor.getControllers(account);
+        cvp.reset();
+        VaultMock(vault).reset();
+        assertTrue(cvp.isControllerEnabled(account, vault));
+        controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
-        EulerVaultMock(vault).call(
-            address(conductor),
+        VaultMock(vault).call(
+            address(cvp),
             abi.encodeWithSelector(
-                EulerConductorHandler.handlerDisableController.selector,
+                cvp.handlerDisableController.selector,
                 account,
                 vault
             )
         );
 
-        controllersPost = conductor.getControllers(account);
+        controllersPost = cvp.getControllers(account);
 
         assertEq(controllersPost.length, controllersPre.length - 1);
         assertEq(controllersPost.length, 0);
-        assertFalse(conductor.isControllerEnabled(account, vault));
+        assertFalse(cvp.isControllerEnabled(account, vault));
     }
 
     function test_EnableController_RevertIfNotOwnerAndNotOperator(address alice, address bob) public {
         vm.assume(!samePrimaryAccount(alice, bob));
 
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.handlerEnableController(bob, vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        conductor.setAccountOperator(bob, alice, true);
+        cvp.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        conductor.handlerEnableController(bob, vault);
+        cvp.handlerEnableController(bob, vault);
     }
 
     function test_DisableController_RevertIfMsgSenderNotController(address alice, address bob) public {
         vm.assume(!samePrimaryAccount(alice, bob));
 
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
         vm.assume(alice != vault);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.handlerDisableController(bob, vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.handlerDisableController(bob, vault);
 
         vm.prank(bob);
-        conductor.setAccountOperator(bob, alice, true);
+        cvp.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector); // although operator, controller msg.sender is still expected
-        conductor.handlerDisableController(bob, vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector); // although operator, controller msg.sender is still expected
+        cvp.handlerDisableController(bob, vault);
 
         vm.prank(alice);
-        EulerVaultMock(vault).call(
-            address(conductor),
+        VaultMock(vault).call(
+            address(cvp),
             abi.encodeWithSelector(
-                EulerConductorHandler.handlerDisableController.selector,
+                cvp.handlerDisableController.selector,
                 bob,
                 vault
             )
@@ -866,35 +866,35 @@ contract EulerConductorTest is Test {
     }
 
     function test_ControllersManagement_RevertIfVaultNotRegistered(address alice) public {
-        address vault = address(new EulerVaultMock(address(conductor)));
+        address vault = address(new VaultMock(cvp));
 
         vm.assume(alice != vault);
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.RegistryViolation.selector,
+                CreditVaultProtocol.RegistryViolation.selector,
                 vault
             )
         );
-        conductor.handlerEnableController(alice, vault);
+        cvp.handlerEnableController(alice, vault);
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.handlerDisableController(alice, vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.handlerDisableController(alice, vault);
 
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        RegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
-        conductor.handlerEnableController(alice, vault);
+        cvp.handlerEnableController(alice, vault);
 
-        conductor.reset();
-        EulerVaultMock(vault).reset();
+        cvp.reset();
+        VaultMock(vault).reset();
         vm.prank(alice);
-        EulerVaultMock(vault).call(
-            address(conductor),
+        VaultMock(vault).call(
+            address(cvp),
             abi.encodeWithSelector(
-                EulerConductorHandler.handlerDisableController.selector,
+                cvp.handlerDisableController.selector,
                 alice,
                 vault
             )
@@ -902,60 +902,60 @@ contract EulerConductorTest is Test {
     }
 
     function test_ControllersManagement_RevertIfAccountStatusViolated(address alice) public {
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
-        EulerVaultMock(vault).setAccountStatusState(1); // account status is violated
+        VaultMock(vault).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.AccountStatusViolation.selector,
+                CreditVaultProtocol.AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
         );
-        conductor.handlerEnableController(alice, vault);
+        cvp.handlerEnableController(alice, vault);
 
         vm.prank(alice);
         // succeeds as there's no controller to perform the account status check
-        EulerVaultMock(vault).call(
-            address(conductor),
+        VaultMock(vault).call(
+            address(cvp),
             abi.encodeWithSelector(
-                EulerConductorHandler.handlerDisableController.selector,
+                cvp.handlerDisableController.selector,
                 alice,
                 vault
             )
         );
 
-        conductor.reset();
-        EulerVaultMock(vault).reset();
-        EulerVaultMock(vault).setAccountStatusState(1); // account status is still violated
+        cvp.reset();
+        VaultMock(vault).reset();
+        VaultMock(vault).setAccountStatusState(1); // account status is still violated
 
         vm.prank(alice);
         // succeeds as there's no controller to perform the account status check
-        conductor.handlerEnableCollateral(alice, vault);
+        cvp.handlerEnableCollateral(alice, vault);
 
-        conductor.reset();
-        EulerVaultMock(vault).reset(); // account status is no longer violated in order to enable controller
+        cvp.reset();
+        VaultMock(vault).reset(); // account status is no longer violated in order to enable controller
 
         vm.prank(alice);
-        conductor.handlerEnableController(alice, vault);
+        cvp.handlerEnableController(alice, vault);
 
-        conductor.reset();
-        EulerVaultMock(vault).reset();
-        EulerVaultMock(vault).setAccountStatusState(1); // account status is violated again
+        cvp.reset();
+        VaultMock(vault).reset();
+        VaultMock(vault).setAccountStatusState(1); // account status is violated again
 
         vm.prank(alice);
         // it won't succeed as this time we have a controller so the account status check is performed
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.AccountStatusViolation.selector,
+                CreditVaultProtocol.AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
         );
-        conductor.handlerEnableCollateral(alice, vault);
+        cvp.handlerEnableCollateral(alice, vault);
     }
 
     function test_Call(address alice, uint96 seed) public {
@@ -964,7 +964,7 @@ contract EulerConductorTest is Test {
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(uint160(alice) ^ 256));
             vm.prank(account);
-            conductor.setAccountOperator(account, alice, true);
+            cvp.setAccountOperator(account, alice, true);
         } else {
             // in this case the account is alice's sub-account
             account = address(uint160(uint160(alice) ^ (seed % 256)));
@@ -972,19 +972,19 @@ contract EulerConductorTest is Test {
         vm.assume(account != address(0));
 
         address targetContract = address(new TargetMock());
-        vm.assume(targetContract != address(conductor));
+        vm.assume(targetContract != address(cvp));
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             account
         );
 
         hoax(alice, seed);
-        (bool success, bytes memory result) = conductor.handlerCall{value: seed}(
+        (bool success, bytes memory result) = cvp.handlerCall{value: seed}(
             targetContract,
             account,
             data
@@ -996,15 +996,15 @@ contract EulerConductorTest is Test {
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
         data = abi.encodeWithSelector(
             TargetMock(targetContract).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        (success, result) = conductor.handlerCall{value: seed}(
+        (success, result) = cvp.handlerCall{value: seed}(
             targetContract,
             address(0),
             data
@@ -1020,20 +1020,20 @@ contract EulerConductorTest is Test {
         vm.assume(bob != address(0));
         
         address targetContract = address(new TargetMock());
-        vm.assume(targetContract != address(conductor));
+        vm.assume(targetContract != address(cvp));
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        (bool success,) = conductor.handlerCall{value: seed}(
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        (bool success,) = cvp.handlerCall{value: seed}(
             targetContract,
             bob,
             data
@@ -1046,12 +1046,12 @@ contract EulerConductorTest is Test {
     function test_Call_RevertIfTargetContractInvalid(address alice, uint seed) public {
         vm.assume(alice != address(0));
 
-        // target contract is the conductor
-        address targetContract = address(conductor);
+        // target contract is the CVP
+        address targetContract = address(cvp);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(targetContract).func.selector,
-            address(conductor),
+            address(cvp),
             targetContract,
             seed,
             false,
@@ -1059,9 +1059,9 @@ contract EulerConductorTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(EulerConductor.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
 
-        (bool success,) = conductor.handlerCall{value: seed}(
+        (bool success,) = cvp.handlerCall{value: seed}(
             targetContract,
             alice,
             data
@@ -1077,7 +1077,7 @@ contract EulerConductorTest is Test {
 
         data = abi.encodeWithSelector(
             TargetMock(targetContract).func.selector,
-            address(conductor),
+            address(cvp),
             targetContract,
             seed,
             false,
@@ -1085,9 +1085,9 @@ contract EulerConductorTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(EulerConductor.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
 
-        (success,) = conductor.handlerCall{value: seed}(
+        (success,) = cvp.handlerCall{value: seed}(
             targetContract,
             alice,
             data
@@ -1099,28 +1099,28 @@ contract EulerConductorTest is Test {
     function test_CallFromControllerToCollateral(address alice, uint96 seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new EulerVaultMock(address(conductor)));
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(collateral, true);
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        address collateral = address(new VaultMock(cvp));
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(collateral, true);
+        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
-        conductor.enableCollateral(alice, collateral);
+        cvp.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        conductor.enableController(alice, controller);
+        cvp.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
         );
 
         hoax(controller, seed);
-        (bool success, bytes memory result) = conductor.handlerCallFromControllerToCollateral{value: seed}(
+        (bool success, bytes memory result) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
             data
@@ -1132,22 +1132,22 @@ contract EulerConductorTest is Test {
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
         // note that in this case the controller tries to act on behalf itself
         vm.prank(controller);
-        conductor.enableCollateral(controller, collateral);
+        cvp.enableCollateral(controller, collateral);
 
         vm.prank(controller);
-        conductor.enableController(controller, controller);
+        cvp.enableController(controller, controller);
 
         data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             controller
         );
 
         hoax(controller, seed);
-        (success, result) = conductor.handlerCallFromControllerToCollateral{value: seed}(
+        (success, result) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             address(0),
             data
@@ -1160,18 +1160,18 @@ contract EulerConductorTest is Test {
     function test_CallFromControllerToCollateral_RevertIfNoControllerEnabled(address alice, uint seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new EulerVaultMock(address(conductor)));
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(collateral, true);
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        address collateral = address(new VaultMock(cvp));
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(collateral, true);
+        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
-        conductor.enableCollateral(alice, collateral);
+        cvp.enableCollateral(alice, collateral);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
@@ -1180,11 +1180,11 @@ contract EulerConductorTest is Test {
         hoax(controller, seed);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.ControllerViolation.selector,
+                CreditVaultProtocol.ControllerViolation.selector,
                 alice
             )
         );
-        (bool success,) = conductor.handlerCallFromControllerToCollateral{value: seed}(
+        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
             data
@@ -1196,29 +1196,29 @@ contract EulerConductorTest is Test {
     function test_CallFromControllerToCollateral_RevertIfMultipleControllersEnabled(address alice, uint seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new EulerVaultMock(address(conductor)));
-        address controller_1 = address(new EulerVaultMock(address(conductor)));
-        address controller_2 = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(collateral, true);
-        EulerRegistryMock(registry).setRegistered(controller_1, true);
-        EulerRegistryMock(registry).setRegistered(controller_2, true);
+        address collateral = address(new VaultMock(cvp));
+        address controller_1 = address(new VaultMock(cvp));
+        address controller_2 = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(collateral, true);
+        RegistryMock(registry).setRegistered(controller_1, true);
+        RegistryMock(registry).setRegistered(controller_2, true);
 
         // mock checks deferred to enable multiple controllers
-        conductor.setBatchDepth(2);
+        cvp.setBatchDepth(2);
 
         vm.prank(alice);
-        conductor.enableCollateral(alice, collateral);
+        cvp.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        conductor.enableController(alice, controller_1);
+        cvp.enableController(alice, controller_1);
 
         vm.prank(alice);
-        conductor.enableController(alice, controller_2);
+        cvp.enableController(alice, controller_2);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
@@ -1227,11 +1227,11 @@ contract EulerConductorTest is Test {
         hoax(controller_1, seed);
         vm.expectRevert(
             abi.encodeWithSelector(
-                EulerConductor.ControllerViolation.selector,
+                CreditVaultProtocol.ControllerViolation.selector,
                 alice
             )
         );
-        (bool success,) = conductor.handlerCallFromControllerToCollateral{value: seed}(
+        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
             data
@@ -1243,31 +1243,31 @@ contract EulerConductorTest is Test {
     function test_CallFromControllerToCollateral_RevertIfMsgSenderIsNotEnabledController(address alice, address randomAddress, uint seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new EulerVaultMock(address(conductor)));
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(collateral, true);
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        address collateral = address(new VaultMock(cvp));
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(collateral, true);
+        RegistryMock(registry).setRegistered(controller, true);
 
         vm.assume(randomAddress != controller);
 
         vm.prank(alice);
-        conductor.enableCollateral(alice, collateral);
+        cvp.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        conductor.enableController(alice, controller);
+        cvp.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
         );
 
         hoax(randomAddress, seed);
-        vm.expectRevert(abi.encodeWithSelector(EulerConductor.NotAuthorized.selector));
-        (bool success,) = conductor.handlerCallFromControllerToCollateral{value: seed}(
+        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.NotAuthorized.selector));
+        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
             data
@@ -1279,31 +1279,31 @@ contract EulerConductorTest is Test {
     function test_CallFromControllerToCollateral_RevertIfTargetContractIsNotEnabledCollateral(address alice, address targetContract, uint seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new EulerVaultMock(address(conductor)));
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(collateral, true);
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        address collateral = address(new VaultMock(cvp));
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(collateral, true);
+        RegistryMock(registry).setRegistered(controller, true);
 
         vm.assume(targetContract != collateral);
 
         vm.prank(alice);
-        conductor.enableCollateral(alice, collateral);
+        cvp.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        conductor.enableController(alice, controller);
+        cvp.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed,
             false,
             alice
         );
 
         hoax(controller, seed);
-        vm.expectRevert(abi.encodeWithSelector(EulerConductor.NotAuthorized.selector));
-        (bool success,) = conductor.handlerCallFromControllerToCollateral{value: seed}(
+        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.NotAuthorized.selector));
+        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             targetContract,
             alice,
             data
@@ -1327,17 +1327,17 @@ contract EulerConductorTest is Test {
             }
             if (seen) continue;
 
-            address controller = address(new EulerVaultMock(address(conductor)));
-            EulerRegistryMock(registry).setRegistered(controller, true);
+            address controller = address(new VaultMock(cvp));
+            RegistryMock(registry).setRegistered(controller, true);
 
             if (!allStatusesValid) {
                 vm.prank(account);
-                conductor.enableController(account, controller);
+                cvp.enableController(account, controller);
             }
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
-            EulerVaultMock(controller).setAccountStatusState(
+            VaultMock(controller).setAccountStatusState(
                 allStatusesValid
                 ? 0
                 : uint160(account) % 3 == 0
@@ -1348,13 +1348,13 @@ contract EulerConductorTest is Test {
             );
 
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
-                assertFalse(conductor.checkAccountStatus(account));
+                assertFalse(cvp.checkAccountStatus(account));
             } else {
-                assertTrue(conductor.checkAccountStatus(account));
+                assertTrue(cvp.checkAccountStatus(account));
             }
         }
 
-        bool[] memory isValid = conductor.checkAccountsStatus(accounts);
+        bool[] memory isValid = cvp.checkAccountsStatus(accounts);
         for (uint i = 0; i < accounts.length; i++) {
             address account = accounts[i];
 
@@ -1378,17 +1378,17 @@ contract EulerConductorTest is Test {
             }
             if (seen) continue;
 
-            address controller = address(new EulerVaultMock(address(conductor)));
-            EulerRegistryMock(registry).setRegistered(controller, true);
+            address controller = address(new VaultMock(cvp));
+            RegistryMock(registry).setRegistered(controller, true);
 
             if (!allStatusesValid) {
                 vm.prank(account);
-                conductor.enableController(account, controller);
+                cvp.enableController(account, controller);
             }
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
-            EulerVaultMock(controller).setAccountStatusState(
+            VaultMock(controller).setAccountStatusState(
                 allStatusesValid
                 ? 0
                 : uint160(account) % 3 == 0
@@ -1400,14 +1400,14 @@ contract EulerConductorTest is Test {
 
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
                 vm.expectRevert(abi.encodeWithSelector(
-                    EulerConductor.AccountStatusViolation.selector,
+                    CreditVaultProtocol.AccountStatusViolation.selector,
                     account,
                     uint160(account) % 3 == 1
                         ? "account status violation"
                         : ""
                 ));
             }
-            conductor.requireAccountStatusCheck(account);
+            cvp.requireAccountStatusCheck(account);
         }
 
         // check if there's any invalid status expected
@@ -1423,14 +1423,14 @@ contract EulerConductorTest is Test {
 
         if (anyInvalid) {
             vm.expectRevert(abi.encodeWithSelector(
-                EulerConductor.AccountStatusViolation.selector,
+                CreditVaultProtocol.AccountStatusViolation.selector,
                 invalidAccount,
                 uint160(invalidAccount) % 3 == 1
                     ? "account status violation"
                     : ""
             ));
         }
-        conductor.requireAccountsStatusCheck(accounts);
+        cvp.requireAccountsStatusCheck(accounts);
     }
 
     function test_RequireAccountsStatusCheckWhenDeferred(address[] memory accounts) external {
@@ -1450,45 +1450,45 @@ contract EulerConductorTest is Test {
             }
             if (seen) continue;
 
-            conductor.setBatchDepth(1);
+            cvp.setBatchDepth(1);
 
-            address controller = address(new EulerVaultMock(address(conductor)));
-            EulerRegistryMock(registry).setRegistered(controller, true);
+            address controller = address(new VaultMock(cvp));
+            RegistryMock(registry).setRegistered(controller, true);
 
             vm.prank(account);
-            conductor.enableController(account, controller);
-            EulerVaultMock(controller).setAccountStatusState(1);
+            cvp.enableController(account, controller);
+            VaultMock(controller).setAccountStatusState(1);
 
-            conductor.setBatchDepth(2);
+            cvp.setBatchDepth(2);
 
             // even though the account status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the accounts to the set
             // so that the checks can be performed later
-            conductor.requireAccountStatusCheck(account);
+            cvp.requireAccountStatusCheck(account);
         }
 
-        conductor.requireAccountsStatusCheck(accounts);
+        cvp.requireAccountsStatusCheck(accounts);
 
         // checks no longer deferred
-        conductor.setBatchDepth(1);
+        cvp.setBatchDepth(1);
 
         vm.expectRevert(abi.encodeWithSelector(
-            EulerConductor.AccountStatusViolation.selector,
+            CreditVaultProtocol.AccountStatusViolation.selector,
             accounts[0],
             "account status violation"
         ));
-        conductor.requireAccountsStatusCheck(accounts);
+        cvp.requireAccountsStatusCheck(accounts);
     }
 
     function test_RequireVaultStatusCheck(uint8 vaultsNumber, bool allStatusesValid) external {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= 10);
         
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new EulerVaultMock(address(conductor)));
+            address vault = address(new VaultMock(cvp));
 
             // check all the options: vault state is ok, vault state is violated with
             // controller returning false and reverting
-            EulerVaultMock(vault).setVaultStatusState(
+            VaultMock(vault).setVaultStatusState(
                 allStatusesValid
                 ? 0
                 : uint160(vault) % 3 == 0
@@ -1501,14 +1501,14 @@ contract EulerConductorTest is Test {
             vm.prank(vault);
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(abi.encodeWithSelector(
-                    EulerConductor.VaultStatusViolation.selector,
+                    CreditVaultProtocol.VaultStatusViolation.selector,
                     vault,
                     uint160(vault) % 3 == 1
                         ? "vault status violation"
                         : ""
                 ));
             }
-            conductor.requireVaultStatusCheck(vault);
+            cvp.requireVaultStatusCheck(vault);
         }
     }
 
@@ -1516,11 +1516,11 @@ contract EulerConductorTest is Test {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= 10);
         
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new EulerVaultMock(address(conductor)));
+            address vault = address(new VaultMock(cvp));
 
             // check all the options: vault state is ok, vault state is violated with
             // controller returning false and reverting
-            EulerVaultMock(vault).setVaultStatusState(
+            VaultMock(vault).setVaultStatusState(
                 allStatusesValid
                 ? 0
                 : uint160(vault) % 3 == 0
@@ -1530,40 +1530,40 @@ contract EulerConductorTest is Test {
                         : 2
             );
 
-            EulerVaultMock(vault).setVaultStatusState(1);
-            conductor.setBatchDepth(2);
+            VaultMock(vault).setVaultStatusState(1);
+            cvp.setBatchDepth(2);
 
             vm.prank(vault);
 
             // even though the vault status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the vaults to the set
             // so that the checks can be performed later
-            conductor.requireVaultStatusCheck(vault);
+            cvp.requireVaultStatusCheck(vault);
 
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // checks no longer deferred
-                conductor.setBatchDepth(1);
+                cvp.setBatchDepth(1);
 
                 vm.prank(vault);
                 vm.expectRevert(abi.encodeWithSelector(
-                    EulerConductor.VaultStatusViolation.selector,
+                    CreditVaultProtocol.VaultStatusViolation.selector,
                     vault,
                     "vault status violation"
                 ));
-                conductor.requireVaultStatusCheck(vault);
+                cvp.requireVaultStatusCheck(vault);
             }   
         }
     }
 
     function test_RequireVaultStatusCheck_RevertIfNotVaultCalling(address randomMsgSender) external {
-        address vault = address(new EulerVaultMock(address(conductor)));
+        address vault = address(new VaultMock(cvp));
         vm.assume(vault != randomMsgSender);
 
-        EulerVaultMock(vault).setVaultStatusState(0);
+        VaultMock(vault).setVaultStatusState(0);
 
         vm.prank(randomMsgSender);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.requireVaultStatusCheck(vault);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.requireVaultStatusCheck(vault);
     }
 
 
@@ -1571,12 +1571,12 @@ contract EulerConductorTest is Test {
         vm.assume(!samePrimaryAccount(alice, bob));
         vm.assume(seed >= 3);
 
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](7);
-        address controller = address(new EulerVaultMock(address(conductor)));
-        address otherVault = address(new EulerVaultMock(address(conductor)));
+        Types.BatchItem[] memory items = new Types.BatchItem[](7);
+        address controller = address(new VaultMock(cvp));
+        address otherVault = address(new VaultMock(cvp));
         address alicesSubAccount = address(uint160(alice) ^ 0x10);
 
-        EulerRegistryMock(registry).setRegistered(otherVault, true);
+        RegistryMock(registry).setRegistered(otherVault, true);
 
         vm.assume(bob != controller);
 
@@ -1586,29 +1586,29 @@ contract EulerConductorTest is Test {
         items[0].targetContract = registry;
         items[0].msgValue = 0;
         items[0].data = abi.encodeWithSelector(
-            EulerRegistryMock.setRegistered.selector,
+            RegistryMock.setRegistered.selector,
             controller,
             true
         );
 
         items[1].allowError = false;
         items[1].onBehalfOfAccount = address(0);
-        items[1].targetContract = address(conductor);
+        items[1].targetContract = address(cvp);
         items[1].msgValue = 0;
         items[1].data = abi.encodeWithSelector(
-            EulerConductor.enableController.selector,
+            cvp.enableController.selector,
             alice,
             controller
         );
 
-        conductor.pushIntoExpectedAccountsChecked(alice);
+        cvp.pushIntoExpectedAccountsChecked(alice);
 
         items[2].allowError = false;
         items[2].onBehalfOfAccount = alice;
-        items[2].targetContract = address(conductor);
+        items[2].targetContract = address(cvp);
         items[2].msgValue = 0;
         items[2].data = abi.encodeWithSelector(
-            EulerConductor.setAccountOperator.selector,
+            cvp.setAccountOperator.selector,
             alice,
             bob,
             true
@@ -1619,7 +1619,7 @@ contract EulerConductorTest is Test {
         items[3].targetContract = otherVault;
         items[3].msgValue = 0;
         items[3].data = abi.encodeWithSelector(
-            EulerVaultMock.requireChecks.selector,
+            VaultMock.requireChecks.selector,
             alicesSubAccount
         );
 
@@ -1628,11 +1628,11 @@ contract EulerConductorTest is Test {
         items[4].targetContract = controller;
         items[4].msgValue = seed / 3;
         items[4].data = abi.encodeWithSelector(
-            EulerVaultMock.call.selector,
+            VaultMock.call.selector,
             otherVault,
             abi.encodeWithSelector(
                 TargetMock.func.selector,
-                address(conductor),
+                address(cvp),
                 controller,
                 seed / 3,
                 true,
@@ -1646,8 +1646,8 @@ contract EulerConductorTest is Test {
         items[5].msgValue = type(uint).max;
         items[5].data = abi.encodeWithSelector(
             TargetMock.func.selector,
-            address(conductor),
-            address(conductor),
+            address(cvp),
+            address(cvp),
             seed - seed / 3,
             true,
             alice
@@ -1655,78 +1655,78 @@ contract EulerConductorTest is Test {
 
         items[6].allowError = false;
         items[6].onBehalfOfAccount = alicesSubAccount;
-        items[6].targetContract = address(conductor);
+        items[6].targetContract = address(cvp);
         items[6].msgValue = 0;
         items[6].data = abi.encodeWithSelector(
-            EulerConductor.enableController.selector,
+            cvp.enableController.selector,
             alicesSubAccount,
             controller
         );
 
-        conductor.pushIntoExpectedAccountsChecked(alicesSubAccount);
+        cvp.pushIntoExpectedAccountsChecked(alicesSubAccount);
 
         hoax(alice, seed);
-        conductor.handlerBatch{value: seed}(items);
+        cvp.handlerBatch{value: seed}(items);
 
-        assertTrue(EulerRegistryMock(registry).isRegistered(controller));
-        assertTrue(conductor.isControllerEnabled(alice, controller));
-        assertTrue(conductor.isControllerEnabled(alicesSubAccount, controller));
-        assertTrue(conductor.accountOperators(alice, bob));
+        assertTrue(RegistryMock(registry).isRegistered(controller));
+        assertTrue(cvp.isControllerEnabled(alice, controller));
+        assertTrue(cvp.isControllerEnabled(alicesSubAccount, controller));
+        assertTrue(cvp.accountOperators(alice, bob));
         assertEq(address(otherVault).balance, seed);
 
-        conductor.reset();
-        EulerVaultMock(controller).reset();
-        EulerVaultMock(otherVault).reset();
+        cvp.reset();
+        VaultMock(controller).reset();
+        VaultMock(otherVault).reset();
 
         // -------------- SECOND BATCH -------------------------
-        items = new Types.EulerBatchItem[](1);
+        items = new Types.BatchItem[](1);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = address(conductor);
+        items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
         items[0].data= abi.encodeWithSelector(
-            EulerConductor.disableController.selector,
+            cvp.disableController.selector,
             alice,
             controller
         );
 
         vm.prank(bob);
-        vm.expectRevert(EulerConductor.NotAuthorized.selector);
-        conductor.handlerBatch(items);
+        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        cvp.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
-        items = new Types.EulerBatchItem[](1);
+        items = new Types.BatchItem[](1);
 
         items[0].allowError = true;
         items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = address(conductor);
+        items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
         items[0].data= abi.encodeWithSelector(
-            EulerConductor.disableController.selector,
+            cvp.disableController.selector,
             alice,
             controller
         );
 
         vm.prank(bob);
-        conductor.handlerBatch(items);
+        cvp.handlerBatch(items);
 
         // the batch had no effect as we allowed error
-        assertTrue(conductor.isControllerEnabled(alice, controller));
+        assertTrue(cvp.isControllerEnabled(alice, controller));
 
-        conductor.reset();
-        EulerVaultMock(controller).reset();
-        EulerVaultMock(otherVault).reset();
+        cvp.reset();
+        VaultMock(controller).reset();
+        VaultMock(otherVault).reset();
 
         // -------------- FOURTH BATCH -------------------------
-        items = new Types.EulerBatchItem[](3);
+        items = new Types.BatchItem[](3);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
         items[0].msgValue = 0;
         items[0].data= abi.encodeWithSelector(
-            EulerVaultMock.disableController.selector,
+            VaultMock.disableController.selector,
             alice
         );
 
@@ -1735,7 +1735,7 @@ contract EulerConductorTest is Test {
         items[1].targetContract = controller;
         items[1].msgValue = 0;
         items[1].data= abi.encodeWithSelector(
-            EulerVaultMock.requireChecks.selector,
+            VaultMock.requireChecks.selector,
             bob
         );
 
@@ -1744,130 +1744,130 @@ contract EulerConductorTest is Test {
         items[2].targetContract = otherVault;
         items[2].msgValue = 0;
         items[2].data= abi.encodeWithSelector(
-            EulerVaultMock.requireChecks.selector,
+            VaultMock.requireChecks.selector,
             alicesSubAccount
         );
 
         vm.prank(bob);
-        conductor.handlerBatch(items);
-        assertFalse(conductor.isControllerEnabled(alice, controller));
+        cvp.handlerBatch(items);
+        assertFalse(cvp.isControllerEnabled(alice, controller));
     }
 
     function test_Batch_RevertIfDeferralDepthExceeded(address alice) external {
-        address vault = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(vault, true);
+        address vault = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(vault, true);
 
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](9);
+        Types.BatchItem[] memory items = new Types.BatchItem[](9);
 
         for (int i = int(items.length - 1); i >= 0; --i) {
             uint j = uint(i);
             items[j].allowError = false;
             items[j].onBehalfOfAccount = alice;
-            items[j].targetContract = address(conductor);
+            items[j].targetContract = address(cvp);
             items[j].msgValue = 0;
 
             if (j == items.length - 1) {
-                Types.EulerBatchItem[] memory nestedItems = new Types.EulerBatchItem[](2);
+                Types.BatchItem[] memory nestedItems = new Types.BatchItem[](2);
 
                 nestedItems[0].allowError = false;
                 nestedItems[0].onBehalfOfAccount = address(0);
                 nestedItems[0].targetContract = vault;
                 nestedItems[0].msgValue = 0;
                 nestedItems[0].data= abi.encodeWithSelector(
-                    EulerVaultMock.requireChecks.selector,
+                    VaultMock.requireChecks.selector,
                     alice
                 );
 
                 nestedItems[1].allowError = false;
                 nestedItems[1].onBehalfOfAccount = address(0);
-                nestedItems[1].targetContract = address(conductor);
+                nestedItems[1].targetContract = address(cvp);
                 nestedItems[1].msgValue = 0;
                 nestedItems[1].data= abi.encodeWithSelector(
-                    EulerConductor.enableController.selector,
+                    cvp.enableController.selector,
                     alice,
                     vault
                 );
 
                 items[j].data = abi.encodeWithSelector(
-                    EulerConductor.batch.selector,
+                    cvp.batch.selector,
                     nestedItems
                 );
             } else {
-                Types.EulerBatchItem[] memory nestedItems = new Types.EulerBatchItem[](1);
+                Types.BatchItem[] memory nestedItems = new Types.BatchItem[](1);
                 nestedItems[0] = items[j+1];
 
                 items[j].data = abi.encodeWithSelector(
-                    EulerConductor.batch.selector,
+                    cvp.batch.selector,
                     nestedItems
                 );
             }
         }
 
         vm.prank(alice);
-        vm.expectRevert(EulerConductor.BatchDepthViolation.selector);
-        (bool success, ) = address(conductor).call(abi.encodeWithSelector(
-            EulerConductorHandler.handlerBatch.selector,
+        vm.expectRevert(CreditVaultProtocol.BatchDepthViolation.selector);
+        (bool success, ) = address(cvp).call(abi.encodeWithSelector(
+            cvp.handlerBatch.selector,
             items
         ));
         assertTrue(success); // is true because of vm.expectRevert() above
 
         // should succeed when one less item. doesn't revert anymore,
         // but checks are performed only once, when the top level batch concludes
-        Types.EulerBatchItem[] memory itemsOneLess = new Types.EulerBatchItem[](8);
+        Types.BatchItem[] memory itemsOneLess = new Types.BatchItem[](8);
         for (uint i = 1; i <= itemsOneLess.length; ++i) {
             itemsOneLess[i-1] = items[i];
         }
 
         vm.prank(alice);
-        (success, ) = address(conductor).call(abi.encodeWithSelector(
-            EulerConductorHandler.handlerBatch.selector,
+        (success, ) = address(cvp).call(abi.encodeWithSelector(
+            cvp.handlerBatch.selector,
             itemsOneLess
         ));
         assertTrue(success);
     }
 
     function test_Batch_RevertIfChecksInProgress(address alice) external {
-        address vault = address(new EulerVaultMaliciousMock(address(conductor)));
+        address vault = address(new VaultMaliciousMock(cvp));
 
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](1);
+        Types.BatchItem[] memory items = new Types.BatchItem[](1);
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
         items[0].msgValue = 0;
         items[0].data= abi.encodeWithSelector(
-            EulerVaultMock.requireChecks.selector,
+            VaultMock.requireChecks.selector,
             alice
         );
 
         // internal batch in the malicious vault reverted with ChecksReentrancy error,
-        // check EulerVaultMaliciousMock implementation
+        // check VaultMaliciousMock implementation
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(
-            EulerConductor.VaultStatusViolation.selector,
+            CreditVaultProtocol.VaultStatusViolation.selector,
             vault,
             ""
         ));
-        conductor.batch(items);
+        cvp.batch(items);
     }
 
     function test_BatchRevert_AND_BatchSimulation(address alice) external {
-        Types.EulerBatchItem[] memory items = new Types.EulerBatchItem[](1);
-        Types.EulerResult[] memory expectedBatchItemsResult = new Types.EulerResult[](1);
-        Types.EulerResult[] memory expectedAccountsStatusResult = new Types.EulerResult[](1);
-        Types.EulerResult[] memory expectedVaultsStatusResult = new Types.EulerResult[](1);
+        Types.BatchItem[] memory items = new Types.BatchItem[](1);
+        Types.BatchResult[] memory expectedBatchItemsResult = new Types.BatchResult[](1);
+        Types.BatchResult[] memory expectedAccountsStatusResult = new Types.BatchResult[](1);
+        Types.BatchResult[] memory expectedVaultsStatusResult = new Types.BatchResult[](1);
 
-        address controller = address(new EulerVaultMock(address(conductor)));
-        EulerRegistryMock(registry).setRegistered(controller, true);
+        address controller = address(new VaultMock(cvp));
+        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
-        conductor.enableController(alice, controller);
+        cvp.enableController(alice, controller);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
         items[0].msgValue = 0;
         items[0].data = abi.encodeWithSelector(
-            EulerVaultMock.requireChecks.selector,
+            VaultMock.requireChecks.selector,
             alice
         );
 
@@ -1882,21 +1882,21 @@ contract EulerConductorTest is Test {
 
         // regular batch doesn't revert
         vm.prank(alice);
-        conductor.batch(items);
+        cvp.batch(items);
 
         {
             vm.prank(alice);
-            try conductor.batchRevert(items) {
+            try cvp.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(bytes4(err), EulerConductor.RevertedBatchResult.selector);
+                assertEq(bytes4(err), CreditVaultProtocol.RevertedBatchResult.selector);
 
                 assembly { err := add(err, 4) }
                 (
-                    Types.EulerResult[] memory batchItemsResult,
-                    Types.EulerResult[] memory accountsStatusResult,
-                    Types.EulerResult[] memory vaultsStatusResult 
-                ) = abi.decode(err, (Types.EulerResult[], Types.EulerResult[], Types.EulerResult[]));
+                    Types.BatchResult[] memory batchItemsResult,
+                    Types.BatchResult[] memory accountsStatusResult,
+                    Types.BatchResult[] memory vaultsStatusResult 
+                ) = abi.decode(err, (Types.BatchResult[], Types.BatchResult[], Types.BatchResult[]));
                 
                 assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
                 assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
@@ -1915,10 +1915,10 @@ contract EulerConductorTest is Test {
         {
             vm.prank(alice);
             (
-                Types.EulerResult[] memory batchItemsResult,
-                Types.EulerResult[] memory accountsStatusResult,
-                Types.EulerResult[] memory vaultsStatusResult 
-            ) = conductor.batchSimulation(items);
+                Types.BatchResult[] memory batchItemsResult,
+                Types.BatchResult[] memory accountsStatusResult,
+                Types.BatchResult[] memory vaultsStatusResult 
+            ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
             assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
@@ -1934,20 +1934,20 @@ contract EulerConductorTest is Test {
         }
 
         // invalidate both checks
-        EulerVaultMock(controller).setVaultStatusState(1);
-        EulerVaultMock(controller).setAccountStatusState(1);
+        VaultMock(controller).setVaultStatusState(1);
+        VaultMock(controller).setAccountStatusState(1);
 
         // update expected behavior
         expectedAccountsStatusResult[0].success = false;
         expectedAccountsStatusResult[0].result = abi.encodeWithSelector(
-            EulerConductor.AccountStatusViolation.selector,
+            CreditVaultProtocol.AccountStatusViolation.selector,
             alice,
             "account status violation"
         );
         
         expectedVaultsStatusResult[0].success = false;
         expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
-            EulerConductor.VaultStatusViolation.selector,
+            CreditVaultProtocol.VaultStatusViolation.selector,
             controller,
             "vault status violation"
         );
@@ -1955,25 +1955,25 @@ contract EulerConductorTest is Test {
         // regular batch reverts now
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(
-            EulerConductor.AccountStatusViolation.selector,
+            CreditVaultProtocol.AccountStatusViolation.selector,
             alice,
             "account status violation"
         ));
-        conductor.batch(items);
+        cvp.batch(items);
 
         {
             vm.prank(alice);
-            try conductor.batchRevert(items) {
+            try cvp.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(bytes4(err), EulerConductor.RevertedBatchResult.selector);
+                assertEq(bytes4(err), CreditVaultProtocol.RevertedBatchResult.selector);
 
                 assembly { err := add(err, 4) }
                 (
-                    Types.EulerResult[] memory batchItemsResult,
-                    Types.EulerResult[] memory accountsStatusResult,
-                    Types.EulerResult[] memory vaultsStatusResult 
-                ) = abi.decode(err, (Types.EulerResult[], Types.EulerResult[], Types.EulerResult[]));
+                    Types.BatchResult[] memory batchItemsResult,
+                    Types.BatchResult[] memory accountsStatusResult,
+                    Types.BatchResult[] memory vaultsStatusResult 
+                ) = abi.decode(err, (Types.BatchResult[], Types.BatchResult[], Types.BatchResult[]));
                 
                 assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
                 assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
@@ -1992,10 +1992,10 @@ contract EulerConductorTest is Test {
         {
             vm.prank(alice);
             (
-                Types.EulerResult[] memory batchItemsResult,
-                Types.EulerResult[] memory accountsStatusResult,
-                Types.EulerResult[] memory vaultsStatusResult 
-            ) = conductor.batchSimulation(items);
+                Types.BatchResult[] memory batchItemsResult,
+                Types.BatchResult[] memory accountsStatusResult,
+                Types.BatchResult[] memory vaultsStatusResult 
+            ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
             assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);

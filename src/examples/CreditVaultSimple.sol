@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 
 import "solmate/mixins/ERC4626.sol";
 import "solmate/utils/SafeTransferLib.sol";
-import "./EulerVaultBase.sol";
+import "./CreditVaultBase.sol";
 
-contract EulerVaultSimple is EulerVaultBase, ERC4626 {
+contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     using SafeTransferLib for ERC20;
 
     event OwnershipTransferred(address indexed user, address indexed newOwner);
@@ -16,11 +16,11 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     address public vaultOwner;
     
     constructor(
-        address _eulerConductor, 
+        ICVP _cvp, 
         ERC20 _asset, 
         string memory _name, 
         string memory _symbol
-    ) EulerVaultBase(_eulerConductor) ERC4626(_asset, _name, _symbol) {
+    ) CreditVaultBase(_cvp) ERC4626(_asset, _name, _symbol) {
         vaultOwner = msg.sender;
         emit OwnershipTransferred(address(0), msg.sender);
     }
@@ -77,15 +77,15 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
 
     function disableController(address account) external virtual override 
     nonReentrant {
-        IEulerConductor(eulerConductor).disableController(account, address(this));
+        cvp.disableController(account, address(this));
     }
 
     function approve(address spender, uint256 amount) public override 
     returns (bool) {
         address owner = msg.sender;
 
-        if (msg.sender == eulerConductor) {
-            (, owner) = IEulerConductor(eulerConductor).getExecutionContext();
+        if (msg.sender == address(cvp)) {
+            (, owner) = cvp.getExecutionContext();
         }
 
         allowance[owner][spender] = amount;
@@ -103,9 +103,9 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function transferFrom(address from, address to, uint256 amount) public override 
     nonReentrant
     returns (bool) {
-        conductorAuthenticate(msg.sender, from, false);
+        CVPAuthenticate(msg.sender, from, false);
 
-        if (msg.sender != eulerConductor && msg.sender != from) {
+        if (msg.sender != address(cvp) && msg.sender != from) {
             uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
 
             if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
@@ -207,11 +207,11 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function burnInternal(uint256 shares, address receiver, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        conductorAuthenticate(msg.sender, owner, false);
+        CVPAuthenticate(msg.sender, owner, false);
         vaultStatusSnapshot();
 
         if (
-            msg.sender != eulerConductor && 
+            msg.sender != address(cvp) && 
             msg.sender != owner && 
             msg.sender != vaultOwner && // allows withdrawing reserves by the vault owner
             owner != address(this) // allows withdrawing reserves by the vault owner
@@ -240,9 +240,9 @@ contract EulerVaultSimple is EulerVaultBase, ERC4626 {
     function donateInternal(uint256 shares, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        conductorAuthenticate(msg.sender, owner, false);
+        CVPAuthenticate(msg.sender, owner, false);
 
-        if (msg.sender != eulerConductor && msg.sender != owner) {
+        if (msg.sender != address(cvp) && msg.sender != owner) {
             uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
 
             if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
