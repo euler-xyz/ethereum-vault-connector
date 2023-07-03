@@ -84,7 +84,7 @@ abstract contract CreditVaultBase is ICreditVault {
     }
 
     function requireVaultStatusCheck() internal checksInProgress {
-        cvp.requireVaultStatusCheck(address(this));
+        cvp.requireVaultStatusCheck();
     }
 
     function requireAccountStatusCheck(address account) internal checksInProgress {

@@ -7,12 +7,6 @@ import "../src/CreditVaultProtocol.sol";
 import "../src/Types.sol";
 import "../src/Set.sol";
 
-contract RegistryMock is ICreditVaultRegistry {
-    function isRegistered(address vault) external pure returns (bool) {
-        return vault == address(0) ? false : true;
-    }
-}
-
 contract VaultMock is ICreditVault {
     ICVP public immutable cvp;
 
@@ -32,7 +26,7 @@ contract VaultMock is ICreditVault {
     
     fallback(bytes calldata) external payable returns (bytes memory) {
         cvp.requireAccountStatusCheck(address(0));
-        cvp.requireVaultStatusCheck(address(this));
+        cvp.requireVaultStatusCheck();
         return "";
     }
 
@@ -55,20 +49,8 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         accountOperators[account][msg.sender] = true;
     }
 
-    constructor(address admin, address registry) CreditVaultProtocol(admin, registry) {
+    constructor() {
         vaultMock = address(new VaultMock(ICVP(address(this))));
-    }
-
-    function setGovernorAdmin(address newGovernorAdmin) public payable override {
-        governorAdmin = msg.sender;
-        newGovernorAdmin = msg.sender;
-        super.setGovernorAdmin(newGovernorAdmin);
-    }
-
-    function setVaultRegistry(address newVaultRegistry) public payable override {
-        governorAdmin = msg.sender;
-        newVaultRegistry = vaultRegistry;
-        super.setVaultRegistry(newVaultRegistry);
     }
 
     function setAccountOperator(address account, address operator, bool isAuthorized) public payable override {
@@ -80,7 +62,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     function enableCollateral(address account, address vault) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.enableCollateral(account, vault);
     }
@@ -88,7 +69,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     function disableCollateral(address account, address vault) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.disableCollateral(account, vault);
     }
@@ -96,7 +76,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     function enableController(address account, address vault) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.enableCollateral(account, vault);
     }
@@ -105,7 +84,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         vault = msg.sender;
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
-        if (vault == vaultRegistry) return;
         setup(account, vault);
         super.disableController(account, vault);
     }
@@ -117,7 +95,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
             if (uint160(items[i].msgValue) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
-            if (items[i].targetContract == vaultRegistry) return;
         }
 
         vm.deal(address(this), type(uint).max);
@@ -140,7 +117,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     returns (bool success, bytes memory result) {
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
-        if (targetContract == vaultRegistry) return (true, "");
         if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
         setup(onBehalfOfAccount, targetContract);
         return super.callInternal(targetContract, onBehalfOfAccount, msgValue, data);
@@ -150,10 +126,8 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (msg.sender == address(this)) return (true, "");
-        if (msg.sender == vaultRegistry) return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
-        if (targetContract == vaultRegistry) return (true, "");
         if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
         setup(onBehalfOfAccount, msg.sender);
         setup(onBehalfOfAccount, targetContract);
@@ -167,9 +141,8 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.requireAccountsStatusCheck(accounts);
     }
 
-    function requireVaultStatusCheck(address vault) public override {
-        vault = msg.sender;
-        super.requireVaultStatusCheck(vault);
+    function requireVaultStatusCheck() public override {
+        super.requireVaultStatusCheck();
     }
 
     function exposeAccountCollaterals(address account) external view returns (SetStorage memory) {
@@ -186,16 +159,10 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
 }
 
 contract CreditVaultProtocolInvariants is Test {
-    address governor = makeAddr("governor");
-    address registry;
     CreditVaultProtocolHandler cvp;
 
     function setUp() public {
-        registry = address(new RegistryMock());
-        vm.assume(governor != address(0));
-        vm.assume(registry != address(0));
-
-        cvp = new CreditVaultProtocolHandler(governor, registry);
+        cvp = new CreditVaultProtocolHandler();
 
         targetContract(address(cvp));
     }

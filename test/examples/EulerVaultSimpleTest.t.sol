@@ -7,17 +7,7 @@ import "forge-std/Test.sol";
 import "../../src/examples/CreditVaultSimple.sol";
 import "../../src/CreditVaultProtocol.sol";
 
-contract RegistryMock is ICreditVaultRegistry {
-    mapping(address => bool) public isRegistered;
-
-    function setRegistered(address vault, bool registered) external {
-        isRegistered[vault] = registered;
-    }
-}
-
 contract CreditVaultSimpleTest is DSTestPlus {
-    address governor = address(uint160(uint256(keccak256(abi.encodePacked("governor")))));
-    address registry;
     ICVP cvp;
     MockERC20 underlying;
     CreditVaultSimple vault;
@@ -26,12 +16,9 @@ contract CreditVaultSimpleTest is DSTestPlus {
     error ControllerDisabled();
     
     function setUp() public {
-        registry = address(new RegistryMock());
-        cvp = new CreditVaultProtocol(governor, registry);
+        cvp = new CreditVaultProtocol();
         underlying = new MockERC20("Mock Token", "TKN", 18);
         vault = new CreditVaultSimple(cvp, underlying, "Mock Token Vault", "vwTKN");
-
-        RegistryMock(registry).setRegistered(address(vault), true);
     }
 
     function invariantMetadata() public {

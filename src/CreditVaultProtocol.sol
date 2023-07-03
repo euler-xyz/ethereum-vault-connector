@@ -6,7 +6,6 @@ import "./TransientStorage.sol";
 import "./Types.sol";
 import "./Set.sol";
 import "./interfaces/ICreditVaultProtocol.sol";
-import "./interfaces/ICreditVaultRegistry.sol";
 import "./interfaces/ICreditVault.sol";
 
 contract CreditVaultProtocol is ICVP, TransientStorage, Types {
@@ -23,8 +22,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
 
     // Storage
-    address public governorAdmin;
-    address public vaultRegistry;
     mapping(address account => mapping(address operator => bool isOperator)) public accountOperators;
 
     ExecutionContext internal executionContext;
@@ -34,17 +31,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     // Events, Errors
 
-    event Genesis();
-    event GovernorAdminSet(address indexed admin);
-    event VaultRegistrySet(address indexed registry);
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
-
     error NotAuthorized();
     error InvalidAddress();
     error ChecksReentrancy();
     error DeferralViolation();
     error BatchDepthViolation();
-    error RegistryViolation(address vault);
     error ControllerViolation(address account);
     error AccountStatusViolation(address account, bytes data);
     error VaultStatusViolation(address vault, bytes data);
@@ -54,31 +46,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     // Constructor
 
-    constructor(address admin, address registry) {
-        if (admin == address(0) || registry == address(0)) revert InvalidAddress();
-
+    constructor() {
         executionContext.batchDepth = BATCH_DEPTH__INIT;
-        governorAdmin = admin;
-        vaultRegistry = registry;
-
-        emit Genesis();
     }
 
 
     // Modifiers
-
-    /// @notice A modifier that allows only the governor admin to call the function.
-    modifier governorOnly {
-        if (msg.sender != governorAdmin) revert NotAuthorized();
-        _;
-    }
-
-    /// @notice A modifier that allows only the specified vault account to call the function.
-    /// @param vault The address of the vault that is allowed to call the function.
-    modifier vaultOnly(address vault) {
-        if (msg.sender != vault) revert NotAuthorized();
-        _;
-    }
 
     /// @notice A modifier that allows only the owner or an operator of the account to call the function.
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
@@ -107,26 +80,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     modifier notInDeferral() {
         if (executionContext.batchDepth != BATCH_DEPTH__INIT) revert DeferralViolation();
         _;
-    }
-
-
-    // Governance
-
-    /// @notice Sets a new governor admin address.
-    /// @dev Only the current governor can call this function.
-    /// @param newGovernorAdmin The address of the new governor admin.
-    function setGovernorAdmin(address newGovernorAdmin) public payable virtual governorOnly {
-        governorAdmin = newGovernorAdmin;
-        emit GovernorAdminSet(newGovernorAdmin);
-    }
-
-    /// @notice Sets a new vault registry address.
-    /// @dev Only the current governor can call this function. The vault registry is a contract that keeps track of all the vaults that are allowed to interact with the CVP.
-    /// @param newVaultRegistry The address of the new vault registry.
-    function setVaultRegistry(address newVaultRegistry) public payable virtual governorOnly {
-        if (newVaultRegistry == address(0)) revert InvalidAddress();
-        vaultRegistry = newVaultRegistry;
-        emit VaultRegistrySet(newVaultRegistry);
     }
 
 
@@ -199,13 +152,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
     /// @notice Enables a collateral for an account.
-    /// @dev A collaterals is a vault for which account's balances are under the control of the currently chosen controller vault. Only the owner or an operator of the account can call this function and a vault must be registered to become a collateral. Account status checks are performed.
+    /// @dev A collaterals is a vault for which account's balances are under the control of the currently chosen controller vault. Only the owner or an operator of the account can call this function. Account status checks are performed.
     /// @param account The address for which the collateral is being enabled.
     /// @param vault The address of the collateral being enabled.
     function enableCollateral(address account, address vault) public payable virtual
     ownerOrOperator(account) {
-        if (!ICreditVaultRegistry(vaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
-
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -242,13 +193,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
     /// @notice Enables a controller for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the owner or an operator of the account can call this function and a vault must be registered to become a controller. Account status checks are performed.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the owner or an operator of the account can call this function. Account status checks are performed.
     /// @param account The address for which the controller is being enabled.
     /// @param vault The address of the controller being enabled. 
     function enableController(address account, address vault) public payable virtual
-    ownerOrOperator(account) {
-        if (!ICreditVaultRegistry(vaultRegistry).isRegistered(vault)) revert RegistryViolation(vault);
-        
+    ownerOrOperator(account) {        
         accountControllers[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -257,8 +206,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function. Account status checks are performed.
     /// @param account The address for which the controller is being disabled.
     /// @param vault The address of the controller being disabled.
-    function disableController(address account, address vault) public payable virtual
-    vaultOnly(vault) {
+    function disableController(address account, address vault) public payable virtual {
+        if (msg.sender != vault) revert NotAuthorized();
+
         accountControllers[account].remove(vault);
         requireAccountStatusCheck(account);
     }
@@ -282,7 +232,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
     /// @notice Calls to one of the enabled collateral vaults from currently enabled controller vault.
-    /// @dev This function can be used to interact with any registered vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
+    /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
     /// @param data The encoded data which is called on the target contract.
@@ -413,11 +363,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
     /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the execution flow. This function can only be called by the vault itself.
-    /// @param vault The address of the vault to be checked.
-    function requireVaultStatusCheck(address vault) public virtual 
-    vaultOnly(vault) {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) requireVaultStatusCheckInternal(vault);
-        else vaultStatusChecks.insert(vault);
+    function requireVaultStatusCheck() public virtual {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) requireVaultStatusCheckInternal(msg.sender);
+        else vaultStatusChecks.insert(msg.sender);
     }
 
 

@@ -30,5 +30,5 @@ interface ICVP {
     function checkAccountsStatus(address[] calldata accounts) external view returns (bool[] memory isValid);
     function requireAccountStatusCheck(address account) external;
     function requireAccountsStatusCheck(address[] calldata accounts) external;
-    function requireVaultStatusCheck(address vault) external;
+    function requireVaultStatusCheck() external;
 }   

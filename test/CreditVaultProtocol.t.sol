@@ -21,14 +21,6 @@ contract TargetMock {
     }
 }
 
-contract RegistryMock is ICreditVaultRegistry {
-    mapping(address => bool) public isRegistered;
-
-    function setRegistered(address vault, bool registered) external {
-        isRegistered[vault] = registered;
-    }
-}
-
 contract VaultMock is ICreditVault, TargetMock, Test {
     ICVP public immutable cvp;
     uint internal vaultStatusState;
@@ -91,7 +83,7 @@ contract VaultMock is ICreditVault, TargetMock, Test {
 
     function requireChecks(address account) external payable {
         cvp.requireAccountStatusCheck(account);
-        cvp.requireVaultStatusCheck(address(this));
+        cvp.requireVaultStatusCheck();
     }
 
     function call(address target, bytes memory data) external payable {
@@ -141,7 +133,7 @@ contract VaultMaliciousMock is ICreditVault {
 
     function requireChecks(address account) external payable {
         cvp.requireAccountStatusCheck(account);
-        cvp.requireVaultStatusCheck(address(this));
+        cvp.requireVaultStatusCheck();
     }
 }
 
@@ -150,8 +142,6 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
     address[] expectedVaultsChecked;
 
     using Set for SetStorage;
-
-    constructor(address admin, address registry) CreditVaultProtocol(admin, registry) {}
 
     function reset() external {
         delete expectedAccountsChecked;
@@ -191,10 +181,10 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
         if (controllers.length == 1) VaultMock(controllers[0]).pushAccountStatusChecked(account);
     }
 
-    function requireVaultStatusCheck(address vault) public override {
-        super.requireVaultStatusCheck(vault);
+    function requireVaultStatusCheck() public override {
+        super.requireVaultStatusCheck();
 
-        expectedVaultsChecked.push(vault);
+        expectedVaultsChecked.push(msg.sender);
     }
 
     function requireVaultStatusCheckInternal(address vault) internal override {
@@ -317,12 +307,8 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
 }
 
 contract CreditVaultProtocolTest is Test {
-    address governor = makeAddr("governor");
     CreditVaultProtocolHandler cvp;
-    address registry;
 
-    event GovernorAdminSet(address indexed admin);
-    event VaultRegistrySet(address indexed registry);
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
 
     function samePrimaryAccount(address accountOne, address accountTwo) internal pure returns (bool) {
@@ -330,63 +316,7 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function setUp() public {
-        registry = address(new RegistryMock());
-        vm.assume(governor != address(0));
-        vm.assume(registry != address(0));
-        
-        cvp = new CreditVaultProtocolHandler(governor, registry);
-    }
-
-    function test_SetGovernorAdmin(address newGovernor) public {
-        assertEq(cvp.governorAdmin(), governor);
-
-        vm.prank(governor);
-        vm.expectEmit(true, false, false, false, address(cvp));
-        emit GovernorAdminSet(newGovernor);
-        cvp.setGovernorAdmin(newGovernor);
-
-        assertEq(cvp.governorAdmin(), newGovernor);
-    }
-
-    function test_SetGovernorAdmin_RevertIfNotGovernor(address newGovernor, address notGovernor) public {
-        vm.assume(notGovernor != governor);
-
-        assertEq(cvp.governorAdmin(), governor);
-
-        vm.prank(notGovernor);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
-        cvp.setGovernorAdmin(newGovernor);
-    }
-
-    function test_SetVaultRegistry(address newRegistry) public {
-        vm.assume(newRegistry != address(0));
-
-        assertEq(cvp.vaultRegistry(), registry);
-
-        vm.prank(governor);
-        vm.expectEmit(true, false, false, false, address(cvp));
-        emit VaultRegistrySet(newRegistry);
-        cvp.setVaultRegistry(newRegistry);
-
-        assertEq(cvp.vaultRegistry(), newRegistry);
-    }
-
-    function test_SetVaultRegistry_RevertIfNotGovernor(address newRegistry, address notGovernor) public {
-        vm.assume(notGovernor != governor && newRegistry != address(0));
-
-        assertEq(cvp.vaultRegistry(), registry);
-
-        vm.prank(notGovernor);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
-        cvp.setVaultRegistry(newRegistry);
-    }
-
-    function test_SetVaultRegistry_RevertIfZeroAddress() public {
-        assertEq(cvp.vaultRegistry(), registry);
-
-        vm.prank(governor);
-        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
-        cvp.setVaultRegistry(address(0));
+        cvp = new CreditVaultProtocolHandler();
     }
 
     function test_SetAccountOperator(address alice, address operator) public {
@@ -457,7 +387,6 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(account != address(0));
 
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(controller, true);
 
         (
             bool checksDeferred, 
@@ -497,7 +426,6 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(account != address(this));
         vm.assume(account != controller);
         
-        RegistryMock(registry).setRegistered(controller, true);
         vm.prank(account);
         cvp.enableController(account, controller);
         
@@ -548,8 +476,6 @@ contract CreditVaultProtocolTest is Test {
         // enable a controller to check if account status check works properly
         address controller = address(new VaultMock(cvp));
         if (seed % 3 == 0) {
-            RegistryMock(registry).setRegistered(controller, true);
-
             vm.prank(alice);
             cvp.enableController(account, controller);
         }
@@ -564,7 +490,6 @@ contract CreditVaultProtocolTest is Test {
                 ? collateralsPre[seed % collateralsPre.length]
                 : address(new VaultMock(cvp));
 
-            RegistryMock(registry).setRegistered(vault, true);
             bool alreadyEnabled = cvp.isCollateralEnabled(account, vault);
 
             assert((alreadyEnabled && i % 5 == 0) || (!alreadyEnabled && i % 5 != 0));
@@ -610,7 +535,6 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(!samePrimaryAccount(alice, bob));
 
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
@@ -630,37 +554,9 @@ contract CreditVaultProtocolTest is Test {
         cvp.handlerDisableCollateral(bob, vault);
     }
 
-    function test_CollateralsManagement_RevertIfVaultNotRegistered(address alice) public {
-        address vault = address(new VaultMock(cvp));
-
-        vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultProtocol.RegistryViolation.selector,
-                vault
-            )
-        );
-        cvp.handlerEnableCollateral(alice, vault);
-
-        vm.prank(alice);
-        // does not revert. because only registered collaterals can be enabled it doesn't check for registration here
-        cvp.handlerDisableCollateral(alice, vault);
-
-        RegistryMock(registry).setRegistered(vault, true);
-
-        vm.prank(alice);
-        cvp.handlerEnableCollateral(alice, vault);
-
-        vm.prank(alice);
-        cvp.handlerDisableCollateral(alice, vault);
-    }
-
     function test_CollateralsManagement_RevertIfAccountStatusViolated(address alice) public {
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
-
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
         cvp.enableController(alice, controller);
@@ -753,7 +649,6 @@ contract CreditVaultProtocolTest is Test {
 
         // enabling controller
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
 
         assertFalse(cvp.isControllerEnabled(account, vault));
         address[] memory controllersPre = cvp.getControllers(account);
@@ -784,7 +679,6 @@ contract CreditVaultProtocolTest is Test {
 
         // trying to enable second controller will throw on the account status check
         address otherVault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(otherVault, true);
 
         vm.prank(msgSender);
         vm.expectRevert(
@@ -822,7 +716,6 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(!samePrimaryAccount(alice, bob));
 
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
@@ -839,7 +732,6 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(!samePrimaryAccount(alice, bob));
 
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
 
         vm.assume(alice != vault);
 
@@ -865,45 +757,8 @@ contract CreditVaultProtocolTest is Test {
         );
     }
 
-    function test_ControllersManagement_RevertIfVaultNotRegistered(address alice) public {
-        address vault = address(new VaultMock(cvp));
-
-        vm.assume(alice != vault);
-
-        vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultProtocol.RegistryViolation.selector,
-                vault
-            )
-        );
-        cvp.handlerEnableController(alice, vault);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
-        cvp.handlerDisableController(alice, vault);
-
-        RegistryMock(registry).setRegistered(vault, true);
-
-        vm.prank(alice);
-        cvp.handlerEnableController(alice, vault);
-
-        cvp.reset();
-        VaultMock(vault).reset();
-        vm.prank(alice);
-        VaultMock(vault).call(
-            address(cvp),
-            abi.encodeWithSelector(
-                cvp.handlerDisableController.selector,
-                alice,
-                vault
-            )
-        );
-    }
-
     function test_ControllersManagement_RevertIfAccountStatusViolated(address alice) public {
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
 
         VaultMock(vault).setAccountStatusState(1); // account status is violated
 
@@ -1101,8 +956,6 @@ contract CreditVaultProtocolTest is Test {
 
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(collateral, true);
-        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
         cvp.enableCollateral(alice, collateral);
@@ -1162,8 +1015,6 @@ contract CreditVaultProtocolTest is Test {
 
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(collateral, true);
-        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
         cvp.enableCollateral(alice, collateral);
@@ -1199,9 +1050,6 @@ contract CreditVaultProtocolTest is Test {
         address collateral = address(new VaultMock(cvp));
         address controller_1 = address(new VaultMock(cvp));
         address controller_2 = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(collateral, true);
-        RegistryMock(registry).setRegistered(controller_1, true);
-        RegistryMock(registry).setRegistered(controller_2, true);
 
         // mock checks deferred to enable multiple controllers
         cvp.setBatchDepth(2);
@@ -1245,8 +1093,6 @@ contract CreditVaultProtocolTest is Test {
 
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(collateral, true);
-        RegistryMock(registry).setRegistered(controller, true);
 
         vm.assume(randomAddress != controller);
 
@@ -1281,8 +1127,6 @@ contract CreditVaultProtocolTest is Test {
 
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(collateral, true);
-        RegistryMock(registry).setRegistered(controller, true);
 
         vm.assume(targetContract != collateral);
 
@@ -1328,7 +1172,6 @@ contract CreditVaultProtocolTest is Test {
             if (seen) continue;
 
             address controller = address(new VaultMock(cvp));
-            RegistryMock(registry).setRegistered(controller, true);
 
             if (!allStatusesValid) {
                 vm.prank(account);
@@ -1379,7 +1222,6 @@ contract CreditVaultProtocolTest is Test {
             if (seen) continue;
 
             address controller = address(new VaultMock(cvp));
-            RegistryMock(registry).setRegistered(controller, true);
 
             if (!allStatusesValid) {
                 vm.prank(account);
@@ -1453,7 +1295,6 @@ contract CreditVaultProtocolTest is Test {
             cvp.setBatchDepth(1);
 
             address controller = address(new VaultMock(cvp));
-            RegistryMock(registry).setRegistered(controller, true);
 
             vm.prank(account);
             cvp.enableController(account, controller);
@@ -1508,7 +1349,7 @@ contract CreditVaultProtocolTest is Test {
                         : ""
                 ));
             }
-            cvp.requireVaultStatusCheck(vault);
+            cvp.requireVaultStatusCheck();
         }
     }
 
@@ -1538,7 +1379,7 @@ contract CreditVaultProtocolTest is Test {
             // even though the vault status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the vaults to the set
             // so that the checks can be performed later
-            cvp.requireVaultStatusCheck(vault);
+            cvp.requireVaultStatusCheck();
 
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // checks no longer deferred
@@ -1550,20 +1391,9 @@ contract CreditVaultProtocolTest is Test {
                     vault,
                     "vault status violation"
                 ));
-                cvp.requireVaultStatusCheck(vault);
+                cvp.requireVaultStatusCheck();
             }   
         }
-    }
-
-    function test_RequireVaultStatusCheck_RevertIfNotVaultCalling(address randomMsgSender) external {
-        address vault = address(new VaultMock(cvp));
-        vm.assume(vault != randomMsgSender);
-
-        VaultMock(vault).setVaultStatusState(0);
-
-        vm.prank(randomMsgSender);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
-        cvp.requireVaultStatusCheck(vault);
     }
 
 
@@ -1571,31 +1401,19 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(!samePrimaryAccount(alice, bob));
         vm.assume(seed >= 3);
 
-        Types.BatchItem[] memory items = new Types.BatchItem[](7);
+        Types.BatchItem[] memory items = new Types.BatchItem[](6);
         address controller = address(new VaultMock(cvp));
         address otherVault = address(new VaultMock(cvp));
         address alicesSubAccount = address(uint160(alice) ^ 0x10);
-
-        RegistryMock(registry).setRegistered(otherVault, true);
 
         vm.assume(bob != controller);
 
         // -------------- FIRST BATCH -------------------------
         items[0].allowError = false;
-        items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = registry;
+        items[0].onBehalfOfAccount = address(0);
+        items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
         items[0].data = abi.encodeWithSelector(
-            RegistryMock.setRegistered.selector,
-            controller,
-            true
-        );
-
-        items[1].allowError = false;
-        items[1].onBehalfOfAccount = address(0);
-        items[1].targetContract = address(cvp);
-        items[1].msgValue = 0;
-        items[1].data = abi.encodeWithSelector(
             cvp.enableController.selector,
             alice,
             controller
@@ -1603,31 +1421,31 @@ contract CreditVaultProtocolTest is Test {
 
         cvp.pushIntoExpectedAccountsChecked(alice);
 
-        items[2].allowError = false;
-        items[2].onBehalfOfAccount = alice;
-        items[2].targetContract = address(cvp);
-        items[2].msgValue = 0;
-        items[2].data = abi.encodeWithSelector(
+        items[1].allowError = false;
+        items[1].onBehalfOfAccount = alice;
+        items[1].targetContract = address(cvp);
+        items[1].msgValue = 0;
+        items[1].data = abi.encodeWithSelector(
             cvp.setAccountOperator.selector,
             alice,
             bob,
             true
         );
 
-        items[3].allowError = false;
-        items[3].onBehalfOfAccount = alicesSubAccount;
-        items[3].targetContract = otherVault;
-        items[3].msgValue = 0;
-        items[3].data = abi.encodeWithSelector(
+        items[2].allowError = false;
+        items[2].onBehalfOfAccount = alicesSubAccount;
+        items[2].targetContract = otherVault;
+        items[2].msgValue = 0;
+        items[2].data = abi.encodeWithSelector(
             VaultMock.requireChecks.selector,
             alicesSubAccount
         );
 
-        items[4].allowError = false;
-        items[4].onBehalfOfAccount = address(0);
-        items[4].targetContract = controller;
-        items[4].msgValue = seed / 3;
-        items[4].data = abi.encodeWithSelector(
+        items[3].allowError = false;
+        items[3].onBehalfOfAccount = address(0);
+        items[3].targetContract = controller;
+        items[3].msgValue = seed / 3;
+        items[3].data = abi.encodeWithSelector(
             VaultMock.call.selector,
             otherVault,
             abi.encodeWithSelector(
@@ -1640,11 +1458,11 @@ contract CreditVaultProtocolTest is Test {
             )
         );
 
-        items[5].allowError = false;
-        items[5].onBehalfOfAccount = alice;
-        items[5].targetContract = otherVault;
-        items[5].msgValue = type(uint).max;
-        items[5].data = abi.encodeWithSelector(
+        items[4].allowError = false;
+        items[4].onBehalfOfAccount = alice;
+        items[4].targetContract = otherVault;
+        items[4].msgValue = type(uint).max;
+        items[4].data = abi.encodeWithSelector(
             TargetMock.func.selector,
             address(cvp),
             address(cvp),
@@ -1653,11 +1471,11 @@ contract CreditVaultProtocolTest is Test {
             alice
         );
 
-        items[6].allowError = false;
-        items[6].onBehalfOfAccount = alicesSubAccount;
-        items[6].targetContract = address(cvp);
-        items[6].msgValue = 0;
-        items[6].data = abi.encodeWithSelector(
+        items[5].allowError = false;
+        items[5].onBehalfOfAccount = alicesSubAccount;
+        items[5].targetContract = address(cvp);
+        items[5].msgValue = 0;
+        items[5].data = abi.encodeWithSelector(
             cvp.enableController.selector,
             alicesSubAccount,
             controller
@@ -1668,7 +1486,6 @@ contract CreditVaultProtocolTest is Test {
         hoax(alice, seed);
         cvp.handlerBatch{value: seed}(items);
 
-        assertTrue(RegistryMock(registry).isRegistered(controller));
         assertTrue(cvp.isControllerEnabled(alice, controller));
         assertTrue(cvp.isControllerEnabled(alicesSubAccount, controller));
         assertTrue(cvp.accountOperators(alice, bob));
@@ -1755,7 +1572,6 @@ contract CreditVaultProtocolTest is Test {
 
     function test_Batch_RevertIfDeferralDepthExceeded(address alice) external {
         address vault = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(vault, true);
 
         Types.BatchItem[] memory items = new Types.BatchItem[](9);
 
@@ -1857,7 +1673,6 @@ contract CreditVaultProtocolTest is Test {
         Types.BatchResult[] memory expectedVaultsStatusResult = new Types.BatchResult[](1);
 
         address controller = address(new VaultMock(cvp));
-        RegistryMock(registry).setRegistered(controller, true);
 
         vm.prank(alice);
         cvp.enableController(alice, controller);
