@@ -6,23 +6,15 @@ const DESIRED_ADDRESS_PREFIX = "271828";
     const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
     await provider.getBlock();
 
-    if (process.argv.length !== 5) {
-        console.log('Usage: node NicksMethod.js <fileName>.sol <governorAddress> <registryAddress>');
+    if (process.argv.length !== 3 || process.argv[2]?.slice(-4) !== ".sol") {
+        console.log('Usage: node NicksMethod.js <fileName>.sol');
         process.exit(1);
     }
     
     const fileName = process.argv[2];
-    const governorAddress = process.argv[3];
-    const registryAddress = process.argv[4];
-    
-    if (fileName?.slice(-4) !== ".sol" || !ethers.isAddress(governorAddress) || !ethers.isAddress(registryAddress)) {
-        console.log('Usage: node NicksMethod.js <fileName>.sol <governorAddress> <registryAddress>');
-        process.exit(1);
-    }
-    
     const artifact = require("../out/" + fileName + `/${fileName.slice(0, -4)}.json`);
     const factory = ethers.ContractFactory.fromSolidity(artifact);
-    const deploymentTx = await factory.getDeployTransaction(governorAddress, registryAddress);
+    const deploymentTx = await factory.getDeployTransaction();
     const legacyTx = {
         nonce: 0,
         gasPrice: ethers.parseUnits("100", "gwei"),

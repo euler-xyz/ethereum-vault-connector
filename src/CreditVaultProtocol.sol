@@ -32,6 +32,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     // Events, Errors
 
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
+    
     error NotAuthorized();
     error InvalidAddress();
     error ChecksReentrancy();
