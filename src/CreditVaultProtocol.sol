@@ -262,8 +262,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
             executionContext.checksInProgressLock = false;
-
-            invariantsCheck();
         }
     }
 
@@ -288,8 +286,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
             accountsStatusResult= checkStatusAll(SetType.Account, true);
             vaultsStatusResult= checkStatusAll(SetType.Vault, true);
             executionContext.checksInProgressLock = false;
-
-            invariantsCheck();
         }
 
         revert RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
