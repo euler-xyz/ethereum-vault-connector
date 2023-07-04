@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "../src/CreditVaultProtocol.sol";
-import "../src/Types.sol";
-import "../src/Set.sol";
 
 contract TargetMock {
     function func(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
