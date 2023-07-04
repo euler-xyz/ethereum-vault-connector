@@ -203,13 +203,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
     /// @notice Disables a controller for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function. Account status checks are performed.
-    /// @param account The address for which the controller is being disabled.
-    /// @param vault The address of the controller being disabled.
-    function disableController(address account, address vault) public payable virtual {
-        if (msg.sender != vault) revert NotAuthorized();
-
-        accountControllers[account].remove(vault);
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function which means that msg.sender is treated as a calling vault. Account status checks are performed.
+    /// @param account The address for which the calling controller is being disabled.
+    function disableController(address account) public payable virtual {
+        accountControllers[account].remove(msg.sender);
         requireAccountStatusCheck(account);
     }
 

@@ -105,7 +105,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     }
 
     function disableController(address account) external override nonReentrant {
-        if (owed[account] == 0) cvp.disableController(account, address(this));
+        if (owed[account] == 0) cvp.disableController(account);
     }
 
     function flashLoan(uint256 amount, bytes calldata data) external nonReentrant {
@@ -177,7 +177,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
 
         emit Repay(msg.sender, receiver, owner, assets);
 
-        if (owed[receiver] == 0) cvp.disableController(receiver, address(this));
+        if (owed[receiver] == 0) cvp.disableController(receiver);
 
         requireAccountStatusCheck(receiver);
         requireVaultStatusCheck();
@@ -224,7 +224,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
         _burn(receiver, shares);
         emit Withdraw(msg.sender, receiver, receiver, assets, shares);
 
-        if (owed[receiver] == 0) cvp.disableController(receiver, address(this));
+        if (owed[receiver] == 0) cvp.disableController(receiver);
 
         requireAccountStatusCheck(receiver);
     }
@@ -242,7 +242,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
         emit Repay(msg.sender, from, to, amount);
         emit Borrow(msg.sender, to, amount);
 
-        if (owed[from] == 0) cvp.disableController(from, address(this));
+        if (owed[from] == 0) cvp.disableController(from);
         
         address[] memory accounts = new address[](2);
         accounts[0] = from;

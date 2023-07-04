@@ -16,7 +16,7 @@ interface ICVP {
     function getControllers(address account) external view returns (address[] memory);
     function isControllerEnabled(address account, address vault) external view returns (bool);
     function enableController(address account, address vault) external payable;
-    function disableController(address account, address vault) external payable;
+    function disableController(address account) external payable;
     function batch(Types.BatchItem[] calldata items) external payable;
     function batchRevert(Types.BatchItem[] calldata items) external payable
         returns (Types.BatchResult[] memory batchItemsResult, Types.BatchResult[] memory accountsStatusResult, Types.BatchResult[] memory vaultsStatusResult);

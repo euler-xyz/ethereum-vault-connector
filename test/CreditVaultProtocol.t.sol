@@ -64,7 +64,7 @@ contract VaultMock is ICreditVault, TargetMock, Test {
     }
 
     function disableController(address account) external override {
-        cvp.disableController(account, address(this));
+        cvp.disableController(account);
     }
 
     function checkVaultStatus() external view override 
@@ -267,8 +267,8 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
         verifyAccountStatusChecks();
     }
 
-    function handlerDisableController(address account, address vault) external {
-        super.disableController(account, vault);
+    function handlerDisableController(address account) external {
+        super.disableController(account);
 
         if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
 
@@ -700,8 +700,7 @@ contract CreditVaultProtocolTest is Test {
             address(cvp),
             abi.encodeWithSelector(
                 cvp.handlerDisableController.selector,
-                account,
-                vault
+                account
             )
         );
 
@@ -728,35 +727,6 @@ contract CreditVaultProtocolTest is Test {
         cvp.handlerEnableController(bob, vault);
     }
 
-    function test_DisableController_RevertIfMsgSenderNotController(address alice, address bob) public {
-        vm.assume(!samePrimaryAccount(alice, bob));
-
-        address vault = address(new VaultMock(cvp));
-
-        vm.assume(alice != vault);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
-        cvp.handlerDisableController(bob, vault);
-
-        vm.prank(bob);
-        cvp.setAccountOperator(bob, alice, true);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector); // although operator, controller msg.sender is still expected
-        cvp.handlerDisableController(bob, vault);
-
-        vm.prank(alice);
-        VaultMock(vault).call(
-            address(cvp),
-            abi.encodeWithSelector(
-                cvp.handlerDisableController.selector,
-                bob,
-                vault
-            )
-        );
-    }
-
     function test_ControllersManagement_RevertIfAccountStatusViolated(address alice) public {
         address vault = address(new VaultMock(cvp));
 
@@ -778,8 +748,7 @@ contract CreditVaultProtocolTest is Test {
             address(cvp),
             abi.encodeWithSelector(
                 cvp.handlerDisableController.selector,
-                alice,
-                vault
+                alice
             )
         );
 
@@ -1503,13 +1472,14 @@ contract CreditVaultProtocolTest is Test {
         items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
         items[0].data= abi.encodeWithSelector(
-            cvp.disableController.selector,
+            cvp.call.selector,
+            address(cvp),
             alice,
-            controller
+            ""
         );
 
         vm.prank(bob);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
         cvp.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
@@ -1520,16 +1490,15 @@ contract CreditVaultProtocolTest is Test {
         items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
         items[0].data= abi.encodeWithSelector(
-            cvp.disableController.selector,
+            cvp.call.selector,
+            address(cvp),
             alice,
-            controller
+            ""
         );
 
+        // no rever this time as error allowed
         vm.prank(bob);
         cvp.handlerBatch(items);
-
-        // the batch had no effect as we allowed error
-        assertTrue(cvp.isControllerEnabled(alice, controller));
 
         cvp.reset();
         VaultMock(controller).reset();

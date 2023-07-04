@@ -77,7 +77,7 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
 
     function disableController(address account) external virtual override 
     nonReentrant {
-        cvp.disableController(account, address(this));
+        cvp.disableController(account);
     }
 
     function approve(address spender, uint256 amount) public override 

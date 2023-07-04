@@ -80,12 +80,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.enableCollateral(account, vault);
     }
 
-    function disableController(address account, address vault) public payable override {
-        vault = msg.sender;
-        if (uint160(vault) <= 10) return;
-        if (vault == address(this)) return;
-        setup(account, vault);
-        super.disableController(account, vault);
+    function disableController(address account) public payable override {
+        setup(account, msg.sender);
+        super.disableController(account);
     }
 
     function batch(BatchItem[] calldata items) public payable override {
