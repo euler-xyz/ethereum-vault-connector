@@ -118,25 +118,25 @@ An operator is similar to a controller, in that an account gives considerable pe
 
 ### call
 
-The `call` function on the Conductor allows users to invoke functions on vaults and other target smart contracts. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function. This is because vaults themselves don't understand sub-accounts or operators, and only need to verify that they are being invoked by the conductor (see the Authentication By Vaults section).
+The `call` function on the CVP allows users to invoke functions on vaults and other target smart contracts. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function. This is because vaults themselves don't understand sub-accounts or operators, and only need to verify that they are being invoked by the CVP (see the Authentication By Vaults section).
 
-`call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the conductor as `msg.sender`. For this reason, it is critical that the Conductor itself never be given any special privileges, or hold any token or ETH balances (except for a few corner cases where it is temporarily safe, see the Conductor Contract Privilege section).
+`call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the CVP as `msg.sender`. For this reason, it is critical that the CVP itself never be given any special privileges, or hold any token or ETH balances (except for a few corner cases where it is temporarily safe, see the CVP Contract Privilege section).
 
-Batches can be composed of calls to the Conductor itself, and external `execute` calls (when the `targetContract` is not the Conductor). Calling the conductor is how users can enable collateral from within a batch, for example.
+Batches can be composed of calls to the CVP itself, and external `call` calls (when the `targetContract` is not the CVP). Calling the CVP is how users can enable collateral from within a batch, for example.
 
 Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
 
 
-### forward
+### callFromControllerToCollateral
 
-The `forward` function can only be used in one specific case: When a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some of collateral asset to repay the debt.
+The `callFromControllerToCollateral` function can only be used in one specific case: When a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some of collateral asset to repay the debt.
 
-This is accomplished is by the controller vault calling `forward` and passing the collateral vault as the target contract and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. The collateral vault does not need to know that the funds are being withdrawn due to a liquidation.
+This is accomplished is by the controller vault calling `callFromControllerToCollateral` and passing the collateral vault as the target contract and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. The collateral vault does not need to know that the funds are being withdrawn due to a liquidation.
 
 
 ### Execution Contexts
 
-As mentioned above, when interacting with the Conductor, it is often useful to defer certain checks until the end of the transaction. This allows a user to temporarily violate some of the constraints imposed by the vaults being interacted with, so long as the constraints are satisfied at the end of the transaction.
+As mentioned above, when interacting with the CVP, it is often useful to defer certain checks until the end of the transaction. This allows a user to temporarily violate some of the constraints imposed by the vaults being interacted with, so long as the constraints are satisfied at the end of the transaction.
 
 In order to implement this, the CVP maintains an *execution context* which holds two sets of addresses in regular or transient storage (if supported): `accountStatusChecks` and `vaultStatusChecks`. The execution context will also contain the `onBehalfOfAddress` that has currently been authenticated, so it can be queried for by a vault (see security considerations).
 
@@ -145,19 +145,19 @@ An execution context will exist for the duration of the batch, and then be disca
 When the execution context is complete, the address sets are iterated over:
 
 * For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied.
-* For each address in `vaultStatusChecks`, call `vaultStatusHook` (providing the initial snapshot data for this vault) and determine that the vault is satisfied.
+* For each address in `vaultStatusChecks`, call `checkVaultStatus` on the vault address stored in the set and ensure that the vault is satisfied.
 
 #### Nested Execution Contexts
 
-If a vault or other contract is invoked via the Conductor, and that contract in turn re-invokes the conductor to call another vault/contract, then the execution context is considered nested. The execution context is however *not* treated as a stack. The sets of deferred account and vault status checks are added to, and only after unwinding the final execution context will they be validated.
+If a vault or other contract is invoked via the CVP, and that contract in turn re-invokes the CVP to call another vault/contract, then the execution context is considered nested. The execution context is however *not* treated as a stack. The sets of deferred account and vault status checks are added to, and only after unwinding the final execution context will they be validated.
 
-The previous value of `onBehalfOfAddress` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAddress` at all times when `msg.sender` is the Conductor. However, they can not necessarily rely on this value not changing when they invoke user-controllable callbacks (because they could created a nested context).
+The previous value of `onBehalfOfAddress` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAddress` at all times when `msg.sender` is the CVP. However, they can not necessarily rely on this value not changing when they invoke user-controllable callbacks (because they could created a nested context).
 
 
 
 ### Simulations
 
-The Conductor also supports executing batches in a "simulation" mode. This is only intended to be invoked "off-chain", and is useful for user interfaces because the can show the user what the expected outcome will be of a sequence of operations.
+The CVP also supports executing batches in a "simulation" mode. This is only intended to be invoked "off-chain", and is useful for user interfaces because the can show the user what the expected outcome will be of a sequence of operations.
 
 Simulations work by actually performing the requested operations but then reverting, which (if called on-chain) reverts all the effects. Although simple in principle, there are a number of design elements involved:
 
@@ -170,7 +170,7 @@ Simulations work by actually performing the requested operations but then revert
 
 ## Transient Storage
 
-In order to maintain the execution context, access to the same variables must occur from different invocations of the Conductor. This means that they must be held in storage, and not memory. Unfortunately, storage is expensive compared to memory. Luckily, the EVM protocol may soon specify a new type of memory lifetime: transient storage that is accessible to multiple invocations, but is inexpensive to access.
+In order to maintain the execution context, access to the same variables must occur from different invocations of the CVP. This means that they must be held in storage, and not memory. Unfortunately, storage is expensive compared to memory. Luckily, the EVM protocol may soon specify a new type of memory lifetime: transient storage that is accessible to multiple invocations, but is inexpensive to access.
 
 In order to take advantage of transient storage, the contracts have been structured to keep all the variables that should be stored in transient storage in a separate base class contract `TransientStorage`. By optionally overriding this at compile-time, both old and new networks can be supported.
 
@@ -180,29 +180,26 @@ In order to take advantage of transient storage, the contracts have been structu
 
 ### Authentication by Vaults
 
-In order to support sub-accounts, operators, and forwarding (ie, liquidations), vaults can be invoked via the Conductor's `execute` function (or a batch), which will then execute the requested call on the vault. However, in this case the vault will see the Conductor as the `msg.sender`.
+In order to support sub-accounts, operators, and forwarding (ie, liquidations), vaults can be invoked via the CVP's `call` function (or a `batch` or `callFromControllerToCollateral`), which will then execute the requested call on the vault. However, in this case the vault will see the CVP as the `msg.sender`.
 
-When a vault detects that `msg.sender` is the Conductor, it should call back into the conductor to retrieve the current execution context using `getExecutionContext`. This will tell the vault two things:
+When a vault detects that `msg.sender` is the CVP, it should call back into the CVP to retrieve the current execution context using `getExecutionContext`. This will tell the vault three things:
 
-* The `onBehalfOfAddress` that has been authenticated by the conductor. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
-* Whether or not account/market status checks have been deferred. If they have, then as an optimisation the market status checks and the `requireAccountStatusCheck` call to the conductor for the `onBehalfOfAddress` (but no other addresses) can be omitted.
+* The `onBehalfOfAddress` that has been authenticated by the CVP. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
+* Whether or not account/vault status checks have been deferred
+* Whether or not the vault calling `getExecutionContext` is currently enabled as a controller for the current `onBehalfOfAddress` account. This information is only considered valid when `getExecutionContext` is invoked with `controllerEnabledCheck` set to `true`. When `controllerEnabledCheck` is set to `false` (which optimizes gas consumption), the value returned is always `false`. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account.
 
-If the vault is performing an operation (such as a borrow) that requires it to be the controller for an account, then the `getExecutionContextExtended` function can instead be invoked on the conductor. This requires an `account` argument and will returns both the items above, but also:
+### CVP Contract Privileges
 
-* A boolean `controllerEnabled` which is true only if the provided `account` argument has the vault in its controller set.
+Because the CVP contract can be made to invoke any arbitrary target contract with any arbitrary calldata, it should never be given any privileges, or hold any ETH or tokens.
 
-### Conductor Contract Privileges
-
-Because the Conductor contract can be made to invoke any arbitrary target contract with any arbitrary calldata, it should never be given any privileges, or hold any ETH or tokens.
-
-The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves ETH or tokens into the conductor, but a subsequent batch item moves it out, then because batches execute atomically, it is safe. However, generally moving tokens to the conductor is not necessary, because tokens can usually be moved immediately to their final destination with `transferFrom` etc.
+The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves ETH or tokens into the CVP, but a subsequent batch item moves it out, then because batches execute atomically, it is safe. However, generally moving tokens to the CVP is not necessary, because tokens can usually be moved immediately to their final destination with `transferFrom` etc.
 
 One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item.
 
-One area where the untrustable conductor address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the Conductor as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the CVP doesn't attempt to comprehensively solve this, specifically for ERC-777 tokens and related systems, the ERC-1820 registry address is blocked and can not be invoked via `execute` or batches.
+One area where the untrustable CVP address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the CVP as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the CVP doesn't attempt to comprehensively solve this, specifically for ERC-777 tokens and related systems, the ERC-1820 registry address is blocked and can not be invoked via `call` or batches.
 
 ### Read-only Re-entrancy
 
-The non-transient storage maintained by the Conductor cannot be read while checks are deferred. This is to prevent a class of issues known as read-only re-entrancy.
+The non-transient storage maintained by the CVP cannot be read while checks are deferred. This is to prevent a class of issues known as read-only re-entrancy.
 
 By failing reading the collateral and controller sets in a deferral, it prevents external users that may rely on this information to be seeing a view of it in a transient mid-batch state.

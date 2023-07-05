@@ -15,7 +15,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     
     event BorrowCapSet(uint newBorrowCap);
     event Borrow(address indexed caller, address indexed owner, uint256 assets);
-    event Repay(address indexed caller, address indexed receiver, address indexed owner, uint256 assets);
+    event Repay(address indexed caller, address indexed receiver, uint256 assets);
 
     error FlashloanNotRepaid();
 
@@ -118,64 +118,61 @@ contract CreditVaultBorrowable is CreditVaultSimple {
         if (asset.balanceOf(address(this)) < origBalance) revert FlashloanNotRepaid();
     }
 
-    function borrow(uint256 assets, address receiver, address owner) external virtual {
-        borrowInternal(assets, receiver, owner);
+    function borrow(uint256 assets, address receiver) external virtual {
+        borrowInternal(assets, receiver);
     }
 
     function repay(uint256 assets, address receiver) external virtual {
-        repay(assets, receiver, msg.sender);
+        repayInternal(assets, receiver);
     }
 
-    function repay(uint256 assets, address receiver, address owner) public virtual {
-        repayInternal(assets, receiver, owner);
-    }
-
-    function wind(uint256 assets, address receiver) external virtual 
+    function wind(uint256 assets) external virtual 
     returns (uint shares) {
-        shares= windInternal(assets, receiver);
+        shares= windInternal(assets);
     }
 
-    function unwind(uint256 assets, address receiver) external virtual 
+    function unwind(uint256 assets) external virtual 
     returns (uint shares) {
-        shares= unwindInternal(assets, receiver);
+        shares= unwindInternal(assets);
     }
 
-    function transferDebt(address from, address to, uint256 amount) external virtual 
+    function transferDebt(address from, uint256 amount) external virtual 
     returns (bool) {
-        transferDebtInternal(from, to, amount);
+        transferDebtInternal(from, amount);
         return true;
     }
 
-    function borrowInternal(uint256 assets, address receiver, address owner) internal virtual 
+    function borrowInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant {
-        CVPAuthenticate(msg.sender, owner, true);
         vaultStatusSnapshot();
-        
-        if (msg.sender != address(cvp) && msg.sender != owner) revert NotAuthorized();
-
-        asset.safeTransfer(receiver, assets);
+        address msgSender = CVPAuthenticate(msg.sender, true);
 
         totalBorrowed += assets;
 
-        unchecked { owed[owner] += assets; }
+        unchecked { owed[msgSender] += assets; }
 
-        emit Borrow(msg.sender, owner, assets);
+        emit Borrow(msgSender, receiver, assets);
 
-        requireAccountStatusCheck(owner);
+        asset.safeTransfer(receiver, assets);
+
+        if (owed[msgSender] == 0) cvp.disableController(msgSender);
+
+        requireAccountStatusCheck(msgSender);
         requireVaultStatusCheck();
     }
 
-    function repayInternal(uint256 assets, address receiver, address owner) internal virtual 
+    function repayInternal(uint256 assets, address receiver) internal virtual 
     nonReentrant {
         vaultStatusSnapshot();
+        address msgSender = CVPAuthenticate(msg.sender, true);
         
-        asset.safeTransferFrom(owner, address(this), assets);
+        asset.safeTransferFrom(msgSender, address(this), assets);
 
-        owed[owner] -= assets;
+        owed[receiver] -= assets;
 
         unchecked { totalBorrowed -= assets; }
 
-        emit Repay(msg.sender, receiver, owner, assets);
+        emit Repay(msgSender, receiver, assets);
 
         if (owed[receiver] == 0) cvp.disableController(receiver);
 
@@ -183,70 +180,65 @@ contract CreditVaultBorrowable is CreditVaultSimple {
         requireVaultStatusCheck();
     }
 
-    function windInternal(uint256 assets, address receiver) internal virtual 
+    function windInternal(uint256 assets) internal virtual 
     nonReentrant
     returns (uint shares) {
-        CVPAuthenticate(msg.sender, receiver, true);
-
-        if (msg.sender != address(cvp) && msg.sender != receiver) revert NotAuthorized();
+        address msgSender = CVPAuthenticate(msg.sender, true);
         
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
         assets = previewMint(shares);
 
-        _mint(receiver, shares);
+        _mint(msgSender, shares);
 
         totalBorrowed += assets;
 
-        unchecked { owed[receiver] += assets; }
+        unchecked { owed[msgSender] += assets; }
 
-        emit Deposit(msg.sender, receiver, assets, shares);
-        emit Borrow(msg.sender, receiver, assets);
+        emit Deposit(msgSender, msgSender, assets, shares);
+        emit Borrow(msgSender, msgSender, assets);
 
-        requireAccountStatusCheck(receiver);
+        requireAccountStatusCheck(msgSender);
     }
 
-    function unwindInternal(uint256 assets, address receiver) internal virtual 
+    function unwindInternal(uint256 assets) internal virtual 
     nonReentrant
     returns (uint shares) {
-        CVPAuthenticate(msg.sender, receiver, true);
-        
-        if (msg.sender != address(cvp) && msg.sender != receiver) revert NotAuthorized();
+        address msgSender = CVPAuthenticate(msg.sender, true);
         
         shares = previewWithdraw(assets);
         require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
 
-        owed[receiver] -= assets;    
+        owed[msgSender] -= assets;    
 
         unchecked { totalBorrowed -= assets; }
 
-        emit Repay(msg.sender, receiver, receiver, assets);
+        _burn(msgSender, shares);
+        
+        emit Repay(msgSender, msgSender, assets);
+        emit Withdraw(msgSender, msgSender, msgSender, assets, shares);
 
-        _burn(receiver, shares);
-        emit Withdraw(msg.sender, receiver, receiver, assets, shares);
+        if (owed[msgSender] == 0) cvp.disableController(msgSender);
 
-        if (owed[receiver] == 0) cvp.disableController(receiver);
-
-        requireAccountStatusCheck(receiver);
+        requireAccountStatusCheck(msgSender);
     }
 
-    function transferDebtInternal(address from, address to, uint256 amount) internal virtual 
+    function transferDebtInternal(address from, uint256 amount) internal virtual 
     nonReentrant {
-        CVPAuthenticate(msg.sender, to, true);
-        
-        if (msg.sender != address(cvp) && msg.sender != to) revert NotAuthorized();
+        address msgSender = CVPAuthenticate(msg.sender, true);
         
         owed[from] -= amount;    
 
-        unchecked { owed[to] += amount; }
+        unchecked { owed[msgSender] += amount; }
 
-        emit Repay(msg.sender, from, to, amount);
-        emit Borrow(msg.sender, to, amount);
+        emit Repay(msgSender, from, amount);
+        emit Borrow(msgSender, msgSender, amount);
 
         if (owed[from] == 0) cvp.disableController(from);
+        if (owed[msgSender] == 0) cvp.disableController(msgSender);
         
         address[] memory accounts = new address[](2);
         accounts[0] = from;
-        accounts[1] = to;
+        accounts[1] = msgSender;
         requireAccountsStatusCheck(accounts);
     }
 }

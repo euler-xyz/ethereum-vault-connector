@@ -82,15 +82,11 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
 
     function approve(address spender, uint256 amount) public override 
     returns (bool) {
-        address owner = msg.sender;
+        address msgSender = CVPAuthenticate(msg.sender, false);
 
-        if (msg.sender == address(cvp)) {
-            (, owner) = cvp.getExecutionContext();
-        }
+        allowance[msgSender][spender] = amount;
 
-        allowance[owner][spender] = amount;
-
-        emit Approval(owner, spender, amount);
+        emit Approval(msgSender, spender, amount);
 
         return true;
     }
@@ -103,12 +99,12 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     function transferFrom(address from, address to, uint256 amount) public override 
     nonReentrant
     returns (bool) {
-        CVPAuthenticate(msg.sender, from, false);
+        address msgSender = CVPAuthenticate(msg.sender, false);
 
-        if (msg.sender != address(cvp) && msg.sender != from) {
-            uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
+        if (msgSender != from) {
+            uint256 allowed = allowance[from][msgSender];
 
-            if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
+            if (allowed != type(uint256).max) allowance[from][msgSender] = allowed - amount;
         }
         
         balanceOf[from] -= amount;
@@ -127,23 +123,13 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
 
     function deposit(uint256 assets, address receiver) public override
     returns (uint256 shares) {
-        shares = deposit(assets, receiver, msg.sender);
-    }
-
-    function deposit(uint256 assets, address receiver, address owner) public
-    returns (uint256 shares) {
         shares = previewDeposit(assets);
-        mintInternal(shares, receiver, owner);
+        mintInternal(shares, receiver);
     }
 
     function mint(uint256 shares, address receiver) public override
     returns (uint256 assets) {
-        assets = mint(shares, receiver, msg.sender);
-    }
-
-    function mint(uint256 shares, address receiver, address owner) public
-    returns (uint256 assets) {
-        assets = mintInternal(shares, receiver, owner);
+        assets = mintInternal(shares, receiver);
     }
 
     function withdraw(uint256 assets, address receiver, address owner) public override
@@ -181,22 +167,22 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
         assets = burnInternal(shares, receiver, address(this));
     }
 
-    function mintInternal(uint256 shares, address receiver, address owner) internal virtual 
+    function mintInternal(uint256 shares, address receiver) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        require(shares > 0, "ZERO_SHARES");
-
         vaultStatusSnapshot();
+        address msgSender = CVPAuthenticate(msg.sender, false);
+
+        require(shares > 0, "ZERO_SHARES");
 
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer before minting or ERC777s could reenter.
-        asset.safeTransferFrom(owner, address(this), assets);
+        asset.safeTransferFrom(msgSender, address(this), assets);
 
         _mint(receiver, shares);
 
-        // TODO figure out what to do with caller
-        emit Deposit(msg.sender, receiver, assets, shares);
+        emit Deposit(msgSender, receiver, assets, shares);
 
         afterDeposit(assets, shares);
 
@@ -207,18 +193,16 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     function burnInternal(uint256 shares, address receiver, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        CVPAuthenticate(msg.sender, owner, false);
         vaultStatusSnapshot();
+        address msgSender = CVPAuthenticate(msg.sender, false);
 
         if (
-            msg.sender != address(cvp) && 
-            msg.sender != owner && 
-            msg.sender != vaultOwner && // allows withdrawing reserves by the vault owner
-            owner != address(this) // allows withdrawing reserves by the vault owner
+            msgSender != owner && 
+            !(msgSender == vaultOwner && address(this) == owner) // allows withdrawing reserves by the vault owner
         ) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+            uint256 allowed = allowance[owner][msgSender];
 
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
+            if (allowed != type(uint256).max) allowance[owner][msgSender] = allowed - shares;
         }
 
         // Check for rounding error since we round down in previewRedeem.
@@ -228,8 +212,7 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
 
         _burn(owner, shares);
 
-        // TODO figure out what to do with caller
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+        emit Withdraw(msgSender, receiver, owner, assets, shares);
 
         asset.safeTransfer(receiver, assets);
 
@@ -240,12 +223,12 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     function donateInternal(uint256 shares, address owner) internal virtual 
     nonReentrant
     returns (uint256 assets) {
-        CVPAuthenticate(msg.sender, owner, false);
+        address msgSender = CVPAuthenticate(msg.sender, false);
 
-        if (msg.sender != address(cvp) && msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+        if (msgSender != owner) {
+            uint256 allowed = allowance[owner][msgSender];
 
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
+            if (allowed != type(uint256).max) allowance[owner][msgSender] = allowed - shares;
         }
 
         // Check for rounding error since we round down in previewRedeem.
@@ -255,13 +238,11 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
 
         _burn(owner, shares);
 
-        // TODO figure out what to do with caller
-        emit Withdraw(msg.sender, address(this), owner, assets, shares);
+        emit Withdraw(msgSender, address(this), owner, assets, shares);
 
         _mint(address(this), shares);
 
-        // TODO figure out what to do with caller
-        emit Deposit(address(this), address(this), assets, shares);
+        emit Deposit(msgSender, address(this), assets, shares);
 
         afterDeposit(assets, shares);
 

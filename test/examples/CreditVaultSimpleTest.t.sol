@@ -47,165 +47,9 @@ contract CreditVaultSimpleTest is DSTestPlus {
         (bool isValid,) = vault.checkAccountStatus(alice, new address[](0));
         assertTrue(isValid);
 
-        // check vault status hooks
+        // check vault status hook
         hevm.prank(address(cvp));
         vault.checkVaultStatus();
-    }
-        
-    function testDepositDoesntAuthenticateCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x6e553f65, 10, bob));  // deposit(uint256,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-
-        hevm.prank(alice);
-        (
-            success, 
-            result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, bob, address(0)));  // deposit(uint256,address,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-
-        hevm.prank(alice);
-        (
-            success, 
-            result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x2e2d2984, 10, address(0), bob));  // deposit(uint256,address,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testMintDoesntAuthenticateCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0x94bf804d, 10, bob));  // mint(uint256,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-
-        hevm.prank(alice);
-        (
-            success, 
-            result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, bob, address(0)));  // mint(uint256,address,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-
-        hevm.prank(alice);
-        (
-            success, 
-            result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(0xda39b3e7, 10, address(0), bob));  // mint(uint256,address,address)
-    
-        assertNotEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testTransferAuthenticatesCVP(address alice) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(address(cvp) )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.transfer.selector, address(0), 10));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testTransferFromAuthenticatesCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.transferFrom.selector, bob, address(0), 10));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testWithdrawAuthenticatesCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.withdraw.selector, 10, address(0), bob));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testRedeemAuthenticatesCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.redeem.selector, 10, address(0), bob));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testWithdrawToReservesAuthenticatesCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.withdrawToReserves.selector, 10, bob));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testRedeemToReservesAuthenticatesCVP(address alice, address bob) external {
-        hevm.assume(uint160(alice )| 0xff != uint160(bob )| 0xff);
-
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.redeemToReserves.selector, 10, bob));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testWithdrawReservesAuthenticatesCVP(address alice) external {
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.withdrawReserves.selector, 10, address(0)));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
-    }
-
-    function testRedeemReservesAuthenticatesCVP(address alice) external {
-        hevm.prank(alice);
-        (
-            bool success, 
-            bytes memory result
-        ) = cvp.call(address(vault), alice, abi.encodeWithSelector(vault.redeemReserves.selector, 10, address(0)));
-    
-        assertFalse(success);
-        assertEq(bytes4(result), NotAuthorized.selector);
     }
 
     function testMetadata(address cvpAddr, string calldata name, string calldata symbol) public {
@@ -233,18 +77,15 @@ contract CreditVaultSimpleTest is DSTestPlus {
 
         hevm.prank(alice);
         uint256 aliceShareAmount;
-        if (seed % 3 == 0) {
+        if (seed % 2 == 0) {
             aliceShareAmount = vault.deposit(aliceUnderlyingAmount, alice);
-        } else if (seed % 2 == 0) { 
-            aliceShareAmount = vault.deposit(aliceUnderlyingAmount, alice, alice);
         } else {
             (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
-                    0x2e2d2984, //"function deposit(uint256,address,address) public returns (uint256)",
+                    vault.deposit.selector,
                     aliceUnderlyingAmount,
-                    alice,
                     alice
                 )
             );
@@ -302,18 +143,15 @@ contract CreditVaultSimpleTest is DSTestPlus {
 
         hevm.prank(alice);
         uint256 aliceUnderlyingAmount;
-        if (seed % 3 == 0) {
+        if (seed % 2 == 0) {
             aliceUnderlyingAmount = vault.mint(aliceShareAmount, alice);
-        } else if (seed % 2 == 0) { 
-            aliceUnderlyingAmount = vault.mint(aliceShareAmount, alice, alice);
         } else {
             (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
-                    0xda39b3e7, //"function mint(uint256,address,address) public returns (uint256)",
+                    vault.mint.selector,
                     aliceShareAmount,
-                    alice,
                     alice
                 )
             );
@@ -430,18 +268,15 @@ contract CreditVaultSimpleTest is DSTestPlus {
         // 1. Alice mints 2000 shares (costs 2000 tokens)
         hevm.prank(alice);
         uint256 aliceUnderlyingAmount;
-        if (seed % 3 == 0) {
+        if (seed % 2 == 0) {
             aliceUnderlyingAmount = vault.mint(2000, alice);
-        } else if (seed % 2 == 0) { 
-            aliceUnderlyingAmount = vault.mint(2000, alice, alice);
         } else {
             (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
-                    0xda39b3e7, //"function mint(uint256,address,address) public returns (uint256)",
+                    vault.mint.selector,
                     2000,
-                    alice,
                     alice
                 )
             );
@@ -467,16 +302,14 @@ contract CreditVaultSimpleTest is DSTestPlus {
         // 2. Bob deposits 4000 tokens (mints 4000 shares)
         hevm.prank(bob);
         uint256 bobShareAmount;
-        if (seed % 3 == 0) {
+        if (seed % 2 == 0) {
             bobShareAmount = vault.deposit(4000, bob);
-        } else if (seed % 2 == 0) { 
-            bobShareAmount = vault.deposit(4000, bob, bob);
         } else {
             (bool success, bytes memory result) = cvp.call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
-                    0x2e2d2984, //"function deposit(uint256,address,address) public returns (uint256)",
+                    vault.deposit.selector,
                     4000,
                     bob,
                     bob
@@ -528,16 +361,13 @@ contract CreditVaultSimpleTest is DSTestPlus {
         hevm.prank(alice);
         if (seed % 3 == 0) {
             vault.deposit(2000, alice);
-        } else if (seed % 2 == 0) { 
-            vault.deposit(2000, alice, alice);
         } else {
             (bool success,) = cvp.call(
                 address(vault),
                 alice,
                 abi.encodeWithSelector(
-                    0x2e2d2984, //"function deposit(uint256,address,address) public returns (uint256)",
+                    vault.deposit.selector,
                     2000,
-                    alice,
                     alice
                 )
             );
@@ -556,16 +386,13 @@ contract CreditVaultSimpleTest is DSTestPlus {
         hevm.prank(bob);
         if (seed % 3 == 0) {
             vault.mint(2000, bob);
-        } else if (seed % 2 == 0) { 
-            vault.mint(2000, bob, bob);
         } else {
             (bool success,) = cvp.call(
                 address(vault),
                 bob,
                 abi.encodeWithSelector(
-                    0xda39b3e7, //"function mint(uint256,address,address) public returns (uint256)",
+                    vault.mint.selector,
                     2000,
-                    bob,
                     bob
                 )
             );
