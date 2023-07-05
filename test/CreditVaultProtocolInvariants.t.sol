@@ -163,9 +163,10 @@ contract CreditVaultProtocolInvariants is Test {
     }
 
     function invariant_context() external {
-        (bool checksDeferred, address account) = cvp.getExecutionContext();
+        (bool checksDeferred, address account, bool controllerEnabled) = cvp.getExecutionContext(true);
         assertFalse(checksDeferred);
         assertTrue(account == address(0));
+        assertFalse(controllerEnabled);
     }
 
     function invariant_transientStorage() external {     

@@ -104,32 +104,18 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     // Execution context
 
-    /// @notice Returns the current execution context.
-    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. Checks are deferred if the execution flow is currently in a batch.
+    /// @notice Returns the current execution context. If needed, the context is extended with information whether a msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
+    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. Checks are deferred if the execution flow is currently in a batch. If needed, the context is extended with information whether a msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
+    /// @param controllerEnabledCheck A boolean flag that indicates whether the context should be extended with information whether a msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
     /// @return checksDeferred A boolean flag that indicates whether the checks are deferred or not.
     /// @return onBehalfOfAccount The address of the account on behalf of which the execution flow is being executed at the moment.
-    function getExecutionContext() external view returns (bool checksDeferred, address onBehalfOfAccount) {
-        ExecutionContext memory context = executionContext;
-        checksDeferred = context.batchDepth != BATCH_DEPTH__INIT;
-        onBehalfOfAccount = context.onBehalfOfAccount;
-    }
-
-    /// @notice Returns the current execution context extended with information whether a controller is enabled for an account.
-    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. Checks are deferred if the execution flow is currently in a batch. If msg.sender is not a vault itself, this function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
-    /// @param account The address of the account for which controller is being checked.
-    /// @param vault The address of the controller that is being checked.
-    /// @return checksDeferred A boolean flag that indicates whether the checks are deferred or not.
-    /// @return onBehalfOfAccount The address of the account on behalf of which the execution flow is being executed at the moment.
-    /// @return controllerEnabled A boolean value that indicates whether the vault is controller for the account or not.
-    function getExecutionContextExtended(address account, address vault) external view 
+    /// @return controllerEnabled A boolean value that indicates whether msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment. Always false if controllerEnabledCheck is false.
+    function getExecutionContext(bool controllerEnabledCheck) external view 
     returns (bool checksDeferred, address onBehalfOfAccount, bool controllerEnabled) {
         ExecutionContext memory context = executionContext;
         checksDeferred = context.batchDepth != BATCH_DEPTH__INIT;
-
-        if (msg.sender != vault && checksDeferred) revert DeferralViolation();
-
         onBehalfOfAccount = context.onBehalfOfAccount;
-        controllerEnabled = accountControllers[account].contains(vault);
+        controllerEnabled = controllerEnabledCheck ? accountControllers[context.onBehalfOfAccount].contains(msg.sender) : false;
     }
 
 

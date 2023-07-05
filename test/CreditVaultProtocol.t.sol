@@ -8,7 +8,7 @@ import "../src/CreditVaultProtocol.sol";
 contract TargetMock {
     function func(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
         // also tests getExecutionContext() from the CVP
-        (bool _checksDeferred, address _onBehalfOfAccount) = ICVP(cvp).getExecutionContext();
+        (bool _checksDeferred, address _onBehalfOfAccount,) = ICVP(cvp).getExecutionContext(false);
 
         require(msg.sender == msgSender, "func/invalid-sender");
         require(msg.value == msgValue, "func/invalid-msg-value");
@@ -363,25 +363,7 @@ contract CreditVaultProtocolTest is Test {
         cvp.setAccountOperator(alice, operator, true);
     }
 
-    function test_GetExecutionContext(uint8 depth, address account) external {
-        vm.assume(depth > 0);
-        vm.assume(account != address(0));
-
-        (bool checksDeferred, address onBehalfOfAccount) = cvp.getExecutionContext();
-
-        assertFalse(checksDeferred);
-        assertEq(onBehalfOfAccount, address(0));
-        
-        cvp.setBatchDepth(depth);
-        cvp.setOnBehalfOfAccount(account);
-
-        (checksDeferred, onBehalfOfAccount) = cvp.getExecutionContext();
-        
-        assertEq(checksDeferred, depth > 1 ? true : false);
-        assertEq(onBehalfOfAccount, account);
-    }
-
-    function test_GetExecutionContextExtended(address account, uint seed) external {
+    function test_GetExecutionContext(address account, bool controllerEnabledCheck, uint seed) external {
         vm.assume(account != address(0));
 
         address controller = address(new VaultMock(cvp));
@@ -390,13 +372,13 @@ contract CreditVaultProtocolTest is Test {
             bool checksDeferred, 
             address onBehalfOfAccount, 
             bool controllerEnabled
-        ) = cvp.getExecutionContextExtended(account, controller);
+        ) = cvp.getExecutionContext(true);
 
         assertFalse(checksDeferred);
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
         
-        if (seed % 2 == 0) {
+        if (seed % 4 == 0) {
             vm.prank(account);
             cvp.enableController(account, controller);
         }
@@ -404,35 +386,17 @@ contract CreditVaultProtocolTest is Test {
         cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
         cvp.setOnBehalfOfAccount(account);
 
-        if (seed % 3 == 0) vm.prank(controller);
+        if (seed % 2 == 0) vm.prank(controller);
 
         (
             checksDeferred, 
             onBehalfOfAccount, 
             controllerEnabled
-        ) = cvp.getExecutionContextExtended(account, controller);
+        ) = cvp.getExecutionContext(controllerEnabledCheck);
         
         assertEq(checksDeferred, seed % 3 == 0 ? true : false);
         assertEq(onBehalfOfAccount, account);
-        assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
-    }
-
-    function test_GetExecutionContextExtended_RevertIfChecksDeferredAndMsgSenderNotVault(address account) external {
-        vm.assume(account != address(0));
-
-        address controller = address(new VaultMock(cvp));
-        vm.assume(account != address(this));
-        vm.assume(account != controller);
-        
-        vm.prank(account);
-        cvp.enableController(account, controller);
-        
-        cvp.setBatchDepth(2);
-        cvp.setOnBehalfOfAccount(account);
-
-        vm.prank(account);
-        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
-        cvp.getExecutionContextExtended(account, controller);
+        assertEq(controllerEnabled, (controllerEnabledCheck && seed % 4 == 0) ? true : false);
     }
 
     function test_GetCollaterals(address alice) public {
@@ -930,6 +894,9 @@ contract CreditVaultProtocolTest is Test {
         vm.prank(alice);
         cvp.enableController(alice, controller);
 
+        cvp.reset();
+        VaultMock(controller).reset();
+
         bytes memory data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
             address(cvp),
@@ -950,12 +917,15 @@ contract CreditVaultProtocolTest is Test {
         assertEq(abi.decode(result, (uint)), seed);
 
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
-        // note that in this case the controller tries to act on behalf itself
+        // note that in this case the controller tries to act on behalf of itself
         vm.prank(controller);
         cvp.enableCollateral(controller, collateral);
 
         vm.prank(controller);
         cvp.enableController(controller, controller);
+
+        cvp.reset();
+        VaultMock(controller).reset();
 
         data = abi.encodeWithSelector(
             TargetMock(collateral).func.selector,
@@ -1242,8 +1212,17 @@ contract CreditVaultProtocolTest is Test {
         cvp.requireAccountsStatusCheck(accounts);
     }
 
-    function test_RequireAccountsStatusCheckWhenDeferred(address[] memory accounts) external {
-        vm.assume(accounts.length > 0 && accounts.length <= 10);
+    function test_RequireAccountsStatusCheckWhenDeferred(uint8 numberOfAccounts, uint seed) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= 10);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        for (uint i = 0; i < accounts.length; i++) {
+            accounts[i] = address(uint160(uint(keccak256(
+                i == 0 
+                    ? abi.encode(seed)
+                    : abi.encode(accounts[i-1])
+            ))));
+        }
         
         for (uint i = 0; i < accounts.length; i++) {
             address account = accounts[i];
