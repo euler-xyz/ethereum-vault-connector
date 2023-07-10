@@ -32,7 +32,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     // Events, Errors
 
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
-    
+
     error NotAuthorized();
     error InvalidAddress();
     error ChecksReentrancy();
@@ -405,13 +405,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     function checkAccountStatusInternal(address account) internal view 
     returns (bool isValid, bytes memory data) {
         SetStorage storage controllers = accountControllers[account];
-        
+
         if (controllers.numElements == 0) return (true, "");
         else if (controllers.numElements > 1) revert ControllerViolation(account);
-        
+
         address[] memory collaterals = accountCollaterals[account].get();
 
-        (bool success, bytes memory result) = controllers.firstElement.staticcall(
+        bool success;
+        (success, data) = controllers.firstElement.staticcall(
             abi.encodeWithSelector(
                 ICreditVault.checkAccountStatus.selector,
                 account,
@@ -419,7 +420,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
             )
         );
 
-        if (success) (isValid, data) = abi.decode(result, (bool, bytes));
+        if (success) (isValid, data) = abi.decode(data, (bool, bytes));
         else isValid = false;
     }
 
@@ -431,13 +432,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     function checkVaultStatusInternal(address vault) internal 
     returns (bool isValid, bytes memory data) {
-        (bool success, bytes memory result) = vault.call(
+        bool success;
+        (success, data) = vault.call(
             abi.encodeWithSelector(
                 ICreditVault.checkVaultStatus.selector
             )
         );
-        
-        if (success) (isValid, data) = abi.decode(result, (bool, bytes));
+
+        if (success) (isValid, data) = abi.decode(data, (bool, bytes));
         else isValid = false;
     }
 
@@ -467,12 +469,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         uint8 numElements = setStorage.numElements;
 
         if (returnResult) result = new BatchResult[](numElements);
-        
+
         if (numElements == 0) return result;
 
         for (uint i = 0; i < numElements;) {
             address addr = i == 0 ? firstElement : setStorage.elements[i];
-            
+
             if (returnResult) {
                 bytes memory data;
                 (result[i].success, data) = checkStatus(addr);
@@ -489,7 +491,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
                     );
                 }
             } else requireStatusCheck(addr);
-            
+
             delete setStorage.elements[i];
             unchecked { ++i; }
         }

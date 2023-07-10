@@ -69,14 +69,14 @@ contract VaultMock is ICreditVault, TargetMock, Test {
     returns (bool isValid, bytes memory data) {
         if (vaultStatusState == 0) return (true, "");
         else if (vaultStatusState == 1) return (false, "vault status violation");
-        else revert("invalid");
+        else revert("invalid vault");
     }
 
     function checkAccountStatus(address, address[] memory) external view override 
     returns (bool isValid, bytes memory data) {
         if (accountStatusState == 0) return (true, "");
         else if (accountStatusState == 1) return (false, "account status violation");
-        else revert("invalid");
+        else revert("invalid account");
     }
 
     function requireChecks(address account) external payable {
@@ -1182,8 +1182,8 @@ contract CreditVaultProtocolTest is Test {
                     CreditVaultProtocol.AccountStatusViolation.selector,
                     account,
                     uint160(account) % 3 == 1
-                        ? "account status violation"
-                        : ""
+                        ? bytes("account status violation")
+                        : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
                 ));
             }
             cvp.requireAccountStatusCheck(account);
@@ -1205,8 +1205,8 @@ contract CreditVaultProtocolTest is Test {
                 CreditVaultProtocol.AccountStatusViolation.selector,
                 invalidAccount,
                 uint160(invalidAccount) % 3 == 1
-                    ? "account status violation"
-                    : ""
+                    ? bytes("account status violation")
+                    : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
             ));
         }
         cvp.requireAccountsStatusCheck(accounts);
@@ -1291,8 +1291,8 @@ contract CreditVaultProtocolTest is Test {
                     CreditVaultProtocol.VaultStatusViolation.selector,
                     vault,
                     uint160(vault) % 3 == 1
-                        ? "vault status violation"
-                        : ""
+                        ? bytes("vault status violation")
+                        : abi.encodeWithSignature("Error(string)", bytes("invalid vault"))
                 ));
             }
             cvp.requireVaultStatusCheck();
