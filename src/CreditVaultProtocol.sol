@@ -411,14 +411,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         if (controllers.numElements == 0) return (true, "");
         else if (controllers.numElements > 1) revert ControllerViolation(account);
 
-        address[] memory collaterals = accountCollaterals[account].get();
-
         bool success;
         (success, data) = controllers.firstElement.staticcall(
             abi.encodeWithSelector(
                 ICreditVault.checkAccountStatus.selector,
                 account,
-                collaterals
+                accountCollaterals[account].get()
             )
         );
 
