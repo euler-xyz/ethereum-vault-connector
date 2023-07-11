@@ -198,14 +198,14 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
         require(accountStatusChecks.numElements == 0, "verifyStorage/account-status-checks/numElements");
         require(accountStatusChecks.firstElement == address(0), "verifyStorage/account-status-checks/firstElement");
 
-        for (uint i = 0; i < 10; ++i) {
+        for (uint i = 0; i < 20; ++i) {
             require(accountStatusChecks.elements[i] == address(0), "verifyStorage/account-status-checks/elements");
         }
 
         require(vaultStatusChecks.numElements == 0, "verifyStorage/vault-status-checks/numElements");
         require(vaultStatusChecks.firstElement == address(0), "verifyStorage/vault-status-checks/firstElement");
 
-        for (uint i = 0; i < 10; ++i) {
+        for (uint i = 0; i < 20; ++i) {
             require(vaultStatusChecks.elements[i] == address(0), "verifyStorage/vault-status-checks/elements");
         }
     }
@@ -422,7 +422,7 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function test_CollateralsManagement(address alice, uint8 subAccountId, uint8 numberOfVaults, uint seed) public {
-        vm.assume(numberOfVaults > 0 && numberOfVaults <= 10);
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= 20);
         vm.assume(seed > 1000);
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
@@ -1213,7 +1213,7 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function test_RequireAccountsStatusCheckWhenDeferred(uint8 numberOfAccounts, uint seed) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= 10);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= 20);
 
         address[] memory accounts = new address[](numberOfAccounts);
         for (uint i = 0; i < accounts.length; i++) {
@@ -1268,7 +1268,7 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function test_RequireVaultStatusCheck(uint8 vaultsNumber, bool allStatusesValid) external {
-        vm.assume(vaultsNumber > 0 && vaultsNumber <= 10);
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= 20);
         
         for (uint i = 0; i < vaultsNumber; i++) {
             address vault = address(new VaultMock(cvp));
@@ -1300,7 +1300,7 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function test_RequireVaultStatusCheckWhenDeferred(uint8 vaultsNumber, bool allStatusesValid) external {
-        vm.assume(vaultsNumber > 0 && vaultsNumber <= 10);
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= 20);
         
         for (uint i = 0; i < vaultsNumber; i++) {
             address vault = address(new VaultMock(cvp));
