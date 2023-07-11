@@ -8,7 +8,7 @@ import "../src/CreditVaultProtocol.sol";
 contract TargetMock {
     function func(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
         // also tests getExecutionContext() from the CVP
-        (bool _checksDeferred, address _onBehalfOfAccount,) = ICVP(cvp).getExecutionContext(false);
+        (address _onBehalfOfAccount, , bool _checksDeferred) = ICVP(cvp).getExecutionContext(address(0));
 
         require(msg.sender == msgSender, "func/invalid-sender");
         require(msg.value == msgValue, "func/invalid-msg-value");
@@ -363,16 +363,16 @@ contract CreditVaultProtocolTest is Test {
         cvp.setAccountOperator(alice, operator, true);
     }
 
-    function test_GetExecutionContext(address account, bool controllerEnabledCheck, uint seed) external {
+    function test_GetExecutionContext(address account, uint seed) external {
         vm.assume(account != address(0));
 
         address controller = address(new VaultMock(cvp));
 
         (
-            bool checksDeferred, 
             address onBehalfOfAccount, 
-            bool controllerEnabled
-        ) = cvp.getExecutionContext(true);
+            bool controllerEnabled,
+            bool checksDeferred
+        ) = cvp.getExecutionContext(controller);
 
         assertFalse(checksDeferred);
         assertEq(onBehalfOfAccount, address(0));
@@ -386,39 +386,59 @@ contract CreditVaultProtocolTest is Test {
         cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
         cvp.setOnBehalfOfAccount(account);
 
-        if (seed % 2 == 0) vm.prank(controller);
-
         (
-            checksDeferred, 
             onBehalfOfAccount, 
-            controllerEnabled
-        ) = cvp.getExecutionContext(controllerEnabledCheck);
+            controllerEnabled,
+            checksDeferred
+        ) = cvp.getExecutionContext(controller);
         
         assertEq(checksDeferred, seed % 3 == 0 ? true : false);
         assertEq(onBehalfOfAccount, account);
-        assertEq(controllerEnabled, (controllerEnabledCheck && seed % 4 == 0) ? true : false);
+        assertEq(controllerEnabled, seed % 4 == 0 && controller != address(0) ? true : false);
     }
 
-    function test_GetCollaterals(address alice) public {
-        cvp.setBatchDepth(1);
-        cvp.getCollaterals(alice);
+    function test_IsAccountStatusCheckDeferred(uint8 numberOfAccounts, bytes memory seed) external {
+        vm.assume(numberOfAccounts <= 20);
+
+        for (uint i = 0; i < numberOfAccounts; ++i) {
+            // we're not in a batch thus the check will not get deferred
+            cvp.setBatchDepth(1);
+
+            address account = address(uint160(uint(keccak256(abi.encode(i, seed)))));
+            assertFalse(cvp.isAccountStatusCheckDeferred(account));
+
+            cvp.requireAccountStatusCheck(account);
+            assertFalse(cvp.isAccountStatusCheckDeferred(account));
+
+            // simulate being in a batch
+            cvp.setBatchDepth(2);
+
+            cvp.requireAccountStatusCheck(account);
+            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+        }
     }
 
-    function test_GetCollaterals_RevertIfChecksDeferred(address alice) public {
-        cvp.setBatchDepth(2);
-        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
-        cvp.getCollaterals(alice);
-    }
+    function test_IsVaultStatusCheckDeferred(uint8 numberOfVaults) external {
+        vm.assume(numberOfVaults <= 20);
 
-    function test_IsCollateralEnabled(address alice, address vault) public {
-        cvp.setBatchDepth(1);
-        cvp.isCollateralEnabled(alice, vault);
-    }
+        for (uint i = 0; i < numberOfVaults; ++i) {
+            // we're not in a batch thus the check will not get deferred
+            cvp.setBatchDepth(1);
 
-    function test_IsCollateralEnabled_RevertIfChecksDeferred(address alice, address vault) public {
-        cvp.setBatchDepth(2);
-        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
-        cvp.isCollateralEnabled(alice, vault);
+            address vault = address(new VaultMock(cvp));
+            assertFalse(cvp.isVaultStatusCheckDeferred(vault));
+
+            vm.prank(vault);
+            cvp.requireVaultStatusCheck();
+            assertFalse(cvp.isVaultStatusCheckDeferred(vault));
+
+            // simulate being in a batch
+            cvp.setBatchDepth(2);
+
+            vm.prank(vault);
+            cvp.requireVaultStatusCheck();
+            assertTrue(cvp.isVaultStatusCheckDeferred(vault));
+        }
     }
 
     function test_CollateralsManagement(address alice, uint8 subAccountId, uint8 numberOfVaults, uint seed) public {
@@ -554,46 +574,6 @@ contract CreditVaultProtocolTest is Test {
 
         vm.prank(alice);
         cvp.handlerDisableCollateral(alice, vault);
-    }
-
-    function test_GetController(address alice) public {
-        cvp.setBatchDepth(1);
-        cvp.getController(alice);
-    }
-
-    function test_GetController_RevertIfChecksDeferred(address alice) public {
-        cvp.setBatchDepth(2);
-        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
-        cvp.getController(alice);
-    }
-
-    function test_IsControllerEnabled(address alice) public {
-        address vault = address(new VaultMock(cvp));
-        cvp.setBatchDepth(1);
-        cvp.isControllerEnabled(alice, vault);
-
-        // even though checks are deferred, the function succeeds if called by the vault asking if vault enabled
-        // as a controller
-        cvp.setBatchDepth(2);
-        VaultMock(vault).call(
-            address(cvp),
-            abi.encodeWithSelector(
-                cvp.isControllerEnabled.selector,
-                alice,
-                vault
-            )
-        );
-    }
-
-    function test_IsControllerEnabled_RevertIfChecksDeferredAndMsgSenderNotVault(address alice, address vault) public {
-        vm.assume(alice != vault);
-        vm.assume(address(this) != vault);
-
-        cvp.setBatchDepth(2);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
-        cvp.isControllerEnabled(alice, vault);
     }
 
     function test_ControllersManagement(address alice, uint8 subAccountId, uint seed) public {
