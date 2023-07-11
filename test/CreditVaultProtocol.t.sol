@@ -318,6 +318,7 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function test_SetAccountOperator(address alice, address operator) public {
+        vm.assume(alice != address(0));
         vm.assume(!samePrimaryAccount(alice, operator));
 
         for (uint i = 0; i < 256; ++i) {
@@ -325,12 +326,20 @@ contract CreditVaultProtocolTest is Test {
 
             assertFalse(cvp.accountOperators(account, operator));
 
+            if (i == 0) {
+                vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+                cvp.getAccountOwner(account);
+            } else {
+                assertEq(cvp.getAccountOwner(account), alice);
+            }
+
             vm.prank(alice);
             vm.expectEmit(true, true, false, true, address(cvp));
             emit AccountOperatorSet(account, operator, true);
             cvp.setAccountOperator(account, operator, true);
 
             assertTrue(cvp.accountOperators(account, operator));
+            assertEq(cvp.getAccountOwner(account), alice);
 
             vm.prank(alice);
             vm.expectEmit(true, true, false, true, address(cvp));
@@ -338,6 +347,7 @@ contract CreditVaultProtocolTest is Test {
             cvp.setAccountOperator(account, operator, false);
 
             assertFalse(cvp.accountOperators(account, operator));
+            assertEq(cvp.getAccountOwner(account), alice);
         }
     }
 
@@ -427,12 +437,16 @@ contract CreditVaultProtocolTest is Test {
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
+        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        cvp.getAccountOwner(account);
+
         // test collaterals management with use of an operator
         address msgSender = alice;
         if (seed % 2 == 0 && !samePrimaryAccount(account, address(uint160(seed)))) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
             cvp.setAccountOperator(account, msgSender, true);
+            assertEq(cvp.getAccountOwner(account), alice);
         }
 
         // enable a controller to check if account status check works properly
@@ -440,6 +454,7 @@ contract CreditVaultProtocolTest is Test {
         if (seed % 3 == 0) {
             vm.prank(alice);
             cvp.enableController(account, controller);
+            assertEq(cvp.getAccountOwner(account), alice);
         }
 
         // enabling collaterals

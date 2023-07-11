@@ -25,6 +25,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     mapping(address account => mapping(address operator => bool isOperator)) public accountOperators;
 
     ExecutionContext internal executionContext;
+    mapping(uint160 prefix => address owner) internal ownerLookup; // prefix is the first 19 bytes of the account address
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
@@ -58,10 +59,17 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
-        if (
-            (uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF) && 
-            !accountOperators[account][msg.sender]
-        ) revert NotAuthorized();
+        {
+            if (
+                (uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF) && 
+                !accountOperators[account][msg.sender]
+            ) revert NotAuthorized();
+
+            // if owner is not set yet at this point, it means that it must be the msg.sender that is an owner.
+            // ownerLookup is set only once on the initial interaction of the account with the CVP
+            uint160 prefix = uint160(account) & ~uint160(0xFF);
+            if (ownerLookup[prefix] == address(0)) ownerLookup[prefix] = msg.sender;
+        }
 
         _;
     }
@@ -84,7 +92,16 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
 
-    // Account operators
+    // Account owner and operators
+
+    /// @notice Returns the owner for the specified account.
+    /// @param account The address of the account whose owner is being retrieved.
+    /// @return owner The address of the owner.
+    function getAccountOwner(address account) external view returns (address owner) {
+        owner = ownerLookup[uint160(account) & ~uint160(0xFF)];
+
+        if (owner == address(0)) revert InvalidAddress();
+    }
 
     /// @notice Sets or unsets an operator for an account.
     /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. 
@@ -92,12 +109,16 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
     function setAccountOperator(address account, address operator, bool isAuthorized) public payable virtual {
-        // only the primary account can call this function for any of its sub accounts.
+        // only the owner account can call this function for any of its sub accounts.
         // the operator can't be the sub account of the account
         if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF)) revert NotAuthorized();
         else if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) revert InvalidAddress();
 
         accountOperators[account][operator] = isAuthorized;
+
+        uint160 prefix = uint160(account) & ~uint160(0xFF);
+        if (ownerLookup[prefix] == address(0)) ownerLookup[prefix] = msg.sender;
+
         emit AccountOperatorSet(account, operator, isAuthorized);
     }
 

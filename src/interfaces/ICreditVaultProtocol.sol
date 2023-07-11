@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "../Types.sol";
 
 interface ICVP {
+    function getAccountOwner(address account) external view returns (address);
     function setAccountOperator(address account, address operator, bool isAuthorized) external payable;
     function getExecutionContext(bool controllerEnabledCheck) external view 
     returns (bool checksDeferred, address onBehalfOfAccount, bool controllerEnabled);
