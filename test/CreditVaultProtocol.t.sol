@@ -556,15 +556,15 @@ contract CreditVaultProtocolTest is Test {
         cvp.handlerDisableCollateral(alice, vault);
     }
 
-    function test_GetControllers(address alice) public {
+    function test_GetController(address alice) public {
         cvp.setBatchDepth(1);
-        cvp.getControllers(alice);
+        cvp.getController(alice);
     }
 
-    function test_GetControllers_RevertIfChecksDeferred(address alice) public {
+    function test_GetController_RevertIfChecksDeferred(address alice) public {
         cvp.setBatchDepth(2);
         vm.expectRevert(CreditVaultProtocol.DeferralViolation.selector);
-        cvp.getControllers(alice);
+        cvp.getController(alice);
     }
 
     function test_IsControllerEnabled(address alice) public {
@@ -613,30 +613,30 @@ contract CreditVaultProtocolTest is Test {
         address vault = address(new VaultMock(cvp));
 
         assertFalse(cvp.isControllerEnabled(account, vault));
-        address[] memory controllersPre = cvp.getControllers(account);
+        address controllerPre = cvp.getController(account);
 
         vm.prank(msgSender);
         cvp.handlerEnableController(account, vault);
 
-        address[] memory controllersPost = cvp.getControllers(account);
+        address controllerPost = cvp.getController(account);
 
-        assertEq(controllersPost.length, controllersPre.length + 1);
-        assertEq(controllersPost[controllersPost.length - 1], vault);
+        assertEq(controllerPre, address(0));
+        assertEq(controllerPost, vault);
         assertTrue(cvp.isControllerEnabled(account, vault));
 
         // enabling the same controller again should succeed (duplicate will not be added)
         cvp.reset();
         VaultMock(vault).reset();
         assertTrue(cvp.isControllerEnabled(account, vault));
-        controllersPre = cvp.getControllers(account);
+        controllerPre = cvp.getController(account);
 
         vm.prank(msgSender);
         cvp.handlerEnableController(account, vault);
 
-        controllersPost = cvp.getControllers(account);
+        controllerPost = cvp.getController(account);
 
-        assertEq(controllersPost.length, controllersPre.length);
-        assertEq(controllersPost[0], controllersPre[0]);
+        assertEq(controllerPre, vault);
+        assertEq(controllerPost, vault);
         assertTrue(cvp.isControllerEnabled(account, vault));
 
         // trying to enable second controller will throw on the account status check
@@ -655,7 +655,7 @@ contract CreditVaultProtocolTest is Test {
         cvp.reset();
         VaultMock(vault).reset();
         assertTrue(cvp.isControllerEnabled(account, vault));
-        controllersPre = cvp.getControllers(account);
+        controllerPre = cvp.getController(account);
 
         vm.prank(msgSender);
         VaultMock(vault).call(
@@ -666,10 +666,10 @@ contract CreditVaultProtocolTest is Test {
             )
         );
 
-        controllersPost = cvp.getControllers(account);
+        controllerPost = cvp.getController(account);
 
-        assertEq(controllersPost.length, controllersPre.length - 1);
-        assertEq(controllersPost.length, 0);
+        assertEq(controllerPre, vault);
+        assertEq(controllerPost, address(0));
         assertFalse(cvp.isControllerEnabled(account, vault));
     }
 

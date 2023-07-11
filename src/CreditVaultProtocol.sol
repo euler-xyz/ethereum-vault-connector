@@ -161,12 +161,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     // Controllers management
 
-    /// @notice Returns an array of controllers for an account.
+    /// @notice Return a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers within a batch execution, but only one (or none) can be selected when the account status check is performed upon the batch exit. This function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
     /// @param account The address of the account whose controllers are being queried.
-    /// @return An array of addresses that are the controllers for the account.
-    function getControllers(address account) external view notInDeferral returns (address[] memory) {
-        return accountControllers[account].get();
+    /// @return An addresses that is the controller for the account. If no controller is set for an account, the function retuturns address(0).
+    function getController(address account) external view notInDeferral returns (address) {
+        address[] memory controllers = accountControllers[account].get();
+
+        return controllers.length > 0 ? controllers[0] : address(0);
     }
 
     /// @notice Returns whether a controller is enabled for an account.
