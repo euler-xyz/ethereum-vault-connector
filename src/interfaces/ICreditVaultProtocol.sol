@@ -14,7 +14,7 @@ interface ICVP {
     function isCollateralEnabled(address account, address vault) external view returns (bool);
     function enableCollateral(address account, address vault) external payable;
     function disableCollateral(address account, address vault) external payable;
-    function getController(address account) external view returns (address);
+    function getControllers(address account) external view returns (address[] memory);
     function isControllerEnabled(address account, address vault) external view returns (bool);
     function enableController(address account, address vault) external payable;
     function disableController(address account) external payable;

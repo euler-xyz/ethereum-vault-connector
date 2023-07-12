@@ -185,13 +185,17 @@ contract CreditVaultProtocolInvariants is Test {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
             Types.SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
-            address accountController = cvp.getController(touchedAccounts[i]);
+            address[] memory accountControllersArray = cvp.getControllers(touchedAccounts[i]);
         
             assertTrue(accountControllers.numElements == 0 || accountControllers.numElements == 1);
             assertTrue(
-                (accountControllers.numElements == 0 && accountControllers.firstElement == address(0) && accountController == address(0)) ||
-                (accountControllers.numElements == 1 && accountControllers.firstElement != address(0) && accountController != address(0))
+                (accountControllers.numElements == 0 && accountControllers.firstElement == address(0)) ||
+                (accountControllers.numElements == 1 && accountControllers.firstElement != address(0))
             );
+
+            for (uint j = 1; j < accountControllersArray.length; j++) {
+                assertTrue(accountControllersArray[j] == address(0));
+            }
         }
     }
 
