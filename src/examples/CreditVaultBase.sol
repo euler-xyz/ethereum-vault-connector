@@ -56,8 +56,8 @@ abstract contract CreditVaultBase is ICreditVault {
     function CVPAuthenticate(address msgSender, bool controllerEnabledCheck) internal view 
     returns (address authMsgSender) {
         if (msgSender == address(cvp)) {
-            bool controllerEnabled;
-            (authMsgSender, controllerEnabled, ) = cvp.getExecutionContext(address(this));
+            (Types.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+            authMsgSender = context.onBehalfOfAccount;
             if (controllerEnabledCheck && !controllerEnabled) revert ControllerDisabled();
         } else {
             authMsgSender = msgSender;
