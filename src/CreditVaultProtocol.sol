@@ -97,20 +97,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
     // Execution internals
 
-    /// @notice Returns current execution context.
-    /// @dev The execution context consists of the account on behalf of which the execution flow is being executed at the moment, checks deferral state and information whether is the controller calling into the collateral. Checks are deferred if the execution flow is currently in a batch. If needed, the context is extended with information whether a controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
+    /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
-    /// @return onBehalfOfAccount The address of the account on behalf of which the execution flow is being executed at the moment.
+    /// @return context Current execution context.
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment. Always false if controllerToCheck passed is address(0).
-    /// @return checksDeferred A boolean flag that indicates whether the checks are deferred or not.
-    /// @return controllerToCollateralCall A boolean flag that indicates whether it's a controller calling into the collateral (pass through the callFromControllerToCollateral function)
     function getExecutionContext(address controllerToCheck) external view 
-    returns (address onBehalfOfAccount, bool controllerEnabled, bool checksDeferred, bool controllerToCollateralCall) {
-        ExecutionContext memory context = executionContext;
-        onBehalfOfAccount = context.onBehalfOfAccount;
+    returns (ExecutionContext memory context, bool controllerEnabled) {
+        context = executionContext;
         controllerEnabled = controllerToCheck == address(0) ? false : accountControllers[context.onBehalfOfAccount].contains(controllerToCheck);
-        checksDeferred = context.batchDepth != BATCH_DEPTH__INIT;
-        controllerToCollateralCall = context.controllerToCollateralCall;
     }
 
     /// @notice Checks whether the status check is deferred for a given account.
@@ -387,6 +381,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
             !accountCollaterals[onBehalfOfAccount].contains(targetContract)
         ) revert NotAuthorized();
 
+        // must be cached in case of CVP reentrancy
         bool controllerToCollateralCallCache = executionContext.controllerToCollateralCall;
         executionContext.controllerToCollateralCall = true;
 

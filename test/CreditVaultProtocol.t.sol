@@ -8,24 +8,26 @@ import "../src/CreditVaultProtocol.sol";
 contract TargetMock {
     function func(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
         // also tests getExecutionContext() from the CVP
-        (address _onBehalfOfAccount, , bool _checksDeferred,) = ICVP(cvp).getExecutionContext(address(0));
+        (Types.ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
+        bool _checksDeferred = context.batchDepth != 1;
 
         require(msg.sender == msgSender, "func/invalid-sender");
         require(msg.value == msgValue, "func/invalid-msg-value");
         require(_checksDeferred == checksDeferred, "func/invalid-checks-deferred");
-        require(_onBehalfOfAccount == onBehalfOfAccount, "func/invalid-on-behalf-of-account");
+        require(context.onBehalfOfAccount == onBehalfOfAccount, "func/invalid-on-behalf-of-account");
 
         return msg.value;
     }
 
     function callFromControllerToCollateralTest(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
-        (address _onBehalfOfAccount, , bool _checksDeferred, bool _controllerToCollateralCall) = ICVP(cvp).getExecutionContext(address(0));
+        (Types.ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
+        bool _checksDeferred = context.batchDepth != 1;
 
         require(msg.sender == msgSender, "func/invalid-sender");
         require(msg.value == msgValue, "func/invalid-msg-value");
         require(_checksDeferred == checksDeferred, "func/invalid-checks-deferred");
-        require(_onBehalfOfAccount == onBehalfOfAccount, "func/invalid-on-behalf-of-account");
-        require(_controllerToCollateralCall == true, "func/controller-to-collateral-call");
+        require(context.onBehalfOfAccount == onBehalfOfAccount, "func/invalid-on-behalf-of-account");
+        require(context.controllerToCollateralCall == true, "func/controller-to-collateral-call");
 
         return msg.value;
     }
@@ -391,38 +393,27 @@ contract CreditVaultProtocolTest is Test {
 
         address controller = address(new VaultMock(cvp));
 
-        (
-            address onBehalfOfAccount, 
-            bool controllerEnabled,
-            bool checksDeferred,
-            bool controllerToCollateralCall
-        ) = cvp.getExecutionContext(controller);
+        (Types.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(controller);
 
-        assertEq(onBehalfOfAccount, address(0));
+        assertEq(context.batchDepth, 1);
+        assertFalse(context.controllerToCollateralCall);
+        assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertFalse(checksDeferred);
-        assertFalse(controllerToCollateralCall);
         
+        cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
+        cvp.setControllerToCollateralCall(seed % 4 == 0 ? true : false);
         cvp.setOnBehalfOfAccount(account);
-
-        if (seed % 3 == 0) {
+        if (seed % 5 == 0) {
             vm.prank(account);
             cvp.enableController(account, controller);
         }
-        cvp.setBatchDepth(seed % 4 == 0 ? 2 : 1);
-        cvp.setControllerToCollateralCall(seed % 5 == 0 ? true : false);
-
-        (
-            onBehalfOfAccount, 
-            controllerEnabled,
-            checksDeferred,
-            controllerToCollateralCall
-        ) = cvp.getExecutionContext(controller);
         
-        assertEq(onBehalfOfAccount, account);
-        assertEq(controllerEnabled, seed % 3 == 0 && controller != address(0) ? true : false);
-        assertEq(checksDeferred, seed % 4 == 0 ? true : false);
-        assertEq(controllerToCollateralCall, seed % 5 == 0 ? true : false);
+        (context, controllerEnabled) = cvp.getExecutionContext(controller);
+        
+        assertEq(context.batchDepth, seed % 3 == 0 ? 2 : 1);
+        assertEq(context.controllerToCollateralCall, seed % 4 == 0 ? true : false);
+        assertEq(context.onBehalfOfAccount, account);
+        assertEq(controllerEnabled, seed % 5 == 0 ? true : false);
     }
 
     function test_IsAccountStatusCheckDeferred(uint8 numberOfAccounts, bytes memory seed) external {

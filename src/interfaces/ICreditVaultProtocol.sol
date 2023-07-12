@@ -6,8 +6,7 @@ import "../Types.sol";
 
 interface ICVP {
     function setAccountOperator(address account, address operator, bool isAuthorized) external payable;
-    function getExecutionContext(address controllerToCheck) external view 
-    returns (address onBehalfOfAccount, bool controllerEnabled, bool checksDeferred, bool controllerToCollateralCall);
+    function getExecutionContext(address controllerToCheck) external view returns (Types.ExecutionContext memory context, bool controllerEnabled);
     function isAccountStatusCheckDeferred(address account) external view returns (bool);
     function isVaultStatusCheckDeferred(address vault) external view returns (bool);
     function getCollaterals(address account) external view returns (address[] memory);
