@@ -4,11 +4,10 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "../src/Set.sol";
-import "../src/Types.sol";
 
 contract SetTest is Test {
-    using Set for Types.SetStorage;
-    Types.SetStorage setStorage;
+    using Set for SetStorage;
+    SetStorage setStorage;
     uint counter;
 
     function test_InsertRemove(address[] memory elements, uint64 seed) public {

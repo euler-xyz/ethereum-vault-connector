@@ -163,7 +163,7 @@ contract CreditVaultProtocolInvariants is Test {
     }
 
     function invariant_context() external {
-        (Types.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+        (ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.checksInProgressLock);
@@ -174,8 +174,8 @@ contract CreditVaultProtocolInvariants is Test {
 
     function invariant_transientStorage() external {     
         (
-            Types.SetStorage memory accountStatusChecks, 
-            Types.SetStorage memory vaultStatusChecks
+            SetStorage memory accountStatusChecks, 
+            SetStorage memory vaultStatusChecks
         ) = cvp.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
@@ -187,7 +187,7 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_controllers() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
+            SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
             address[] memory accountControllersArray = cvp.getControllers(touchedAccounts[i]);
         
             assertTrue(accountControllers.numElements == 0 || accountControllers.numElements == 1);
@@ -205,7 +205,7 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_collaterals() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
+            SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
             address[] memory accountCollateralsArray = cvp.getCollaterals(touchedAccounts[i]);
 
             assertTrue(accountCollaterals.numElements <= 20);

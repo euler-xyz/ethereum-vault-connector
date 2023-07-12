@@ -8,7 +8,7 @@ import "../src/CreditVaultProtocol.sol";
 contract TargetMock {
     function func(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
         // also tests getExecutionContext() from the CVP
-        (Types.ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
+        (ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
         bool _checksDeferred = context.batchDepth != 1;
 
         require(msg.sender == msgSender, "func/invalid-sender");
@@ -20,7 +20,7 @@ contract TargetMock {
     }
 
     function callFromControllerToCollateralTest(address cvp, address msgSender, uint msgValue, bool checksDeferred, address onBehalfOfAccount) external payable returns (uint) {
-        (Types.ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
+        (ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
         bool _checksDeferred = context.batchDepth != 1;
 
         require(msg.sender == msgSender, "func/invalid-sender");
@@ -127,7 +127,7 @@ contract VaultMaliciousMock is ICreditVault {
         // - because checks are deferred, checkVaultStatus() on vault B is not executed right away
         // - control is handed over back to checkStatusAll() which had numElements = 1 when entering the loop
         // - the loop ends and "delete vaultStatusChecks" is called removing the vault status check scheduled on vault B
-        Types.BatchItem[] memory items = new Types.BatchItem[](1);
+        BatchItem[] memory items = new BatchItem[](1);
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(0);
@@ -435,7 +435,7 @@ contract CreditVaultProtocolTest is Test {
 
         address controller = address(new VaultMock(cvp));
 
-        (Types.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(controller);
+        (ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(controller);
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.controllerToCollateralCall);
@@ -1452,7 +1452,7 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(!samePrimaryAccount(alice, bob));
         vm.assume(seed >= 3);
 
-        Types.BatchItem[] memory items = new Types.BatchItem[](6);
+        BatchItem[] memory items = new BatchItem[](6);
         address controller = address(new VaultMock(cvp));
         address otherVault = address(new VaultMock(cvp));
         address alicesSubAccount = address(uint160(alice) ^ 0x10);
@@ -1547,7 +1547,7 @@ contract CreditVaultProtocolTest is Test {
         VaultMock(otherVault).reset();
 
         // -------------- SECOND BATCH -------------------------
-        items = new Types.BatchItem[](1);
+        items = new BatchItem[](1);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
@@ -1565,7 +1565,7 @@ contract CreditVaultProtocolTest is Test {
         cvp.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
-        items = new Types.BatchItem[](1);
+        items = new BatchItem[](1);
 
         items[0].allowError = true;
         items[0].onBehalfOfAccount = alice;
@@ -1587,7 +1587,7 @@ contract CreditVaultProtocolTest is Test {
         VaultMock(otherVault).reset();
 
         // -------------- FOURTH BATCH -------------------------
-        items = new Types.BatchItem[](3);
+        items = new BatchItem[](3);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
@@ -1624,7 +1624,7 @@ contract CreditVaultProtocolTest is Test {
     function test_Batch_RevertIfDeferralDepthExceeded(address alice) external {
         address vault = address(new VaultMock(cvp));
 
-        Types.BatchItem[] memory items = new Types.BatchItem[](9);
+        BatchItem[] memory items = new BatchItem[](9);
 
         for (int i = int(items.length - 1); i >= 0; --i) {
             uint j = uint(i);
@@ -1634,7 +1634,7 @@ contract CreditVaultProtocolTest is Test {
             items[j].msgValue = 0;
 
             if (j == items.length - 1) {
-                Types.BatchItem[] memory nestedItems = new Types.BatchItem[](2);
+                BatchItem[] memory nestedItems = new BatchItem[](2);
 
                 nestedItems[0].allowError = false;
                 nestedItems[0].onBehalfOfAccount = address(0);
@@ -1660,7 +1660,7 @@ contract CreditVaultProtocolTest is Test {
                     nestedItems
                 );
             } else {
-                Types.BatchItem[] memory nestedItems = new Types.BatchItem[](1);
+                BatchItem[] memory nestedItems = new BatchItem[](1);
                 nestedItems[0] = items[j+1];
 
                 items[j].data = abi.encodeWithSelector(
@@ -1680,7 +1680,7 @@ contract CreditVaultProtocolTest is Test {
 
         // should succeed when one less item. doesn't revert anymore,
         // but checks are performed only once, when the top level batch concludes
-        Types.BatchItem[] memory itemsOneLess = new Types.BatchItem[](8);
+        BatchItem[] memory itemsOneLess = new BatchItem[](8);
         for (uint i = 1; i <= itemsOneLess.length; ++i) {
             itemsOneLess[i-1] = items[i];
         }
@@ -1696,7 +1696,7 @@ contract CreditVaultProtocolTest is Test {
     function test_Batch_RevertIfChecksInProgress(address alice) external {
         address vault = address(new VaultMaliciousMock(cvp));
 
-        Types.BatchItem[] memory items = new Types.BatchItem[](1);
+        BatchItem[] memory items = new BatchItem[](1);
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
@@ -1718,10 +1718,10 @@ contract CreditVaultProtocolTest is Test {
     }
 
     function test_BatchRevert_AND_BatchSimulation(address alice) external {
-        Types.BatchItem[] memory items = new Types.BatchItem[](1);
-        Types.BatchResult[] memory expectedBatchItemsResult = new Types.BatchResult[](1);
-        Types.BatchResult[] memory expectedAccountsStatusResult = new Types.BatchResult[](1);
-        Types.BatchResult[] memory expectedVaultsStatusResult = new Types.BatchResult[](1);
+        BatchItem[] memory items = new BatchItem[](1);
+        BatchResult[] memory expectedBatchItemsResult = new BatchResult[](1);
+        BatchResult[] memory expectedAccountsStatusResult = new BatchResult[](1);
+        BatchResult[] memory expectedVaultsStatusResult = new BatchResult[](1);
 
         address controller = address(new VaultMock(cvp));
 
@@ -1759,10 +1759,10 @@ contract CreditVaultProtocolTest is Test {
 
                 assembly { err := add(err, 4) }
                 (
-                    Types.BatchResult[] memory batchItemsResult,
-                    Types.BatchResult[] memory accountsStatusResult,
-                    Types.BatchResult[] memory vaultsStatusResult 
-                ) = abi.decode(err, (Types.BatchResult[], Types.BatchResult[], Types.BatchResult[]));
+                    BatchResult[] memory batchItemsResult,
+                    BatchResult[] memory accountsStatusResult,
+                    BatchResult[] memory vaultsStatusResult 
+                ) = abi.decode(err, (BatchResult[], BatchResult[], BatchResult[]));
                 
                 assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
                 assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
@@ -1781,9 +1781,9 @@ contract CreditVaultProtocolTest is Test {
         {
             vm.prank(alice);
             (
-                Types.BatchResult[] memory batchItemsResult,
-                Types.BatchResult[] memory accountsStatusResult,
-                Types.BatchResult[] memory vaultsStatusResult 
+                BatchResult[] memory batchItemsResult,
+                BatchResult[] memory accountsStatusResult,
+                BatchResult[] memory vaultsStatusResult 
             ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
@@ -1836,10 +1836,10 @@ contract CreditVaultProtocolTest is Test {
 
                 assembly { err := add(err, 4) }
                 (
-                    Types.BatchResult[] memory batchItemsResult,
-                    Types.BatchResult[] memory accountsStatusResult,
-                    Types.BatchResult[] memory vaultsStatusResult 
-                ) = abi.decode(err, (Types.BatchResult[], Types.BatchResult[], Types.BatchResult[]));
+                    BatchResult[] memory batchItemsResult,
+                    BatchResult[] memory accountsStatusResult,
+                    BatchResult[] memory vaultsStatusResult 
+                ) = abi.decode(err, (BatchResult[], BatchResult[], BatchResult[]));
                 
                 assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
                 assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
@@ -1858,9 +1858,9 @@ contract CreditVaultProtocolTest is Test {
         {
             vm.prank(alice);
             (
-                Types.BatchResult[] memory batchItemsResult,
-                Types.BatchResult[] memory accountsStatusResult,
-                Types.BatchResult[] memory vaultsStatusResult 
+                BatchResult[] memory batchItemsResult,
+                BatchResult[] memory accountsStatusResult,
+                BatchResult[] memory vaultsStatusResult 
             ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);

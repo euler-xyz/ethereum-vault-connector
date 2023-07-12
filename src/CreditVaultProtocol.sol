@@ -3,12 +3,11 @@
 pragma solidity ^0.8.0;
 
 import "./TransientStorage.sol";
-import "./Types.sol";
 import "./Set.sol";
 import "./interfaces/ICreditVaultProtocol.sol";
 import "./interfaces/ICreditVault.sol";
 
-contract CreditVaultProtocol is ICVP, TransientStorage, Types {
+contract CreditVaultProtocol is ICVP, TransientStorage {
     using Set for SetStorage;
 
     // Constants
