@@ -36,7 +36,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     error NotAuthorized();
     error InvalidAddress();
     error ChecksReentrancy();
-    error DeferralViolation();
     error BatchDepthViolation();
     error ControllerViolation(address account);
     error AccountStatusViolation(address account, bytes data);
@@ -77,12 +76,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         executionContext.onBehalfOfAccount = onBehalfOfAccountCache;
     }
 
-    /// @notice A modifier that prevents the function from being called when checks are deferred (which happens when the execution context is in a batch).
-    modifier notInDeferral() {
-        if (executionContext.batchDepth != BATCH_DEPTH__INIT) revert DeferralViolation();
-        _;
-    }
-
 
     // Account operators
 
@@ -102,39 +95,51 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
 
-    // Execution context
+    // Execution internals
 
-    /// @notice Returns the current execution context. If needed, the context is extended with information whether a msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
-    /// @dev The execution context consists of checks deferral state and the account on behalf of which the execution flow is being executed at the moment. Checks are deferred if the execution flow is currently in a batch. If needed, the context is extended with information whether a msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
-    /// @param controllerEnabledCheck A boolean flag that indicates whether the context should be extended with information whether a msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
-    /// @return checksDeferred A boolean flag that indicates whether the checks are deferred or not.
-    /// @return onBehalfOfAccount The address of the account on behalf of which the execution flow is being executed at the moment.
-    /// @return controllerEnabled A boolean value that indicates whether msg.sender is an enabled controller for the account on behalf of which the execution flow is being executed at the moment. Always false if controllerEnabledCheck is false.
-    function getExecutionContext(bool controllerEnabledCheck) external view 
-    returns (bool checksDeferred, address onBehalfOfAccount, bool controllerEnabled) {
-        ExecutionContext memory context = executionContext;
-        checksDeferred = context.batchDepth != BATCH_DEPTH__INIT;
-        onBehalfOfAccount = context.onBehalfOfAccount;
-        controllerEnabled = controllerEnabledCheck ? accountControllers[context.onBehalfOfAccount].contains(msg.sender) : false;
+    /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
+    /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
+    /// @return context Current execution context.
+    /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment. Always false if controllerToCheck passed is address(0).
+    function getExecutionContext(address controllerToCheck) external view 
+    returns (ExecutionContext memory context, bool controllerEnabled) {
+        context = executionContext;
+        controllerEnabled = controllerToCheck == address(0) ? false : accountControllers[context.onBehalfOfAccount].contains(controllerToCheck);
+    }
+
+    /// @notice Checks whether the status check is deferred for a given account.
+    /// @dev The account status check can only be deferred if the execution flow is currently in a batch.
+    /// @param account The address of the account for which it is checked whether the status check is deferred.
+    /// @return A boolean flag that indicates whether the status check is deferred or not.
+    function isAccountStatusCheckDeferred(address account) external view returns (bool) {
+        return accountStatusChecks.contains(account);
+    }
+
+    /// @notice Checks whether the status check is deferred for a given vault.
+    /// @dev The vault status check can only be deferred if the execution flow is currently in a batch.
+    /// @param vault The address of the vault for which it is checked whether the status check is deferred.
+    /// @return A boolean flag that indicates whether the status check is deferred or not.
+    function isVaultStatusCheckDeferred(address vault) external view returns (bool) {
+        return vaultStatusChecks.contains(vault);
     }
 
 
     // Collaterals management
 
     /// @notice Returns an array of collaterals for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the execution context is in a batch, as the collaterals may change during the execution flow.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault.
     /// @param account The address of the account whose collaterals are being queried.
     /// @return An array of addresses that are the collaterals for the account.
-    function getCollaterals(address account) external view notInDeferral returns (address[] memory) {
+    function getCollaterals(address account) external view returns (address[] memory) {
         return accountCollaterals[account].get();
     }
 
     /// @notice Returns whether a collateral is enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault. This function cannot be called when the execution context is in a batch, as the collaterals may change during the execution flow.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault.
     /// @param account The address of the account that is being checked.
     /// @param vault The address of the collateral that is being checked.
     /// @return A boolean value that indicates whether the vault is collateral for the account or not.
-    function isCollateralEnabled(address account, address vault) external view notInDeferral returns (bool) {
+    function isCollateralEnabled(address account, address vault) external view returns (bool) {
         return accountCollaterals[account].contains(vault);
     }
 
@@ -162,20 +167,19 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     // Controllers management
 
     /// @notice Returns an array of controllers for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers within a batch execution, but only one (or none) can be selected when the account status check is performed upon the batch exit. This function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers within a batch execution, but only one (or none) can be selected when the account status check is performed upon the batch exit.
     /// @param account The address of the account whose controllers are being queried.
     /// @return An array of addresses that are the controllers for the account.
-    function getControllers(address account) external view notInDeferral returns (address[] memory) {
+    function getControllers(address account) external view returns (address[] memory) {
         return accountControllers[account].get();
     }
 
     /// @notice Returns whether a controller is enabled for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. If msg.sender is not a vault itself, this function cannot be called when the execution context is in a batch, as the controllers may change during the execution flow.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults.
     /// @param account The address of the account that is being checked.
     /// @param vault The address of the controller that is being checked.
     /// @return A boolean value that indicates whether the vault is controller for the account or not.
     function isControllerEnabled(address account, address vault) external view returns (bool) {
-        if (msg.sender != vault && executionContext.batchDepth != BATCH_DEPTH__INIT) revert DeferralViolation();
         return accountControllers[account].contains(vault);
     }
 
@@ -323,18 +327,23 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) public virtual {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(account);
-        else accountStatusChecks.insert(account);
+        ExecutionContext memory context = executionContext;
+        if (context.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(account);
+        else if (!(context.controllerToCollateralCall && context.onBehalfOfAccount == account)) {
+            accountStatusChecks.insert(account);
+        }
     }
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
     /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(address[] calldata accounts) public virtual {
-        bool checksDeferred = executionContext.batchDepth != BATCH_DEPTH__INIT;
+        ExecutionContext memory context = executionContext;
         for (uint i = 0; i < accounts.length;) {
-            if (checksDeferred) accountStatusChecks.insert(accounts[i]);
-            else requireAccountStatusCheckInternal(accounts[i]);
+            if (context.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(accounts[i]);
+            else if (!(context.controllerToCollateralCall && context.onBehalfOfAccount == accounts[i])) {
+                accountStatusChecks.insert(accounts[i]);
+            }
             unchecked { ++i; }
         }
     }
@@ -372,8 +381,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
             !accountCollaterals[onBehalfOfAccount].contains(targetContract)
         ) revert NotAuthorized();
 
+        // must be cached in case of CVP reentrancy
+        bool controllerToCollateralCallCache = executionContext.controllerToCollateralCall;
+        executionContext.controllerToCollateralCall = true;
+
         msgValue = msgValue == type(uint).max ? address(this).balance : msgValue;
         (success, result) = targetContract.call{value: msgValue}(data);
+
+        executionContext.controllerToCollateralCall = controllerToCollateralCallCache;
     }
 
     function batchInternal(BatchItem[] calldata items, bool returnResult) internal
@@ -409,14 +424,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         if (controllers.numElements == 0) return (true, "");
         else if (controllers.numElements > 1) revert ControllerViolation(account);
 
-        address[] memory collaterals = accountCollaterals[account].get();
-
         bool success;
         (success, data) = controllers.firstElement.staticcall(
             abi.encodeWithSelector(
                 ICreditVault.checkAccountStatus.selector,
                 account,
-                collaterals
+                accountCollaterals[account].get()
             )
         );
 
@@ -519,6 +532,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         ExecutionContext memory context = executionContext;
         assert(context.batchDepth == BATCH_DEPTH__INIT);
         assert(!context.checksInProgressLock);
+        assert(!context.controllerToCollateralCall);
         assert(context.onBehalfOfAccount == address(0));
 
         SetStorage storage asChecks = accountStatusChecks;

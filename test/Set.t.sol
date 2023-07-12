@@ -20,7 +20,7 @@ contract SetTest is Test {
 
         // count added elements not to exceed the limit
         uint expectedNumElements;
-        for (uint i = 0; i < elements.length && expectedNumElements < 10; ++i) {
+        for (uint i = 0; i < elements.length && expectedNumElements < 20; ++i) {
             if (setStorage.insert(elements[i])) ++expectedNumElements;
         }
         
@@ -73,7 +73,7 @@ contract SetTest is Test {
     }
 
     function test_InsertRevertIfTooManyElements() public {
-        for (uint i = 0; i < 10; ++i) {
+        for (uint i = 0; i < 20; ++i) {
             assertEq(setStorage.insert(address(uint160(i))), true);
         }
 

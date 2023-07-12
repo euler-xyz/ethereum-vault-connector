@@ -84,9 +84,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     }
 
     function batch(BatchItem[] calldata items) public payable override {
-        if (items.length > 10) return;
+        if (items.length > 20) return;
         
-        for (uint i = 0; i < items.length && i < 10; i++) {
+        for (uint i = 0; i < items.length && i < 20; i++) {
             if (uint160(items[i].msgValue) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
@@ -132,7 +132,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     }
 
     function requireAccountsStatusCheck(address[] calldata accounts) public override {
-        if (accounts.length > 10) return;
+        if (accounts.length > 20) return;
         super.requireAccountsStatusCheck(accounts);
     }
 
@@ -163,9 +163,12 @@ contract CreditVaultProtocolInvariants is Test {
     }
 
     function invariant_context() external {
-        (bool checksDeferred, address account, bool controllerEnabled) = cvp.getExecutionContext(true);
-        assertFalse(checksDeferred);
-        assertTrue(account == address(0));
+        (Types.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+
+        assertEq(context.batchDepth, 1);
+        assertFalse(context.checksInProgressLock);
+        assertFalse(context.controllerToCollateralCall);
+        assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
     }
 
@@ -205,7 +208,7 @@ contract CreditVaultProtocolInvariants is Test {
             Types.SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
             address[] memory accountCollateralsArray = cvp.getCollaterals(touchedAccounts[i]);
 
-            assertTrue(accountCollaterals.numElements <= 10);
+            assertTrue(accountCollaterals.numElements <= 20);
             assertTrue(
                 (accountCollaterals.numElements == 0 && accountCollaterals.firstElement == address(0)) ||
                 (accountCollaterals.numElements == 1 && accountCollaterals.firstElement != address(0))

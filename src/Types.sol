@@ -6,6 +6,7 @@ abstract contract Types {
     struct ExecutionContext {
         uint8 batchDepth;
         bool checksInProgressLock;
+        bool controllerToCollateralCall;
         address onBehalfOfAccount;
     }
 

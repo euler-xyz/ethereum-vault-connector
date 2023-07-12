@@ -7,7 +7,7 @@ import "./Types.sol";
 library Set {
     error TooManyElements();
 
-    uint internal constant MAX_PRESENT_ELEMENTS = 10;
+    uint internal constant MAX_PRESENT_ELEMENTS = 20;
 
     /// @notice Inserts an element and returns whether the operation was successful or not. 
     /// @param setStorage The set storage to which the element will be inserted. 
