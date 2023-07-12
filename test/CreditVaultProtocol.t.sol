@@ -327,7 +327,7 @@ contract CreditVaultProtocolTest is Test {
             assertFalse(cvp.accountOperators(account, operator));
 
             if (i == 0) {
-                vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+                vm.expectRevert(CreditVaultProtocol.AccountOwnerNotRegistered.selector);
                 cvp.getAccountOwner(account);
             } else {
                 assertEq(cvp.getAccountOwner(account), alice);
@@ -437,7 +437,7 @@ contract CreditVaultProtocolTest is Test {
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
-        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.AccountOwnerNotRegistered.selector);
         cvp.getAccountOwner(account);
 
         // test collaterals management with use of an operator
@@ -658,12 +658,7 @@ contract CreditVaultProtocolTest is Test {
         address otherVault = address(new VaultMock(cvp));
 
         vm.prank(msgSender);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultProtocol.ControllerViolation.selector,
-                account
-            )
-        );
+        vm.expectRevert(CreditVaultProtocol.ControllerViolation.selector);
         cvp.handlerEnableController(account, otherVault);
 
         // only the controller vault can disable itself
@@ -981,12 +976,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(controller, seed);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultProtocol.ControllerViolation.selector,
-                alice
-            )
-        );
+        vm.expectRevert(CreditVaultProtocol.ControllerViolation.selector);
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
@@ -1025,12 +1015,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(controller_1, seed);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultProtocol.ControllerViolation.selector,
-                alice
-            )
-        );
+        vm.expectRevert(CreditVaultProtocol.ControllerViolation.selector);
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,

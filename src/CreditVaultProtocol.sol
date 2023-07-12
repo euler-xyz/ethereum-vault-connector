@@ -35,11 +35,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
 
     error NotAuthorized();
+    error AccountOwnerNotRegistered();
     error InvalidAddress();
     error ChecksReentrancy();
     error DeferralViolation();
     error BatchDepthViolation();
-    error ControllerViolation(address account);
+    error ControllerViolation();
     error AccountStatusViolation(address account, bytes data);
     error VaultStatusViolation(address vault, bytes data);
     error RevertedBatchResult(BatchResult[] batchItemsResult, BatchResult[] accountsStatusResult, BatchResult[] vaultsStatusResult);
@@ -95,12 +96,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     // Account owner and operators
 
     /// @notice Returns the owner for the specified account.
+    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction of any sub-account that requires authentication.
     /// @param account The address of the account whose owner is being retrieved.
-    /// @return owner The address of the owner.
+    /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches first 19 bytes of the sub-account address.
     function getAccountOwner(address account) external view returns (address owner) {
         owner = ownerLookup[uint160(account) & ~uint160(0xFF)];
 
-        if (owner == address(0)) revert InvalidAddress();
+        if (owner == address(0)) revert AccountOwnerNotRegistered();
     }
 
     /// @notice Sets or unsets an operator for an account.
@@ -387,7 +389,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     returns (bool success, bytes memory result) {
         SetStorage storage controllers = accountControllers[onBehalfOfAccount];
 
-        if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
+        if (controllers.numElements != 1) revert ControllerViolation();
         else if (
             controllers.firstElement != msg.sender || 
             !accountCollaterals[onBehalfOfAccount].contains(targetContract)
@@ -428,7 +430,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         SetStorage storage controllers = accountControllers[account];
 
         if (controllers.numElements == 0) return (true, "");
-        else if (controllers.numElements > 1) revert ControllerViolation(account);
+        else if (controllers.numElements > 1) revert ControllerViolation();
 
         address[] memory collaterals = accountCollaterals[account].get();
 
