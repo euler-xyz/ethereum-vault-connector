@@ -137,7 +137,7 @@ contract VaultMaliciousMock is ICreditVault {
         try cvp.batch(items) {
             assert(false);
         } catch (bytes memory err) {
-            assert(bytes4(err) == CreditVaultProtocol.ChecksReentrancy.selector);
+            assert(bytes4(err) == CreditVaultProtocol.CVP_ChecksReentrancy.selector);
             return (false, "");
         }
         return (true, "");
@@ -354,7 +354,7 @@ contract CreditVaultProtocolTest is Test {
             assertFalse(cvp.accountOperators(account, operator));
 
             if (i == 0) {
-                vm.expectRevert(CreditVaultProtocol.AccountOwnerNotRegistered.selector);
+                vm.expectRevert(CreditVaultProtocol.CVP_AccountOwnerNotRegistered.selector);
                 cvp.getAccountOwner(account);
             } else {
                 assertEq(cvp.getAccountOwner(account), alice);
@@ -416,7 +416,7 @@ contract CreditVaultProtocolTest is Test {
         assertFalse(cvp.accountOperators(account, operator));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
         cvp.setAccountOperator(account, operator, true);
     }
 
@@ -426,7 +426,7 @@ contract CreditVaultProtocolTest is Test {
         assertFalse(cvp.accountOperators(alice, operator));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
         cvp.setAccountOperator(alice, operator, true);
     }
 
@@ -508,7 +508,7 @@ contract CreditVaultProtocolTest is Test {
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
-        vm.expectRevert(CreditVaultProtocol.AccountOwnerNotRegistered.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_AccountOwnerNotRegistered.selector);
         cvp.getAccountOwner(account);
 
         // test collaterals management with use of an operator
@@ -585,11 +585,11 @@ contract CreditVaultProtocolTest is Test {
         address vault = address(new VaultMock(cvp));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
         cvp.handlerEnableCollateral(bob, vault);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
         cvp.handlerDisableCollateral(bob, vault);
 
         vm.prank(bob);
@@ -615,7 +615,7 @@ contract CreditVaultProtocolTest is Test {
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.AccountStatusViolation.selector,
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
@@ -625,7 +625,7 @@ contract CreditVaultProtocolTest is Test {
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.AccountStatusViolation.selector,
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
@@ -689,7 +689,7 @@ contract CreditVaultProtocolTest is Test {
         address otherVault = address(new VaultMock(cvp));
 
         vm.prank(msgSender);
-        vm.expectRevert(CreditVaultProtocol.ControllerViolation.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
         cvp.handlerEnableController(account, otherVault);
 
         // only the controller vault can disable itself
@@ -720,7 +720,7 @@ contract CreditVaultProtocolTest is Test {
         address vault = address(new VaultMock(cvp));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
         cvp.handlerEnableController(bob, vault);
 
         vm.prank(bob);
@@ -738,7 +738,7 @@ contract CreditVaultProtocolTest is Test {
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.AccountStatusViolation.selector,
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
@@ -777,7 +777,7 @@ contract CreditVaultProtocolTest is Test {
         // it won't succeed as this time we have a controller so the account status check is performed
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.AccountStatusViolation.selector,
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
@@ -859,7 +859,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.NotAuthorized.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
         (bool success,) = cvp.handlerCall{value: seed}(
             targetContract,
             bob,
@@ -886,7 +886,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
 
         (bool success,) = cvp.handlerCall{value: seed}(
             targetContract,
@@ -912,7 +912,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
 
         (success,) = cvp.handlerCall{value: seed}(
             targetContract,
@@ -1007,7 +1007,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(controller, seed);
-        vm.expectRevert(CreditVaultProtocol.ControllerViolation.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
@@ -1046,7 +1046,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(controller_1, seed);
-        vm.expectRevert(CreditVaultProtocol.ControllerViolation.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
@@ -1080,7 +1080,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(randomAddress, seed);
-        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.NotAuthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.CVP_NotAuthorized.selector));
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
@@ -1114,7 +1114,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         hoax(controller, seed);
-        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.NotAuthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.CVP_NotAuthorized.selector));
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             targetContract,
             alice,
@@ -1213,7 +1213,7 @@ contract CreditVaultProtocolTest is Test {
 
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
                 vm.expectRevert(abi.encodeWithSelector(
-                    CreditVaultProtocol.AccountStatusViolation.selector,
+                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
                     account,
                     uint160(account) % 3 == 1
                         ? bytes("account status violation")
@@ -1246,7 +1246,7 @@ contract CreditVaultProtocolTest is Test {
 
         if (anyInvalid) {
             vm.expectRevert(abi.encodeWithSelector(
-                CreditVaultProtocol.AccountStatusViolation.selector,
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
                 invalidAccount,
                 uint160(invalidAccount) % 3 == 1
                     ? bytes("account status violation")
@@ -1365,7 +1365,7 @@ contract CreditVaultProtocolTest is Test {
         cvp.setOnBehalfOfAccount(accounts[0]);
 
         vm.expectRevert(abi.encodeWithSelector(
-            CreditVaultProtocol.AccountStatusViolation.selector,
+            CreditVaultProtocol.CVP_AccountStatusViolation.selector,
             accounts[0],
             "account status violation"
         ));
@@ -1393,7 +1393,7 @@ contract CreditVaultProtocolTest is Test {
             vm.prank(vault);
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(abi.encodeWithSelector(
-                    CreditVaultProtocol.VaultStatusViolation.selector,
+                    CreditVaultProtocol.CVP_VaultStatusViolation.selector,
                     vault,
                     uint160(vault) % 3 == 1
                         ? bytes("vault status violation")
@@ -1438,7 +1438,7 @@ contract CreditVaultProtocolTest is Test {
 
                 vm.prank(vault);
                 vm.expectRevert(abi.encodeWithSelector(
-                    CreditVaultProtocol.VaultStatusViolation.selector,
+                    CreditVaultProtocol.CVP_VaultStatusViolation.selector,
                     vault,
                     "vault status violation"
                 ));
@@ -1561,7 +1561,7 @@ contract CreditVaultProtocolTest is Test {
         );
 
         vm.prank(bob);
-        vm.expectRevert(CreditVaultProtocol.InvalidAddress.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
         cvp.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
@@ -1671,7 +1671,7 @@ contract CreditVaultProtocolTest is Test {
         }
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.BatchDepthViolation.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_BatchDepthViolation.selector);
         (bool success, ) = address(cvp).call(abi.encodeWithSelector(
             cvp.handlerBatch.selector,
             items
@@ -1706,11 +1706,11 @@ contract CreditVaultProtocolTest is Test {
             alice
         );
 
-        // internal batch in the malicious vault reverted with ChecksReentrancy error,
+        // internal batch in the malicious vault reverted with CVP_ChecksReentrancy error,
         // check VaultMaliciousMock implementation
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(
-            CreditVaultProtocol.VaultStatusViolation.selector,
+            CreditVaultProtocol.CVP_VaultStatusViolation.selector,
             vault,
             ""
         ));
@@ -1755,7 +1755,7 @@ contract CreditVaultProtocolTest is Test {
             try cvp.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(bytes4(err), CreditVaultProtocol.RevertedBatchResult.selector);
+                assertEq(bytes4(err), CreditVaultProtocol.CVP_RevertedBatchResult.selector);
 
                 assembly { err := add(err, 4) }
                 (
@@ -1806,14 +1806,14 @@ contract CreditVaultProtocolTest is Test {
         // update expected behavior
         expectedAccountsStatusResult[0].success = false;
         expectedAccountsStatusResult[0].result = abi.encodeWithSelector(
-            CreditVaultProtocol.AccountStatusViolation.selector,
+            CreditVaultProtocol.CVP_AccountStatusViolation.selector,
             alice,
             "account status violation"
         );
         
         expectedVaultsStatusResult[0].success = false;
         expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
-            CreditVaultProtocol.VaultStatusViolation.selector,
+            CreditVaultProtocol.CVP_VaultStatusViolation.selector,
             controller,
             "vault status violation"
         );
@@ -1821,7 +1821,7 @@ contract CreditVaultProtocolTest is Test {
         // regular batch reverts now
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(
-            CreditVaultProtocol.AccountStatusViolation.selector,
+            CreditVaultProtocol.CVP_AccountStatusViolation.selector,
             alice,
             "account status violation"
         ));
@@ -1832,7 +1832,7 @@ contract CreditVaultProtocolTest is Test {
             try cvp.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(bytes4(err), CreditVaultProtocol.RevertedBatchResult.selector);
+                assertEq(bytes4(err), CreditVaultProtocol.CVP_RevertedBatchResult.selector);
 
                 assembly { err := add(err, 4) }
                 (
