@@ -57,7 +57,7 @@ abstract contract CreditVaultBase is ICreditVault {
     returns (address authMsgSender) {
         if (msgSender == address(cvp)) {
             bool controllerEnabled;
-            (authMsgSender, controllerEnabled, ) = cvp.getExecutionContext(address(this));
+            (authMsgSender, controllerEnabled,,) = cvp.getExecutionContext(address(this));
             if (controllerEnabledCheck && !controllerEnabled) revert ControllerDisabled();
         } else {
             authMsgSender = msgSender;
