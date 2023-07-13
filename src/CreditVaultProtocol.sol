@@ -241,7 +241,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     // Call forwarding
 
     /// @notice Calls to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any contract. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
+    /// @dev This function can be used to interact with any contract. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
     /// @param data The encoded data which is called on the target contract.
@@ -251,21 +251,26 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     returns (bool success, bytes memory result) {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
+        uint msgValue = executionContext.batchDepth == BATCH_DEPTH__INIT ? msg.value : 0;
         onBehalfOfAccount = onBehalfOfAccount == address(0) ? msg.sender : onBehalfOfAccount;
-        (success, result) = callInternal(targetContract, onBehalfOfAccount, msg.value, data);
+        (success, result) = callInternal(targetContract, onBehalfOfAccount, msgValue, data);
     }
 
     /// @notice Calls to one of the enabled collateral vaults from currently enabled controller vault.
-    /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
+    /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
+    /// @param ignoreAccountStatusCheck A boolean value that indicates whether the account status check should be ignored for onBehalfOfAccount if required from collateral.
     /// @param data The encoded data which is called on the target contract.
     /// @return success A boolean value that indicates whether the call succeeded or not.
     /// @return result Returned data from the call. 
-    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable
     returns (bool success, bytes memory result) {
+        if (targetContract == address(this)) revert CVP_InvalidAddress();
+
+        uint msgValue = executionContext.batchDepth == BATCH_DEPTH__INIT ? msg.value : 0;
         onBehalfOfAccount = onBehalfOfAccount == address(0) ? msg.sender : onBehalfOfAccount;
-        (success, result) = callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, msg.value, data);
+        (success, result) = callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, msgValue, data);
     }
 
 
@@ -353,6 +358,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @return isValid An array of boolean values that indicate whether each account is valid or not.
     function checkAccountsStatus(address[] calldata accounts) public view returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
+
         for (uint i = 0; i < accounts.length;) {
             (isValid[i],) = checkAccountStatusInternal(accounts[i]);
             unchecked { ++i; }
@@ -360,26 +366,45 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     }
 
     /// @notice Checks the status of an account and reverts if it is not valid.
-    /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
+    /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. The account status is checked only if not explicitly ordered to be ignored for the current onBehalfOfAccount.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) public virtual {
         ExecutionContext memory context = executionContext;
-        if (context.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(account);
-        else if (!(context.controllerToCollateralCall && context.onBehalfOfAccount == account)) {
-            accountStatusChecks.insert(account);
-        }
+
+        if (context.ignoreAccountStatusCheck && context.onBehalfOfAccount == account) return;
+        else if (context.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(account);
+        else accountStatusChecks.insert(account);
     }
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
+    /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid. The account status is checked only if not explicitly ordered to be ignored for the current onBehalfOfAccount.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(address[] calldata accounts) public virtual {
         ExecutionContext memory context = executionContext;
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            if (context.ignoreAccountStatusCheck && context.onBehalfOfAccount == accounts[i]) continue;
+            else if (context.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(accounts[i]);
+            else accountStatusChecks.insert(accounts[i]);
+        }
+    }
+
+    /// @notice Unconditionally checks the status of an account and reverts if it is not valid.
+    /// @dev Account status check is performed on the fly regardless of the current execution context. If account was previously added to a set to be checked later, it is removed.
+    /// @param account The address of the account to be checked.
+    function requireAccountStatusCheckUnconditional(address account) public virtual {
+        requireAccountStatusCheckInternal(account);
+        accountStatusChecks.remove(account);
+    }
+
+    /// @notice Unconditionally checks the status of multiple accounts and reverts if any of them is not valid.
+    /// @dev Account status checks are performed on the fly regardless of the current execution context.
+    /// @param accounts An array of addresses of the accounts to be checked.
+    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) public virtual {
         for (uint i = 0; i < accounts.length;) {
-            if (context.batchDepth == BATCH_DEPTH__INIT) requireAccountStatusCheckInternal(accounts[i]);
-            else if (!(context.controllerToCollateralCall && context.onBehalfOfAccount == accounts[i])) {
-                accountStatusChecks.insert(accounts[i]);
-            }
+            requireAccountStatusCheckInternal(accounts[i]);
+            accountStatusChecks.remove(accounts[i]);
+
             unchecked { ++i; }
         }
     }
@@ -406,7 +431,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         (success, result) = targetContract.call{value: msgValue}(data);
     }
 
-    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
+    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, uint msgValue, bytes calldata data) internal virtual
     onBehalfOfAccountContext(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
         SetStorage storage controllers = accountControllers[onBehalfOfAccount];
@@ -418,13 +443,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         ) revert CVP_NotAuthorized();
 
         // must be cached in case of CVP reentrancy
-        bool controllerToCollateralCallCache = executionContext.controllerToCollateralCall;
+        ExecutionContext memory context = executionContext;
         executionContext.controllerToCollateralCall = true;
+        executionContext.ignoreAccountStatusCheck = ignoreAccountStatusCheck;
 
-        msgValue = msgValue == type(uint).max ? address(this).balance : msgValue;
         (success, result) = targetContract.call{value: msgValue}(data);
 
-        executionContext.controllerToCollateralCall = controllerToCollateralCallCache;
+        executionContext.controllerToCollateralCall = context.controllerToCollateralCall;
+        executionContext.ignoreAccountStatusCheck = context.ignoreAccountStatusCheck;
     }
 
     function batchInternal(BatchItem[] calldata items, bool returnResult) internal
@@ -576,6 +602,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         assert(context.batchDepth == BATCH_DEPTH__INIT);
         assert(!context.checksInProgressLock);
         assert(!context.controllerToCollateralCall);
+        assert(!context.ignoreAccountStatusCheck);
         assert(context.onBehalfOfAccount == address(0));
 
         SetStorage storage asChecks = accountStatusChecks;

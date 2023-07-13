@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 pragma solidity ^0.8.0;
@@ -6,13 +7,14 @@ struct ExecutionContext {
     uint8 batchDepth;
     bool checksInProgressLock;
     bool controllerToCollateralCall;
+    bool ignoreAccountStatusCheck;
     address onBehalfOfAccount;
 }
 
 struct BatchItem {
     bool allowError;
-    address onBehalfOfAccount;
     address targetContract;
+    address onBehalfOfAccount;
     uint msgValue;
     bytes data;
 }
@@ -43,11 +45,13 @@ interface ICVP {
         returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult);
     function call(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
         returns (bool success, bytes memory result);
-    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) external payable
         returns (bool success, bytes memory result);
     function checkAccountStatus(address account) external view returns (bool isValid);
     function checkAccountsStatus(address[] calldata accounts) external view returns (bool[] memory isValid);
     function requireAccountStatusCheck(address account) external;
     function requireAccountsStatusCheck(address[] calldata accounts) external;
+    function requireAccountStatusCheckUnconditional(address account) external;
+    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) external;
     function requireVaultStatusCheck() external;
 }   

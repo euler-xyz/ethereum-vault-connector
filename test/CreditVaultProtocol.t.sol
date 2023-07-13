@@ -23,11 +23,22 @@ contract TargetMock {
         (ExecutionContext memory context,) = ICVP(cvp).getExecutionContext(address(0));
         bool _checksDeferred = context.batchDepth != 1;
 
-        require(msg.sender == msgSender, "func/invalid-sender");
-        require(msg.value == msgValue, "func/invalid-msg-value");
-        require(_checksDeferred == checksDeferred, "func/invalid-checks-deferred");
-        require(context.onBehalfOfAccount == onBehalfOfAccount, "func/invalid-on-behalf-of-account");
-        require(context.controllerToCollateralCall == true, "func/controller-to-collateral-call");
+        require(msg.sender == msgSender, "cfctct/invalid-sender");
+        require(msg.value == msgValue, "cfctct/invalid-msg-value");
+        require(_checksDeferred == checksDeferred, "cfctct/invalid-checks-deferred");
+        require(context.onBehalfOfAccount == onBehalfOfAccount, "cfctct/invalid-on-behalf-of-account");
+        require(context.controllerToCollateralCall == true, "cfctct/controller-to-collateral-call");
+
+        // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
+        // therefore it's not necessary to fully verify it here
+        if (_checksDeferred) {
+            require(CreditVaultProtocolHandler(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount), "cfctct/1");
+            CreditVaultProtocolHandler(cvp).requireAccountStatusCheck(onBehalfOfAccount);
+            require(CreditVaultProtocolHandler(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount), "cfctct/2");
+        } else {
+            CreditVaultProtocolHandler(cvp).requireAccountStatusCheck(onBehalfOfAccount);
+            CreditVaultProtocolHandler(cvp).verifyAccountStatusChecks();
+        }
 
         return msg.value;
     }
@@ -167,6 +178,11 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
         delete vaultStatusChecks;
     }
 
+    function clearExpectedVaultsAndAccountsChecks() external {
+        delete expectedAccountsChecked;
+        delete expectedVaultsChecked;
+    }
+
     function setBatchDepth(uint8 depth) external {
         executionContext.batchDepth = depth;
     }
@@ -183,6 +199,10 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
         executionContext.controllerToCollateralCall = isCalling;
     }
 
+    function setIgnoreAccountStatusCheck(bool ignore) external {
+        executionContext.ignoreAccountStatusCheck = ignore;
+    }
+
     function pushIntoExpectedAccountsChecked(address account) external {
         expectedAccountsChecked.push(account);
     }
@@ -194,7 +214,35 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
     function requireAccountStatusCheck(address account) public override {
         super.requireAccountStatusCheck(account);
 
+        if (
+            !executionContext.ignoreAccountStatusCheck || 
+            executionContext.onBehalfOfAccount != account
+        ) expectedAccountsChecked.push(account);
+    }
+
+    function requireAccountsStatusCheck(address[] calldata accounts) public override {
+        super.requireAccountsStatusCheck(accounts);
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            if (
+                !executionContext.ignoreAccountStatusCheck || 
+                executionContext.onBehalfOfAccount != accounts[i]
+            ) expectedAccountsChecked.push(accounts[i]);
+        }
+    }
+
+    function requireAccountStatusCheckUnconditional(address account) public override {
+        super.requireAccountStatusCheckUnconditional(account);
+
         expectedAccountsChecked.push(account);
+    }
+
+    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) public override {
+        super.requireAccountsStatusCheckUnconditional(accounts);
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            expectedAccountsChecked.push(accounts[i]);
+        }
     }
 
     function requireAccountStatusCheckInternal(address account) internal override {
@@ -319,9 +367,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
         verifyAccountStatusChecks();
     }
 
-    function handlerCallFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable 
+    function handlerCallFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable 
     returns (bool success, bytes memory result) {
-        (success, result) = super.callFromControllerToCollateral(targetContract, onBehalfOfAccount, data);
+        (success, result) = super.callFromControllerToCollateral(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, data);
 
         verifyStorage();
         verifyVaultStatusChecks();
@@ -442,8 +490,9 @@ contract CreditVaultProtocolTest is Test {
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
         
-        cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
-        cvp.setControllerToCollateralCall(seed % 4 == 0 ? true : false);
+        cvp.setBatchDepth(seed % 2 == 0 ? 2 : 1);
+        cvp.setControllerToCollateralCall(seed % 3 == 0 ? true : false);
+        cvp.setIgnoreAccountStatusCheck(seed % 4 == 0 ? true : false);
         cvp.setOnBehalfOfAccount(account);
         if (seed % 5 == 0) {
             vm.prank(account);
@@ -452,8 +501,9 @@ contract CreditVaultProtocolTest is Test {
         
         (context, controllerEnabled) = cvp.getExecutionContext(controller);
         
-        assertEq(context.batchDepth, seed % 3 == 0 ? 2 : 1);
-        assertEq(context.controllerToCollateralCall, seed % 4 == 0 ? true : false);
+        assertEq(context.batchDepth, seed % 2 == 0 ? 2 : 1);
+        assertEq(context.controllerToCollateralCall, seed % 3 == 0 ? true : false);
+        assertEq(context.ignoreAccountStatusCheck, seed % 4 == 0 ? true : false);
         assertEq(context.onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 5 == 0 ? true : false);
     }
@@ -820,6 +870,32 @@ contract CreditVaultProtocolTest is Test {
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
 
+        // if called from a batch, the ETH value does not get forwarded
+        data = abi.encodeWithSelector(
+            TargetMock(targetContract).func.selector,
+            address(cvp),
+            address(cvp),
+            0,  // we're expecting ETH not to get forwarded
+            true,
+            account
+        );
+
+        BatchItem[] memory items = new BatchItem[](1);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = address(0);
+        items[0].targetContract = address(cvp);
+        items[0].msgValue = seed;    // this value will get ignored
+        items[0].data = abi.encodeWithSelector(
+            cvp.call.selector,
+            targetContract,
+            account,
+            data
+        );
+
+        hoax(alice, seed);
+        cvp.batch(items);
+
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
         data = abi.encodeWithSelector(
             TargetMock(targetContract).func.selector,
@@ -951,11 +1027,39 @@ contract CreditVaultProtocolTest is Test {
         (bool success, bytes memory result) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
+            seed % 2 == 0 ? true : false,
             data
         );
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
+
+        // if called from a batch, the ETH value does not get forwarded
+        data = abi.encodeWithSelector(
+            TargetMock(collateral).callFromControllerToCollateralTest.selector,
+            address(cvp),
+            address(cvp),
+            0,  // we're expecting ETH not to get forwarded
+            true,
+            alice
+        );
+
+        BatchItem[] memory items = new BatchItem[](1);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = address(0);
+        items[0].targetContract = address(cvp);
+        items[0].msgValue = seed;    // this value will get ignored
+        items[0].data = abi.encodeWithSelector(
+            cvp.callFromControllerToCollateral.selector,
+            collateral,
+            alice,
+            seed % 2 == 0 ? true : false,
+            data
+        );
+
+        hoax(controller, seed);
+        cvp.batch(items);
 
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
         // note that in this case the controller tries to act on behalf of itself
@@ -981,11 +1085,50 @@ contract CreditVaultProtocolTest is Test {
         (success, result) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             address(0),
+            seed % 2 == 0 ? true : false,
             data
         );
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
+    }
+
+    function test_CallFromControllerToCollateral_RevertIfTargetContractInvalid(address alice, uint seed) public {
+        vm.assume(alice != address(0));
+
+        address collateral = address(new VaultMock(cvp));
+        address controller = address(new VaultMock(cvp));
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, collateral);
+
+        vm.prank(alice);
+        cvp.enableController(alice, controller);
+
+        cvp.reset();
+        VaultMock(controller).reset();
+
+        // target contract is the CVP
+        bytes memory data = abi.encodeWithSelector(
+            TargetMock(address(cvp)).callFromControllerToCollateralTest.selector,
+            address(cvp),
+            address(cvp),
+            seed,
+            false,
+            controller
+        );
+
+        hoax(alice, seed);
+        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
+
+        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
+            address(cvp),
+            alice,
+            false,
+            data
+        );
+
+        assertFalse(success);
     }
 
     function test_CallFromControllerToCollateral_RevertIfNoControllerEnabled(address alice, uint seed) public {
@@ -1011,6 +1154,7 @@ contract CreditVaultProtocolTest is Test {
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
+            false,
             data
         );
 
@@ -1050,6 +1194,7 @@ contract CreditVaultProtocolTest is Test {
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
+            false,
             data
         );
 
@@ -1084,6 +1229,7 @@ contract CreditVaultProtocolTest is Test {
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
+            false,
             data
         );
 
@@ -1118,6 +1264,7 @@ contract CreditVaultProtocolTest is Test {
         (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
             targetContract,
             alice,
+            false,
             data
         );
 
@@ -1176,22 +1323,22 @@ contract CreditVaultProtocolTest is Test {
 
     function test_RequireAccountsStatusCheck(uint8 numberOfAccounts, bytes memory seed, bool allStatusesValid) external {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= 20);
-
+        
         address[] memory accounts = new address[](numberOfAccounts);
-        for (uint i = 0; i < accounts.length; i++) {
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
             accounts[i] = address(uint160(uint(keccak256(abi.encode(i, seed)))));
+            controllers[i] = address(new VaultMock(cvp));
         }
 
-        for (uint i = 0; i < accounts.length; i++) {
+        for (uint i = 0; i < numberOfAccounts; i++) {
             address account = accounts[i];
-            address controller = address(new VaultMock(cvp));
+            address controller = controllers[i];
 
-            if (!allStatusesValid) {
-                vm.prank(account);
-                cvp.enableController(account, controller);
-                VaultMock(controller).clearVaultsAndAccountsChecks();
-                cvp.reset();
-            }
+            vm.prank(account);
+            cvp.enableController(account, controller);
+            VaultMock(controller).clearVaultsAndAccountsChecks();
+            cvp.reset();
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
@@ -1205,10 +1352,32 @@ contract CreditVaultProtocolTest is Test {
                         : 2
             );
 
-            // even though it's controller calling into collateral and scheduling account status check 
-            // for the current onBehalfOfAccount, the account status check will be executed right away
+            // account status check will be performed because
+            // the account status check is not ordered to be ignored or the check is not being scheduled for current onBehalfOfAccount
             cvp.setBatchDepth(1);
-            cvp.setControllerToCollateralCall(true);
+            cvp.setIgnoreAccountStatusCheck(true);
+            cvp.setOnBehalfOfAccount(address(0));
+
+            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
+                vm.expectRevert(abi.encodeWithSelector(
+                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                    account,
+                    uint160(account) % 3 == 1
+                        ? bytes("account status violation")
+                        : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
+                ));
+            }
+
+            cvp.requireAccountStatusCheck(account);
+
+            if (allStatusesValid || uint160(account) % 3 == 0) cvp.verifyAccountStatusChecks();
+
+            VaultMock(controller).clearVaultsAndAccountsChecks();
+            cvp.reset();
+
+            // try other combinations of the conditions; account status check still being performed
+            cvp.setBatchDepth(1);
+            cvp.setIgnoreAccountStatusCheck(false);
             cvp.setOnBehalfOfAccount(account);
 
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
@@ -1227,28 +1396,76 @@ contract CreditVaultProtocolTest is Test {
 
             VaultMock(controller).clearVaultsAndAccountsChecks();
             cvp.reset();
+
+            // account status check will no longer be performed because
+            // the account status check is ordered to be ignored and the check is being scheduled for current onBehalfOfAccount
+            cvp.setBatchDepth(1);
+            cvp.setIgnoreAccountStatusCheck(true);
+            cvp.setOnBehalfOfAccount(account);
+
+            cvp.requireAccountStatusCheck(account);
+            cvp.verifyAccountStatusChecks();
+
+            VaultMock(controller).clearVaultsAndAccountsChecks();
+            cvp.reset();
         }
 
         // check if there's any invalid status expected
-        bool anyInvalid = false;
-        address invalidAccount;
+        uint invalidAccountsCounter;
+        address[] memory invalidAccounts = new address[](numberOfAccounts);
         for (uint i = 0; i < accounts.length; i++) {
-            invalidAccount = accounts[i];
-            if (!(allStatusesValid || uint160(invalidAccount) % 3 == 0)) {
-                anyInvalid = true;
-                break;
+            if (!(allStatusesValid || uint160(accounts[i]) % 3 == 0)) {
+                invalidAccounts[invalidAccountsCounter++] = accounts[i];
             }
         }
 
         cvp.setBatchDepth(1);
-        cvp.setControllerToCollateralCall(true);
-        cvp.setOnBehalfOfAccount(invalidAccount);
+        cvp.setIgnoreAccountStatusCheck(true);
+        cvp.setOnBehalfOfAccount(address(0));
 
-        if (anyInvalid) {
+        if (invalidAccountsCounter > 0) {
             vm.expectRevert(abi.encodeWithSelector(
                 CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                invalidAccount,
-                uint160(invalidAccount) % 3 == 1
+                invalidAccounts[0],
+                uint160(invalidAccounts[0]) % 3 == 1
+                    ? bytes("account status violation")
+                    : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
+            ));
+        }
+
+        cvp.requireAccountsStatusCheck(accounts);
+        cvp.verifyAccountStatusChecks();
+        cvp.reset();
+        for (uint i = 0; i < controllers.length; ++i) {VaultMock(controllers[i]).clearVaultsAndAccountsChecks();}
+
+        cvp.setBatchDepth(1);
+        cvp.setIgnoreAccountStatusCheck(false);
+        cvp.setOnBehalfOfAccount(invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0));
+
+        if (invalidAccountsCounter > 0) {
+            vm.expectRevert(abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                invalidAccounts[0],
+                uint160(invalidAccounts[0]) % 3 == 1
+                    ? bytes("account status violation")
+                    : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
+            ));
+        }
+
+        cvp.requireAccountsStatusCheck(accounts);
+        cvp.verifyAccountStatusChecks();
+        cvp.reset();
+        for (uint i = 0; i < controllers.length; ++i) {VaultMock(controllers[i]).clearVaultsAndAccountsChecks();}
+
+        cvp.setBatchDepth(1);
+        cvp.setIgnoreAccountStatusCheck(true);
+        cvp.setOnBehalfOfAccount(invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0));
+
+        if (invalidAccountsCounter > 1) {
+            vm.expectRevert(abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                invalidAccounts[1],
+                uint160(invalidAccounts[1]) % 3 == 1
                     ? bytes("account status violation")
                     : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
             ));
@@ -1262,24 +1479,26 @@ contract CreditVaultProtocolTest is Test {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= 20);
 
         address[] memory accounts = new address[](numberOfAccounts);
-        for (uint i = 0; i < accounts.length; i++) {
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
             accounts[i] = address(uint160(uint(keccak256(abi.encode(i, seed)))));
+            controllers[i] = address(new VaultMock(cvp));
         }
         
-        for (uint i = 0; i < accounts.length; i++) {
+        for (uint i = 0; i < numberOfAccounts; i++) {
             cvp.setBatchDepth(1);
 
             address account = accounts[i];
-            address controller = address(new VaultMock(cvp));
+            address controller = controllers[i];
 
             vm.prank(account);
             cvp.enableController(account, controller);
             VaultMock(controller).setAccountStatusState(1);
 
             // account status check will be scheduled because checks are deferred and
-            // it's not the controller calling or the check is not being scheduled for current onBehalfOfAccount
+            // the account status check is not ordered to be ignored or the check is not being scheduled for current onBehalfOfAccount
             cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCall(false);
+            cvp.setIgnoreAccountStatusCheck(true);
             cvp.setOnBehalfOfAccount(address(0));
 
             // even though the account status state was set to 1 which should revert,
@@ -1292,17 +1511,7 @@ contract CreditVaultProtocolTest is Test {
 
             // try other combinations of the conditions; account status check still being scheduled
             cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCall(true);
-            cvp.setOnBehalfOfAccount(address(0));
-
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
-            cvp.requireAccountStatusCheck(account);
-            assertTrue(cvp.isAccountStatusCheckDeferred(account));
-            cvp.reset();
-
-            // try other combinations of the conditions; account status check still being scheduled
-            cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCall(false);
+            cvp.setIgnoreAccountStatusCheck(false);
             cvp.setOnBehalfOfAccount(account);
 
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
@@ -1310,10 +1519,11 @@ contract CreditVaultProtocolTest is Test {
             assertTrue(cvp.isAccountStatusCheckDeferred(account));
             cvp.reset();
 
-            // account status check is no longer scheduled if we're in checks deferral, but
-            // it's the controller that is calling into the collateral for the onBehalfOfAccount
+            // account status check is no longer scheduled because
+            // the account status check is ordered to be ignored and the check is being scheduled for current onBehalfOfAccount
+            // because we're in a batch, the call doesn't revert but the account status check gets scheduled for later
             cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCall(true);
+            cvp.setIgnoreAccountStatusCheck(true);
             cvp.setOnBehalfOfAccount(account);
 
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
@@ -1323,7 +1533,7 @@ contract CreditVaultProtocolTest is Test {
         }
 
         cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCall(false);
+        cvp.setIgnoreAccountStatusCheck(true);
         cvp.setOnBehalfOfAccount(address(0));
 
         for (uint i = 0; i < accounts.length; ++i) {assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));}
@@ -1332,16 +1542,7 @@ contract CreditVaultProtocolTest is Test {
         cvp.reset();
 
         cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCall(true);
-        cvp.setOnBehalfOfAccount(address(0));
-
-        for (uint i = 0; i < accounts.length; ++i) {assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));}
-        cvp.requireAccountsStatusCheck(accounts);
-        for (uint i = 0; i < accounts.length; ++i) {assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));}
-        cvp.reset();
-
-        cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCall(false);
+        cvp.setIgnoreAccountStatusCheck(false);
         cvp.setOnBehalfOfAccount(accounts[0]);
 
         for (uint i = 0; i < accounts.length; ++i) {assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));}
@@ -1350,7 +1551,7 @@ contract CreditVaultProtocolTest is Test {
         cvp.reset();
 
         cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCall(true);
+        cvp.setIgnoreAccountStatusCheck(true);
         cvp.setOnBehalfOfAccount(accounts[0]);
 
         for (uint i = 0; i < accounts.length; ++i) {assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));}
@@ -1361,15 +1562,121 @@ contract CreditVaultProtocolTest is Test {
 
         // checks no longer deferred
         cvp.setBatchDepth(1);
-        cvp.setControllerToCollateralCall(true);
+        cvp.setIgnoreAccountStatusCheck(true);
         cvp.setOnBehalfOfAccount(accounts[0]);
 
-        vm.expectRevert(abi.encodeWithSelector(
-            CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-            accounts[0],
-            "account status violation"
-        ));
+        for (uint i = 0; i < accounts.length; ++i) {assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));}
+
+        if (accounts.length > 1) {
+            vm.expectRevert(abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                accounts[1],
+                "account status violation"
+            ));
+        }
+        
         cvp.requireAccountsStatusCheck(accounts);
+        if (accounts.length == 1) assertFalse(cvp.isAccountStatusCheckDeferred(accounts[0]));
+    }
+
+    function test_RequireAccountsStatusCheckUnconditional(uint8 numberOfAccounts, bytes memory seed, bool allStatusesValid) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= 20);
+        
+        address[] memory accounts = new address[](numberOfAccounts);
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(uint160(uint(keccak256(abi.encode(i, seed)))));
+            controllers[i] = address(new VaultMock(cvp));
+        }
+
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            address account = accounts[i];
+            address controller = controllers[i];
+
+            vm.prank(account);
+            cvp.enableController(account, controller);
+
+            // check all the options: account state is ok, account state is violated with
+            // controller returning false and reverting
+            VaultMock(controller).setAccountStatusState(
+                allStatusesValid
+                ? 0
+                : uint160(account) % 3 == 0
+                    ? 0
+                    : uint160(account) % 3 == 1
+                        ? 1
+                        : 2
+            );
+
+            // fist, schedule the check to be performed later to prove that after being peformed on the fly
+            // account is no longer contained in the set to be performed later
+            cvp.setBatchDepth(2);
+            cvp.setIgnoreAccountStatusCheck(false);
+            cvp.requireAccountStatusCheck(account);
+            VaultMock(controller).clearVaultsAndAccountsChecks();
+            cvp.clearExpectedVaultsAndAccountsChecks();
+
+            // account status check will be performed on the fly despite checks deferral and 
+            // the account status check ordered to be ignored and the check is being scheduled for current onBehalfOfAccount
+            cvp.setBatchDepth(2);
+            cvp.setIgnoreAccountStatusCheck(true);
+            cvp.setOnBehalfOfAccount(account);
+
+            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+
+            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
+                vm.expectRevert(abi.encodeWithSelector(
+                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                    account,
+                    uint160(account) % 3 == 1
+                        ? bytes("account status violation")
+                        : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
+                ));
+            }
+
+            cvp.requireAccountStatusCheckUnconditional(account);
+
+            if (allStatusesValid || uint160(account) % 3 == 0) {
+                assertFalse(cvp.isAccountStatusCheckDeferred(account));
+                cvp.verifyAccountStatusChecks();
+            }
+        }
+
+        // check if there's any invalid status expected
+        uint invalidAccountsCounter;
+        address[] memory invalidAccounts = new address[](numberOfAccounts);
+        for (uint i = 0; i < accounts.length; i++) {
+            if (!(allStatusesValid || uint160(accounts[i]) % 3 == 0)) {
+                invalidAccounts[invalidAccountsCounter++] = accounts[i];
+            }
+        }
+
+        // schedule the checks to be performed later to prove that after being peformed on the fly
+        // accounts are no longer contained in the set to be performed later
+        cvp.setBatchDepth(2);
+        cvp.setIgnoreAccountStatusCheck(false);
+        cvp.requireAccountsStatusCheck(accounts);
+        for (uint i = 0; i < controllers.length; ++i) {VaultMock(controllers[i]).clearVaultsAndAccountsChecks();}
+        cvp.clearExpectedVaultsAndAccountsChecks();
+
+        cvp.setBatchDepth(2);
+        cvp.setIgnoreAccountStatusCheck(true);
+        cvp.setOnBehalfOfAccount(accounts[0]);
+
+        for (uint i = 0; i < accounts.length; ++i) {assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));}
+
+        if (invalidAccountsCounter > 0) {
+            vm.expectRevert(abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                invalidAccounts[0],
+                uint160(invalidAccounts[0]) % 3 == 1
+                    ? bytes("account status violation")
+                    : abi.encodeWithSignature("Error(string)", bytes("invalid account"))
+            ));
+        }
+
+        cvp.requireAccountsStatusCheckUnconditional(accounts);
+        cvp.verifyAccountStatusChecks();
     }
 
     function test_RequireVaultStatusCheck(uint8 vaultsNumber, bool allStatusesValid) external {
@@ -1578,7 +1885,7 @@ contract CreditVaultProtocolTest is Test {
             ""
         );
 
-        // no rever this time as error allowed
+        // no revert this time as error allowed
         vm.prank(bob);
         cvp.handlerBatch(items);
 

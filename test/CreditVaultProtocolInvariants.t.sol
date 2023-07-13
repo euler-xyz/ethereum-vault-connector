@@ -117,7 +117,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         return super.callInternal(targetContract, onBehalfOfAccount, msgValue, data);
     }
 
-    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
+    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, uint msgValue, bytes calldata data) internal override
     returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (msg.sender == address(this)) return (true, "");
@@ -128,7 +128,8 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         setup(onBehalfOfAccount, targetContract);
         accountControllers[onBehalfOfAccount].insert(msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
-        return super.callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, msgValue, data);
+
+        return super.callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, msgValue, data);
     }
 
     function requireAccountsStatusCheck(address[] calldata accounts) public override {
@@ -168,6 +169,7 @@ contract CreditVaultProtocolInvariants is Test {
         assertEq(context.batchDepth, 1);
         assertFalse(context.checksInProgressLock);
         assertFalse(context.controllerToCollateralCall);
+        assertFalse(context.ignoreAccountStatusCheck);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
     }
