@@ -66,8 +66,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
                 !accountOperators[account][msg.sender]
             ) revert NotAuthorized();
 
-            // if owner is not set yet at this point, it means that it must be the msg.sender that is an owner.
-            // ownerLookup is set only once on the initial interaction of the account with the CVP
+            // if it's an operator calling and we get up to this point (thanks to accountOperators[account][msg.sender] == true), 
+            // it means that the function setAccountOperator() must have been called previously and the ownerLookup is already set.
+            // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
+            // ownerLookup is set only once on the initial interaction of the account with the CVP.
             uint160 prefix = uint160(account) & ~uint160(0xFF);
             if (ownerLookup[prefix] == address(0)) ownerLookup[prefix] = msg.sender;
         }
