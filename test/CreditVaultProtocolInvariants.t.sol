@@ -137,6 +137,11 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.requireAccountsStatusCheck(accounts);
     }
 
+    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) public override {
+        if (accounts.length > 20) return;
+        super.requireAccountsStatusCheckUnconditional(accounts);
+    }
+
     function requireVaultStatusCheck() public override {
         super.requireVaultStatusCheck();
     }
