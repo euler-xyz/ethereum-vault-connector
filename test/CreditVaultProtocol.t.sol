@@ -1005,6 +1005,8 @@ contract CreditVaultProtocolTest is Test {
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
 
+        vm.assume(collateral != address(cvp));
+
         vm.prank(alice);
         cvp.enableCollateral(alice, collateral);
 
@@ -1096,11 +1098,7 @@ contract CreditVaultProtocolTest is Test {
     function test_CallFromControllerToCollateral_RevertIfTargetContractInvalid(address alice, uint seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
-
-        vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
 
         vm.prank(alice);
         cvp.enableController(alice, controller);
@@ -1137,6 +1135,8 @@ contract CreditVaultProtocolTest is Test {
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
 
+        vm.assume(collateral != address(cvp));
+
         vm.prank(alice);
         cvp.enableCollateral(alice, collateral);
 
@@ -1167,6 +1167,8 @@ contract CreditVaultProtocolTest is Test {
         address collateral = address(new VaultMock(cvp));
         address controller_1 = address(new VaultMock(cvp));
         address controller_2 = address(new VaultMock(cvp));
+
+        vm.assume(collateral != address(cvp));
 
         // mock checks deferred to enable multiple controllers
         cvp.setBatchDepth(2);
@@ -1207,6 +1209,7 @@ contract CreditVaultProtocolTest is Test {
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
 
+        vm.assume(collateral != address(cvp));
         vm.assume(randomAddress != controller);
 
         vm.prank(alice);
@@ -1238,6 +1241,7 @@ contract CreditVaultProtocolTest is Test {
 
     function test_CallFromControllerToCollateral_RevertIfTargetContractIsNotEnabledCollateral(address alice, address targetContract, uint seed) public {
         vm.assume(alice != address(0));
+        vm.assume(targetContract != address(cvp));
 
         address collateral = address(new VaultMock(cvp));
         address controller = address(new VaultMock(cvp));
