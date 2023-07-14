@@ -71,8 +71,6 @@ abstract contract CreditVaultBase is ReentrancyGuard, UnstructuredStorageBytes, 
             reentrancyGuard != REENTRANCY_GUARD_CHECKS_IN_PROGRESS
         ) revert Reentrancy();
 
-        if (areBytesEmpty()) return (true, data);
-
         (isValid, data) = doCheckVaultStatus(getBytes());
     }
 

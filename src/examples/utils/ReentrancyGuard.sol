@@ -7,6 +7,7 @@ abstract contract ReentrancyGuard {
     error MustBeNonReentrant();
     
     bytes32 immutable private reentrancyGuardPosition;
+    uint constant internal REENTRANCY_GUARD_UNDEFINED = 0;
     uint constant internal REENTRANCY_GUARD_INIT = 1;
     uint constant internal REENTRANCY_GUARD_BUSY = 2;
     
@@ -16,6 +17,9 @@ abstract contract ReentrancyGuard {
     }
 
     modifier nonReentrant() {
+        // for proxy compatibility
+        if (getReentrancyGuard() == REENTRANCY_GUARD_UNDEFINED) setReentrancyGuard(REENTRANCY_GUARD_INIT);
+
         testReentrancyGuard(REENTRANCY_GUARD_INIT, Reentrancy.selector);
 
         setReentrancyGuard(REENTRANCY_GUARD_BUSY);

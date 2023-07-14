@@ -11,13 +11,6 @@ abstract contract UnstructuredStorageBytes {
         bytesDataPosition = keccak256(abi.encodePacked(bytesLengthPosition));
     }
 
-    modifier clearBytes() {
-        _;
-
-        bytes32 lengthPosition = bytesLengthPosition;
-        assembly { sstore(lengthPosition, 0) }
-    }
-
     // assembly functions implemented with help of the following stackoverflow topic:
     // https://ethereum.stackexchange.com/questions/126269/how-to-store-and-retrieve-string-which-is-more-than-32-bytesor-could-be-less-th
     function getBytes() internal view returns (bytes memory bytesToGet) {
@@ -103,6 +96,11 @@ abstract contract UnstructuredStorageBytes {
                 }
             }
         }
+    }
+
+    function clearBytes() internal {
+        bytes32 lengthPosition = bytesLengthPosition;
+        assembly { sstore(lengthPosition, 0) }
     }
 
     function areBytesEmpty() internal view returns (bool areEmpty) {

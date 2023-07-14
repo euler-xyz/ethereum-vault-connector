@@ -45,6 +45,9 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     function doCheckVaultStatus(bytes memory snapshot) internal virtual override returns (bool isValid, bytes memory data) {
         isValid = true;
 
+        // sanity check in case the snapshot hasn't been taken
+        if (snapshot.length == 0) return (isValid, data);
+
         // validate the vault state here, i.e.:
         (uint initialSupply, uint initialBorrows) = abi.decode(snapshot, (uint, uint));
         uint finalSupply = convertToAssets(totalSupply);
@@ -74,6 +77,8 @@ contract CreditVaultBorrowable is CreditVaultSimple {
         //    isValid = false;
         //    data = "withdrawal too large";
         //}
+
+        clearBytes();
     }
 
     function doCheckAccountStatus(address account, address[] calldata collaterals) internal view override
@@ -143,7 +148,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     }
 
     function borrowInternal(uint256 assets, address receiver) internal virtual 
-    nonReentrant clearBytes {
+    nonReentrant {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, true);
 
@@ -162,7 +167,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     }
 
     function repayInternal(uint256 assets, address receiver) internal virtual 
-    nonReentrant clearBytes {
+    nonReentrant {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, true);
         

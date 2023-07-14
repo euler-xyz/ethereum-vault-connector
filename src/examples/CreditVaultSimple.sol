@@ -48,6 +48,9 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     function doCheckVaultStatus(bytes memory snapshot) internal virtual override returns (bool isValid, bytes memory data) {
         isValid = true;
 
+        // sanity check in case the snapshot hasn't been taken
+        if (snapshot.length == 0) return (isValid, data);
+
         // validate the vault state here, i.e.:
         uint initialSupply = abi.decode(snapshot, (uint));
         uint finalSupply = convertToAssets(totalSupply);
@@ -67,6 +70,8 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
         //    isValid = false;
         //    data = "withdrawal too large";
         //}
+
+        clearBytes();
     }
 
     function doCheckAccountStatus(address, address[] calldata) internal view virtual override
@@ -168,7 +173,7 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     }
 
     function mintInternal(uint256 shares, address receiver) internal virtual 
-    nonReentrant clearBytes
+    nonReentrant
     returns (uint256 assets) {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, false);
@@ -191,7 +196,7 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     }
 
     function burnInternal(uint256 shares, address receiver, address owner) internal virtual 
-    nonReentrant clearBytes
+    nonReentrant
     returns (uint256 assets) {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, false);
