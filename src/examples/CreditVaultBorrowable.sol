@@ -143,7 +143,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     }
 
     function borrowInternal(uint256 assets, address receiver) internal virtual 
-    nonReentrant {
+    nonReentrant clearBytes {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, true);
 
@@ -162,7 +162,7 @@ contract CreditVaultBorrowable is CreditVaultSimple {
     }
 
     function repayInternal(uint256 assets, address receiver) internal virtual 
-    nonReentrant {
+    nonReentrant clearBytes {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, true);
         

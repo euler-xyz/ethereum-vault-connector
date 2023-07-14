@@ -168,7 +168,7 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     }
 
     function mintInternal(uint256 shares, address receiver) internal virtual 
-    nonReentrant
+    nonReentrant clearBytes
     returns (uint256 assets) {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, false);
@@ -191,7 +191,7 @@ contract CreditVaultSimple is CreditVaultBase, ERC4626 {
     }
 
     function burnInternal(uint256 shares, address receiver, address owner) internal virtual 
-    nonReentrant
+    nonReentrant clearBytes
     returns (uint256 assets) {
         vaultStatusSnapshot();
         address msgSender = CVPAuthenticate(msg.sender, false);
