@@ -37,8 +37,13 @@ abstract contract CreditVaultBase is ReentrancyGuard, UnstructuredStorageBytes, 
     function CVPAuthenticate(address msgSender, bool controllerEnabledCheck) internal view 
     returns (address authMsgSender) {
         if (msgSender == address(cvp)) {
-            (ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+            (
+                ExecutionContext memory context, 
+                bool controllerEnabled
+            ) = cvp.getExecutionContext(controllerEnabledCheck ? address(this) : address(0));
+
             authMsgSender = context.onBehalfOfAccount;
+            
             if (controllerEnabledCheck && !controllerEnabled) revert ControllerDisabled();
         } else {
             authMsgSender = msgSender;
