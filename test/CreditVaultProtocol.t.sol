@@ -383,6 +383,8 @@ contract CreditVaultProtocolTest is Test {
     event AccountOperatorEnabled(address indexed account, address indexed operator);
     event AccountOperatorDisabled(address indexed account, address indexed operator);
     event AccountsOwnerRegistered(uint152 indexed prefix, address indexed owner);
+    event ControllerEnabled(address indexed account, address indexed controller);
+    event ControllerDisabled(address indexed account, address indexed controller);
 
     function samePrimaryAccount(address accountOne, address accountTwo) internal pure returns (bool) {
         return (uint160(accountOne) | 0xFF) == (uint160(accountTwo) | 0xFF);
@@ -712,6 +714,8 @@ contract CreditVaultProtocolTest is Test {
         address[] memory controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
+        vm.expectEmit(true, true, false, false, address(cvp));
+        emit ControllerEnabled(account, vault);
         cvp.handlerEnableController(account, vault);
 
         address[] memory controllersPost = cvp.getControllers(account);
@@ -720,17 +724,19 @@ contract CreditVaultProtocolTest is Test {
         assertEq(controllersPost[controllersPost.length - 1], vault);
         assertTrue(cvp.isControllerEnabled(account, vault));
 
-        // enabling the same controller again should succeed (duplicate will not be added)
+        // enabling the same controller again should succeed (duplicate will not be added and the event won't be emitted)
         cvp.reset();
         VaultMock(vault).reset();
         assertTrue(cvp.isControllerEnabled(account, vault));
         controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
         cvp.handlerEnableController(account, vault);
 
         controllersPost = cvp.getControllers(account);
 
+        assertEq(logs.length, 0);
         assertEq(controllersPost.length, controllersPre.length);
         assertEq(controllersPost[0], controllersPre[0]);
         assertTrue(cvp.isControllerEnabled(account, vault));
@@ -739,6 +745,8 @@ contract CreditVaultProtocolTest is Test {
         address otherVault = address(new VaultMock(cvp));
 
         vm.prank(msgSender);
+        vm.expectEmit(true, true, false, false, address(cvp));
+        emit ControllerEnabled(account, otherVault);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
         cvp.handlerEnableController(account, otherVault);
 
@@ -749,6 +757,8 @@ contract CreditVaultProtocolTest is Test {
         controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
+        vm.expectEmit(true, true, false, false, address(cvp));
+        emit ControllerDisabled(account, vault);
         VaultMock(vault).call(
             address(cvp),
             abi.encodeWithSelector(

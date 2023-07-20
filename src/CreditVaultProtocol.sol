@@ -40,6 +40,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     event AccountOperatorEnabled(address indexed account, address indexed operator);
     event AccountOperatorDisabled(address indexed account, address indexed operator);
     event AccountsOwnerRegistered(uint152 indexed prefix, address indexed owner);
+    event ControllerEnabled(address indexed account, address indexed controller);
+    event ControllerDisabled(address indexed account, address indexed controller);
 
     error CVP_NotAuthorized();
     error CVP_AccountOwnerNotRegistered();
@@ -225,7 +227,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @param vault The address of the controller being enabled. 
     function enableController(address account, address vault) public payable virtual
     ownerOrOperator(account) {        
-        accountControllers[account].insert(vault);
+        if (accountControllers[account].insert(vault)) emit ControllerEnabled(account, vault);
         requireAccountStatusCheck(account);
     }
 
@@ -233,7 +235,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function which means that msg.sender is treated as a calling vault. Account status checks are performed.
     /// @param account The address for which the calling controller is being disabled.
     function disableController(address account) public payable virtual {
-        accountControllers[account].remove(msg.sender);
+        if (accountControllers[account].remove(msg.sender)) emit ControllerDisabled(account, msg.sender);
         requireAccountStatusCheck(account);
     }
 
