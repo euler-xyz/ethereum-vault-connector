@@ -307,7 +307,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol {
 contract CreditVaultProtocolTest is Test {
     CreditVaultProtocolHandler cvp;
 
-    event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
+    event AccountOperatorEnabled(address indexed account, address indexed operator);
+    event AccountOperatorDisabled(address indexed account, address indexed operator);
+    event AccountsOwnerRegistered(uint152 indexed prefix, address indexed owner);
 
     function samePrimaryAccount(address accountOne, address accountTwo) internal pure returns (bool) {
         return (uint160(accountOne) | 0xFF) == (uint160(accountTwo) | 0xFF);
@@ -334,18 +336,48 @@ contract CreditVaultProtocolTest is Test {
             }
 
             vm.prank(alice);
-            vm.expectEmit(true, true, false, true, address(cvp));
-            emit AccountOperatorSet(account, operator, true);
+            if (i == 0) {
+                vm.expectEmit(true, true, false, false, address(cvp));
+                emit AccountsOwnerRegistered(uint152(uint160(alice) >> 8), alice);   
+            }
+            vm.expectEmit(true, true, false, false, address(cvp));
+            emit AccountOperatorEnabled(account, operator);
+            vm.recordLogs();
             cvp.setAccountOperator(account, operator, true);
+            Vm.Log[] memory logs = vm.getRecordedLogs();
 
+            assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
+            assertTrue(cvp.accountOperators(account, operator));
+            assertEq(cvp.getAccountOwner(account), alice);
+
+            // early return if the operator is already enabled
+            vm.prank(alice);
+            vm.recordLogs();
+            cvp.setAccountOperator(account, operator, true);
+            logs = vm.getRecordedLogs();
+
+            assertEq(logs.length, 0);
             assertTrue(cvp.accountOperators(account, operator));
             assertEq(cvp.getAccountOwner(account), alice);
 
             vm.prank(alice);
-            vm.expectEmit(true, true, false, true, address(cvp));
-            emit AccountOperatorSet(account, operator, false);
+            vm.expectEmit(true, true, false, false, address(cvp));
+            emit AccountOperatorDisabled(account, operator);
+            vm.recordLogs();
             cvp.setAccountOperator(account, operator, false);
+            logs = vm.getRecordedLogs();
 
+            assertEq(logs.length, 1);
+            assertFalse(cvp.accountOperators(account, operator));
+            assertEq(cvp.getAccountOwner(account), alice);
+
+            // early return if the operator is already disabled
+            vm.prank(alice);
+            vm.recordLogs();
+            cvp.setAccountOperator(account, operator, false);
+            logs = vm.getRecordedLogs();
+
+            assertEq(logs.length, 0);
             assertFalse(cvp.accountOperators(account, operator));
             assertEq(cvp.getAccountOwner(account), alice);
         }
