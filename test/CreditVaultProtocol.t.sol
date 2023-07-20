@@ -716,10 +716,13 @@ contract CreditVaultProtocolTest is Test {
         vm.prank(msgSender);
         vm.expectEmit(true, true, false, false, address(cvp));
         emit ControllerEnabled(account, vault);
+        vm.recordLogs();
         cvp.handlerEnableController(account, vault);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         address[] memory controllersPost = cvp.getControllers(account);
 
+        assertEq(logs.length, 1);
         assertEq(controllersPost.length, controllersPre.length + 1);
         assertEq(controllersPost[controllersPost.length - 1], vault);
         assertTrue(cvp.isControllerEnabled(account, vault));
@@ -731,8 +734,9 @@ contract CreditVaultProtocolTest is Test {
         controllersPre = cvp.getControllers(account);
 
         vm.prank(msgSender);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+        vm.recordLogs();
         cvp.handlerEnableController(account, vault);
+        logs = vm.getRecordedLogs();
 
         controllersPost = cvp.getControllers(account);
 
