@@ -4,7 +4,10 @@ out = "out"
 libs = ["lib"]
 optimizer_runs = 10000
 ignored_error_codes = ["unreachable"]
-remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/","solmate/=lib/solmate/src"]
+remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/"]
+fuzz.runs = 1000
+fuzz.seed = "0xee1d0f7d9556539a9c0e26aed5e63556"
+invariant.runs = 1000
 
 [profile.smt]
 model_checker.engine = "chc"

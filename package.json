@@ -1,8 +1,8 @@
 {
-  "name": "euler-conductor",
+  "name": "euler-cvp",
   "version": "1.0.0",
   "main": "index.js",
-  "repository": "https://github.com/euler-xyz/euler-conductor.git",
+  "repository": "https://github.com/euler-xyz/euler-cvp.git",
   "author": "kasperpawlowski <kasperpawlowski@gmail.com>",
   "license": "MIT",
   "dependencies": {
