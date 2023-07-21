@@ -28,16 +28,26 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
+    // Every Ethereum address has 256 accounts in the CVP (including the primary account - called the owner). 
+    // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account 
+    // addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address.
+    // In order to record the owner of a group of 256 accounts, the CVP uses a definition of a prefix. A prefix is a part 
+    // of an address having the first 19 bytes common with any of the 256 account addresses. account/152 -> prefix/152.
+    // To get the prefix, it's enough to take the account address and right shift it by 8 bits.
+    mapping(uint152 prefix => address owner) internal ownerLookup;
 
     // Events, Errors
 
-    event AccountOperatorSet(address indexed account, address indexed operator, bool isAuthorized);
+    event AccountOperatorEnabled(address indexed account, address indexed operator);
+    event AccountOperatorDisabled(address indexed account, address indexed operator);
+    event AccountsOwnerRegistered(uint152 indexed prefix, address indexed owner);
 
     error NotAuthorized();
+    error AccountOwnerNotRegistered();
     error InvalidAddress();
     error ChecksReentrancy();
     error BatchDepthViolation();
-    error ControllerViolation(address account);
+    error ControllerViolation();
     error AccountStatusViolation(address account, bytes data);
     error VaultStatusViolation(address vault, bytes data);
     error RevertedBatchResult(BatchResult[] batchItemsResult, BatchResult[] accountsStatusResult, BatchResult[] vaultsStatusResult);
@@ -57,10 +67,19 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
-        if (
-            (uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF) && 
-            !accountOperators[account][msg.sender]
-        ) revert NotAuthorized();
+        {
+            if (!sameAccountsGroup(msg.sender, account) && !accountOperators[account][msg.sender]) revert NotAuthorized();
+
+            // if it's an operator calling and we get up to this point (thanks to accountOperators[account][msg.sender] == true), 
+            // it means that the function setAccountOperator() must have been called previously and the ownerLookup is already set.
+            // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
+            // ownerLookup is set only once on the initial interaction of the account with the CVP.
+            uint152 prefix = uint152(uint160(account) >> 8);
+            if (ownerLookup[prefix] == address(0)) {
+                ownerLookup[prefix] = msg.sender;
+                emit AccountsOwnerRegistered(prefix, msg.sender);
+            }
+        }
 
         _;
     }
@@ -77,7 +96,17 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     }
 
 
-    // Account operators
+    // Account owner and operators
+
+    /// @notice Returns the owner for the specified account.
+    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction that requires authentication of any of the 256 accounts that belong to the owner.
+    /// @param account The address of the account whose owner is being retrieved.
+    /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
+    function getAccountOwner(address account) external view returns (address owner) {
+        owner = ownerLookup[uint152(uint160(account) >> 8)];
+
+        if (owner == address(0)) revert AccountOwnerNotRegistered();
+    }
 
     /// @notice Sets or unsets an operator for an account.
     /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. 
@@ -85,13 +114,23 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
     function setAccountOperator(address account, address operator, bool isAuthorized) public payable virtual {
-        // only the primary account can call this function for any of its sub accounts.
-        // the operator can't be the sub account of the account
-        if ((uint160(msg.sender) | 0xFF) != (uint160(account) | 0xFF)) revert NotAuthorized();
-        else if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) revert InvalidAddress();
+        // only the account owner can call this function for any of its 256 accounts.
+        // the operator cannot be one of the 256 accounts that belong to the owner
+        if (!sameAccountsGroup(msg.sender, account)) revert NotAuthorized();
+        else if (sameAccountsGroup(msg.sender, operator)) revert InvalidAddress();
 
+        uint152 prefix = uint152(uint160(account) >> 8);
+        if (ownerLookup[prefix] == address(0)) {
+            ownerLookup[prefix] = msg.sender;
+            emit AccountsOwnerRegistered(prefix, msg.sender);
+        }
+
+        if (accountOperators[account][operator] == isAuthorized) return;
+        
         accountOperators[account][operator] = isAuthorized;
-        emit AccountOperatorSet(account, operator, isAuthorized);
+
+        if (isAuthorized) emit AccountOperatorEnabled(account, operator);
+        else emit AccountOperatorDisabled(account, operator);
     }
 
 
@@ -375,7 +414,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
     returns (bool success, bytes memory result) {
         SetStorage storage controllers = accountControllers[onBehalfOfAccount];
 
-        if (controllers.numElements != 1) revert ControllerViolation(onBehalfOfAccount);
+        if (controllers.numElements != 1) revert ControllerViolation();
         else if (
             controllers.firstElement != msg.sender || 
             !accountCollaterals[onBehalfOfAccount].contains(targetContract)
@@ -422,7 +461,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
         SetStorage storage controllers = accountControllers[account];
 
         if (controllers.numElements == 0) return (true, "");
-        else if (controllers.numElements > 1) revert ControllerViolation(account);
+        else if (controllers.numElements > 1) revert ControllerViolation();
 
         bool success;
         (success, data) = controllers.firstElement.staticcall(
@@ -511,6 +550,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage, Types {
 
         if (setType == SetType.Account) delete accountStatusChecks;
         else delete vaultStatusChecks;
+    }
+
+
+    // Accounts management
+
+    function sameAccountsGroup(address account, address otherAccount) internal pure returns (bool) {
+        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
 
