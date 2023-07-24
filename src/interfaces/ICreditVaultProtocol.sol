@@ -1,13 +1,33 @@
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 pragma solidity ^0.8.0;
 
-import "../Types.sol";
+struct ExecutionContext {
+    uint8 batchDepth;
+    bool checksInProgressLock;
+    bool controllerToCollateralCall;
+    bool ignoreAccountStatusCheck;
+    address onBehalfOfAccount;
+}
+
+struct BatchItem {
+    bool allowError;
+    address targetContract;
+    address onBehalfOfAccount;
+    uint msgValue;
+    bytes data;
+}
+
+struct BatchResult {
+    bool success;
+    bytes result;
+}
 
 interface ICVP {
     function getAccountOwner(address account) external view returns (address);
     function setAccountOperator(address account, address operator, bool isAuthorized) external payable;
-    function getExecutionContext(address controllerToCheck) external view returns (Types.ExecutionContext memory context, bool controllerEnabled);
+    function getExecutionContext(address controllerToCheck) external view returns (ExecutionContext memory context, bool controllerEnabled);
     function isAccountStatusCheckDeferred(address account) external view returns (bool);
     function isVaultStatusCheckDeferred(address vault) external view returns (bool);
     function getCollaterals(address account) external view returns (address[] memory);
@@ -18,18 +38,20 @@ interface ICVP {
     function isControllerEnabled(address account, address vault) external view returns (bool);
     function enableController(address account, address vault) external payable;
     function disableController(address account) external payable;
-    function batch(Types.BatchItem[] calldata items) external payable;
-    function batchRevert(Types.BatchItem[] calldata items) external payable
-        returns (Types.BatchResult[] memory batchItemsResult, Types.BatchResult[] memory accountsStatusResult, Types.BatchResult[] memory vaultsStatusResult);
-    function batchSimulation(Types.BatchItem[] calldata items) external payable
-        returns (Types.BatchResult[] memory batchItemsResult, Types.BatchResult[] memory accountsStatusResult, Types.BatchResult[] memory vaultsStatusResult);
+    function batch(BatchItem[] calldata items) external payable;
+    function batchRevert(BatchItem[] calldata items) external payable
+        returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult);
+    function batchSimulation(BatchItem[] calldata items) external payable
+        returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult);
     function call(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
         returns (bool success, bytes memory result);
-    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bytes calldata data) external payable
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) external payable
         returns (bool success, bytes memory result);
     function checkAccountStatus(address account) external view returns (bool isValid);
     function checkAccountsStatus(address[] calldata accounts) external view returns (bool[] memory isValid);
     function requireAccountStatusCheck(address account) external;
     function requireAccountsStatusCheck(address[] calldata accounts) external;
+    function requireAccountStatusCheckUnconditional(address account) external;
+    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) external;
     function requireVaultStatusCheck() external;
 }   

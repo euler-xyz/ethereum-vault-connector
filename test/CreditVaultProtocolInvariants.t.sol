@@ -117,7 +117,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         return super.callInternal(targetContract, onBehalfOfAccount, msgValue, data);
     }
 
-    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
+    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, uint msgValue, bytes calldata data) internal override
     returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (msg.sender == address(this)) return (true, "");
@@ -128,12 +128,18 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         setup(onBehalfOfAccount, targetContract);
         accountControllers[onBehalfOfAccount].insert(msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
-        return super.callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, msgValue, data);
+
+        return super.callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, msgValue, data);
     }
 
     function requireAccountsStatusCheck(address[] calldata accounts) public override {
         if (accounts.length > 20) return;
         super.requireAccountsStatusCheck(accounts);
+    }
+
+    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) public override {
+        if (accounts.length > 20) return;
+        super.requireAccountsStatusCheckUnconditional(accounts);
     }
 
     function requireVaultStatusCheck() public override {
@@ -163,19 +169,20 @@ contract CreditVaultProtocolInvariants is Test {
     }
 
     function invariant_context() external {
-        (Types.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+        (ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.checksInProgressLock);
         assertFalse(context.controllerToCollateralCall);
+        assertFalse(context.ignoreAccountStatusCheck);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
     }
 
     function invariant_transientStorage() external {     
         (
-            Types.SetStorage memory accountStatusChecks, 
-            Types.SetStorage memory vaultStatusChecks
+            SetStorage memory accountStatusChecks, 
+            SetStorage memory vaultStatusChecks
         ) = cvp.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
@@ -187,7 +194,7 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_controllers() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
+            SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
             address[] memory accountControllersArray = cvp.getControllers(touchedAccounts[i]);
         
             assertTrue(accountControllers.numElements == 0 || accountControllers.numElements == 1);
@@ -205,7 +212,7 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_collaterals() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            Types.SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
+            SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
             address[] memory accountCollateralsArray = cvp.getCollaterals(touchedAccounts[i]);
 
             assertTrue(accountCollaterals.numElements <= 20);

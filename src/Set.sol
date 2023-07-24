@@ -2,7 +2,11 @@
 
 pragma solidity ^0.8.0;
 
-import "./Types.sol";
+struct SetStorage {
+    uint8 numElements;
+    address firstElement;
+    address[2**8] elements;
+}
 
 library Set {
     error TooManyElements();
@@ -13,7 +17,7 @@ library Set {
     /// @param setStorage The set storage to which the element will be inserted. 
     /// @param element The address of the element to be inserted. 
     /// @return wasInserted A boolean value that indicates whether the element was inserted or not. If the element was already in the set storage, it returns false.
-    function insert(Types.SetStorage storage setStorage, address element) internal returns (bool wasInserted) {
+    function insert(SetStorage storage setStorage, address element) internal returns (bool wasInserted) {
         address firstElement = setStorage.firstElement;
         uint8 numElements = setStorage.numElements;
 
@@ -39,7 +43,7 @@ library Set {
     /// @param setStorage The set storage from which the element will be removed. 
     /// @param element The address of the element to be removed. 
     /// @return wasRemoved A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
-    function remove(Types.SetStorage storage setStorage, address element) internal returns (bool wasRemoved) {
+    function remove(SetStorage storage setStorage, address element) internal returns (bool wasRemoved) {
         address firstElement = setStorage.firstElement;
         uint8 numElements = setStorage.numElements;
         uint searchIndex = type(uint).max;
@@ -80,7 +84,7 @@ library Set {
     /// @dev The order of the elements in the memory array is not preserved.
     /// @param setStorage The set storage to be copied. 
     /// @return A memory array that contains the same elements as the set storage.
-    function get(Types.SetStorage storage setStorage) internal view returns (address[] memory) {
+    function get(SetStorage storage setStorage) internal view returns (address[] memory) {
         address firstElement = setStorage.firstElement;
         uint8 numElements = setStorage.numElements;
 
@@ -101,7 +105,7 @@ library Set {
     /// @param setStorage The set storage to be searched. 
     /// @param element The address of the element to be checked. 
     /// @return A boolean value that indicates whether the set storage includes the element or not. 
-    function contains(Types.SetStorage storage setStorage, address element) internal view returns (bool) {
+    function contains(SetStorage storage setStorage, address element) internal view returns (bool) {
         address firstElement = setStorage.firstElement;
         uint8 numElements = setStorage.numElements;
 
