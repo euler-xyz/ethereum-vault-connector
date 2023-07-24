@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../src/Set.sol";
+import "src/Set.sol";
 
 contract SetTest is Test {
     using Set for SetStorage;
@@ -19,7 +19,7 @@ contract SetTest is Test {
 
         // count added elements not to exceed the limit
         uint expectedNumElements;
-        for (uint i = 0; i < elements.length && expectedNumElements < 20; ++i) {
+        for (uint i = 0; i < elements.length && expectedNumElements < Set.MAX_ELEMENTS; ++i) {
             if (setStorage.insert(elements[i])) ++expectedNumElements;
         }
         
@@ -71,8 +71,8 @@ contract SetTest is Test {
         }
     }
 
-    function test_InsertRevertIfTooManyElements() public {
-        for (uint i = 0; i < 20; ++i) {
+    function test_RevertIfTooManyElements_Insert() public {
+        for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {
             assertEq(setStorage.insert(address(uint160(i))), true);
         }
 

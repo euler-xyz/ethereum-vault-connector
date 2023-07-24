@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../src/CreditVaultProtocol.sol";
+import "src/CreditVaultProtocol.sol";
 
 contract VaultMock is ICreditVault {
     ICVP public immutable cvp;
@@ -37,18 +37,18 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     address vaultMock;
     address[] public touchedAccounts;
 
+    constructor() {
+        vaultMock = address(new VaultMock(ICVP(address(this))));
+    }
+
     function getTouchedAccounts() external view returns (address[] memory) {
         return touchedAccounts;
     }
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        vm.etch(vault, vaultMock.code);
         accountOperators[account][msg.sender] = true;
-    }
-
-    constructor() {
-        vaultMock = address(new VaultMock(ICVP(address(this))));
+        vm.etch(vault, vaultMock.code);
     }
 
     function setAccountOperator(address account, address operator, bool isAuthorized) public payable override {
@@ -79,14 +79,37 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     }
 
     function disableController(address account) public payable override {
+        if (uint160(msg.sender) <= 10) return;
         setup(account, msg.sender);
         super.disableController(account);
     }
 
+    function call(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable override 
+    returns (bool success, bytes memory result) {
+        if (uint160(targetContract) <= 10) return (true, "");
+        if (targetContract == address(this)) return (true, "");
+        setup(onBehalfOfAccount, targetContract);
+
+        (success, result) = super.call(targetContract, onBehalfOfAccount, data);
+    }
+
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable override
+    returns (bool success, bytes memory result) {
+        if (uint160(msg.sender) <= 10) return (true, "");
+        if (uint160(targetContract) <= 10) return (true, "");
+        if (targetContract == address(this)) return (true, "");
+        setup(onBehalfOfAccount, msg.sender);
+        setup(onBehalfOfAccount, targetContract);
+        accountControllers[onBehalfOfAccount].insert(msg.sender);
+        accountCollaterals[onBehalfOfAccount].insert(targetContract);
+
+        (success, result) = super.callFromControllerToCollateral(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, data);
+    }
+
     function batch(BatchItem[] calldata items) public payable override {
-        if (items.length > 20) return;
+        if (items.length > Set.MAX_ELEMENTS) return;
         
-        for (uint i = 0; i < items.length && i < 20; i++) {
+        for (uint i = 0; i < items.length; i++) {
             if (uint160(items[i].msgValue) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
@@ -108,42 +131,22 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         return (x, x, x);
     }
 
-    function callInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal override
-    returns (bool success, bytes memory result) {
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == address(this)) return (true, "");
-        if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
-        setup(onBehalfOfAccount, targetContract);
-        return super.callInternal(targetContract, onBehalfOfAccount, msgValue, data);
-    }
-
-    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, uint msgValue, bytes calldata data) internal override
-    returns (bool success, bytes memory result) {
-        if (uint160(msg.sender) <= 10) return (true, "");
-        if (msg.sender == address(this)) return (true, "");
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == address(this)) return (true, "");
-        if (onBehalfOfAccount == address(0)) onBehalfOfAccount = msg.sender;
-        setup(onBehalfOfAccount, msg.sender);
-        setup(onBehalfOfAccount, targetContract);
-        accountControllers[onBehalfOfAccount].insert(msg.sender);
-        accountCollaterals[onBehalfOfAccount].insert(targetContract);
-
-        return super.callFromControllerToCollateralInternal(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, msgValue, data);
-    }
-
     function requireAccountsStatusCheck(address[] calldata accounts) public override {
-        if (accounts.length > 20) return;
+        if (accounts.length > Set.MAX_ELEMENTS) return;
         super.requireAccountsStatusCheck(accounts);
     }
 
     function requireAccountsStatusCheckUnconditional(address[] calldata accounts) public override {
-        if (accounts.length > 20) return;
+        if (accounts.length > Set.MAX_ELEMENTS) return;
         super.requireAccountsStatusCheckUnconditional(accounts);
     }
 
-    function requireVaultStatusCheck() public override {
-        super.requireVaultStatusCheck();
+    function requireAccountStatusCheckInternal(address) internal pure override {
+        return;
+    }
+
+    function requireVaultStatusCheckInternal(address) internal pure override {
+        return;
     }
 
     function exposeAccountCollaterals(address account) external view returns (SetStorage memory) {
@@ -168,8 +171,12 @@ contract CreditVaultProtocolInvariants is Test {
         targetContract(address(cvp));
     }
 
-    function invariant_context() external {
-        (ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+    function invariant_invariantsCheck() external view {
+        cvp.invariantsCheck();
+    }
+
+    function invariant_executionContext() external {
+        (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.checksInProgressLock);
@@ -215,7 +222,7 @@ contract CreditVaultProtocolInvariants is Test {
             SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
             address[] memory accountCollateralsArray = cvp.getCollaterals(touchedAccounts[i]);
 
-            assertTrue(accountCollaterals.numElements <= 20);
+            assertTrue(accountCollaterals.numElements <= Set.MAX_ELEMENTS);
             assertTrue(
                 (accountCollaterals.numElements == 0 && accountCollaterals.firstElement == address(0)) ||
                 (accountCollaterals.numElements == 1 && accountCollaterals.firstElement != address(0))

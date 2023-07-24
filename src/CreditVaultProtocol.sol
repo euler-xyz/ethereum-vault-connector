@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-import "./TransientStorage.sol";
 import "./Set.sol";
+import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultProtocol.sol";
 import "./interfaces/ICreditVault.sol";
 
@@ -68,7 +68,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
-        if (!sameAccountsGroup(msg.sender, account) && !accountOperators[account][msg.sender]) revert CVP_NotAuthorized();
+        if (!haveCommonOwner(msg.sender, account) && !accountOperators[account][msg.sender]) revert CVP_NotAuthorized();
 
         // if it's an operator calling and we get up to this point (thanks to accountOperators[account][msg.sender] == true), 
         // it means that the function setAccountOperator() must have been called previously and the ownerLookup is already set.
@@ -97,6 +97,15 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Account owner and operators
 
+    /// @notice Checks whether the specified account and the other account have the same owner.
+    /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other.
+    /// @param account The address of the account that is being checked.
+    /// @param otherAccount The address of the other account that is being checked.
+    /// @return A boolean flag that indicates whether the accounts have the same owner.
+    function haveCommonOwner(address account, address otherAccount) public pure returns (bool) {
+        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
+    }
+
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction that requires authentication of any of the 256 accounts that belong to the owner.
     /// @param account The address of the account whose owner is being retrieved.
@@ -115,8 +124,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function setAccountOperator(address account, address operator, bool isAuthorized) public payable virtual {
         // only the account owner can call this function for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
-        if (!sameAccountsGroup(msg.sender, account)) revert CVP_NotAuthorized();
-        else if (sameAccountsGroup(msg.sender, operator)) revert CVP_InvalidAddress();
+        if (!haveCommonOwner(msg.sender, account)) revert CVP_NotAuthorized();
+        else if (haveCommonOwner(msg.sender, operator)) revert CVP_InvalidAddress();
 
         uint152 prefix = uint152(uint160(account) >> 8);
         if (ownerLookup[prefix] == address(0)) {
@@ -249,7 +258,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @param data The encoded data which is called on the target contract.
     /// @return success A boolean value that indicates whether the call succeeded or not.
     /// @return result Returned data from the call.
-    function call(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable
+    function call(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable virtual
     returns (bool success, bytes memory result) {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
@@ -266,7 +275,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @param data The encoded data which is called on the target contract.
     /// @return success A boolean value that indicates whether the call succeeded or not.
     /// @return result Returned data from the call. 
-    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable
+    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable virtual
     returns (bool success, bytes memory result) {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
@@ -423,7 +432,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // INTERNAL FUNCTIONS
 
-    function callInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal virtual
+    function callInternal(address targetContract, address onBehalfOfAccount, uint msgValue, bytes calldata data) internal
     ownerOrOperator(onBehalfOfAccount)
     onBehalfOfAccountContext(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
@@ -433,7 +442,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         (success, result) = targetContract.call{value: msgValue}(data);
     }
 
-    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, uint msgValue, bytes calldata data) internal virtual
+    function callFromControllerToCollateralInternal(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, uint msgValue, bytes calldata data) internal
     onBehalfOfAccountContext(onBehalfOfAccount)
     returns (bool success, bytes memory result) {
         SetStorage storage controllers = accountControllers[onBehalfOfAccount];
@@ -575,13 +584,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
         if (setType == SetType.Account) delete accountStatusChecks;
         else delete vaultStatusChecks;
-    }
-
-
-    // Accounts management
-
-    function sameAccountsGroup(address account, address otherAccount) internal pure returns (bool) {
-        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
 

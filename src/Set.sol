@@ -11,7 +11,7 @@ struct SetStorage {
 library Set {
     error TooManyElements();
 
-    uint internal constant MAX_PRESENT_ELEMENTS = 20;
+    uint public constant MAX_ELEMENTS = 20;
 
     /// @notice Inserts an element and returns whether the operation was successful or not. 
     /// @param setStorage The set storage to which the element will be inserted. 
@@ -29,7 +29,7 @@ library Set {
             }
         }
 
-        if (numElements >= MAX_PRESENT_ELEMENTS) revert TooManyElements();
+        if (numElements >= MAX_ELEMENTS) revert TooManyElements();
 
         if (numElements == 0) setStorage.firstElement = element;
         else setStorage.elements[numElements] = element;

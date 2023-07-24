@@ -3,28 +3,29 @@
 
 pragma solidity ^0.8.0;
 
-struct ExecutionContext {
-    uint8 batchDepth;
-    bool checksInProgressLock;
-    bool controllerToCollateralCall;
-    bool ignoreAccountStatusCheck;
-    address onBehalfOfAccount;
-}
-
-struct BatchItem {
-    bool allowError;
-    address targetContract;
-    address onBehalfOfAccount;
-    uint msgValue;
-    bytes data;
-}
-
-struct BatchResult {
-    bool success;
-    bytes result;
-}
-
 interface ICVP {
+    struct ExecutionContext {
+        uint8 batchDepth;
+        bool checksInProgressLock;
+        bool controllerToCollateralCall;
+        bool ignoreAccountStatusCheck;
+        address onBehalfOfAccount;
+    }
+
+    struct BatchItem {
+        bool allowError;
+        address targetContract;
+        address onBehalfOfAccount;
+        uint msgValue;
+        bytes data;
+    }
+
+    struct BatchResult {
+        bool success;
+        bytes result;
+    }
+
+    function haveCommonOwner(address account, address otherAccount) external pure returns (bool);
     function getAccountOwner(address account) external view returns (address);
     function setAccountOperator(address account, address operator, bool isAuthorized) external payable;
     function getExecutionContext(address controllerToCheck) external view returns (ExecutionContext memory context, bool controllerEnabled);
