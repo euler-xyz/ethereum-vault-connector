@@ -8,8 +8,6 @@
         "func-name-mixedcase": "off",
         "var-name-mixedcase": "off",
         "func-visibility": ["error", { "ignoreConstructors": true }],
-        "max-line-length": ["error", 123],
-        "named-parameters-mapping": "warn",
         "no-global-import": "off",
         "code-complexity": "off",
         "compiler-version": ["error", "^0.8.0"],

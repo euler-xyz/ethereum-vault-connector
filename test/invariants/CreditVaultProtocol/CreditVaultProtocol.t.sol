@@ -14,14 +14,22 @@ contract VaultMock is ICreditVault {
 
     function disableController(address account) public override {}
 
-    function checkAccountStatus(address, address[] memory) external pure override returns (bool, bytes memory) {
+    function checkAccountStatus(
+        address,
+        address[] memory
+    ) external pure override returns (bool, bytes memory) {
         return (true, "");
     }
 
-    function checkVaultStatus() external pure override returns (bool, bytes memory) {
+    function checkVaultStatus()
+        external
+        pure
+        override
+        returns (bool, bytes memory)
+    {
         return (true, "");
     }
-    
+
     fallback(bytes calldata) external payable returns (bytes memory) {
         cvp.requireAccountStatusCheck(address(0));
         cvp.requireVaultStatusCheck();
@@ -33,7 +41,7 @@ contract VaultMock is ICreditVault {
 
 contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     using Set for SetStorage;
-    
+
     address vaultMock;
     address[] public touchedAccounts;
 
@@ -51,27 +59,40 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         vm.etch(vault, vaultMock.code);
     }
 
-    function setAccountOperator(address account, address operator, bool isAuthorized) public payable override {
+    function setAccountOperator(
+        address account,
+        address operator,
+        bool isAuthorized
+    ) public payable override {
         if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) return;
         account = msg.sender;
         super.setAccountOperator(account, operator, isAuthorized);
     }
 
-    function enableCollateral(address account, address vault) public payable override {
+    function enableCollateral(
+        address account,
+        address vault
+    ) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
         super.enableCollateral(account, vault);
     }
 
-    function disableCollateral(address account, address vault) public payable override {
+    function disableCollateral(
+        address account,
+        address vault
+    ) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
         super.disableCollateral(account, vault);
     }
 
-    function enableController(address account, address vault) public payable override {
+    function enableController(
+        address account,
+        address vault
+    ) public payable override {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
@@ -84,8 +105,11 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.disableController(account);
     }
 
-    function call(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable override 
-    returns (bool success, bytes memory result) {
+    function call(
+        address targetContract,
+        address onBehalfOfAccount,
+        bytes calldata data
+    ) public payable override returns (bool success, bytes memory result) {
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
         setup(onBehalfOfAccount, targetContract);
@@ -93,8 +117,12 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         (success, result) = super.call(targetContract, onBehalfOfAccount, data);
     }
 
-    function callFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable override
-    returns (bool success, bytes memory result) {
+    function callFromControllerToCollateral(
+        address targetContract,
+        address onBehalfOfAccount,
+        bool ignoreAccountStatusCheck,
+        bytes calldata data
+    ) public payable override returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
@@ -103,12 +131,17 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         accountControllers[onBehalfOfAccount].insert(msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
 
-        (success, result) = super.callFromControllerToCollateral(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, data);
+        (success, result) = super.callFromControllerToCollateral(
+            targetContract,
+            onBehalfOfAccount,
+            ignoreAccountStatusCheck,
+            data
+        );
     }
 
     function batch(BatchItem[] calldata items) public payable override {
         if (items.length > Set.MAX_ELEMENTS) return;
-        
+
         for (uint i = 0; i < items.length; i++) {
             if (uint160(items[i].msgValue) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
@@ -119,24 +152,48 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.batch(items);
     }
 
-    function batchRevert(BatchItem[] calldata) public payable override
-    returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult) {
+    function batchRevert(
+        BatchItem[] calldata
+    )
+        public
+        payable
+        override
+        returns (
+            BatchResult[] memory batchItemsResult,
+            BatchResult[] memory accountsStatusResult,
+            BatchResult[] memory vaultsStatusResult
+        )
+    {
         BatchResult[] memory x;
         return (x, x, x);
     }
 
-    function batchSimulation(BatchItem[] calldata) public payable override
-    returns (BatchResult[] memory batchItemsResult, BatchResult[] memory accountsStatusResult, BatchResult[] memory vaultsStatusResult) {
+    function batchSimulation(
+        BatchItem[] calldata
+    )
+        public
+        payable
+        override
+        returns (
+            BatchResult[] memory batchItemsResult,
+            BatchResult[] memory accountsStatusResult,
+            BatchResult[] memory vaultsStatusResult
+        )
+    {
         BatchResult[] memory x;
         return (x, x, x);
     }
 
-    function requireAccountsStatusCheck(address[] calldata accounts) public override {
+    function requireAccountsStatusCheck(
+        address[] calldata accounts
+    ) public override {
         if (accounts.length > Set.MAX_ELEMENTS) return;
         super.requireAccountsStatusCheck(accounts);
     }
 
-    function requireAccountsStatusCheckUnconditional(address[] calldata accounts) public override {
+    function requireAccountsStatusCheckUnconditional(
+        address[] calldata accounts
+    ) public override {
         if (accounts.length > Set.MAX_ELEMENTS) return;
         super.requireAccountsStatusCheckUnconditional(accounts);
     }
@@ -149,15 +206,23 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         return;
     }
 
-    function exposeAccountCollaterals(address account) external view returns (SetStorage memory) {
+    function exposeAccountCollaterals(
+        address account
+    ) external view returns (SetStorage memory) {
         return accountControllers[account];
     }
 
-    function exposeAccountControllers(address account) external view returns (SetStorage memory) {
+    function exposeAccountControllers(
+        address account
+    ) external view returns (SetStorage memory) {
         return accountControllers[account];
     }
 
-    function exposeTransientStorage() external view returns (SetStorage memory, SetStorage memory) {
+    function exposeTransientStorage()
+        external
+        view
+        returns (SetStorage memory, SetStorage memory)
+    {
         return (accountStatusChecks, vaultStatusChecks);
     }
 }
@@ -176,7 +241,8 @@ contract CreditVaultProtocolInvariants is Test {
     }
 
     function invariant_executionContext() external {
-        (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(address(this));
+        (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp
+            .getExecutionContext(address(this));
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.checksInProgressLock);
@@ -186,9 +252,9 @@ contract CreditVaultProtocolInvariants is Test {
         assertFalse(controllerEnabled);
     }
 
-    function invariant_transientStorage() external {     
+    function invariant_transientStorage() external {
         (
-            SetStorage memory accountStatusChecks, 
+            SetStorage memory accountStatusChecks,
             SetStorage memory vaultStatusChecks
         ) = cvp.exposeTransientStorage();
 
@@ -201,13 +267,22 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_controllers() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            SetStorage memory accountControllers = cvp.exposeAccountControllers(touchedAccounts[i]);
-            address[] memory accountControllersArray = cvp.getControllers(touchedAccounts[i]);
-        
-            assertTrue(accountControllers.numElements == 0 || accountControllers.numElements == 1);
+            SetStorage memory accountControllers = cvp.exposeAccountControllers(
+                touchedAccounts[i]
+            );
+            address[] memory accountControllersArray = cvp.getControllers(
+                touchedAccounts[i]
+            );
+
             assertTrue(
-                (accountControllers.numElements == 0 && accountControllers.firstElement == address(0)) ||
-                (accountControllers.numElements == 1 && accountControllers.firstElement != address(0))
+                accountControllers.numElements == 0 ||
+                    accountControllers.numElements == 1
+            );
+            assertTrue(
+                (accountControllers.numElements == 0 &&
+                    accountControllers.firstElement == address(0)) ||
+                    (accountControllers.numElements == 1 &&
+                        accountControllers.firstElement != address(0))
             );
 
             for (uint j = 1; j < accountControllersArray.length; j++) {
@@ -219,13 +294,19 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_collaterals() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
-            SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(touchedAccounts[i]);
-            address[] memory accountCollateralsArray = cvp.getCollaterals(touchedAccounts[i]);
+            SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(
+                touchedAccounts[i]
+            );
+            address[] memory accountCollateralsArray = cvp.getCollaterals(
+                touchedAccounts[i]
+            );
 
             assertTrue(accountCollaterals.numElements <= Set.MAX_ELEMENTS);
             assertTrue(
-                (accountCollaterals.numElements == 0 && accountCollaterals.firstElement == address(0)) ||
-                (accountCollaterals.numElements == 1 && accountCollaterals.firstElement != address(0))
+                (accountCollaterals.numElements == 0 &&
+                    accountCollaterals.firstElement == address(0)) ||
+                    (accountCollaterals.numElements == 1 &&
+                        accountCollaterals.firstElement != address(0))
             );
 
             for (uint j = 0; j < accountCollateralsArray.length; j++) {
@@ -235,7 +316,9 @@ contract CreditVaultProtocolInvariants is Test {
             // verify that none entry is duplicated
             for (uint j = 1; j < accountCollateralsArray.length; j++) {
                 for (uint k = 0; k < j; k++) {
-                    assertTrue(accountCollateralsArray[j] != accountCollateralsArray[k]);
+                    assertTrue(
+                        accountCollateralsArray[j] != accountCollateralsArray[k]
+                    );
                 }
             }
         }

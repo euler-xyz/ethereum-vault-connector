@@ -127,7 +127,7 @@ contract BatchTest is Test {
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
-        items[0].data= abi.encodeWithSelector(
+        items[0].data = abi.encodeWithSelector(
             cvp.call.selector,
             address(cvp),
             alice,
@@ -145,7 +145,7 @@ contract BatchTest is Test {
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvp);
         items[0].msgValue = 0;
-        items[0].data= abi.encodeWithSelector(
+        items[0].data = abi.encodeWithSelector(
             cvp.call.selector,
             address(cvp),
             alice,
@@ -167,7 +167,7 @@ contract BatchTest is Test {
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
         items[0].msgValue = 0;
-        items[0].data= abi.encodeWithSelector(
+        items[0].data = abi.encodeWithSelector(
             Vault.disableController.selector,
             alice
         );
@@ -176,7 +176,7 @@ contract BatchTest is Test {
         items[1].onBehalfOfAccount = address(0);
         items[1].targetContract = controller;
         items[1].msgValue = 0;
-        items[1].data= abi.encodeWithSelector(
+        items[1].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             bob
         );
@@ -185,7 +185,7 @@ contract BatchTest is Test {
         items[2].onBehalfOfAccount = bob;
         items[2].targetContract = otherVault;
         items[2].msgValue = 0;
-        items[2].data= abi.encodeWithSelector(
+        items[2].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alicesSubAccount
         );
@@ -214,7 +214,7 @@ contract BatchTest is Test {
                 nestedItems[0].onBehalfOfAccount = address(0);
                 nestedItems[0].targetContract = vault;
                 nestedItems[0].msgValue = 0;
-                nestedItems[0].data= abi.encodeWithSelector(
+                nestedItems[0].data = abi.encodeWithSelector(
                     Vault.requireChecks.selector,
                     alice
                 );
@@ -223,7 +223,7 @@ contract BatchTest is Test {
                 nestedItems[1].onBehalfOfAccount = address(0);
                 nestedItems[1].targetContract = address(cvp);
                 nestedItems[1].msgValue = 0;
-                nestedItems[1].data= abi.encodeWithSelector(
+                nestedItems[1].data = abi.encodeWithSelector(
                     cvp.enableController.selector,
                     alice,
                     vault
@@ -235,7 +235,7 @@ contract BatchTest is Test {
                 );
             } else {
                 ICVP.BatchItem[] memory nestedItems = new ICVP.BatchItem[](1);
-                nestedItems[0] = items[j+1];
+                nestedItems[0] = items[j + 1];
 
                 items[j].data = abi.encodeWithSelector(
                     cvp.batch.selector,
@@ -246,24 +246,22 @@ contract BatchTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.CVP_BatchDepthViolation.selector);
-        (bool success, ) = address(cvp).call(abi.encodeWithSelector(
-            cvp.handlerBatch.selector,
-            items
-        ));
+        (bool success, ) = address(cvp).call(
+            abi.encodeWithSelector(cvp.handlerBatch.selector, items)
+        );
         assertTrue(success); // is true because of vm.expectRevert() above
 
         // should succeed when one less item. doesn't revert anymore,
         // but checks are performed only once, when the top level batch concludes
         ICVP.BatchItem[] memory itemsOneLess = new ICVP.BatchItem[](8);
         for (uint i = 1; i <= itemsOneLess.length; ++i) {
-            itemsOneLess[i-1] = items[i];
+            itemsOneLess[i - 1] = items[i];
         }
 
         vm.prank(alice);
-        (success, ) = address(cvp).call(abi.encodeWithSelector(
-            cvp.handlerBatch.selector,
-            itemsOneLess
-        ));
+        (success, ) = address(cvp).call(
+            abi.encodeWithSelector(cvp.handlerBatch.selector, itemsOneLess)
+        );
         assertTrue(success);
     }
 
@@ -275,7 +273,7 @@ contract BatchTest is Test {
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
         items[0].msgValue = 0;
-        items[0].data= abi.encodeWithSelector(
+        items[0].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alice
         );
@@ -283,19 +281,24 @@ contract BatchTest is Test {
         // internal batch in the malicious vault reverts with CVP_ChecksReentrancy error,
         // check VaultMalicious implementation
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(
-            CreditVaultProtocol.CVP_VaultStatusViolation.selector,
-            vault,
-            "malicious vault"
-        ));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_VaultStatusViolation.selector,
+                vault,
+                "malicious vault"
+            )
+        );
         cvp.batch(items);
     }
 
     function test_BatchRevert_BatchSimulation(address alice) external {
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
-        ICVP.BatchResult[] memory expectedBatchItemsResult = new ICVP.BatchResult[](1);
-        ICVP.BatchResult[] memory expectedAccountsStatusResult = new ICVP.BatchResult[](1);
-        ICVP.BatchResult[] memory expectedVaultsStatusResult = new ICVP.BatchResult[](1);
+        ICVP.BatchResult[]
+            memory expectedBatchItemsResult = new ICVP.BatchResult[](1);
+        ICVP.BatchResult[]
+            memory expectedAccountsStatusResult = new ICVP.BatchResult[](1);
+        ICVP.BatchResult[]
+            memory expectedVaultsStatusResult = new ICVP.BatchResult[](1);
 
         address controller = address(new Vault(cvp));
 
@@ -329,26 +332,65 @@ contract BatchTest is Test {
             try cvp.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(bytes4(err), CreditVaultProtocol.CVP_RevertedBatchResult.selector);
+                assertEq(
+                    bytes4(err),
+                    CreditVaultProtocol.CVP_RevertedBatchResult.selector
+                );
 
-                assembly { err := add(err, 4) }
+                assembly {
+                    err := add(err, 4)
+                }
                 (
                     ICVP.BatchResult[] memory batchItemsResult,
                     ICVP.BatchResult[] memory accountsStatusResult,
-                    ICVP.BatchResult[] memory vaultsStatusResult 
-                ) = abi.decode(err, (ICVP.BatchResult[], ICVP.BatchResult[], ICVP.BatchResult[]));
-                
-                assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
-                assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
-                assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
+                    ICVP.BatchResult[] memory vaultsStatusResult
+                ) = abi.decode(
+                        err,
+                        (
+                            ICVP.BatchResult[],
+                            ICVP.BatchResult[],
+                            ICVP.BatchResult[]
+                        )
+                    );
 
-                assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-                assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-                assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+                assertEq(
+                    expectedBatchItemsResult.length,
+                    batchItemsResult.length
+                );
+                assertEq(
+                    expectedBatchItemsResult[0].success,
+                    batchItemsResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedBatchItemsResult[0].result),
+                    keccak256(batchItemsResult[0].result)
+                );
 
-                assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-                assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-                assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+                assertEq(
+                    expectedAccountsStatusResult.length,
+                    accountsStatusResult.length
+                );
+                assertEq(
+                    expectedAccountsStatusResult[0].success,
+                    accountsStatusResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedAccountsStatusResult[0].result),
+                    keccak256(accountsStatusResult[0].result)
+                );
+
+                assertEq(
+                    expectedVaultsStatusResult.length,
+                    vaultsStatusResult.length
+                );
+                assertEq(
+                    expectedVaultsStatusResult[0].success,
+                    vaultsStatusResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedVaultsStatusResult[0].result),
+                    keccak256(vaultsStatusResult[0].result)
+                );
             }
         }
 
@@ -357,20 +399,44 @@ contract BatchTest is Test {
             (
                 ICVP.BatchResult[] memory batchItemsResult,
                 ICVP.BatchResult[] memory accountsStatusResult,
-                ICVP.BatchResult[] memory vaultsStatusResult 
+                ICVP.BatchResult[] memory vaultsStatusResult
             ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
-            assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
-            assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
+            assertEq(
+                expectedBatchItemsResult[0].success,
+                batchItemsResult[0].success
+            );
+            assertEq(
+                keccak256(expectedBatchItemsResult[0].result),
+                keccak256(batchItemsResult[0].result)
+            );
 
-            assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-            assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-            assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+            assertEq(
+                expectedAccountsStatusResult.length,
+                accountsStatusResult.length
+            );
+            assertEq(
+                expectedAccountsStatusResult[0].success,
+                accountsStatusResult[0].success
+            );
+            assertEq(
+                keccak256(expectedAccountsStatusResult[0].result),
+                keccak256(accountsStatusResult[0].result)
+            );
 
-            assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-            assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-            assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+            assertEq(
+                expectedVaultsStatusResult.length,
+                vaultsStatusResult.length
+            );
+            assertEq(
+                expectedVaultsStatusResult[0].success,
+                vaultsStatusResult[0].success
+            );
+            assertEq(
+                keccak256(expectedVaultsStatusResult[0].result),
+                keccak256(vaultsStatusResult[0].result)
+            );
         }
 
         // invalidate both checks
@@ -384,7 +450,7 @@ contract BatchTest is Test {
             alice,
             "account status violation"
         );
-        
+
         expectedVaultsStatusResult[0].success = false;
         expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
             CreditVaultProtocol.CVP_VaultStatusViolation.selector,
@@ -394,11 +460,13 @@ contract BatchTest is Test {
 
         // regular batch reverts now
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(
-            CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-            alice,
-            "account status violation"
-        ));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                alice,
+                "account status violation"
+            )
+        );
         cvp.batch(items);
 
         {
@@ -406,26 +474,65 @@ contract BatchTest is Test {
             try cvp.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(bytes4(err), CreditVaultProtocol.CVP_RevertedBatchResult.selector);
+                assertEq(
+                    bytes4(err),
+                    CreditVaultProtocol.CVP_RevertedBatchResult.selector
+                );
 
-                assembly { err := add(err, 4) }
+                assembly {
+                    err := add(err, 4)
+                }
                 (
                     ICVP.BatchResult[] memory batchItemsResult,
                     ICVP.BatchResult[] memory accountsStatusResult,
-                    ICVP.BatchResult[] memory vaultsStatusResult 
-                ) = abi.decode(err, (ICVP.BatchResult[], ICVP.BatchResult[], ICVP.BatchResult[]));
-                
-                assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
-                assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
-                assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
+                    ICVP.BatchResult[] memory vaultsStatusResult
+                ) = abi.decode(
+                        err,
+                        (
+                            ICVP.BatchResult[],
+                            ICVP.BatchResult[],
+                            ICVP.BatchResult[]
+                        )
+                    );
 
-                assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-                assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-                assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+                assertEq(
+                    expectedBatchItemsResult.length,
+                    batchItemsResult.length
+                );
+                assertEq(
+                    expectedBatchItemsResult[0].success,
+                    batchItemsResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedBatchItemsResult[0].result),
+                    keccak256(batchItemsResult[0].result)
+                );
 
-                assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-                assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-                assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+                assertEq(
+                    expectedAccountsStatusResult.length,
+                    accountsStatusResult.length
+                );
+                assertEq(
+                    expectedAccountsStatusResult[0].success,
+                    accountsStatusResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedAccountsStatusResult[0].result),
+                    keccak256(accountsStatusResult[0].result)
+                );
+
+                assertEq(
+                    expectedVaultsStatusResult.length,
+                    vaultsStatusResult.length
+                );
+                assertEq(
+                    expectedVaultsStatusResult[0].success,
+                    vaultsStatusResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedVaultsStatusResult[0].result),
+                    keccak256(vaultsStatusResult[0].result)
+                );
             }
         }
 
@@ -434,20 +541,44 @@ contract BatchTest is Test {
             (
                 ICVP.BatchResult[] memory batchItemsResult,
                 ICVP.BatchResult[] memory accountsStatusResult,
-                ICVP.BatchResult[] memory vaultsStatusResult 
+                ICVP.BatchResult[] memory vaultsStatusResult
             ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
-            assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
-            assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
+            assertEq(
+                expectedBatchItemsResult[0].success,
+                batchItemsResult[0].success
+            );
+            assertEq(
+                keccak256(expectedBatchItemsResult[0].result),
+                keccak256(batchItemsResult[0].result)
+            );
 
-            assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-            assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-            assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+            assertEq(
+                expectedAccountsStatusResult.length,
+                accountsStatusResult.length
+            );
+            assertEq(
+                expectedAccountsStatusResult[0].success,
+                accountsStatusResult[0].success
+            );
+            assertEq(
+                keccak256(expectedAccountsStatusResult[0].result),
+                keccak256(accountsStatusResult[0].result)
+            );
 
-            assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-            assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-            assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+            assertEq(
+                expectedVaultsStatusResult.length,
+                vaultsStatusResult.length
+            );
+            assertEq(
+                expectedVaultsStatusResult[0].success,
+                vaultsStatusResult[0].success
+            );
+            assertEq(
+                keccak256(expectedVaultsStatusResult[0].result),
+                keccak256(vaultsStatusResult[0].result)
+            );
         }
     }
 }

@@ -12,14 +12,19 @@ contract IsAccountStatusCheckDeferredTest is Test {
         cvp = new CreditVaultProtocolHarnessed();
     }
 
-    function test_IsAccountStatusCheckDeferred(uint8 numberOfAccounts, bytes memory seed) external {
+    function test_IsAccountStatusCheckDeferred(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
         vm.assume(numberOfAccounts <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < numberOfAccounts; ++i) {
             // we're not in a batch thus the check will not get deferred
             cvp.setBatchDepth(1);
 
-            address account = address(uint160(uint(keccak256(abi.encode(i, seed)))));
+            address account = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
 
             cvp.requireAccountStatusCheck(account);

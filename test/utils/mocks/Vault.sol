@@ -54,25 +54,37 @@ contract Vault is ICreditVault, Target {
         return vaultStatusChecked;
     }
 
-    function getAccountStatusChecked() external view returns (address[] memory) {
+    function getAccountStatusChecked()
+        external
+        view
+        returns (address[] memory)
+    {
         return accountStatusChecked;
     }
 
-    function disableController(address account) external override virtual {
+    function disableController(address account) external virtual override {
         cvp.disableController(account);
     }
 
-    function checkVaultStatus() external override virtual 
-    returns (bool isValid, bytes memory data) {
+    function checkVaultStatus()
+        external
+        virtual
+        override
+        returns (bool isValid, bytes memory data)
+    {
         if (vaultStatusState == 0) return (true, "");
-        else if (vaultStatusState == 1) return (false, "vault status violation");
+        else if (vaultStatusState == 1)
+            return (false, "vault status violation");
         else revert("invalid vault");
     }
 
-    function checkAccountStatus(address, address[] memory) external view override virtual
-    returns (bool isValid, bytes memory data) {
+    function checkAccountStatus(
+        address,
+        address[] memory
+    ) external view virtual override returns (bool isValid, bytes memory data) {
         if (accountStatusState == 0) return (true, "");
-        else if (accountStatusState == 1) return (false, "account status violation");
+        else if (accountStatusState == 1)
+            return (false, "account status violation");
         else revert("invalid account");
     }
 
@@ -111,15 +123,19 @@ contract VaultMalicious is Vault {
         try cvp.batch(items) {
             assert(false);
         } catch (bytes memory err) {
-            assert(bytes4(err) == CreditVaultProtocol.CVP_ChecksReentrancy.selector);
+            assert(
+                bytes4(err) == CreditVaultProtocol.CVP_ChecksReentrancy.selector
+            );
             return (false, "malicious vault");
         }
 
         return (true, "");
     }
 
-    function checkAccountStatus(address, address[] memory) external pure override 
-    returns (bool isValid, bytes memory data) {
+    function checkAccountStatus(
+        address,
+        address[] memory
+    ) external pure override returns (bool isValid, bytes memory data) {
         return (true, "");
     }
 }

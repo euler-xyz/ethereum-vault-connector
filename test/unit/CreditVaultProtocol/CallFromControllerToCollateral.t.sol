@@ -8,12 +8,23 @@ import "../../utils/CreditVaultProtocolHarnessed.sol";
 contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
     using Set for SetStorage;
 
-    function handlerCallFromControllerToCollateral(address targetContract, address onBehalfOfAccount, bool ignoreAccountStatusCheck, bytes calldata data) public payable 
-    returns (bool success, bytes memory result) {
-        (success,) = msg.sender.call(abi.encodeWithSelector(Vault.clearChecks.selector));
+    function handlerCallFromControllerToCollateral(
+        address targetContract,
+        address onBehalfOfAccount,
+        bool ignoreAccountStatusCheck,
+        bytes calldata data
+    ) public payable returns (bool success, bytes memory result) {
+        (success, ) = msg.sender.call(
+            abi.encodeWithSelector(Vault.clearChecks.selector)
+        );
         clearExpectedChecks();
 
-        (success, result) = super.callFromControllerToCollateral(targetContract, onBehalfOfAccount, ignoreAccountStatusCheck, data);
+        (success, result) = super.callFromControllerToCollateral(
+            targetContract,
+            onBehalfOfAccount,
+            ignoreAccountStatusCheck,
+            data
+        );
 
         verifyStorage();
         verifyVaultStatusChecks();
@@ -28,7 +39,10 @@ contract CallFromControllerToCollateralTest is Test {
         cvp = new CreditVaultProtocolHandler();
     }
 
-    function test_CallFromControllerToCollateral(address alice, uint96 seed) public {
+    function test_CallFromControllerToCollateral(
+        address alice,
+        uint96 seed
+    ) public {
         vm.assume(alice != address(0));
 
         address collateral = address(new Vault(cvp));
@@ -51,7 +65,8 @@ contract CallFromControllerToCollateralTest is Test {
         );
 
         hoax(controller, seed);
-        (bool success, bytes memory result) = cvp.handlerCallFromControllerToCollateral{value: seed}(
+        (bool success, bytes memory result) = cvp
+            .handlerCallFromControllerToCollateral{value: seed}(
             collateral,
             alice,
             seed % 2 == 0 ? true : false,
@@ -61,12 +76,15 @@ contract CallFromControllerToCollateralTest is Test {
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
 
+        cvp.clearExpectedChecks();
+        Vault(controller).clearChecks();
+
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
             Target(collateral).callFromControllerToCollateralTest.selector,
             address(cvp),
             address(cvp),
-            0,  // we're expecting ETH not to get forwarded
+            0, // we're expecting ETH not to get forwarded
             true,
             alice
         );
@@ -76,7 +94,7 @@ contract CallFromControllerToCollateralTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvp);
-        items[0].msgValue = seed;    // this value will get ignored
+        items[0].msgValue = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
             cvp.callFromControllerToCollateral.selector,
             collateral,
@@ -87,14 +105,20 @@ contract CallFromControllerToCollateralTest is Test {
 
         hoax(controller, seed);
         cvp.batch(items);
+        cvp.verifyVaultStatusChecks();
+        cvp.verifyAccountStatusChecks();
 
-        // this call should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
-        // note that in this case the controller tries to act on behalf of itself
+        // this call should also succeed if the onBehalfOfAccount address passed is 0.
+        // it should be replaced with msg.sender note that in this case the controller
+        // tries to act on behalf of itself
         vm.prank(controller);
         cvp.enableCollateral(controller, collateral);
 
         vm.prank(controller);
         cvp.enableController(controller, controller);
+
+        cvp.clearExpectedChecks();
+        Vault(controller).clearChecks();
 
         data = abi.encodeWithSelector(
             Target(collateral).callFromControllerToCollateralTest.selector,
@@ -106,18 +130,18 @@ contract CallFromControllerToCollateralTest is Test {
         );
 
         hoax(controller, seed);
-        (success, result) = cvp.handlerCallFromControllerToCollateral{value: seed}(
-            collateral,
-            address(0),
-            seed % 2 == 0 ? true : false,
-            data
-        );
+        (success, result) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(collateral, address(0), seed % 2 == 0 ? true : false, data);
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
     }
 
-    function test_RevertIfTargetContractInvalid_CallFromControllerToCollateral(address alice, uint seed) public {
+    function test_RevertIfTargetContractInvalid_CallFromControllerToCollateral(
+        address alice,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
 
         address controller = address(new Vault(cvp));
@@ -137,17 +161,17 @@ contract CallFromControllerToCollateralTest is Test {
 
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
-        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
-            address(cvp),
-            alice,
-            false,
-            data
-        );
+        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(address(cvp), alice, false, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfNoControllerEnabled_CallFromControllerToCollateral(address alice, uint seed) public {
+    function test_RevertIfNoControllerEnabled_CallFromControllerToCollateral(
+        address alice,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
 
         address collateral = address(new Vault(cvp));
@@ -169,17 +193,17 @@ contract CallFromControllerToCollateralTest is Test {
 
         hoax(controller, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
-            collateral,
-            alice,
-            false,
-            data
-        );
+        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(collateral, alice, false, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfMultipleControllersEnabled_CallFromControllerToCollateral(address alice, uint seed) public {
+    function test_RevertIfMultipleControllersEnabled_CallFromControllerToCollateral(
+        address alice,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
 
         address collateral = address(new Vault(cvp));
@@ -211,17 +235,18 @@ contract CallFromControllerToCollateralTest is Test {
 
         hoax(controller_1, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
-            collateral,
-            alice,
-            false,
-            data
-        );
+        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(collateral, alice, false, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfMsgSenderIsNotEnabledController_CallFromControllerToCollateral(address alice, address randomAddress, uint seed) public {
+    function test_RevertIfMsgSenderIsNotEnabledController_CallFromControllerToCollateral(
+        address alice,
+        address randomAddress,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
         vm.assume(uint160(randomAddress) > 10);
 
@@ -247,18 +272,23 @@ contract CallFromControllerToCollateralTest is Test {
         );
 
         hoax(randomAddress, seed);
-        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.CVP_NotAuthorized.selector));
-        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
-            collateral,
-            alice,
-            false,
-            data
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_NotAuthorized.selector
+            )
         );
+        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(collateral, alice, false, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfTargetContractIsNotEnabledCollateral_CallFromControllerToCollateral(address alice, address targetContract, uint seed) public {
+    function test_RevertIfTargetContractIsNotEnabledCollateral_CallFromControllerToCollateral(
+        address alice,
+        address targetContract,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
         vm.assume(targetContract != address(cvp));
 
@@ -283,13 +313,14 @@ contract CallFromControllerToCollateralTest is Test {
         );
 
         hoax(controller, seed);
-        vm.expectRevert(abi.encodeWithSelector(CreditVaultProtocol.CVP_NotAuthorized.selector));
-        (bool success,) = cvp.handlerCallFromControllerToCollateral{value: seed}(
-            targetContract,
-            alice,
-            false,
-            data
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_NotAuthorized.selector
+            )
         );
+        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(targetContract, alice, false, data);
 
         assertFalse(success);
     }

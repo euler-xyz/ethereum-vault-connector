@@ -8,8 +8,11 @@ import "../../utils/CreditVaultProtocolHarnessed.sol";
 contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
     using Set for SetStorage;
 
-    function handlerCall(address targetContract, address onBehalfOfAccount, bytes calldata data) public payable 
-    returns (bool success, bytes memory result) {
+    function handlerCall(
+        address targetContract,
+        address onBehalfOfAccount,
+        bytes calldata data
+    ) public payable returns (bool success, bytes memory result) {
         (success, result) = super.call(targetContract, onBehalfOfAccount, data);
 
         verifyStorage();
@@ -63,7 +66,7 @@ contract CallTest is Test {
             Target(targetContract).callTest.selector,
             address(cvp),
             address(cvp),
-            0,  // we're expecting ETH not to get forwarded
+            0, // we're expecting ETH not to get forwarded
             true,
             account
         );
@@ -73,7 +76,7 @@ contract CallTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvp);
-        items[0].msgValue = seed;    // this value will get ignored
+        items[0].msgValue = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
             cvp.call.selector,
             targetContract,
@@ -105,10 +108,14 @@ contract CallTest is Test {
         assertEq(abi.decode(result, (uint)), seed);
     }
 
-    function test_RevertIfNotOwnerOrOperator_Call(address alice, address bob, uint seed) public {
+    function test_RevertIfNotOwnerOrOperator_Call(
+        address alice,
+        address bob,
+        uint seed
+    ) public {
         vm.assume(!cvp.haveCommonOwner(alice, bob));
         vm.assume(bob != address(0));
-        
+
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvp));
 
@@ -123,7 +130,7 @@ contract CallTest is Test {
 
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        (bool success,) = cvp.handlerCall{value: seed}(
+        (bool success, ) = cvp.handlerCall{value: seed}(
             targetContract,
             bob,
             data
@@ -132,8 +139,10 @@ contract CallTest is Test {
         assertFalse(success);
     }
 
-
-    function test_RevertIfTargetContractInvalid_Call(address alice, uint seed) public {
+    function test_RevertIfTargetContractInvalid_Call(
+        address alice,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
 
         // target contract is the CVP
@@ -151,7 +160,7 @@ contract CallTest is Test {
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
 
-        (bool success,) = cvp.handlerCall{value: seed}(
+        (bool success, ) = cvp.handlerCall{value: seed}(
             targetContract,
             alice,
             data
@@ -177,11 +186,7 @@ contract CallTest is Test {
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
 
-        (success,) = cvp.handlerCall{value: seed}(
-            targetContract,
-            alice,
-            data
-        );
+        (success, ) = cvp.handlerCall{value: seed}(targetContract, alice, data);
 
         assertFalse(success);
     }

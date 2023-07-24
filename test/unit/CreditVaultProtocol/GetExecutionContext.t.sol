@@ -17,13 +17,14 @@ contract GetExecutionContextTest is Test {
 
         address controller = address(new Vault(cvp));
 
-        (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp.getExecutionContext(controller);
+        (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp
+            .getExecutionContext(controller);
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.controllerToCollateralCall);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        
+
         cvp.setBatchDepth(seed % 2 == 0 ? 2 : 1);
         cvp.setControllerToCollateralCall(seed % 3 == 0 ? true : false);
         cvp.setIgnoreAccountStatusCheck(seed % 4 == 0 ? true : false);
@@ -32,12 +33,18 @@ contract GetExecutionContextTest is Test {
             vm.prank(account);
             cvp.enableController(account, controller);
         }
-        
+
         (context, controllerEnabled) = cvp.getExecutionContext(controller);
-        
+
         assertEq(context.batchDepth, seed % 2 == 0 ? 2 : 1);
-        assertEq(context.controllerToCollateralCall, seed % 3 == 0 ? true : false);
-        assertEq(context.ignoreAccountStatusCheck, seed % 4 == 0 ? true : false);
+        assertEq(
+            context.controllerToCollateralCall,
+            seed % 3 == 0 ? true : false
+        );
+        assertEq(
+            context.ignoreAccountStatusCheck,
+            seed % 4 == 0 ? true : false
+        );
         assertEq(context.onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 5 == 0 ? true : false);
     }

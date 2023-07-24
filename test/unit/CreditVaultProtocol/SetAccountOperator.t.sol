@@ -8,9 +8,18 @@ import "src/CreditVaultProtocol.sol";
 contract SetAccountOperatorTest is Test {
     CreditVaultProtocol internal cvp;
 
-    event AccountOperatorEnabled(address indexed account, address indexed operator);
-    event AccountOperatorDisabled(address indexed account, address indexed operator);
-    event AccountsOwnerRegistered(uint152 indexed prefix, address indexed owner);
+    event AccountOperatorEnabled(
+        address indexed account,
+        address indexed operator
+    );
+    event AccountOperatorDisabled(
+        address indexed account,
+        address indexed operator
+    );
+    event AccountsOwnerRegistered(
+        uint152 indexed prefix,
+        address indexed owner
+    );
 
     function setUp() public {
         cvp = new CreditVaultProtocol();
@@ -26,7 +35,9 @@ contract SetAccountOperatorTest is Test {
             assertFalse(cvp.accountOperators(account, operator));
 
             if (i == 0) {
-                vm.expectRevert(CreditVaultProtocol.CVP_AccountOwnerNotRegistered.selector);
+                vm.expectRevert(
+                    CreditVaultProtocol.CVP_AccountOwnerNotRegistered.selector
+                );
                 cvp.getAccountOwner(account);
             } else {
                 assertEq(cvp.getAccountOwner(account), alice);
@@ -35,7 +46,10 @@ contract SetAccountOperatorTest is Test {
             vm.prank(alice);
             if (i == 0) {
                 vm.expectEmit(true, true, false, false, address(cvp));
-                emit AccountsOwnerRegistered(uint152(uint160(alice) >> 8), alice);   
+                emit AccountsOwnerRegistered(
+                    uint152(uint160(alice) >> 8),
+                    alice
+                );
             }
             vm.expectEmit(true, true, false, false, address(cvp));
             emit AccountOperatorEnabled(account, operator);
@@ -80,7 +94,10 @@ contract SetAccountOperatorTest is Test {
         }
     }
 
-    function test_RevertIfSenderNotAuthorized_SetAccountOperator(address alice, address operator) public {
+    function test_RevertIfSenderNotAuthorized_SetAccountOperator(
+        address alice,
+        address operator
+    ) public {
         vm.assume(!cvp.haveCommonOwner(alice, operator));
 
         address account = address(uint160(uint160(alice) ^ 256));
@@ -92,7 +109,10 @@ contract SetAccountOperatorTest is Test {
         cvp.setAccountOperator(account, operator, true);
     }
 
-    function test_RevertIfOperatorIsSendersAccount_SetAccountOperator(address alice, uint8 subAccountId) public {
+    function test_RevertIfOperatorIsSendersAccount_SetAccountOperator(
+        address alice,
+        uint8 subAccountId
+    ) public {
         address operator = address(uint160(uint160(alice) ^ subAccountId));
 
         assertFalse(cvp.accountOperators(alice, operator));

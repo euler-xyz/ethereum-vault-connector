@@ -16,7 +16,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
 
         if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
 
-        expectedAccountsChecked.push(account == address(0) ? msg.sender : account);
+        expectedAccountsChecked.push(
+            account == address(0) ? msg.sender : account
+        );
         verifyStorage();
         verifyAccountStatusChecks();
     }
@@ -29,7 +31,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
 
         if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
 
-        expectedAccountsChecked.push(account == address(0) ? msg.sender : account);
+        expectedAccountsChecked.push(
+            account == address(0) ? msg.sender : account
+        );
         verifyStorage();
         verifyAccountStatusChecks();
     }
@@ -38,14 +42,24 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
 contract ControllersManagementTest is Test {
     CreditVaultProtocolHandler internal cvp;
 
-    event ControllerEnabled(address indexed account, address indexed controller);
-    event ControllerDisabled(address indexed account, address indexed controller);
+    event ControllerEnabled(
+        address indexed account,
+        address indexed controller
+    );
+    event ControllerDisabled(
+        address indexed account,
+        address indexed controller
+    );
 
     function setUp() public {
         cvp = new CreditVaultProtocolHandler();
     }
 
-    function test_ControllersManagement(address alice, uint8 subAccountId, uint seed) public {
+    function test_ControllersManagement(
+        address alice,
+        uint8 subAccountId,
+        uint seed
+    ) public {
         vm.assume(alice != address(0));
         vm.assume(seed > 1000);
 
@@ -53,7 +67,10 @@ contract ControllersManagementTest is Test {
 
         // test controllers management with use of an operator
         address msgSender = alice;
-        if (seed % 2 == 0 && !cvp.haveCommonOwner(account, address(uint160(seed)))) {
+        if (
+            seed % 2 == 0 &&
+            !cvp.haveCommonOwner(account, address(uint160(seed)))
+        ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
             cvp.setAccountOperator(account, msgSender, true);
@@ -124,7 +141,10 @@ contract ControllersManagementTest is Test {
         assertFalse(cvp.isControllerEnabled(account, vault));
     }
 
-    function test_RevertIfNotOwnerAndNotOperator_EnableController(address alice, address bob) public {
+    function test_RevertIfNotOwnerAndNotOperator_EnableController(
+        address alice,
+        address bob
+    ) public {
         vm.assume(!cvp.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvp));
@@ -140,7 +160,9 @@ contract ControllersManagementTest is Test {
         cvp.handlerEnableController(bob, vault);
     }
 
-    function test_RevertIfAccountStatusViolated_ControllersManagement(address alice) public {
+    function test_RevertIfAccountStatusViolated_ControllersManagement(
+        address alice
+    ) public {
         address vault = address(new Vault(cvp));
 
         Vault(vault).setAccountStatusState(1); // account status is violated
@@ -159,10 +181,7 @@ contract ControllersManagementTest is Test {
         // succeeds as there's no controller to perform the account status check
         Vault(vault).call(
             address(cvp),
-            abi.encodeWithSelector(
-                cvp.handlerDisableController.selector,
-                alice
-            )
+            abi.encodeWithSelector(cvp.handlerDisableController.selector, alice)
         );
 
         Vault(vault).setAccountStatusState(1); // account status is still violated
