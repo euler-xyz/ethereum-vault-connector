@@ -787,14 +787,20 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
                 requireStatusCheck(addr);
             }
 
-            delete setStorage.elements[i];
+            // do not clear array elements to optimize gas consumption
+            // delete setStorage.elements[i];
             unchecked {
                 ++i;
             }
         }
 
-        if (setType == SetType.Account) delete accountStatusChecks;
-        else delete vaultStatusChecks;
+        if (setType == SetType.Account) {
+            delete accountStatusChecks.numElements;
+            delete accountStatusChecks.firstElement;
+        } else {
+            delete vaultStatusChecks.numElements;
+            delete vaultStatusChecks.firstElement;
+        }
     }
 
     // Error handling
