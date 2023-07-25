@@ -191,11 +191,11 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.requireAccountsStatusCheck(accounts);
     }
 
-    function requireAccountsStatusCheckUnconditional(
+    function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public override {
         if (accounts.length > Set.MAX_ELEMENTS) return;
-        super.requireAccountsStatusCheckUnconditional(accounts);
+        super.requireAccountsStatusCheckNow(accounts);
     }
 
     function requireAccountStatusCheckInternal(address) internal pure override {

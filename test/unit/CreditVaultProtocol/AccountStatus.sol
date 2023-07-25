@@ -381,7 +381,7 @@ contract AccountStatusTest is Test {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[0]));
     }
 
-    function test_RequireAccountsStatusCheckUnconditional(
+    function test_RequireAccountsStatusCheckNow(
         uint8 numberOfAccounts,
         bytes memory seed,
         bool allStatusesValid
@@ -452,7 +452,7 @@ contract AccountStatusTest is Test {
                     )
                 );
             }
-            cvp.requireAccountStatusCheckUnconditional(account);
+            cvp.requireAccountStatusCheckNow(account);
 
             if (allStatusesValid || uint160(account) % 3 == 0) {
                 assertFalse(cvp.isAccountStatusCheckDeferred(account));
@@ -492,7 +492,7 @@ contract AccountStatusTest is Test {
                 )
             );
         }
-        cvp.requireAccountsStatusCheckUnconditional(accounts);
+        cvp.requireAccountsStatusCheckNow(accounts);
         assertEq(
             cvp.isAccountStatusCheckDeferred(accounts[0]),
             invalidAccountsCounter > 0

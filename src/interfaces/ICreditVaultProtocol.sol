@@ -127,9 +127,9 @@ interface ICVP {
 
     function requireAccountsStatusCheck(address[] calldata accounts) external;
 
-    function requireAccountStatusCheckUnconditional(address account) external;
+    function requireAccountStatusCheckNow(address account) external;
 
-    function requireAccountsStatusCheckUnconditional(
+    function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) external;
 

@@ -48,4 +48,60 @@ contract GetExecutionContextTest is Test {
         assertEq(context.onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 5 == 0 ? true : false);
     }
+
+    // for coverage
+    function test_InvariantsCheck() external {
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setBatchDepth(2);
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setChecksInProgressLock(true);
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setControllerToCollateralCall(true);
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setIgnoreAccountStatusCheck(true);
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setOnBehalfOfAccount(address(1));
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setBatchDepth(2);
+        cvp.requireAccountStatusCheck(address(1));
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setBatchDepth(2);
+        cvp.requireAccountStatusCheck(address(0));
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+        
+        cvp.setBatchDepth(2);
+        cvp.requireVaultStatusCheck();
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setBatchDepth(2);
+        vm.prank(address(0));
+        cvp.requireVaultStatusCheck();
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+    }
 }

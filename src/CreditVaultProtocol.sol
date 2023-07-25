@@ -558,20 +558,20 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @notice Unconditionally checks the status of an account and reverts if it is not valid.
-    /// @dev Account status check is performed on the fly regardless of the current execution context. If account was previously added to a set to be checked later, it is removed.
+    /// @notice Immediately checks the status of an account and reverts if it is not valid.
+    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account was previously added to a set to be checked later, it is removed.
     /// @param account The address of the account to be checked.
-    function requireAccountStatusCheckUnconditional(
+    function requireAccountStatusCheckNow(
         address account
     ) public virtual {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
 
-    /// @notice Unconditionally checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev Account status checks are performed on the fly regardless of the current execution context.
+    /// @notice Immediately checks the status of multiple accounts and reverts if any of them is not valid.
+    /// @dev Account status checks are performed on the fly regardless of the current execution context state. If account was previously added to a set to be checked later, it is removed.
     /// @param accounts An array of addresses of the accounts to be checked.
-    function requireAccountsStatusCheckUnconditional(
+    function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
         for (uint i = 0; i < accounts.length; ) {
@@ -819,11 +819,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         assert(context.onBehalfOfAccount == address(0));
 
         SetStorage storage asChecks = accountStatusChecks;
-        assert(asChecks.numElements == 0);
         assert(asChecks.firstElement == address(0));
+        assert(asChecks.numElements == 0);
 
         SetStorage storage vsChecks = vaultStatusChecks;
-        assert(vsChecks.numElements == 0);
         assert(vsChecks.firstElement == address(0));
+        assert(vsChecks.numElements == 0);
     }
 }

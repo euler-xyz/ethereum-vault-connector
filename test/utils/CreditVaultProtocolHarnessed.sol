@@ -93,18 +93,18 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         }
     }
 
-    function requireAccountStatusCheckUnconditional(
+    function requireAccountStatusCheckNow(
         address account
     ) public override {
-        super.requireAccountStatusCheckUnconditional(account);
+        super.requireAccountStatusCheckNow(account);
 
         expectedAccountsChecked.push(account);
     }
 
-    function requireAccountsStatusCheckUnconditional(
+    function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public override {
-        super.requireAccountsStatusCheckUnconditional(accounts);
+        super.requireAccountsStatusCheckNow(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
             expectedAccountsChecked.push(accounts[i]);
