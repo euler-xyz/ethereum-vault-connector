@@ -6,8 +6,7 @@ interface ICVP {
     struct ExecutionContext {
         uint8 batchDepth;
         bool checksInProgressLock;
-        bool controllerToCollateralCall;
-        bool ignoreAccountStatusCheck;
+        bool controllerToCollateralCallLock;
         address onBehalfOfAccount;
     }
 
@@ -111,7 +110,7 @@ interface ICVP {
     function callFromControllerToCollateral(
         address targetContract,
         address onBehalfOfAccount,
-        bool ignoreAccountStatusCheck,
+        address nextAccountStatusCheckIgnoredFrom,
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 

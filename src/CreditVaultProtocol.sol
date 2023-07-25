@@ -64,6 +64,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     error CVP_AccountOwnerNotRegistered();
     error CVP_InvalidAddress();
     error CVP_ChecksReentrancy();
+    error CVP_CTCC_Reentancy();
     error CVP_BatchDepthViolation();
     error CVP_ControllerViolation();
     error CVP_AccountStatusViolation(address account, bytes data);
@@ -248,6 +249,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address account,
         address vault
     ) public payable virtual ownerOrOperator(account) {
+        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -260,6 +263,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address account,
         address vault
     ) public payable virtual ownerOrOperator(account) {
+        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+
         accountCollaterals[account].remove(vault);
         requireAccountStatusCheck(account);
     }
@@ -296,6 +301,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address account,
         address vault
     ) public payable virtual ownerOrOperator(account) {
+        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+
         if (accountControllers[account].insert(vault)) {
             emit ControllerEnabled(account, vault);
         }
@@ -306,6 +313,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function which means that msg.sender is treated as a calling vault. Account status checks are performed.
     /// @param account The address for which the calling controller is being disabled.
     function disableController(address account) public payable virtual {
+        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+
         if (accountControllers[account].remove(msg.sender)) {
             emit ControllerDisabled(account, msg.sender);
         }
@@ -348,14 +357,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller for the onBehalfOfAccount. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
-    /// @param ignoreAccountStatusCheck A boolean value that indicates whether the account status check should be ignored for onBehalfOfAccount if required from collateral.
+    /// @param nextAccountStatusCheckIgnoredFrom An address of expected message sender which is allowed to  make the next account status check for onBehalfOfAccount ignored.
     /// @param data The encoded data which is called on the target contract.
     /// @return success A boolean value that indicates whether the call succeeded or not.
     /// @return result Returned data from the call.
     function callFromControllerToCollateral(
         address targetContract,
         address onBehalfOfAccount,
-        bool ignoreAccountStatusCheck,
+        address nextAccountStatusCheckIgnoredFrom,
         bytes calldata data
     ) public payable virtual returns (bool success, bytes memory result) {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
@@ -371,7 +380,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         (success, result) = callFromControllerToCollateralInternal(
             targetContract,
             onBehalfOfAccount,
-            ignoreAccountStatusCheck,
+            nextAccountStatusCheckIgnoredFrom,
             msgValue,
             data
         );
@@ -525,9 +534,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         ExecutionContext memory context = executionContext;
 
         if (
-            context.ignoreAccountStatusCheck &&
-            context.onBehalfOfAccount == account
+            context.controllerToCollateralCallLock &&
+            context.onBehalfOfAccount == account &&
+            accountStatusCheckIgnoredFrom == msg.sender
         ) {
+            accountStatusCheckIgnoredFrom = address(0);
             return;
         } else if (context.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
@@ -546,9 +557,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
         for (uint i = 0; i < accounts.length; ++i) {
             if (
-                context.ignoreAccountStatusCheck &&
-                context.onBehalfOfAccount == accounts[i]
+                context.controllerToCollateralCallLock &&
+                context.onBehalfOfAccount == accounts[i] &&
+                accountStatusCheckIgnoredFrom == msg.sender
             ) {
+                accountStatusCheckIgnoredFrom = address(0);
                 continue;
             } else if (context.batchDepth == BATCH_DEPTH__INIT) {
                 requireAccountStatusCheckInternal(accounts[i]);
@@ -610,6 +623,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         returns (bool success, bytes memory result)
     {
         if (targetContract == ERC1820_REGISTRY) revert CVP_InvalidAddress();
+        else if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
 
         msgValue = msgValue == type(uint).max
             ? address(this).balance
@@ -621,7 +635,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function callFromControllerToCollateralInternal(
         address targetContract,
         address onBehalfOfAccount,
-        bool ignoreAccountStatusCheck,
+        address nextAccountStatusCheckIgnoredFrom,
         uint msgValue,
         bytes calldata data
     )
@@ -629,6 +643,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
+        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+
         SetStorage storage controllers = accountControllers[onBehalfOfAccount];
 
         if (controllers.numElements != 1) {
@@ -640,17 +656,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             revert CVP_NotAuthorized();
         }
 
-        // must be cached in case of CVP reentrancy
-        ExecutionContext memory context = executionContext;
-        executionContext.controllerToCollateralCall = true;
-        executionContext.ignoreAccountStatusCheck = ignoreAccountStatusCheck;
+        executionContext.controllerToCollateralCallLock = true;
+        accountStatusCheckIgnoredFrom = nextAccountStatusCheckIgnoredFrom;
 
         (success, result) = targetContract.call{value: msgValue}(data);
 
-        executionContext.controllerToCollateralCall = context
-            .controllerToCollateralCall;
-        executionContext.ignoreAccountStatusCheck = context
-            .ignoreAccountStatusCheck;
+        accountStatusCheckIgnoredFrom = address(0);
+        executionContext.controllerToCollateralCallLock = false;
     }
 
     function batchInternal(
@@ -814,8 +826,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         ExecutionContext memory context = executionContext;
         assert(context.batchDepth == BATCH_DEPTH__INIT);
         assert(!context.checksInProgressLock);
-        assert(!context.controllerToCollateralCall);
-        assert(!context.ignoreAccountStatusCheck);
+        assert(!context.controllerToCollateralCallLock);
         assert(context.onBehalfOfAccount == address(0));
 
         SetStorage storage asChecks = accountStatusChecks;
@@ -825,5 +836,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         SetStorage storage vsChecks = vaultStatusChecks;
         assert(vsChecks.firstElement == address(0));
         assert(vsChecks.numElements == 0);
+
+        assert(accountStatusCheckIgnoredFrom == address(0));
     }
 }

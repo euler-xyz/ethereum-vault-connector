@@ -11,4 +11,5 @@ abstract contract TransientStorage {
     }
     SetStorage internal accountStatusChecks;
     SetStorage internal vaultStatusChecks;
+    address accountStatusCheckIgnoredFrom;
 }
