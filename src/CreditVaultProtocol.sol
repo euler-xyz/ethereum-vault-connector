@@ -510,7 +510,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public view returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
-        for (uint i = 0; i < accounts.length; ) {
+        for (uint i; i < accounts.length; ) {
             (isValid[i], ) = checkAccountStatusInternal(accounts[i]);
             unchecked {
                 ++i;
@@ -544,16 +544,20 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public virtual {
         ExecutionContext memory context = executionContext;
 
-        for (uint i = 0; i < accounts.length; ++i) {
+        for (uint i; i < accounts.length; ) {
             if (
                 context.ignoreAccountStatusCheck &&
                 context.onBehalfOfAccount == accounts[i]
             ) {
-                continue;
+                // do nothing
             } else if (context.batchDepth == BATCH_DEPTH__INIT) {
                 requireAccountStatusCheckInternal(accounts[i]);
             } else {
                 accountStatusChecks.insert(accounts[i]);
+            }
+
+            unchecked {
+                ++i;
             }
         }
     }
@@ -574,7 +578,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
-        for (uint i = 0; i < accounts.length; ) {
+        for (uint i; i < accounts.length; ) {
             requireAccountStatusCheckInternal(accounts[i]);
             accountStatusChecks.remove(accounts[i]);
 
@@ -659,7 +663,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) internal returns (BatchResult[] memory batchItemsResult) {
         if (returnResult) batchItemsResult = new BatchResult[](items.length);
 
-        for (uint i = 0; i < items.length; ) {
+        for (uint i; i < items.length; ) {
             BatchItem calldata item = items[i];
             address targetContract = item.targetContract;
             bool success;
@@ -711,7 +715,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         );
 
         if (success) (isValid, data) = abi.decode(data, (bool, bytes));
-        else isValid = false;
     }
 
     function requireAccountStatusCheckInternal(
@@ -731,7 +734,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         );
 
         if (success) (isValid, data) = abi.decode(data, (bool, bytes));
-        else isValid = false;
     }
 
     function requireVaultStatusCheckInternal(address vault) internal virtual {
@@ -765,12 +767,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
         if (numElements == 0) return result;
 
-        for (uint i = 0; i < numElements; ) {
-            address addr = i == 0 ? firstElement : setStorage.elements[i];
+        for (uint i; i < numElements; ) {
+            address addressToCheck = i == 0 ? firstElement : setStorage.elements[i];
 
             if (returnResult) {
                 bytes memory data;
-                (result[i].success, data) = checkStatus(addr);
+                (result[i].success, data) = checkStatus(addressToCheck);
 
                 if (!result[i].success) {
                     bytes4 violationSelector = setType == SetType.Account
@@ -779,12 +781,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
                     result[i].result = abi.encodeWithSelector(
                         violationSelector,
-                        addr,
+                        addressToCheck,
                         data
                     );
                 }
             } else {
-                requireStatusCheck(addr);
+                requireStatusCheck(addressToCheck);
             }
 
             // do not clear array elements to optimize gas consumption
@@ -806,7 +808,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     // Error handling
 
     function revertBytes(bytes memory errMsg) internal pure {
-        if (errMsg.length > 0) {
+        if (errMsg.length != 0) {
             assembly {
                 revert(add(32, errMsg), mload(errMsg))
             }
