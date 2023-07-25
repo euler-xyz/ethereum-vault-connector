@@ -32,8 +32,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
     // addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address.
     // In order to record the owner of a group of 256 accounts, the CVP uses a definition of a prefix. A prefix is a part
-    // of an address having the first 19 bytes common with any of the 256 account addresses. account/152 -> prefix/152.
-    // To get the prefix, it's enough to take the account address and right shift it by 8 bits.
+    // of an address having the first 19 bytes common with any of the 256 account addresses belonging to the same group. 
+    // account/152 -> prefix/152
+    // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
     mapping(uint152 prefix => address owner) internal ownerLookup;
 
     // Events, Errors

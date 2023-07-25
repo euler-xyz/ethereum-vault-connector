@@ -24,6 +24,7 @@ call_override = false # Override unsafe external calls to perform reentrancy che
 depth = 20
 runs = 1000
 
+
 [profile.smt.model_checker]
 engine = "chc"
 timeout = 100_000

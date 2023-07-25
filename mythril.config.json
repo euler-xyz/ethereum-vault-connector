@@ -1,12 +1,10 @@
 {
     "optimizer": {
       "enabled": true,
-      "runs": 200
+      "runs": 10000
     },
     "remappings": [
-        "ds-test/=lib/forge-std/lib/ds-test/src/",
-        "forge-std/=lib/forge-std/src/",
-        "solmate/=lib/solmate/src"
+        "forge-std/=lib/forge-std/src/"
     ]
   }
   
