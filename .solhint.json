@@ -11,6 +11,7 @@
         "no-global-import": "off",
         "code-complexity": "off",
         "compiler-version": ["error", "^0.8.0"],
-        "no-inline-assembly": "off"
+        "no-inline-assembly": "off",
+        "no-complex-fallback": "off"
     }
 }

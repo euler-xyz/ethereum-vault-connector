@@ -74,4 +74,8 @@ contract Target {
 
         return msg.value;
     }
+
+    function revertEmptyTest() external pure {
+        revert();
+    }
 }

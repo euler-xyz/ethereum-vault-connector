@@ -139,20 +139,20 @@ contract CollateralsManagementTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        cvp.handlerEnableCollateral(bob, vault);
+        cvp.enableCollateral(bob, vault);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        cvp.handlerDisableCollateral(bob, vault);
+        cvp.disableCollateral(bob, vault);
 
         vm.prank(bob);
         cvp.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        cvp.handlerEnableCollateral(bob, vault);
+        cvp.enableCollateral(bob, vault);
 
         vm.prank(alice);
-        cvp.handlerDisableCollateral(bob, vault);
+        cvp.disableCollateral(bob, vault);
     }
 
     function test_RevertIfAccountStatusViolated_CollateralsManagement(
@@ -174,7 +174,7 @@ contract CollateralsManagementTest is Test {
                 "account status violation"
             )
         );
-        cvp.handlerEnableCollateral(alice, vault);
+        cvp.enableCollateral(alice, vault);
 
         vm.prank(alice);
         vm.expectRevert(
@@ -184,16 +184,16 @@ contract CollateralsManagementTest is Test {
                 "account status violation"
             )
         );
-        cvp.handlerDisableCollateral(alice, vault);
+        cvp.disableCollateral(alice, vault);
 
         Vault(controller).setAccountStatusState(0); // account status is NOT violated
 
         Vault(controller).clearChecks();
         vm.prank(alice);
-        cvp.handlerEnableCollateral(alice, vault);
+        cvp.enableCollateral(alice, vault);
 
         Vault(controller).clearChecks();
         vm.prank(alice);
-        cvp.handlerDisableCollateral(alice, vault);
+        cvp.disableCollateral(alice, vault);
     }
 }

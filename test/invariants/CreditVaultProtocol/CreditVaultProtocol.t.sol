@@ -42,7 +42,7 @@ contract VaultMock is ICreditVault {
 contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     using Set for SetStorage;
 
-    address vaultMock;
+    address internal vaultMock;
     address[] public touchedAccounts;
 
     constructor() {
@@ -228,7 +228,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
 }
 
 contract CreditVaultProtocolInvariants is Test {
-    CreditVaultProtocolHandler cvp;
+    CreditVaultProtocolHandler internal cvp;
 
     function setUp() public {
         cvp = new CreditVaultProtocolHandler();

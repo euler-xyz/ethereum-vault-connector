@@ -193,9 +193,25 @@ contract BatchTest is Test {
         vm.prank(bob);
         cvp.handlerBatch(items);
         assertFalse(cvp.isControllerEnabled(alice, controller));
+
+        // -------------- FIFTH BATCH -------------------------
+        items = new ICVP.BatchItem[](1);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = otherVault;
+        items[0].msgValue = 0;
+        items[0].data = abi.encodeWithSelector(Target.revertEmptyTest.selector);
+
+        vm.prank(alice);
+        vm.expectRevert(bytes("CVP-empty-error"));
+        cvp.handlerBatch(items);
     }
 
-    function test_RevertIfDeferralDepthExceeded_Batch(address alice) external {
+    function test_RevertIfDeferralDepthExceeded_Batch_BatchRevert(
+        address alice,
+        uint seed
+    ) external {
         address vault = address(new Vault(cvp));
 
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](9);
@@ -230,7 +246,9 @@ contract BatchTest is Test {
                 );
 
                 items[j].data = abi.encodeWithSelector(
-                    cvp.batch.selector,
+                    seed % 2 == 0
+                        ? cvp.batch.selector
+                        : cvp.batchRevert.selector,
                     nestedItems
                 );
             } else {
@@ -246,10 +264,12 @@ contract BatchTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.CVP_BatchDepthViolation.selector);
-        (bool success, ) = address(cvp).call(
-            abi.encodeWithSelector(cvp.handlerBatch.selector, items)
-        );
-        assertTrue(success); // is true because of vm.expectRevert() above
+        cvp.handlerBatch(items);
+
+        // check one item less call only if the most nested batch call doesn't go through
+        // the batchRevert() function. if it does, we'll revert with a standard
+        // CVP_RevertedBatchResult error
+        if (seed % 2 != 0) return;
 
         // should succeed when one less item. doesn't revert anymore,
         // but checks are performed only once, when the top level batch concludes
@@ -259,14 +279,30 @@ contract BatchTest is Test {
         }
 
         vm.prank(alice);
-        (success, ) = address(cvp).call(
-            abi.encodeWithSelector(cvp.handlerBatch.selector, itemsOneLess)
-        );
-        assertTrue(success);
+        cvp.handlerBatch(itemsOneLess);
+    }
+
+    // for coverage
+    function test_RevertIfDeferralDepthExceeded_BatchSimulation(
+        address alice
+    ) external {
+        ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
+
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = address(0);
+        items[0].msgValue = 0;
+        items[0].data = "";
+
+        cvp.setBatchDepth(10);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_BatchDepthViolation.selector);
+        cvp.batchSimulation(items);
     }
 
     function test_RevertIfChecksInProgress_Batch(address alice) external {
-        address vault = address(new VaultMalicious(cvp));
+        address vault = address(new VaultMaliciousBatch(cvp));
 
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
         items[0].allowError = false;
@@ -279,16 +315,104 @@ contract BatchTest is Test {
         );
 
         // internal batch in the malicious vault reverts with CVP_ChecksReentrancy error,
-        // check VaultMalicious implementation
+        // check VaultMaliciousBatch implementation
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
                 CreditVaultProtocol.CVP_VaultStatusViolation.selector,
                 vault,
-                "malicious vault"
+                "malicious vault batch"
             )
         );
         cvp.batch(items);
+    }
+
+    function test_RevertIfChecksInProgress_BatchRevert_BatchSimulation(
+        address alice
+    ) external {
+        address vault = address(new VaultMaliciousBatchRevert(cvp));
+
+        ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = address(0);
+        items[0].targetContract = vault;
+        items[0].msgValue = 0;
+        items[0].data = abi.encodeWithSelector(
+            Vault.requireChecks.selector,
+            alice
+        );
+
+        // internal batch in the malicious vault reverts with CVP_ChecksReentrancy error,
+        // check VaultMaliciousBatchRevert implementation
+        // error will be encoded in the result
+        ICVP.BatchResult[]
+            memory expectedBatchItemsResult = new ICVP.BatchResult[](1);
+        ICVP.BatchResult[]
+            memory expectedAccountsStatusResult = new ICVP.BatchResult[](1);
+        ICVP.BatchResult[]
+            memory expectedVaultsStatusResult = new ICVP.BatchResult[](1);
+
+        expectedBatchItemsResult[0].success = true;
+        expectedBatchItemsResult[0].result = "";
+
+        expectedAccountsStatusResult[0].success = true;
+        expectedAccountsStatusResult[0].result = "";
+
+        expectedVaultsStatusResult[0].success = false;
+        expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
+            CreditVaultProtocol.CVP_VaultStatusViolation.selector,
+            vault,
+            "malicious vault batch revert"
+        );
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_RevertedBatchResult.selector,
+                expectedBatchItemsResult,
+                expectedAccountsStatusResult,
+                expectedVaultsStatusResult
+            )
+        );
+        cvp.batchRevert(items);
+
+        // same should happen for batchSimulation() but without reverting with standard error
+        vm.prank(alice);
+        (
+            ICVP.BatchResult[] memory batchItemsResult,
+            ICVP.BatchResult[] memory accountsStatusResult,
+            ICVP.BatchResult[] memory vaultsStatusResult
+        ) = cvp.batchSimulation(items);
+
+        assertEq(batchItemsResult.length, 1);
+        assertEq(
+            batchItemsResult[0].success,
+            expectedBatchItemsResult[0].success
+        );
+        assertEq(
+            batchItemsResult[0].result,
+            expectedBatchItemsResult[0].result
+        );
+
+        assertEq(accountsStatusResult.length, 1);
+        assertEq(
+            accountsStatusResult[0].success,
+            expectedAccountsStatusResult[0].success
+        );
+        assertEq(
+            accountsStatusResult[0].result,
+            expectedAccountsStatusResult[0].result
+        );
+
+        assertEq(vaultsStatusResult.length, 1);
+        assertEq(
+            vaultsStatusResult[0].success,
+            expectedVaultsStatusResult[0].success
+        );
+        assertEq(
+            vaultsStatusResult[0].result,
+            expectedVaultsStatusResult[0].result
+        );
     }
 
     function test_BatchRevert_BatchSimulation(address alice) external {

@@ -11,8 +11,8 @@ import "./mocks/Vault.sol";
 contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
     using Set for SetStorage;
 
-    address[] expectedAccountsChecked;
-    address[] expectedVaultsChecked;
+    address[] internal expectedAccountsChecked;
+    address[] internal expectedVaultsChecked;
 
     function reset() external {
         delete accountStatusChecks;
@@ -186,6 +186,9 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
                 "verifyStorage/vault-status-checks/elements"
             );
         }
+
+        // for coverage
+        invariantsCheck();
     }
 
     function verifyVaultStatusChecks() public view {

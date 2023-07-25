@@ -99,12 +99,17 @@ contract Vault is ICreditVault, Target {
     }
 }
 
-contract VaultMalicious is Vault {
+contract VaultMaliciousBatch is Vault {
     constructor(ICVP _cvp) Vault(_cvp) {}
 
     function disableController(address account) external override {}
 
-    function checkVaultStatus() external override returns (bool, bytes memory) {
+    function checkVaultStatus()
+        external
+        virtual
+        override
+        returns (bool, bytes memory)
+    {
         // try to reenter the CVP batch. if it were possible, one could defer other vaults status checks
         // by entering a batch here and making the checkStatusAll() malfunction. possible attack:
         // - execute a batch with any item that calls checkVaultStatus() on vault A
@@ -126,7 +131,7 @@ contract VaultMalicious is Vault {
             assert(
                 bytes4(err) == CreditVaultProtocol.CVP_ChecksReentrancy.selector
             );
-            return (false, "malicious vault");
+            return (false, "malicious vault batch");
         }
 
         return (true, "");
@@ -136,6 +141,39 @@ contract VaultMalicious is Vault {
         address,
         address[] memory
     ) external pure override returns (bool isValid, bytes memory data) {
+        return (true, "");
+    }
+}
+
+// same as VaultMaliciousBatch but calls batchRevert() instead of batch() for coverage
+contract VaultMaliciousBatchRevert is VaultMaliciousBatch {
+    constructor(ICVP _cvp) VaultMaliciousBatch(_cvp) {}
+
+    function checkVaultStatus() external override returns (bool, bytes memory) {
+        // try to reenter the CVP batch. if it were possible, one could defer other vaults status checks
+        // by entering a batch here and making the checkStatusAll() malfunction. possible attack:
+        // - execute a batch with any item that calls checkVaultStatus() on vault A
+        // - checkStatusAll() calls checkVaultStatus() on vault A
+        // - vault A reenters a batch with any item that calls checkVaultStatus() on vault B
+        // - because checks are deferred, checkVaultStatus() on vault B is not executed the right away
+        // - control is handed over back to checkStatusAll() which had numElements = 1 when entering the loop
+        // - the loop ends and "delete vaultStatusChecks" is called removing the vault status check scheduled on vault B
+        ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
+        items[0].allowError = false;
+        items[0].onBehalfOfAccount = address(0);
+        items[0].targetContract = address(0);
+        items[0].msgValue = 0;
+        items[0].data = "";
+
+        try cvp.batchRevert(items) {
+            assert(false);
+        } catch (bytes memory err) {
+            assert(
+                bytes4(err) == CreditVaultProtocol.CVP_ChecksReentrancy.selector
+            );
+            return (false, "malicious vault batch revert");
+        }
+
         return (true, "");
     }
 }
