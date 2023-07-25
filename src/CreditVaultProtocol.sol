@@ -107,6 +107,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         _;
     }
 
+    /// @notice A modifier that allows the function to be called only if the context is not locked by the controller to collateral call.
+    modifier CTCC_NonReentrant() {
+        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+        _;
+    }
+
     /// @notice A modifier sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) {
@@ -248,9 +254,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function enableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) {
-        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
-
+    ) public payable virtual ownerOrOperator(account) CTCC_NonReentrant {
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -262,9 +266,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function disableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) {
-        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
-
+    ) public payable virtual ownerOrOperator(account) CTCC_NonReentrant {
         accountCollaterals[account].remove(vault);
         requireAccountStatusCheck(account);
     }
@@ -300,9 +302,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function enableController(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) {
-        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
-
+    ) public payable virtual ownerOrOperator(account) CTCC_NonReentrant {
         if (accountControllers[account].insert(vault)) {
             emit ControllerEnabled(account, vault);
         }
@@ -312,9 +312,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice Disables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function which means that msg.sender is treated as a calling vault. Account status checks are performed.
     /// @param account The address for which the calling controller is being disabled.
-    function disableController(address account) public payable virtual {
-        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
-
+    function disableController(address account) public payable virtual CTCC_NonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
             emit ControllerDisabled(account, msg.sender);
         }
@@ -619,11 +617,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     )
         internal
         ownerOrOperator(onBehalfOfAccount)
+        CTCC_NonReentrant
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
         if (targetContract == ERC1820_REGISTRY) revert CVP_InvalidAddress();
-        else if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
 
         msgValue = msgValue == type(uint).max
             ? address(this).balance
@@ -640,11 +638,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         bytes calldata data
     )
         internal
+        CTCC_NonReentrant
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
-        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
-
         SetStorage storage controllers = accountControllers[onBehalfOfAccount];
 
         if (controllers.numElements != 1) {
