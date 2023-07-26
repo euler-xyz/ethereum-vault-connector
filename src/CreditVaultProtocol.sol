@@ -612,6 +612,40 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
+    function forgiveAccountStatusCheck(address account) external {
+        SetStorage storage controllers = accountControllers[account];
+
+        if (
+            controllers.numElements != 1 ||
+            controllers.firstElement != msg.sender
+        ) {
+            revert CVP_NotAuthorized();
+        }
+
+        accountStatusChecks.remove(account);
+    }
+
+    function forgiveAccountsStatusCheck(address[] calldata accounts) external {
+        uint length = accounts.length;
+        for (uint i = 0; i < length; ) {
+            address account = accounts[i];
+            SetStorage storage controllers = accountControllers[account];
+
+            if (
+                controllers.numElements != 1 ||
+                controllers.firstElement != msg.sender
+            ) {
+                revert CVP_NotAuthorized();
+            }
+
+            accountStatusChecks.remove(account);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     // Vault Status Check
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
@@ -622,6 +656,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         } else {
             vaultStatusChecks.insert(msg.sender);
         }
+    }
+
+    function forgiveVaultStatusCheck() external {
+        vaultStatusChecks.remove(msg.sender);
     }
 
     // INTERNAL FUNCTIONS
