@@ -595,8 +595,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public virtual {
         uint length = accounts.length;
         for (uint i; i < length; ) {
-            requireAccountStatusCheckInternal(accounts[i]);
-            accountStatusChecks.remove(accounts[i]);
+            address account = accounts[i];
+            requireAccountStatusCheckInternal(account);
+            accountStatusChecks.remove(account);
 
             unchecked {
                 ++i;
