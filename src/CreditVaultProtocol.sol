@@ -107,6 +107,22 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         _;
     }
 
+    /// @notice A modifier that checks whether the context is in desired state.
+    modifier checkContext() {
+        {
+            ExecutionContext memory context = executionContext;
+
+            if (context.checksInProgressLock) {
+                revert CVP_ChecksReentrancy();
+            } else if (context.controllerToCollateralCallLock) {
+                revert CVP_CTCC_Reentancy();
+            } else if (context.batchDepth >= BATCH_DEPTH__MAX) {
+                revert CVP_BatchDepthViolation();
+            }
+        }
+        _;
+    }
+
     /// @notice A modifier that allows the function to be called only if the context is not locked by the controller to collateral call.
     modifier CTCC_NonReentrant() {
         if (executionContext.controllerToCollateralCallLock) {
@@ -336,7 +352,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual returns (bool success, bytes memory result) {
+    )
+        public
+        payable
+        virtual
+        CTCC_NonReentrant
+        returns (bool success, bytes memory result)
+    {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
         uint msgValue = executionContext.batchDepth == BATCH_DEPTH__INIT
@@ -368,7 +390,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address onBehalfOfAccount,
         address nextAccountStatusCheckIgnoredFrom,
         bytes calldata data
-    ) public payable virtual returns (bool success, bytes memory result) {
+    )
+        public
+        payable
+        virtual
+        CTCC_NonReentrant
+        returns (bool success, bytes memory result)
+    {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
         uint msgValue = executionContext.batchDepth == BATCH_DEPTH__INIT
@@ -393,15 +421,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice Defers the account and vault checks until the end of the execution flow and executes a batch of batch items.
     /// @dev Accounts status checks and vault status checks are performed after all the batch items have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.
     /// @param items An array of batch items to be executed.
-    function batch(BatchItem[] calldata items) public payable virtual {
-        ExecutionContext memory context = executionContext;
-
-        if (context.checksInProgressLock) {
-            revert CVP_ChecksReentrancy();
-        } else if (context.batchDepth >= BATCH_DEPTH__MAX) {
-            revert CVP_BatchDepthViolation();
-        }
-
+    function batch(
+        BatchItem[] calldata items
+    ) public payable virtual checkContext {
         unchecked {
             ++executionContext.batchDepth;
         }
@@ -432,20 +454,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         public
         payable
         virtual
+        checkContext
         returns (
             BatchResult[] memory batchItemsResult,
             BatchResult[] memory accountsStatusResult,
             BatchResult[] memory vaultsStatusResult
         )
     {
-        ExecutionContext memory context = executionContext;
-
-        if (context.checksInProgressLock) {
-            revert CVP_ChecksReentrancy();
-        } else if (context.batchDepth >= BATCH_DEPTH__MAX) {
-            revert CVP_BatchDepthViolation();
-        }
-
         unchecked {
             ++executionContext.batchDepth;
         }
@@ -619,7 +634,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     )
         internal
         ownerOrOperator(onBehalfOfAccount)
-        CTCC_NonReentrant
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
@@ -640,7 +654,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         bytes calldata data
     )
         internal
-        CTCC_NonReentrant
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
