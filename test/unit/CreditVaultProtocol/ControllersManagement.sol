@@ -160,7 +160,9 @@ contract ControllersManagementTest is Test {
         cvp.handlerEnableController(bob, vault);
     }
 
-    function test_RevertIfCTCCReentrancy_ControllersManagement(address alice) public {
+    function test_RevertIfCTCCReentrancy_ControllersManagement(
+        address alice
+    ) public {
         address vault = address(new Vault(cvp));
 
         cvp.setControllerToCollateralCallLock(true);
@@ -169,19 +171,16 @@ contract ControllersManagementTest is Test {
         vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
         cvp.enableController(alice, vault);
 
-
         cvp.setControllerToCollateralCallLock(false);
-        
+
         vm.prank(alice);
         cvp.enableController(alice, vault);
-
 
         cvp.setControllerToCollateralCallLock(true);
 
         vm.prank(vault);
         vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
         cvp.disableController(alice);
-
 
         cvp.setControllerToCollateralCallLock(false);
 

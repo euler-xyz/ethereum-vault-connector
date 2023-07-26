@@ -32,7 +32,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
     // addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address.
     // In order to record the owner of a group of 256 accounts, the CVP uses a definition of a prefix. A prefix is a part
-    // of an address having the first 19 bytes common with any of the 256 account addresses belonging to the same group. 
+    // of an address having the first 19 bytes common with any of the 256 account addresses belonging to the same group.
     // account/152 -> prefix/152
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
     mapping(uint152 prefix => address owner) internal ownerLookup;
@@ -109,7 +109,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     /// @notice A modifier that allows the function to be called only if the context is not locked by the controller to collateral call.
     modifier CTCC_NonReentrant() {
-        if (executionContext.controllerToCollateralCallLock) revert CVP_CTCC_Reentancy();
+        if (executionContext.controllerToCollateralCallLock) {
+            revert CVP_CTCC_Reentancy();
+        }
         _;
     }
 
@@ -312,7 +314,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice Disables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function which means that msg.sender is treated as a calling vault. Account status checks are performed.
     /// @param account The address for which the calling controller is being disabled.
-    function disableController(address account) public payable virtual CTCC_NonReentrant {
+    function disableController(
+        address account
+    ) public payable virtual CTCC_NonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
             emit ControllerDisabled(account, msg.sender);
         }
@@ -572,9 +576,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice Immediately checks the status of an account and reverts if it is not valid.
     /// @dev Account status check is performed on the fly regardless of the current execution context state. If account was previously added to a set to be checked later, it is removed.
     /// @param account The address of the account to be checked.
-    function requireAccountStatusCheckNow(
-        address account
-    ) public virtual {
+    function requireAccountStatusCheckNow(address account) public virtual {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }

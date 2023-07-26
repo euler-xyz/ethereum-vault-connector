@@ -67,7 +67,7 @@ contract Target {
             ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
             require(
                 nextAccountStatusCheckIgnoredFrom == address(this) ||
-                ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
+                    ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
                 "cfctct/2"
             );
 

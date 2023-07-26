@@ -81,7 +81,7 @@ contract GetExecutionContextTest is Test {
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
-        
+
         cvp.setBatchDepth(2);
         cvp.requireVaultStatusCheck();
         vm.expectRevert();

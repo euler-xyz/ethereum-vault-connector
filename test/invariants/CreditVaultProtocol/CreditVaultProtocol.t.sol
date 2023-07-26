@@ -223,7 +223,11 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         view
         returns (SetStorage memory, SetStorage memory, address)
     {
-        return (accountStatusChecks, vaultStatusChecks, accountStatusCheckIgnoredFrom);
+        return (
+            accountStatusChecks,
+            vaultStatusChecks,
+            accountStatusCheckIgnoredFrom
+        );
     }
 }
 

@@ -152,13 +152,9 @@ contract CallFromControllerToCollateralTest is Test {
         );
 
         hoax(controller, seed);
-        (success, result) = cvp
-            .handlerCallFromControllerToCollateral{value: seed}(
-            collateral,
-            alice,
-            collateral,
-            data
-        );
+        (success, result) = cvp.handlerCallFromControllerToCollateral{
+            value: seed
+        }(collateral, alice, collateral, data);
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);

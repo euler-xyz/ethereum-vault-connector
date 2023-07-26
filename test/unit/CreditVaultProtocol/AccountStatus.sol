@@ -103,7 +103,7 @@ contract AccountStatusTest is Test {
                     : 2
             );
 
-            // account status check will be performed because we're not in 
+            // account status check will be performed because we're not in
             // a call from controller to collateral state, or current onBehalfOfAccount
             // does not match the account being checked, or the check is not requested
             // from expected sender address
@@ -196,7 +196,7 @@ contract AccountStatusTest is Test {
             Vault(controller).clearChecks();
             cvp.clearExpectedChecks();
 
-            // account status check will no longer be performed because we're in 
+            // account status check will no longer be performed because we're in
             // a call from controller to collateral state and current onBehalfOfAccount
             // matches the account being checked and the check is requested
             // from expected sender address
@@ -211,7 +211,7 @@ contract AccountStatusTest is Test {
             Vault(controller).clearChecks();
             cvp.clearExpectedChecks();
 
-            // if the call repeated, the check will be performed because the sender address 
+            // if the call repeated, the check will be performed because the sender address
             // from which the check was expected was reset during the previous call
             assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
 
@@ -240,7 +240,9 @@ contract AccountStatusTest is Test {
 
         // verify the same test cases as above but for multiple accounts
         cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0));
+        cvp.setOnBehalfOfAccount(
+            invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0)
+        );
         cvp.setAccountStatusCheckIgnoredFrom(address(0));
 
         // if there's any account which is not valid, the whole transaction should revert
@@ -300,7 +302,9 @@ contract AccountStatusTest is Test {
 
         // another test case
         cvp.setControllerToCollateralCallLock(false);
-        cvp.setOnBehalfOfAccount(invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0));
+        cvp.setOnBehalfOfAccount(
+            invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0)
+        );
         cvp.setAccountStatusCheckIgnoredFrom(msgSender);
 
         // if there's any account which is not valid, the whole transaction should revert
@@ -356,7 +360,7 @@ contract AccountStatusTest is Test {
         vm.prank(msgSender);
         cvp.requireAccountsStatusCheck(accounts);
         cvp.verifyAccountStatusChecks();
-/*
+        /*
         // if the call repeated, the check will be performed because the sender address 
         // from which the check was expected was reset during the previous call
         assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
@@ -410,8 +414,8 @@ contract AccountStatusTest is Test {
             Vault(controller).setAccountStatusState(1);
 
             // account status check will be scheduled because even though we're in deferred
-            // checks state, we're not in a call from controller to collateral state, 
-            // or current onBehalfOfAccount does not match the account being checked, 
+            // checks state, we're not in a call from controller to collateral state,
+            // or current onBehalfOfAccount does not match the account being checked,
             // or the check is not requested from expected sender address
             cvp.setBatchDepth(2);
             cvp.setControllerToCollateralCallLock(true);
@@ -452,8 +456,8 @@ contract AccountStatusTest is Test {
             cvp.reset();
 
             // account status check is no longer scheduled because we're in deferred
-            // checks state, and we're in a call from controller to collateral state, 
-            // and current onBehalfOfAccount does not match the account being checked, 
+            // checks state, and we're in a call from controller to collateral state,
+            // and current onBehalfOfAccount does not match the account being checked,
             // and the check is not requested from expected sender address
             cvp.setBatchDepth(2);
             cvp.setControllerToCollateralCallLock(true);
@@ -465,7 +469,7 @@ contract AccountStatusTest is Test {
             cvp.requireAccountStatusCheck(account);
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
 
-            // if the call repeated, the check will be performed because the sender address 
+            // if the call repeated, the check will be performed because the sender address
             // from which the check was expected was reset during the previous call
             assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
 
@@ -539,7 +543,7 @@ contract AccountStatusTest is Test {
             assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
         }
 
-        // if the call repeated, the check will be performed because the sender address 
+        // if the call repeated, the check will be performed because the sender address
         // from which the check was expected was reset during the previous call
         assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
 

@@ -155,7 +155,9 @@ contract CollateralsManagementTest is Test {
         cvp.disableCollateral(bob, vault);
     }
 
-    function test_RevertIfCTCCReentrancy_CollateralsManagement(address alice) public {
+    function test_RevertIfCTCCReentrancy_CollateralsManagement(
+        address alice
+    ) public {
         address vault = address(new Vault(cvp));
 
         cvp.setControllerToCollateralCallLock(true);
@@ -164,12 +166,10 @@ contract CollateralsManagementTest is Test {
         vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
         cvp.enableCollateral(alice, vault);
 
-
         cvp.setControllerToCollateralCallLock(false);
 
         vm.prank(alice);
         cvp.enableCollateral(alice, vault);
-
 
         cvp.setControllerToCollateralCallLock(true);
 
@@ -177,9 +177,8 @@ contract CollateralsManagementTest is Test {
         vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
         cvp.disableCollateral(alice, vault);
 
-
         cvp.setControllerToCollateralCallLock(false);
-        
+
         vm.prank(alice);
         cvp.disableCollateral(alice, vault);
     }

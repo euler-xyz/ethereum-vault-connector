@@ -71,7 +71,11 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         accountStatusCheckIgnoredFrom = from;
     }
 
-    function getAccountStatusCheckIgnoredFrom() external view returns (address) {
+    function getAccountStatusCheckIgnoredFrom()
+        external
+        view
+        returns (address)
+    {
         return accountStatusCheckIgnoredFrom;
     }
 
@@ -104,9 +108,7 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         }
     }
 
-    function requireAccountStatusCheckNow(
-        address account
-    ) public override {
+    function requireAccountStatusCheckNow(address account) public override {
         super.requireAccountStatusCheckNow(account);
 
         expectedAccountsChecked.push(account);

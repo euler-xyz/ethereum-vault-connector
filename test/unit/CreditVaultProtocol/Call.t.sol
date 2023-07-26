@@ -139,10 +139,7 @@ contract CallTest is Test {
         assertFalse(success);
     }
 
-    function test_RevertIfCTCCReentrancy_Call(
-        address alice,
-        uint seed
-    ) public {
+    function test_RevertIfCTCCReentrancy_Call(address alice, uint seed) public {
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvp));
 
