@@ -2,18 +2,41 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+solc = "0.8.19"
 optimizer_runs = 10000
 ignored_error_codes = ["unreachable"]
-remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/","forge-std/=lib/forge-std/src/"]
-fuzz.runs = 1000
-fuzz.seed = "0xee1d0f7d9556539a9c0e26aed5e63556"
-invariant.runs = 1000
+gas_reports = [
+    "CreditVaultProtocol"
+]
+remappings = [
+    "src=src/",
+    "forge-std/=lib/forge-std/src/",
+]
 
-[profile.smt]
-model_checker.engine = "chc"
-model_checker.targets = ["assert"]
-model_checker.timeout = 60
-model_checker.contracts = {"./src/CreditVaultProtocol.sol" = ["CreditVaultProtocol"]}
-model_checker.invariants = ["contract", "reentrancy"]
+
+[profile.default.fuzz]
+max_test_rejects = 1_000_000
+seed = "0xee1d0f7d9556539a9c0e26aed5e63556"
+runs = 1000
+
+[profile.default.invariants]
+call_override = false # Override unsafe external calls to perform reentrancy checks
+depth = 20
+runs = 1000
+
+
+[profile.smt.model_checker]
+engine = "chc"
+timeout = 100_000
+contracts = {"./src/CreditVaultProtocol.sol" = ["CreditVaultProtocol"]}
+invariants = ["contract", "reentrancy"]
+targets = [
+    "assert",
+    "constantCondition",
+    "divByZero",
+    "outOfBounds",
+    "overflow",
+    "underflow",
+]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
