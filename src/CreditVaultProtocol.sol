@@ -538,7 +538,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public view returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
-        for (uint i; i < accounts.length; ) {
+        uint length = accounts.length;
+        for (uint i; i < length; ) {
             (isValid[i], ) = checkAccountStatusInternal(accounts[i]);
             unchecked {
                 ++i;
@@ -564,8 +565,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address[] calldata accounts
     ) public virtual {
         uint batchDepthCache = executionContext.batchDepth;
-
-        for (uint i = 0; i < accounts.length; ) {
+        uint length = accounts.length;
+        for (uint i; i < length; ) {
             if (batchDepthCache == BATCH_DEPTH__INIT) {
                 requireAccountStatusCheckInternal(accounts[i]);
             } else {
@@ -592,7 +593,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
-        for (uint i; i < accounts.length; ) {
+        uint length = accounts.length;
+        for (uint i; i < length; ) {
             requireAccountStatusCheckInternal(accounts[i]);
             accountStatusChecks.remove(accounts[i]);
 
@@ -694,7 +696,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) internal returns (BatchResult[] memory batchItemsResult) {
         if (returnResult) batchItemsResult = new BatchResult[](items.length);
 
-        for (uint i; i < items.length; ) {
+        uint length = items.length;
+        for (uint i; i < length; ) {
             BatchItem calldata item = items[i];
             address targetContract = item.targetContract;
             bool success;
