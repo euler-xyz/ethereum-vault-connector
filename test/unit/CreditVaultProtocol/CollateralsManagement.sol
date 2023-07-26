@@ -155,6 +155,35 @@ contract CollateralsManagementTest is Test {
         cvp.disableCollateral(bob, vault);
     }
 
+    function test_RevertIfCTCCReentrancy_CollateralsManagement(address alice) public {
+        address vault = address(new Vault(cvp));
+
+        cvp.setControllerToCollateralCallLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
+        cvp.enableCollateral(alice, vault);
+
+
+        cvp.setControllerToCollateralCallLock(false);
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, vault);
+
+
+        cvp.setControllerToCollateralCallLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
+        cvp.disableCollateral(alice, vault);
+
+
+        cvp.setControllerToCollateralCallLock(false);
+        
+        vm.prank(alice);
+        cvp.disableCollateral(alice, vault);
+    }
+
     function test_RevertIfAccountStatusViolated_CollateralsManagement(
         address alice
     ) public {

@@ -139,6 +139,35 @@ contract CallTest is Test {
         assertFalse(success);
     }
 
+    function test_RevertIfCTCCReentrancy_Call(
+        address alice,
+        uint seed
+    ) public {
+        address targetContract = address(new Target());
+        vm.assume(targetContract != address(cvp));
+
+        cvp.setControllerToCollateralCallLock(true);
+
+        bytes memory data = abi.encodeWithSelector(
+            Target(targetContract).callTest.selector,
+            address(cvp),
+            targetContract,
+            seed,
+            false,
+            alice
+        );
+
+        hoax(alice, seed);
+        vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
+        (bool success, ) = cvp.handlerCall{value: seed}(
+            targetContract,
+            alice,
+            data
+        );
+
+        assertFalse(success);
+    }
+
     function test_RevertIfTargetContractInvalid_Call(
         address alice,
         uint seed

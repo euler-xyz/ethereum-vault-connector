@@ -36,6 +36,7 @@ contract Target {
         address msgSender,
         uint msgValue,
         bool checksDeferred,
+        address nextAccountStatusCheckIgnoredFrom,
         address onBehalfOfAccount
     ) external payable returns (uint) {
         (ICVP.ExecutionContext memory context, ) = ICVP(cvp)
@@ -52,8 +53,8 @@ contract Target {
             "cfctct/invalid-on-behalf-of-account"
         );
         require(
-            context.controllerToCollateralCall == true,
-            "cfctct/controller-to-collateral-call"
+            context.controllerToCollateralCallLock == true,
+            "cfctct/controller-to-collateral-call-lock"
         );
 
         // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
@@ -65,9 +66,23 @@ contract Target {
             );
             ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
             require(
+                nextAccountStatusCheckIgnoredFrom == address(this) ||
                 ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
                 "cfctct/2"
             );
+
+            // if ignored, it can be ignored only once
+            if (nextAccountStatusCheckIgnoredFrom == address(this)) {
+                require(
+                    !ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
+                    "cfctct/3"
+                );
+                ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
+                require(
+                    ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
+                    "cfctct/4"
+                );
+            }
         } else {
             ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
         }

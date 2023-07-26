@@ -21,32 +21,28 @@ contract GetExecutionContextTest is Test {
             .getExecutionContext(controller);
 
         assertEq(context.batchDepth, 1);
-        assertFalse(context.controllerToCollateralCall);
+        assertFalse(context.controllerToCollateralCallLock);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
 
-        cvp.setBatchDepth(seed % 2 == 0 ? 2 : 1);
-        cvp.setControllerToCollateralCall(seed % 3 == 0 ? true : false);
-        cvp.setIgnoreAccountStatusCheck(seed % 4 == 0 ? true : false);
-        cvp.setOnBehalfOfAccount(account);
-        if (seed % 5 == 0) {
+        if (seed % 2 == 0) {
             vm.prank(account);
             cvp.enableController(account, controller);
         }
 
+        cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
+        cvp.setControllerToCollateralCallLock(seed % 4 == 0 ? true : false);
+        cvp.setOnBehalfOfAccount(account);
+
         (context, controllerEnabled) = cvp.getExecutionContext(controller);
 
-        assertEq(context.batchDepth, seed % 2 == 0 ? 2 : 1);
+        assertEq(context.batchDepth, seed % 3 == 0 ? 2 : 1);
         assertEq(
-            context.controllerToCollateralCall,
-            seed % 3 == 0 ? true : false
-        );
-        assertEq(
-            context.ignoreAccountStatusCheck,
+            context.controllerToCollateralCallLock,
             seed % 4 == 0 ? true : false
         );
         assertEq(context.onBehalfOfAccount, account);
-        assertEq(controllerEnabled, seed % 5 == 0 ? true : false);
+        assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
     }
 
     // for coverage
@@ -64,12 +60,7 @@ contract GetExecutionContextTest is Test {
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setControllerToCollateralCall(true);
-        vm.expectRevert();
-        cvp.invariantsCheck();
-        cvp.reset();
-
-        cvp.setIgnoreAccountStatusCheck(true);
+        cvp.setControllerToCollateralCallLock(true);
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
@@ -100,6 +91,11 @@ contract GetExecutionContextTest is Test {
         cvp.setBatchDepth(2);
         vm.prank(address(0));
         cvp.requireVaultStatusCheck();
+        vm.expectRevert();
+        cvp.invariantsCheck();
+        cvp.reset();
+
+        cvp.setAccountStatusCheckIgnoredFrom(address(1));
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
