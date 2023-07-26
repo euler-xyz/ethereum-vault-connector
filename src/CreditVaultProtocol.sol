@@ -794,7 +794,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             setStorage = vaultStatusChecks;
         }
 
-        address firstElement = setStorage.firstElement;
         uint8 numElements = setStorage.numElements;
 
         if (returnResult) result = new BatchResult[](numElements);
@@ -827,17 +826,19 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
             // do not clear array elements to optimize gas consumption
             // delete setStorage.elements[i];
+
             unchecked {
                 ++i;
             }
         }
 
+        // do not clear the first element to optimize gas consumption
         if (setType == SetType.Account) {
             delete accountStatusChecks.numElements;
-            delete accountStatusChecks.firstElement;
+            //delete accountStatusChecks.firstElement;
         } else {
             delete vaultStatusChecks.numElements;
-            delete vaultStatusChecks.firstElement;
+            //delete vaultStatusChecks.firstElement;
         }
     }
 
@@ -860,13 +861,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         assert(!context.checksLock);
         assert(!context.impersonateLock);
         assert(context.onBehalfOfAccount == address(0));
-
-        SetStorage storage asChecks = accountStatusChecks;
-        assert(asChecks.firstElement == address(0));
-        assert(asChecks.numElements == 0);
-
-        SetStorage storage vsChecks = vaultStatusChecks;
-        assert(vsChecks.firstElement == address(0));
-        assert(vsChecks.numElements == 0);
+        assert(accountStatusChecks.numElements == 0);
+        assert(vaultStatusChecks.numElements == 0);
     }
 }

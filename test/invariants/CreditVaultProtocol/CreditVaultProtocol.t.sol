@@ -256,9 +256,7 @@ contract CreditVaultProtocolInvariants is Test {
         ) = cvp.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
-        assertTrue(accountStatusChecks.firstElement == address(0));
         assertTrue(vaultStatusChecks.numElements == 0);
-        assertTrue(vaultStatusChecks.firstElement == address(0));
     }
 
     function invariant_controllers_collaterals() external {

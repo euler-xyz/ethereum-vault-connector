@@ -3,7 +3,6 @@
 pragma solidity ^0.8.0;
 
 struct SetStorage {
-    uint8 reserved;
     uint8 numElements;
     address firstElement;
     address[2 ** 8] elements;
@@ -105,8 +104,8 @@ library Set {
         SetStorage storage setStorage
     ) internal view returns (address[] memory) {
         uint8 numElements = setStorage.numElements;
-
         address[] memory output = new address[](numElements);
+        
         if (numElements == 0) return output;
 
         output[0] = setStorage.firstElement;

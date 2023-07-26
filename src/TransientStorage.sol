@@ -11,7 +11,10 @@ abstract contract TransientStorage {
         Vault
     }
 
+<<<<<<< HEAD
     ICVP.ExecutionContext internal executionContext;
+=======
+>>>>>>> 11c92d4 (remove reserved field from SetType and don't delete firstElement in checkStatusAll function instead)
     SetStorage internal accountStatusChecks;
     SetStorage internal vaultStatusChecks;
 

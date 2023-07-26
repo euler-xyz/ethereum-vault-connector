@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
 import "src/interfaces/ICreditVaultProtocol.sol";
 
 // mock target contract that allows to test call() and impersonate() functions of the CVP
