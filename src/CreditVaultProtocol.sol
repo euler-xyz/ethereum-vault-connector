@@ -705,7 +705,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             bytes memory result;
 
             if (targetContract == address(this)) {
-                (success, result) = targetContract.delegatecall(item.data);
+                (success, result) = address(this).delegatecall(item.data);
             } else {
                 address onBehalfOfAccount = item.onBehalfOfAccount == address(0)
                     ? msg.sender
