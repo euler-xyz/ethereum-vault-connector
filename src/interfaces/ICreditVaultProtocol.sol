@@ -132,4 +132,8 @@ interface ICVP {
     ) external;
 
     function requireVaultStatusCheck() external;
+
+    function forgiveAccountStatusCheck(address account) external;
+
+    function forgiveAccountsStatusCheck(address[] calldata accounts) external;
 }
