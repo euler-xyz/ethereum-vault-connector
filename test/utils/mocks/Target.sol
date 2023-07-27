@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "src/interfaces/ICreditVaultProtocol.sol";
 
-// mock target contract that allows to test call() and callFromControllerToCollateral() functions of the CVP
+// mock target contract that allows to test call() and impersonate() functions of the CVP
 contract Target {
     function callTest(
         address cvp,
@@ -31,30 +31,29 @@ contract Target {
         return msg.value;
     }
 
-    function callFromControllerToCollateralTest(
+    function impersonateTest(
         address cvp,
         address msgSender,
         uint msgValue,
         bool checksDeferred,
-        address nextAccountStatusCheckIgnoredFrom,
         address onBehalfOfAccount
     ) external payable returns (uint) {
         (ICVP.ExecutionContext memory context, ) = ICVP(cvp)
             .getExecutionContext(address(0));
 
-        require(msg.sender == msgSender, "cfctct/invalid-sender");
-        require(msg.value == msgValue, "cfctct/invalid-msg-value");
+        require(msg.sender == msgSender, "it/invalid-sender");
+        require(msg.value == msgValue, "it/invalid-msg-value");
         require(
             context.batchDepth != 1 == checksDeferred,
-            "cfctct/invalid-checks-deferred"
+            "it/invalid-checks-deferred"
         );
         require(
             context.onBehalfOfAccount == onBehalfOfAccount,
-            "cfctct/invalid-on-behalf-of-account"
+            "it/invalid-on-behalf-of-account"
         );
         require(
-            context.controllerToCollateralCallLock == true,
-            "cfctct/controller-to-collateral-call-lock"
+            context.impersonateLock == true,
+            "it/impersonate-lock"
         );
 
         // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
@@ -62,27 +61,13 @@ contract Target {
         if (checksDeferred) {
             require(
                 !ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
-                "cfctct/1"
+                "it/1"
             );
             ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
             require(
-                nextAccountStatusCheckIgnoredFrom == address(this) ||
-                    ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
-                "cfctct/2"
+                ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
+                "it/2"
             );
-
-            // if ignored, it can be ignored only once
-            if (nextAccountStatusCheckIgnoredFrom == address(this)) {
-                require(
-                    !ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
-                    "cfctct/3"
-                );
-                ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
-                require(
-                    ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
-                    "cfctct/4"
-                );
-            }
         } else {
             ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
         }

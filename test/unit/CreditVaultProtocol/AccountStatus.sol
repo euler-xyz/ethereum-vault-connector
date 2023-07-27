@@ -63,12 +63,10 @@ contract AccountStatusTest is Test {
     }
 
     function test_RequireAccountsStatusCheck(
-        address msgSender,
         uint8 numberOfAccounts,
         bytes memory seed,
         bool allStatusesValid
     ) external {
-        vm.assume(msgSender != address(0));
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAccounts);
@@ -87,7 +85,6 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
             address controller = controllers[i];
 
-            cvp.setControllerToCollateralCallLock(false);
             vm.prank(account);
             cvp.enableController(account, controller);
             Vault(controller).clearChecks();
@@ -102,14 +99,6 @@ contract AccountStatusTest is Test {
                     ? 1
                     : 2
             );
-
-            // account status check will be performed because we're not in
-            // a call from controller to collateral state, or current onBehalfOfAccount
-            // does not match the account being checked, or the check is not requested
-            // from expected sender address
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(address(0));
 
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
                 // for later checks
@@ -129,121 +118,14 @@ contract AccountStatusTest is Test {
                 );
             }
 
-            vm.prank(msgSender);
             cvp.requireAccountStatusCheck(account);
 
             if (allStatusesValid || uint160(account) % 3 == 0)
                 cvp.verifyAccountStatusChecks();
-
-            Vault(controller).clearChecks();
-            cvp.clearExpectedChecks();
-
-            // try other combinations of the conditions; account status check still being performed
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(address(0));
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
-                vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
-                );
-            }
-
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-
-            if (allStatusesValid || uint160(account) % 3 == 0)
-                cvp.verifyAccountStatusChecks();
-
-            Vault(controller).clearChecks();
-            cvp.clearExpectedChecks();
-
-            // try other combinations of the conditions; account status check still being performed
-            cvp.setControllerToCollateralCallLock(false);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
-                vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
-                );
-            }
-
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-
-            if (allStatusesValid || uint160(account) % 3 == 0)
-                cvp.verifyAccountStatusChecks();
-
-            Vault(controller).clearChecks();
-            cvp.clearExpectedChecks();
-
-            // account status check will no longer be performed because we're in
-            // a call from controller to collateral state and current onBehalfOfAccount
-            // matches the account being checked and the check is requested
-            // from expected sender address
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-            cvp.verifyAccountStatusChecks();
-
-            Vault(controller).clearChecks();
-            cvp.clearExpectedChecks();
-
-            // if the call repeated, the check will be performed because the sender address
-            // from which the check was expected was reset during the previous call
-            assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
-
-            if (!(allStatusesValid || uint160(account) % 3 == 0)) {
-                vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
-                );
-            }
-
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-            cvp.verifyAccountStatusChecks();
 
             Vault(controller).clearChecks();
             cvp.clearExpectedChecks();
         }
-
-        // verify the same test cases as above but for multiple accounts
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(
-            invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0)
-        );
-        cvp.setAccountStatusCheckIgnoredFrom(address(0));
 
         // if there's any account which is not valid, the whole transaction should revert
         if (invalidAccountsCounter > 0) {
@@ -261,136 +143,14 @@ contract AccountStatusTest is Test {
             );
         }
 
-        vm.prank(msgSender);
         cvp.requireAccountsStatusCheck(accounts);
         cvp.verifyAccountStatusChecks();
-
-        for (uint i = 0; i < controllers.length; ++i) {
-            Vault(controllers[i]).clearChecks();
-        }
-        cvp.clearExpectedChecks();
-
-        // another test case
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(address(0));
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-        // if there's any account which is not valid, the whole transaction should revert
-        if (invalidAccountsCounter > 0) {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                    invalidAccounts[0],
-                    uint160(invalidAccounts[0]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
-            );
-        }
-
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        cvp.verifyAccountStatusChecks();
-
-        for (uint i = 0; i < controllers.length; ++i) {
-            Vault(controllers[i]).clearChecks();
-        }
-        cvp.clearExpectedChecks();
-
-        // another test case
-        cvp.setControllerToCollateralCallLock(false);
-        cvp.setOnBehalfOfAccount(
-            invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0)
-        );
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-        // if there's any account which is not valid, the whole transaction should revert
-        if (invalidAccountsCounter > 0) {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                    invalidAccounts[0],
-                    uint160(invalidAccounts[0]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
-            );
-        }
-
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        cvp.verifyAccountStatusChecks();
-
-        for (uint i = 0; i < controllers.length; ++i) {
-            Vault(controllers[i]).clearChecks();
-        }
-        cvp.clearExpectedChecks();
-
-        // another test case
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(
-            invalidAccountsCounter > 0 ? invalidAccounts[0] : address(0)
-        );
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-        // if there's more than one account which is not valid, the whole transaction should revert.
-        // if there's only one account which is not valid, the transaction should succeed because the check
-        // for the invalid account is being ignored
-        if (invalidAccountsCounter > 1) {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                    invalidAccounts[1],
-                    uint160(invalidAccounts[1]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
-            );
-        }
-
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        cvp.verifyAccountStatusChecks();
-        /*
-        // if the call repeated, the check will be performed because the sender address 
-        // from which the check was expected was reset during the previous call
-        assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
-
-        if (invalidAccountsCounter > 0) {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                    invalidAccounts[1],
-                    uint160(invalidAccounts[1]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
-            );
-        }
-
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        cvp.verifyAccountStatusChecks();*/
     }
 
     function test_WhenDeferred_RequireAccountsStatusCheck(
-        address msgSender,
         uint8 numberOfAccounts,
         bytes memory seed
     ) external {
-        vm.assume(msgSender != address(0));
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAccounts);
@@ -408,146 +168,27 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
             address controller = controllers[i];
 
-            cvp.setControllerToCollateralCallLock(false);
             vm.prank(account);
             cvp.enableController(account, controller);
             Vault(controller).setAccountStatusState(1);
 
-            // account status check will be scheduled because even though we're in deferred
-            // checks state, we're not in a call from controller to collateral state,
-            // or current onBehalfOfAccount does not match the account being checked,
-            // or the check is not requested from expected sender address
+            // account status check will be scheduled for later due to deferred state
             cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(address(0));
 
             // even though the account status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the accounts to the set
             // so that the checks can be performed later
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-            assertTrue(cvp.isAccountStatusCheckDeferred(account));
-            cvp.reset();
-
-            // try other combinations of the conditions; account status check still being scheduled
-            cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(address(0));
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-            assertTrue(cvp.isAccountStatusCheckDeferred(account));
-            cvp.reset();
-
-            // try other combinations of the conditions; account status check still being scheduled
-            cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCallLock(false);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-            assertTrue(cvp.isAccountStatusCheckDeferred(account));
-            cvp.reset();
-
-            // account status check is no longer scheduled because we're in deferred
-            // checks state, and we're in a call from controller to collateral state,
-            // and current onBehalfOfAccount does not match the account being checked,
-            // and the check is not requested from expected sender address
-            cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
-            vm.prank(msgSender);
-            cvp.requireAccountStatusCheck(account);
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
-
-            // if the call repeated, the check will be performed because the sender address
-            // from which the check was expected was reset during the previous call
-            assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
-
-            vm.prank(msgSender);
             cvp.requireAccountStatusCheck(account);
             assertTrue(cvp.isAccountStatusCheckDeferred(account));
             cvp.reset();
         }
 
-        // repeat the same test cases as above but with multiple accounts
         cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(accounts[0]);
-        cvp.setAccountStatusCheckIgnoredFrom(address(0));
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
         }
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        for (uint i = 0; i < accounts.length; ++i) {
-            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-        cvp.reset();
-
-        // another test case
-        cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(address(0));
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-        for (uint i = 0; i < accounts.length; ++i) {
-            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        for (uint i = 0; i < accounts.length; ++i) {
-            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-        cvp.reset();
-
-        // another test case
-        cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCallLock(false);
-        cvp.setOnBehalfOfAccount(accounts[0]);
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-        for (uint i = 0; i < accounts.length; ++i) {
-            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        for (uint i = 0; i < accounts.length; ++i) {
-            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-        cvp.reset();
-
-        // another test case
-        cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(accounts[0]);
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
-
-        for (uint i = 0; i < accounts.length; ++i) {
-            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-        vm.prank(msgSender);
-        cvp.requireAccountsStatusCheck(accounts);
-        assertFalse(cvp.isAccountStatusCheckDeferred(accounts[0]));
-        for (uint i = 1; i < accounts.length; ++i) {
-            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
-        }
-
-        // if the call repeated, the check will be performed because the sender address
-        // from which the check was expected was reset during the previous call
-        assertEq(cvp.getAccountStatusCheckIgnoredFrom(), address(0));
-
-        vm.prank(msgSender);
         cvp.requireAccountsStatusCheck(accounts);
         for (uint i = 0; i < accounts.length; ++i) {
             assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -557,35 +198,27 @@ contract AccountStatusTest is Test {
         // another test case
         // checks no longer deferred thus revert as all the accounts have invalid status
         cvp.setBatchDepth(1);
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(accounts[0]);
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
         }
-        if (accounts.length > 1) {
+        if (accounts.length > 0) {
             vm.expectRevert(
                 abi.encodeWithSelector(
                     CreditVaultProtocol.CVP_AccountStatusViolation.selector,
-                    accounts[1],
+                    accounts[0],
                     "account status violation"
                 )
             );
         }
-        vm.prank(msgSender);
         cvp.requireAccountsStatusCheck(accounts);
-        if (accounts.length == 1)
-            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[0]));
     }
 
     function test_RequireAccountsStatusCheckNow(
-        address msgSender,
         uint8 numberOfAccounts,
         bytes memory seed,
         bool allStatusesValid
     ) external {
-        vm.assume(msgSender != address(0));
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAccounts);
@@ -604,7 +237,6 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
             address controller = controllers[i];
 
-            cvp.setControllerToCollateralCallLock(false);
             vm.prank(account);
             cvp.enableController(account, controller);
 
@@ -626,15 +258,8 @@ contract AccountStatusTest is Test {
             Vault(controller).clearChecks();
             cvp.clearExpectedChecks();
 
-            // account status check will be performeded on the fly despite:
-            // - checks deferral
-            // - call from controller to collateral state
-            // - current onBehalfOfAccount matching the account being checked
-            // - the check being requested from expected sender address
+            // account status check will be performeded on the fly despite checks deferral
             cvp.setBatchDepth(2);
-            cvp.setControllerToCollateralCallLock(true);
-            cvp.setOnBehalfOfAccount(account);
-            cvp.setAccountStatusCheckIgnoredFrom(msgSender);
 
             assertTrue(cvp.isAccountStatusCheckDeferred(account));
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
@@ -654,7 +279,6 @@ contract AccountStatusTest is Test {
                     )
                 );
             }
-            vm.prank(msgSender);
             cvp.requireAccountStatusCheckNow(account);
 
             if (allStatusesValid || uint160(account) % 3 == 0) {
@@ -674,9 +298,6 @@ contract AccountStatusTest is Test {
         cvp.clearExpectedChecks();
 
         cvp.setBatchDepth(2);
-        cvp.setControllerToCollateralCallLock(true);
-        cvp.setOnBehalfOfAccount(accounts[0]);
-        cvp.setAccountStatusCheckIgnoredFrom(msgSender);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -695,12 +316,212 @@ contract AccountStatusTest is Test {
                 )
             );
         }
-        vm.prank(msgSender);
         cvp.requireAccountsStatusCheckNow(accounts);
         assertEq(
             cvp.isAccountStatusCheckDeferred(accounts[0]),
             invalidAccountsCounter > 0
         );
         cvp.verifyAccountStatusChecks();
+    }
+
+    function test_ForgiveAccountsStatusCheck(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+        }
+
+        address controller = address(new Vault(cvp));
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            address account = accounts[i];
+
+            // account status check will be scheduled for later due to deferred state
+            cvp.setBatchDepth(2);
+
+            vm.prank(account);
+            cvp.enableController(account, controller);
+
+            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+            vm.prank(controller);
+            cvp.forgiveAccountStatusCheck(account);
+            assertFalse(cvp.isAccountStatusCheckDeferred(account));
+
+            cvp.reset();
+        }
+
+        cvp.setBatchDepth(2);
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+        cvp.requireAccountsStatusCheck(accounts);
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+
+        vm.prank(controller);
+        cvp.forgiveAccountsStatusCheck(accounts);
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+    }
+
+    function test_RevertIfNoControllerEnabled_ForgiveAccountsStatusCheck(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+        }
+
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            address account = accounts[i];
+
+            // account status check will be scheduled for later due to deferred state
+            cvp.setBatchDepth(2);
+
+            assertFalse(cvp.isAccountStatusCheckDeferred(account));
+            cvp.requireAccountsStatusCheck(accounts);
+            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+
+            // the check does not get forgiven
+            vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+            cvp.forgiveAccountStatusCheck(account);
+
+            cvp.reset();
+        }
+
+        cvp.setBatchDepth(2);
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+        cvp.requireAccountsStatusCheck(accounts);
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+
+        // the checks do not get forgiven
+        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+        cvp.forgiveAccountsStatusCheck(accounts);
+    }
+
+    function test_RevertIfMultipleControllersEnabled_ForgiveAccountsStatusCheck(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+        vm.assume(uint256(bytes32(seed)) > numberOfAccounts);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+        }
+
+        address controller_1 = address(new Vault(cvp));
+        address controller_2 = address(new Vault(cvp));
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            address account = accounts[i];
+
+            // account status check will be scheduled for later due to deferred state
+            cvp.setBatchDepth(2);
+
+            vm.prank(account);
+            cvp.enableController(account, controller_1);
+
+            vm.prank(account);
+            cvp.enableController(account, controller_2);
+
+            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+            vm.prank(controller_1);
+            vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+            cvp.forgiveAccountStatusCheck(account);
+
+            cvp.reset();
+        }
+
+        cvp.setBatchDepth(2);
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+        cvp.requireAccountsStatusCheck(accounts);
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+
+        vm.prank(controller_1);
+        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+        cvp.forgiveAccountsStatusCheck(accounts);
+
+        // leave only one account with multiple controllers enabled
+        for (uint i = 0; i < accounts.length; i++) {
+            if (uint256(bytes32(seed)) % accounts.length == i) continue; 
+            Vault(controller_2).disableController(accounts[i]);
+        }
+
+        // still reverts
+        vm.prank(controller_1);
+        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+        cvp.forgiveAccountsStatusCheck(accounts);
+    }
+
+    function test_RevertIfMsgSenderIsNotEnabledController_ForgiveAccountsStatusCheck(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+        }
+
+        address controller = address(new Vault(cvp));
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            address account = accounts[i];
+
+            // account status check will be scheduled for later due to deferred state
+            cvp.setBatchDepth(2);
+
+            vm.prank(account);
+            cvp.enableController(account, controller);
+
+            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+            vm.prank(address(uint160(controller) + 1));
+            vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
+            cvp.forgiveAccountStatusCheck(account);
+
+            cvp.reset();
+        }
+
+        cvp.setBatchDepth(2);
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+        cvp.requireAccountsStatusCheck(accounts);
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
+        }
+
+        vm.prank(address(uint160(controller) - 1));
+        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
+        cvp.forgiveAccountsStatusCheck(accounts);
     }
 }

@@ -17,7 +17,6 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
     function reset() external {
         delete accountStatusChecks;
         delete vaultStatusChecks;
-        delete accountStatusCheckIgnoredFrom;
         delete expectedAccountsChecked;
         delete expectedVaultsChecked;
     }
@@ -63,48 +62,23 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         executionContext.onBehalfOfAccount = account;
     }
 
-    function setControllerToCollateralCallLock(bool locked) external {
-        executionContext.controllerToCollateralCallLock = locked;
-    }
-
-    function setAccountStatusCheckIgnoredFrom(address from) external {
-        accountStatusCheckIgnoredFrom = from;
-    }
-
-    function getAccountStatusCheckIgnoredFrom()
-        external
-        view
-        returns (address)
-    {
-        return accountStatusCheckIgnoredFrom;
+    function setImpersonateLock(bool locked) external {
+        executionContext.impersonateLock = locked;
     }
 
     // function overrides in order to verify the account and vault checks
     function requireAccountStatusCheck(address account) public override {
-        address accountStatusCheckIgnoredFromCache = accountStatusCheckIgnoredFrom;
-
         super.requireAccountStatusCheck(account);
-
-        if (
-            !executionContext.controllerToCollateralCallLock ||
-            executionContext.onBehalfOfAccount != account ||
-            accountStatusCheckIgnoredFromCache != msg.sender
-        ) expectedAccountsChecked.push(account);
+        expectedAccountsChecked.push(account);
     }
 
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public override {
-        address accountStatusCheckIgnoredFromCache = accountStatusCheckIgnoredFrom;
-
         super.requireAccountsStatusCheck(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
-            if (
-                !executionContext.controllerToCollateralCallLock ||
-                executionContext.onBehalfOfAccount != accounts[i] ||
-                accountStatusCheckIgnoredFromCache != msg.sender
-            ) expectedAccountsChecked.push(accounts[i]);
+            expectedAccountsChecked.push(accounts[i]);
         }
     }
 
@@ -156,8 +130,8 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             "verifyStorage/checks-in-progress-lock"
         );
         require(
-            executionContext.controllerToCollateralCallLock == false,
-            "verifyStorage/controller-to-collateral-call-lock"
+            executionContext.impersonateLock == false,
+            "verifyStorage/impersonate-lock"
         );
         require(
             executionContext.onBehalfOfAccount == address(0),
@@ -195,11 +169,6 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
                 "verifyStorage/vault-status-checks/elements"
             );
         }
-
-        require(
-            accountStatusCheckIgnoredFrom == address(0),
-            "verifyStorage/account-status-check-ignored-from"
-        );
 
         // for coverage
         invariantsCheck();

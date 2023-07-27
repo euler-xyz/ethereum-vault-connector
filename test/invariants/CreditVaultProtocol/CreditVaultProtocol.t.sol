@@ -117,10 +117,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         (success, result) = super.call(targetContract, onBehalfOfAccount, data);
     }
 
-    function callFromControllerToCollateral(
+    function impersonate(
         address targetContract,
         address onBehalfOfAccount,
-        address nextAccountStatusCheckIgnoredFrom,
         bytes calldata data
     ) public payable override returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
@@ -131,10 +130,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         accountControllers[onBehalfOfAccount].insert(msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
 
-        (success, result) = super.callFromControllerToCollateral(
+        (success, result) = super.impersonate(
             targetContract,
             onBehalfOfAccount,
-            nextAccountStatusCheckIgnoredFrom,
             data
         );
     }
@@ -221,12 +219,11 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     function exposeTransientStorage()
         external
         view
-        returns (SetStorage memory, SetStorage memory, address)
+        returns (SetStorage memory, SetStorage memory)
     {
         return (
             accountStatusChecks,
-            vaultStatusChecks,
-            accountStatusCheckIgnoredFrom
+            vaultStatusChecks
         );
     }
 }
@@ -250,7 +247,7 @@ contract CreditVaultProtocolInvariants is Test {
 
         assertEq(context.batchDepth, 1);
         assertFalse(context.checksInProgressLock);
-        assertFalse(context.controllerToCollateralCallLock);
+        assertFalse(context.impersonateLock);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
     }
@@ -258,15 +255,13 @@ contract CreditVaultProtocolInvariants is Test {
     function invariant_transientStorage() external {
         (
             SetStorage memory accountStatusChecks,
-            SetStorage memory vaultStatusChecks,
-            address accountStatusCheckIgnoredFrom
+            SetStorage memory vaultStatusChecks
         ) = cvp.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
         assertTrue(accountStatusChecks.firstElement == address(0));
         assertTrue(vaultStatusChecks.numElements == 0);
         assertTrue(vaultStatusChecks.firstElement == address(0));
-        assertTrue(accountStatusCheckIgnoredFrom == address(0));
     }
 
     function invariant_controllers() external {

@@ -6,7 +6,7 @@ interface ICVP {
     struct ExecutionContext {
         uint8 batchDepth;
         bool checksInProgressLock;
-        bool controllerToCollateralCallLock;
+        bool impersonateLock;
         address onBehalfOfAccount;
     }
 
@@ -107,10 +107,9 @@ interface ICVP {
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 
-    function callFromControllerToCollateral(
+    function impersonate(
         address targetContract,
         address onBehalfOfAccount,
-        address nextAccountStatusCheckIgnoredFrom,
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 

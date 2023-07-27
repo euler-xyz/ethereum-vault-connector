@@ -8,10 +8,9 @@ import "../../utils/CreditVaultProtocolHarnessed.sol";
 contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
     using Set for SetStorage;
 
-    function handlerCallFromControllerToCollateral(
+    function handlerImpersonate(
         address targetContract,
         address onBehalfOfAccount,
-        address nextAccountStatusCheckIgnoredFrom,
         bytes calldata data
     ) public payable returns (bool success, bytes memory result) {
         (success, ) = msg.sender.call(
@@ -19,10 +18,9 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
         );
         clearExpectedChecks();
 
-        (success, result) = super.callFromControllerToCollateral(
+        (success, result) = super.impersonate(
             targetContract,
             onBehalfOfAccount,
-            nextAccountStatusCheckIgnoredFrom,
             data
         );
 
@@ -32,14 +30,14 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
     }
 }
 
-contract CallFromControllerToCollateralTest is Test {
+contract ImpersonateTest is Test {
     CreditVaultProtocolHandler internal cvp;
 
     function setUp() public {
         cvp = new CreditVaultProtocolHandler();
     }
 
-    function test_CallFromControllerToCollateral(
+    function test_Impersonate(
         address alice,
         uint96 seed
     ) public {
@@ -56,21 +54,19 @@ contract CallFromControllerToCollateralTest is Test {
         cvp.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
         hoax(controller, seed);
         (bool success, bytes memory result) = cvp
-            .handlerCallFromControllerToCollateral{value: seed}(
+            .handlerImpersonate{value: seed}(
             collateral,
             alice,
-            address(0),
             data
         );
 
@@ -82,12 +78,11 @@ contract CallFromControllerToCollateralTest is Test {
 
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             0, // we're expecting ETH not to get forwarded
             true,
-            address(0),
             alice
         );
 
@@ -98,10 +93,9 @@ contract CallFromControllerToCollateralTest is Test {
         items[0].targetContract = address(cvp);
         items[0].msgValue = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
-            cvp.callFromControllerToCollateral.selector,
+            cvp.impersonate.selector,
             collateral,
             alice,
-            address(0),
             data
         );
 
@@ -123,44 +117,24 @@ contract CallFromControllerToCollateralTest is Test {
         Vault(controller).clearChecks();
 
         data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             controller
         );
 
         hoax(controller, seed);
-        (success, result) = cvp.handlerCallFromControllerToCollateral{
+        (success, result) = cvp.handlerImpersonate{
             value: seed
-        }(collateral, address(0), address(0), data);
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
-
-        // verify ignoring the next account status check
-        data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
-            address(cvp),
-            address(cvp),
-            seed,
-            false,
-            collateral,
-            alice
-        );
-
-        hoax(controller, seed);
-        (success, result) = cvp.handlerCallFromControllerToCollateral{
-            value: seed
-        }(collateral, alice, collateral, data);
+        }(collateral, address(0), data);
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
     }
 
-    function test_RevertIfCTCCReentrancy_CallFromControllerToCollateral(
+    function test_RevertIfImpersonateReentrancy_Impersonate(
         address alice,
         uint seed
     ) public {
@@ -176,28 +150,27 @@ contract CallFromControllerToCollateralTest is Test {
         vm.prank(alice);
         cvp.enableController(alice, controller);
 
-        cvp.setControllerToCollateralCallLock(true);
+        cvp.setImpersonateLock(true);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(address(cvp)).callFromControllerToCollateralTest.selector,
+            Target(address(cvp)).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
-        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
+        (bool success, ) = cvp.handlerImpersonate{
             value: seed
-        }(collateral, alice, address(0), data);
+        }(collateral, alice, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfTargetContractInvalid_CallFromControllerToCollateral(
+    function test_RevertIfTargetContractInvalid_Impersonate(
         address alice,
         uint seed
     ) public {
@@ -210,25 +183,24 @@ contract CallFromControllerToCollateralTest is Test {
 
         // target contract is the CVP
         bytes memory data = abi.encodeWithSelector(
-            Target(address(cvp)).callFromControllerToCollateralTest.selector,
+            Target(address(cvp)).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
-        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+        (bool success, ) = cvp.handlerImpersonate{
             value: seed
-        }(address(cvp), alice, address(0), data);
+        }(address(cvp), alice, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfNoControllerEnabled_CallFromControllerToCollateral(
+    function test_RevertIfNoControllerEnabled_Impersonate(
         address alice,
         uint seed
     ) public {
@@ -243,25 +215,24 @@ contract CallFromControllerToCollateralTest is Test {
         cvp.enableCollateral(alice, collateral);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
         hoax(controller, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+        (bool success, ) = cvp.handlerImpersonate{
             value: seed
-        }(collateral, alice, address(0), data);
+        }(collateral, alice, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfMultipleControllersEnabled_CallFromControllerToCollateral(
+    function test_RevertIfMultipleControllersEnabled_Impersonate(
         address alice,
         uint seed
     ) public {
@@ -286,25 +257,24 @@ contract CallFromControllerToCollateralTest is Test {
         cvp.enableController(alice, controller_2);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
         hoax(controller_1, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+        (bool success, ) = cvp.handlerImpersonate{
             value: seed
-        }(collateral, alice, address(0), data);
+        }(collateral, alice, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfMsgSenderIsNotEnabledController_CallFromControllerToCollateral(
+    function test_RevertIfMsgSenderIsNotEnabledController_Impersonate(
         address alice,
         address randomAddress,
         uint seed
@@ -325,12 +295,11 @@ contract CallFromControllerToCollateralTest is Test {
         cvp.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
@@ -340,14 +309,14 @@ contract CallFromControllerToCollateralTest is Test {
                 CreditVaultProtocol.CVP_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+        (bool success, ) = cvp.handlerImpersonate{
             value: seed
-        }(collateral, alice, address(0), data);
+        }(collateral, alice, data);
 
         assertFalse(success);
     }
 
-    function test_RevertIfTargetContractIsNotEnabledCollateral_CallFromControllerToCollateral(
+    function test_RevertIfTargetContractIsNotEnabledCollateral_Impersonate(
         address alice,
         address targetContract,
         uint seed
@@ -367,12 +336,11 @@ contract CallFromControllerToCollateralTest is Test {
         cvp.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(collateral).callFromControllerToCollateralTest.selector,
+            Target(collateral).impersonateTest.selector,
             address(cvp),
             address(cvp),
             seed,
             false,
-            address(0),
             alice
         );
 
@@ -382,9 +350,9 @@ contract CallFromControllerToCollateralTest is Test {
                 CreditVaultProtocol.CVP_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvp.handlerCallFromControllerToCollateral{
+        (bool success, ) = cvp.handlerImpersonate{
             value: seed
-        }(targetContract, alice, address(0), data);
+        }(targetContract, alice, data);
 
         assertFalse(success);
     }

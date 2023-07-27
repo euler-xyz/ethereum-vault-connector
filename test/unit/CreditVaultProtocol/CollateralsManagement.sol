@@ -155,29 +155,29 @@ contract CollateralsManagementTest is Test {
         cvp.disableCollateral(bob, vault);
     }
 
-    function test_RevertIfCTCCReentrancy_CollateralsManagement(
+    function test_RevertIfImpersonateReentrancy_CollateralsManagement(
         address alice
     ) public {
         address vault = address(new Vault(cvp));
 
-        cvp.setControllerToCollateralCallLock(true);
+        cvp.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
         cvp.enableCollateral(alice, vault);
 
-        cvp.setControllerToCollateralCallLock(false);
+        cvp.setImpersonateLock(false);
 
         vm.prank(alice);
         cvp.enableCollateral(alice, vault);
 
-        cvp.setControllerToCollateralCallLock(true);
+        cvp.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_CTCC_Reentancy.selector);
+        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
         cvp.disableCollateral(alice, vault);
 
-        cvp.setControllerToCollateralCallLock(false);
+        cvp.setImpersonateLock(false);
 
         vm.prank(alice);
         cvp.disableCollateral(alice, vault);
