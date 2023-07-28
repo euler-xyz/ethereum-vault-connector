@@ -10,6 +10,7 @@ abstract contract TransientStorage {
         Account,
         Vault
     }
+
     ICVP.ExecutionContext internal executionContext;
     SetStorage internal accountStatusChecks;
     SetStorage internal vaultStatusChecks;

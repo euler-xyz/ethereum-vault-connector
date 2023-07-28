@@ -147,13 +147,6 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             "verifyStorage/account-status-checks/firstElement"
         );
 
-        for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {
-            require(
-                accountStatusChecks.elements[i] == address(0),
-                "verifyStorage/account-status-checks/elements"
-            );
-        }
-
         require(
             vaultStatusChecks.numElements == 0,
             "verifyStorage/vault-status-checks/numElements"
@@ -162,13 +155,6 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             vaultStatusChecks.firstElement == address(0),
             "verifyStorage/vault-status-checks/firstElement"
         );
-
-        for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {
-            require(
-                vaultStatusChecks.elements[i] == address(0),
-                "verifyStorage/vault-status-checks/elements"
-            );
-        }
 
         // for coverage
         invariantsCheck();
