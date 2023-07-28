@@ -163,7 +163,7 @@ contract AccountStatusTest is Test {
         }
 
         for (uint i = 0; i < numberOfAccounts; i++) {
-            cvp.setBatchDepth(1);
+            cvp.setBatchDepth(0);
 
             address account = accounts[i];
             address controller = controllers[i];
@@ -173,7 +173,7 @@ contract AccountStatusTest is Test {
             Vault(controller).setAccountStatusState(1);
 
             // account status check will be scheduled for later due to deferred state
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             // even though the account status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the accounts to the set
@@ -184,7 +184,7 @@ contract AccountStatusTest is Test {
             cvp.reset();
         }
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -197,7 +197,7 @@ contract AccountStatusTest is Test {
 
         // another test case
         // checks no longer deferred thus revert as all the accounts have invalid status
-        cvp.setBatchDepth(1);
+        cvp.setBatchDepth(0);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -252,14 +252,14 @@ contract AccountStatusTest is Test {
 
             // fist, schedule the check to be performed later to prove that after being peformed on the fly
             // account is no longer contained in the set to be performed later
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
             cvp.requireAccountStatusCheck(account);
 
             Vault(controller).clearChecks();
             cvp.clearExpectedChecks();
 
             // account status check will be performeded on the fly despite checks deferral
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             assertTrue(cvp.isAccountStatusCheckDeferred(account));
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
@@ -289,7 +289,7 @@ contract AccountStatusTest is Test {
 
         // schedule the checks to be performed later to prove that after being peformed on the fly
         // accounts are no longer contained in the set to be performed later
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
         cvp.requireAccountsStatusCheck(accounts);
 
         for (uint i = 0; i < controllers.length; ++i) {
@@ -297,7 +297,7 @@ contract AccountStatusTest is Test {
         }
         cvp.clearExpectedChecks();
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertTrue(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -342,7 +342,7 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
 
             // account status check will be scheduled for later due to deferred state
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             vm.prank(account);
             cvp.enableController(account, controller);
@@ -355,7 +355,7 @@ contract AccountStatusTest is Test {
             cvp.reset();
         }
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -389,7 +389,7 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
 
             // account status check will be scheduled for later due to deferred state
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
             cvp.requireAccountsStatusCheck(accounts);
@@ -402,7 +402,7 @@ contract AccountStatusTest is Test {
             cvp.reset();
         }
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -437,7 +437,7 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
 
             // account status check will be scheduled for later due to deferred state
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             vm.prank(account);
             cvp.enableController(account, controller_1);
@@ -453,7 +453,7 @@ contract AccountStatusTest is Test {
             cvp.reset();
         }
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));
@@ -497,7 +497,7 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
 
             // account status check will be scheduled for later due to deferred state
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             vm.prank(account);
             cvp.enableController(account, controller);
@@ -510,7 +510,7 @@ contract AccountStatusTest is Test {
             cvp.reset();
         }
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
             assertFalse(cvp.isAccountStatusCheckDeferred(accounts[i]));

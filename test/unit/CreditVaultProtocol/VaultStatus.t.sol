@@ -72,7 +72,7 @@ contract VaultStatusTest is Test {
             );
 
             Vault(vault).setVaultStatusState(1);
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             vm.prank(vault);
 
@@ -83,7 +83,7 @@ contract VaultStatusTest is Test {
 
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // checks no longer deferred
-                cvp.setBatchDepth(1);
+                cvp.setBatchDepth(0);
 
                 vm.prank(vault);
                 vm.expectRevert(

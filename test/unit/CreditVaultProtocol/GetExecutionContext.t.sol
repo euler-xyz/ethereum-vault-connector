@@ -20,7 +20,7 @@ contract GetExecutionContextTest is Test {
         (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp
             .getExecutionContext(controller);
 
-        assertEq(context.batchDepth, 1);
+        assertEq(context.batchDepth, 0);
         assertFalse(context.impersonateLock);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
@@ -30,13 +30,13 @@ contract GetExecutionContextTest is Test {
             cvp.enableController(account, controller);
         }
 
-        cvp.setBatchDepth(seed % 3 == 0 ? 2 : 1);
+        cvp.setBatchDepth(seed % 3 == 0 ? 1 : 0);
         cvp.setImpersonateLock(seed % 4 == 0 ? true : false);
         cvp.setOnBehalfOfAccount(account);
 
         (context, controllerEnabled) = cvp.getExecutionContext(controller);
 
-        assertEq(context.batchDepth, seed % 3 == 0 ? 2 : 1);
+        assertEq(context.batchDepth, seed % 3 == 0 ? 1 : 0);
         assertEq(
             context.impersonateLock,
             seed % 4 == 0 ? true : false
@@ -50,7 +50,7 @@ contract GetExecutionContextTest is Test {
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
@@ -70,25 +70,25 @@ contract GetExecutionContextTest is Test {
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
         cvp.requireAccountStatusCheck(address(1));
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
         cvp.requireAccountStatusCheck(address(0));
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
         cvp.requireVaultStatusCheck();
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
         vm.prank(address(0));
         cvp.requireVaultStatusCheck();
         vm.expectRevert();

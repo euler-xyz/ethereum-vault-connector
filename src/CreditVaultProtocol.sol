@@ -17,14 +17,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     address internal constant ERC1820_REGISTRY =
         0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
-    uint8 internal constant BATCH_DEPTH__INIT = 1;
-    uint8 internal constant BATCH_DEPTH__MAX = 10;
+    uint8 internal constant BATCH_DEPTH__INIT = 0;
+    uint8 internal constant BATCH_DEPTH__MAX  = 9;
 
     // Storage
     mapping(address account => mapping(address operator => bool isOperator))
         public accountOperators;
 
-    ExecutionContext internal executionContext;
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
@@ -76,11 +75,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     );
     error CVP_BatchPanic();
 
-    // Constructor
-
-    constructor() {
-        executionContext.batchDepth = BATCH_DEPTH__INIT;
-    }
 
     // Modifiers
 

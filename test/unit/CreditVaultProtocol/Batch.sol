@@ -294,7 +294,7 @@ contract BatchTest is Test {
         items[0].msgValue = 0;
         items[0].data = "";
 
-        cvp.setBatchDepth(10);
+        cvp.setBatchDepth(9);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.CVP_BatchDepthViolation.selector);

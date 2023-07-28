@@ -245,7 +245,7 @@ contract CreditVaultProtocolInvariants is Test {
         (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp
             .getExecutionContext(address(this));
 
-        assertEq(context.batchDepth, 1);
+        assertEq(context.batchDepth, 0);
         assertFalse(context.checksInProgressLock);
         assertFalse(context.impersonateLock);
         assertEq(context.onBehalfOfAccount, address(0));

@@ -245,7 +245,7 @@ contract ImpersonateTest is Test {
         vm.assume(collateral != address(cvp));
 
         // mock checks deferred to enable multiple controllers
-        cvp.setBatchDepth(2);
+        cvp.setBatchDepth(1);
 
         vm.prank(alice);
         cvp.enableCollateral(alice, collateral);

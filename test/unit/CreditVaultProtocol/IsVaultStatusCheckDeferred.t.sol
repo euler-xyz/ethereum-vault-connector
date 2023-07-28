@@ -17,7 +17,7 @@ contract IsVaultStatusCheckDeferredTest is Test {
 
         for (uint i = 0; i < numberOfVaults; ++i) {
             // we're not in a batch thus the check will not get deferred
-            cvp.setBatchDepth(1);
+            cvp.setBatchDepth(0);
 
             address vault = address(new Vault(cvp));
             assertFalse(cvp.isVaultStatusCheckDeferred(vault));
@@ -27,7 +27,7 @@ contract IsVaultStatusCheckDeferredTest is Test {
             assertFalse(cvp.isVaultStatusCheckDeferred(vault));
 
             // simulate being in a batch
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             vm.prank(vault);
             cvp.requireVaultStatusCheck();

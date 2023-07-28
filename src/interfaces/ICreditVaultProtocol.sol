@@ -8,6 +8,7 @@ interface ICVP {
         bool checksInProgressLock;
         bool impersonateLock;
         address onBehalfOfAccount;
+        uint8 reserved;
     }
 
     struct BatchItem {

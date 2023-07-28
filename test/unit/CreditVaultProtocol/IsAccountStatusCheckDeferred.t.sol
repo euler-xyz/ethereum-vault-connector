@@ -20,7 +20,7 @@ contract IsAccountStatusCheckDeferredTest is Test {
 
         for (uint i = 0; i < numberOfAccounts; ++i) {
             // we're not in a batch thus the check will not get deferred
-            cvp.setBatchDepth(1);
+            cvp.setBatchDepth(0);
 
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
@@ -31,7 +31,7 @@ contract IsAccountStatusCheckDeferredTest is Test {
             assertFalse(cvp.isAccountStatusCheckDeferred(account));
 
             // simulate being in a batch
-            cvp.setBatchDepth(2);
+            cvp.setBatchDepth(1);
 
             cvp.requireAccountStatusCheck(account);
             assertTrue(cvp.isAccountStatusCheckDeferred(account));

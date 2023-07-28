@@ -20,7 +20,7 @@ contract Target {
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == msgValue, "ct/invalid-msg-value");
         require(
-            context.batchDepth != 1 == checksDeferred,
+            context.batchDepth != 0 == checksDeferred,
             "ct/invalid-checks-deferred"
         );
         require(
@@ -44,7 +44,7 @@ contract Target {
         require(msg.sender == msgSender, "it/invalid-sender");
         require(msg.value == msgValue, "it/invalid-msg-value");
         require(
-            context.batchDepth != 1 == checksDeferred,
+            context.batchDepth != 0 == checksDeferred,
             "it/invalid-checks-deferred"
         );
         require(
