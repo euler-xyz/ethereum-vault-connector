@@ -396,7 +396,9 @@ contract AccountStatusTest is Test {
             assertTrue(cvp.isAccountStatusCheckDeferred(account));
 
             // the check does not get forgiven
-            vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+            vm.expectRevert(
+                CreditVaultProtocol.CVP_ControllerViolation.selector
+            );
             cvp.forgiveAccountStatusCheck(account);
 
             cvp.reset();
@@ -447,7 +449,9 @@ contract AccountStatusTest is Test {
 
             assertTrue(cvp.isAccountStatusCheckDeferred(account));
             vm.prank(controller_1);
-            vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
+            vm.expectRevert(
+                CreditVaultProtocol.CVP_ControllerViolation.selector
+            );
             cvp.forgiveAccountStatusCheck(account);
 
             cvp.reset();
@@ -469,7 +473,7 @@ contract AccountStatusTest is Test {
 
         // leave only one account with multiple controllers enabled
         for (uint i = 0; i < accounts.length; i++) {
-            if (uint256(bytes32(seed)) % accounts.length == i) continue; 
+            if (uint256(bytes32(seed)) % accounts.length == i) continue;
             Vault(controller_2).disableController(accounts[i]);
         }
 

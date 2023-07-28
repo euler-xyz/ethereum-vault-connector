@@ -51,10 +51,7 @@ contract Target {
             context.onBehalfOfAccount == onBehalfOfAccount,
             "it/invalid-on-behalf-of-account"
         );
-        require(
-            context.impersonateLock == true,
-            "it/impersonate-lock"
-        );
+        require(context.impersonateLock == true, "it/impersonate-lock");
 
         // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
         // therefore it's not necessary to fully verify it here

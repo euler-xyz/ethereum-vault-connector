@@ -37,10 +37,7 @@ contract GetExecutionContextTest is Test {
         (context, controllerEnabled) = cvp.getExecutionContext(controller);
 
         assertEq(context.batchDepth, seed % 3 == 0 ? 1 : 0);
-        assertEq(
-            context.impersonateLock,
-            seed % 4 == 0 ? true : false
-        );
+        assertEq(context.impersonateLock, seed % 4 == 0 ? true : false);
         assertEq(context.onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
     }
@@ -55,7 +52,7 @@ contract GetExecutionContextTest is Test {
         cvp.invariantsCheck();
         cvp.reset();
 
-        cvp.setChecksInProgressLock(true);
+        cvp.setChecksLock(true);
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();

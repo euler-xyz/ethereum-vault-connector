@@ -18,7 +18,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
     uint8 internal constant BATCH_DEPTH__INIT = 0;
-    uint8 internal constant BATCH_DEPTH__MAX  = 9;
+    uint8 internal constant BATCH_DEPTH__MAX = 9;
 
     // Storage
     mapping(address account => mapping(address operator => bool isOperator))
@@ -75,7 +75,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     );
     error CVP_BatchPanic();
 
-
     // Modifiers
 
     /// @notice A modifier that allows only the owner or an operator of the account to call the function.
@@ -101,26 +100,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         _;
     }
 
-    /// @notice A modifier that checks whether the context is in desired state.
-    modifier checkContext() {
+    /// @notice A modifier that checks for checks in progress and impersonate reentrancy.
+    modifier nonReentrant() {
         {
             ExecutionContext memory context = executionContext;
 
-            if (context.checksInProgressLock) {
-                revert CVP_ChecksReentrancy();
-            } else if (context.impersonateLock) {
-                revert CVP_ImpersonateReentancy();
-            } else if (context.batchDepth >= BATCH_DEPTH__MAX) {
-                revert CVP_BatchDepthViolation();
-            }
-        }
-        _;
-    }
-
-    /// @notice A modifier that allows the function to be called only if the context is not locked by the impersonate() call.
-    modifier impersonateNonReentrant() {
-        if (executionContext.impersonateLock) {
-            revert CVP_ImpersonateReentancy();
+            if (context.checksLock) revert CVP_ChecksReentrancy();
+            else if (context.impersonateLock) revert CVP_ImpersonateReentancy();
         }
         _;
     }
@@ -149,7 +135,6 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
         _;
     }
-
 
     // Account owner and operators
 
@@ -281,7 +266,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function enableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) impersonateNonReentrant {
+    ) public payable virtual ownerOrOperator(account) nonReentrant {
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -293,7 +278,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function disableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) impersonateNonReentrant {
+    ) public payable virtual ownerOrOperator(account) nonReentrant {
         accountCollaterals[account].remove(vault);
         requireAccountStatusCheck(account);
     }
@@ -329,7 +314,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function enableController(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) impersonateNonReentrant {
+    ) public payable virtual ownerOrOperator(account) nonReentrant {
         if (accountControllers[account].insert(vault)) {
             emit ControllerEnabled(account, vault);
         }
@@ -341,7 +326,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @param account The address for which the calling controller is being disabled.
     function disableController(
         address account
-    ) public payable virtual impersonateNonReentrant {
+    ) public payable virtual nonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
             emit ControllerDisabled(account, msg.sender);
         }
@@ -365,7 +350,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         public
         payable
         virtual
-        impersonateNonReentrant
+        nonReentrant
         returns (bool success, bytes memory result)
     {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
@@ -401,7 +386,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         public
         payable
         virtual
-        impersonateNonReentrant
+        nonReentrant
         returns (bool success, bytes memory result)
     {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
@@ -429,7 +414,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @param items An array of batch items to be executed.
     function batch(
         BatchItem[] calldata items
-    ) public payable virtual checkContext {
+    ) public payable virtual nonReentrant {
+        ExecutionContext memory context = executionContext;
+
+        if (context.batchDepth >= BATCH_DEPTH__MAX)
+            revert CVP_BatchDepthViolation();
+
         unchecked {
             ++executionContext.batchDepth;
         }
@@ -440,11 +430,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             --executionContext.batchDepth;
         }
 
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
-            executionContext.checksInProgressLock = true;
+        if (context.batchDepth == BATCH_DEPTH__INIT) {
+            executionContext.checksLock = true;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
-            executionContext.checksInProgressLock = false;
+            executionContext.checksLock = false;
         }
     }
 
@@ -460,13 +450,18 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         public
         payable
         virtual
-        checkContext
+        nonReentrant
         returns (
             BatchResult[] memory batchItemsResult,
             BatchResult[] memory accountsStatusResult,
             BatchResult[] memory vaultsStatusResult
         )
     {
+        ExecutionContext memory context = executionContext;
+
+        if (context.batchDepth >= BATCH_DEPTH__MAX)
+            revert CVP_BatchDepthViolation();
+
         unchecked {
             ++executionContext.batchDepth;
         }
@@ -477,11 +472,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             --executionContext.batchDepth;
         }
 
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
-            executionContext.checksInProgressLock = true;
+        if (context.batchDepth == BATCH_DEPTH__INIT) {
+            executionContext.checksLock = true;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
-            executionContext.checksInProgressLock = false;
+            executionContext.checksLock = false;
         }
 
         revert CVP_RevertedBatchResult(
@@ -604,7 +599,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    function forgiveAccountStatusCheck(address account) external authenticateController(account) {
+    function forgiveAccountStatusCheck(
+        address account
+    ) external authenticateController(account) {
         accountStatusChecks.remove(account);
     }
 
@@ -848,7 +845,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function invariantsCheck() public view {
         ExecutionContext memory context = executionContext;
         assert(context.batchDepth == BATCH_DEPTH__INIT);
-        assert(!context.checksInProgressLock);
+        assert(!context.checksLock);
         assert(!context.impersonateLock);
         assert(context.onBehalfOfAccount == address(0));
 

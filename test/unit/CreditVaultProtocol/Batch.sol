@@ -301,7 +301,7 @@ contract BatchTest is Test {
         cvp.batchSimulation(items);
     }
 
-    function test_RevertIfChecksInProgress_Batch(address alice) external {
+    function test_RevertIfChecksReentrancy_Batch(address alice) external {
         address vault = address(new VaultMalicious(cvp));
 
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
@@ -332,7 +332,7 @@ contract BatchTest is Test {
         cvp.batch(items);
     }
 
-    function test_RevertIfChecksInProgress_BatchRevert_BatchSimulation(
+    function test_RevertIfChecksReentrancy_BatchRevert_BatchSimulation(
         address alice
     ) external {
         address vault = address(new VaultMalicious(cvp));
@@ -456,12 +456,11 @@ contract BatchTest is Test {
         );
 
         vm.prank(controller);
-        (bool success, bytes memory result) = cvp
-            .impersonate(
-                collateral,
-                alice,
-                abi.encodeWithSelector(Vault.requireChecks.selector, alice)
-            );
+        (bool success, bytes memory result) = cvp.impersonate(
+            collateral,
+            alice,
+            abi.encodeWithSelector(Vault.requireChecks.selector, alice)
+        );
 
         assertFalse(success);
         assertEq(

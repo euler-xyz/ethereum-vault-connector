@@ -160,6 +160,34 @@ contract ControllersManagementTest is Test {
         cvp.handlerEnableController(bob, vault);
     }
 
+    function test_RevertIfProgressReentrancy_ControllersManagement(
+        address alice
+    ) public {
+        address vault = address(new Vault(cvp));
+
+        cvp.setChecksLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
+        cvp.enableController(alice, vault);
+
+        cvp.setChecksLock(false);
+
+        vm.prank(alice);
+        cvp.enableController(alice, vault);
+
+        cvp.setChecksLock(true);
+
+        vm.prank(vault);
+        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
+        cvp.disableController(alice);
+
+        cvp.setChecksLock(false);
+
+        vm.prank(vault);
+        cvp.disableController(alice);
+    }
+
     function test_RevertIfImpersonateReentrancy_ControllersManagement(
         address alice
     ) public {

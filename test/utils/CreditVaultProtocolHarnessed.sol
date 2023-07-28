@@ -54,8 +54,8 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         executionContext.batchDepth = depth;
     }
 
-    function setChecksInProgressLock(bool locked) external {
-        executionContext.checksInProgressLock = locked;
+    function setChecksLock(bool locked) external {
+        executionContext.checksLock = locked;
     }
 
     function setOnBehalfOfAccount(address account) external {
@@ -126,7 +126,7 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             "verifyStorage/checks-deferred"
         );
         require(
-            executionContext.checksInProgressLock == false,
+            executionContext.checksLock == false,
             "verifyStorage/checks-in-progress-lock"
         );
         require(

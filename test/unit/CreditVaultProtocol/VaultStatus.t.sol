@@ -97,4 +97,23 @@ contract VaultStatusTest is Test {
             }
         }
     }
+
+    function test_ForgiveVaultStatusCheck(uint8 vaultsNumber) external {
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
+
+        for (uint i = 0; i < vaultsNumber; i++) {
+            address vault = address(new Vault(cvp));
+
+            // vault status check will be scheduled for later due to deferred state
+            cvp.setBatchDepth(1);
+
+            vm.prank(vault);
+            cvp.requireVaultStatusCheck();
+
+            assertTrue(cvp.isVaultStatusCheckDeferred(vault));
+            vm.prank(vault);
+            cvp.forgiveVaultStatusCheck();
+            assertFalse(cvp.isVaultStatusCheckDeferred(vault));
+        }
+    }
 }

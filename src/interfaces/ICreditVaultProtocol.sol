@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 interface ICVP {
     struct ExecutionContext {
         uint8 batchDepth;
-        bool checksInProgressLock;
+        bool checksLock;
         bool impersonateLock;
         address onBehalfOfAccount;
         uint8 reserved;
@@ -128,13 +128,15 @@ interface ICVP {
 
     function requireAccountStatusCheckNow(address account) external;
 
+    function forgiveAccountStatusCheck(address account) external;
+
+    function forgiveAccountsStatusCheck(address[] calldata accounts) external;
+
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) external;
 
     function requireVaultStatusCheck() external;
 
-    function forgiveAccountStatusCheck(address account) external;
-
-    function forgiveAccountsStatusCheck(address[] calldata accounts) external;
+    function forgiveVaultStatusCheck() external;
 }

@@ -221,10 +221,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         view
         returns (SetStorage memory, SetStorage memory)
     {
-        return (
-            accountStatusChecks,
-            vaultStatusChecks
-        );
+        return (accountStatusChecks, vaultStatusChecks);
     }
 }
 
@@ -246,7 +243,7 @@ contract CreditVaultProtocolInvariants is Test {
             .getExecutionContext(address(this));
 
         assertEq(context.batchDepth, 0);
-        assertFalse(context.checksInProgressLock);
+        assertFalse(context.checksLock);
         assertFalse(context.impersonateLock);
         assertEq(context.onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
@@ -264,9 +261,10 @@ contract CreditVaultProtocolInvariants is Test {
         assertTrue(vaultStatusChecks.firstElement == address(0));
     }
 
-    function invariant_controllers() external {
+    function invariant_controllers_collaterals() external {
         address[] memory touchedAccounts = cvp.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
+            // controllers
             SetStorage memory accountControllers = cvp.exposeAccountControllers(
                 touchedAccounts[i]
             );
@@ -288,12 +286,8 @@ contract CreditVaultProtocolInvariants is Test {
             for (uint j = 1; j < accountControllersArray.length; j++) {
                 assertTrue(accountControllersArray[j] == address(0));
             }
-        }
-    }
 
-    function invariant_collaterals() external {
-        address[] memory touchedAccounts = cvp.getTouchedAccounts();
-        for (uint i = 0; i < touchedAccounts.length; i++) {
+            // collaterals
             SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(
                 touchedAccounts[i]
             );

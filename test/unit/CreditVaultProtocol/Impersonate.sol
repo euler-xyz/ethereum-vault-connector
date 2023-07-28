@@ -37,10 +37,7 @@ contract ImpersonateTest is Test {
         cvp = new CreditVaultProtocolHandler();
     }
 
-    function test_Impersonate(
-        address alice,
-        uint96 seed
-    ) public {
+    function test_Impersonate(address alice, uint96 seed) public {
         vm.assume(alice != address(0));
 
         address collateral = address(new Vault(cvp));
@@ -63,12 +60,9 @@ contract ImpersonateTest is Test {
         );
 
         hoax(controller, seed);
-        (bool success, bytes memory result) = cvp
-            .handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
+        (bool success, bytes memory result) = cvp.handlerImpersonate{
+            value: seed
+        }(collateral, alice, data);
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
@@ -126,12 +120,52 @@ contract ImpersonateTest is Test {
         );
 
         hoax(controller, seed);
-        (success, result) = cvp.handlerImpersonate{
-            value: seed
-        }(collateral, address(0), data);
+        (success, result) = cvp.handlerImpersonate{value: seed}(
+            collateral,
+            address(0),
+            data
+        );
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
+    }
+
+    function test_RevertIfChecksReentrancy_Impersonate(
+        address alice,
+        uint seed
+    ) public {
+        vm.assume(alice != address(0));
+
+        address collateral = address(new Vault(cvp));
+        address controller = address(new Vault(cvp));
+        vm.assume(collateral != address(cvp));
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, collateral);
+
+        vm.prank(alice);
+        cvp.enableController(alice, controller);
+
+        cvp.setChecksLock(true);
+
+        bytes memory data = abi.encodeWithSelector(
+            Target(address(cvp)).impersonateTest.selector,
+            address(cvp),
+            address(cvp),
+            seed,
+            false,
+            alice
+        );
+
+        hoax(alice, seed);
+        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            collateral,
+            alice,
+            data
+        );
+
+        assertFalse(success);
     }
 
     function test_RevertIfImpersonateReentrancy_Impersonate(
@@ -163,9 +197,11 @@ contract ImpersonateTest is Test {
 
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
-        (bool success, ) = cvp.handlerImpersonate{
-            value: seed
-        }(collateral, alice, data);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            collateral,
+            alice,
+            data
+        );
 
         assertFalse(success);
     }
@@ -193,9 +229,11 @@ contract ImpersonateTest is Test {
 
         hoax(alice, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
-        (bool success, ) = cvp.handlerImpersonate{
-            value: seed
-        }(address(cvp), alice, data);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            address(cvp),
+            alice,
+            data
+        );
 
         assertFalse(success);
     }
@@ -225,9 +263,11 @@ contract ImpersonateTest is Test {
 
         hoax(controller, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success, ) = cvp.handlerImpersonate{
-            value: seed
-        }(collateral, alice, data);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            collateral,
+            alice,
+            data
+        );
 
         assertFalse(success);
     }
@@ -267,9 +307,11 @@ contract ImpersonateTest is Test {
 
         hoax(controller_1, seed);
         vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success, ) = cvp.handlerImpersonate{
-            value: seed
-        }(collateral, alice, data);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            collateral,
+            alice,
+            data
+        );
 
         assertFalse(success);
     }
@@ -309,9 +351,11 @@ contract ImpersonateTest is Test {
                 CreditVaultProtocol.CVP_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvp.handlerImpersonate{
-            value: seed
-        }(collateral, alice, data);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            collateral,
+            alice,
+            data
+        );
 
         assertFalse(success);
     }
@@ -350,9 +394,11 @@ contract ImpersonateTest is Test {
                 CreditVaultProtocol.CVP_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvp.handlerImpersonate{
-            value: seed
-        }(targetContract, alice, data);
+        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+            targetContract,
+            alice,
+            data
+        );
 
         assertFalse(success);
     }
