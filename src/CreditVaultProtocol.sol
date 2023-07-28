@@ -103,10 +103,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice A modifier that checks for checks in progress and impersonate reentrancy.
     modifier nonReentrant() {
         {
-            ExecutionContext memory context = executionContext;
+            bool checksLock = executionContext.checksLock;
+            bool impersonateLock = executionContext.impersonateLock;
 
-            if (context.checksLock) revert CVP_ChecksReentrancy();
-            else if (context.impersonateLock) revert CVP_ImpersonateReentancy();
+            if (checksLock) revert CVP_ChecksReentrancy();
+            else if (impersonateLock) revert CVP_ImpersonateReentancy();
         }
         _;
     }
@@ -415,9 +416,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
-        ExecutionContext memory context = executionContext;
+        uint batchDepthCache = executionContext.batchDepth;
 
-        if (context.batchDepth >= BATCH_DEPTH__MAX)
+        if (batchDepthCache >= BATCH_DEPTH__MAX)
             revert CVP_BatchDepthViolation();
 
         unchecked {
@@ -430,7 +431,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             --executionContext.batchDepth;
         }
 
-        if (context.batchDepth == BATCH_DEPTH__INIT) {
+        if (batchDepthCache == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
@@ -457,9 +458,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             BatchResult[] memory vaultsStatusResult
         )
     {
-        ExecutionContext memory context = executionContext;
+        uint batchDepthCache = executionContext.batchDepth;
 
-        if (context.batchDepth >= BATCH_DEPTH__MAX)
+        if (batchDepthCache >= BATCH_DEPTH__MAX)
             revert CVP_BatchDepthViolation();
 
         unchecked {
@@ -472,7 +473,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             --executionContext.batchDepth;
         }
 
-        if (context.batchDepth == BATCH_DEPTH__INIT) {
+        if (batchDepthCache == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
@@ -549,9 +550,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. The account status is checked only if not explicitly ordered to be ignored for the current onBehalfOfAccount.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) public virtual {
-        ExecutionContext memory context = executionContext;
-
-        if (context.batchDepth == BATCH_DEPTH__INIT) {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
         } else {
             accountStatusChecks.insert(account);
@@ -564,10 +563,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
-        ExecutionContext memory context = executionContext;
+        uint batchDepthCache = executionContext.batchDepth;
 
         for (uint i = 0; i < accounts.length; ) {
-            if (context.batchDepth == BATCH_DEPTH__INIT) {
+            if (batchDepthCache == BATCH_DEPTH__INIT) {
                 requireAccountStatusCheckInternal(accounts[i]);
             } else {
                 accountStatusChecks.insert(accounts[i]);
