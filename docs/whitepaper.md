@@ -189,7 +189,7 @@ However, if a vault (or something it invokes) calls back into the CVP at this po
 
 #### impersonateLock
 
-The typical use-case for impersonation is a liability vault is to seize some collateral assets during a liquidation flow.
+The typical use-case for impersonation is for a liability vault to seize collateral assets during a liquidation flow.
 
 However, when interacting with complicated vaults that may invoke external contracts during a withdraw/transfer, a liability vault may want to ensure that no *other* collaterals are removed during the seizure.
 
