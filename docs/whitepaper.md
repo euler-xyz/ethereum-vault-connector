@@ -29,7 +29,7 @@ The primary task of the CVP is to maintain a user's voluntary association with v
 
 After simply depositing, the user is not obligated or bound in any way by the CVP, and could freely withdraw funds from the vaults and/or `disableCollateral` to remove them from the account's collateral set.
 
-However, suppose a user wants to take out a borrow from a separate vault. In this case, the user must call `enableController` to add this vault to the account's controller set. This is a significant action because the user is now entirely submitting the account to the rules encoded in the controller vault's code. All the funds in all the collateral vaults are now indirectly under control of the controller vault. In particular, if a user attempts to withdraw collateral or `disableCollateral` to remove a vault from the collateral set, the controller could cause the transaction to fail. Moreover, the controller can allow the collateral to be seized in order to repay the debt, using the `callFromControllerToCollateral` functionality described below.
+However, suppose a user wants to take out a borrow from a separate vault. In this case, the user must call `enableController` to add this vault to the account's controller set. This is a significant action because the user is now entirely submitting the account to the rules encoded in the controller vault's code. All the funds in all the collateral vaults are now indirectly under control of the controller vault. In particular, if a user attempts to withdraw collateral or `disableCollateral` to remove a vault from the collateral set, the controller could cause the transaction to fail. Moreover, the controller can allow the collateral to be seized in order to repay the debt, using the `impersonate` functionality described below.
 
 * When requested to perform an action such as borrow, a liability vault must call into the CVP's `isControllerEnabled` function to ensure that the account has in fact enabled the vault as a controller.
 * Only the controller itself can call `disableController` on the CVP. This should typically happen upon an account repaying its debt in full. Vaults must be coded carefully to not have edge cases such as unrepayable dust, otherwise accounts could become permanently associated with a controller.
@@ -59,6 +59,25 @@ At the time of the account status check, an account can have at most one control
 
 Although having more than one controller is disallowed when the account status check is performed, multiple controllers can be transiently attached while these checks are deferred. As long as all or all but one controllers release themselves during the execution of the batch, the account status check will succeed.
 
+### Require Immediate
+
+Inside a batch, account status checks are defered and only checked at the end. However, in some cases it is desirable to immediately check an account's status using `requireAccountStatusCheckNow`. If the specified account has a controller, this vault's `checkAccountStatus` is immediately invoked to determine if the account has a valid status.
+
+If valid, the account is removed from the account status deferal set (if present), so it will not be checked again at the end of the batch. However, any future operations in the same batch that require a (non-immediate) status check will re-add it to the set, and the status will be checked at the end of the batch.
+
+Some use-cases are:
+
+* If a vault wants to prevent providing flash loans for whatever reason, it can require the account be healthy immediately following a borrow.
+* If a batch creator believes there is a possibility that an account will be unhealthy after an operation (perhaps because of changes to chain state between transaction creation and inclusion times), it may make sense to check this account's health immediately, before performing other operations. This will save gas by failing the transaction early.
+
+### Forgiveness
+
+If a controller wants to waive the liquidity check for an account it is controlling, it can "forgive" an account. This removes it from the set of accounts that will be checked at the end of batch. Controllers can only forgive accounts that they are the sole controller of.
+
+Needless to say, this functionality should be used with care. It should only be necessary in certain advanced liquidation flows where an unhealthy account is impersonated but the seizure of funds is still not enough to bring the account to a sufficiently healthy level to pass the account status check.
+
+When doing so, it is important that vaults verify that no *other* collaterals have unexpectedly been withdrawn during the seizure, in the event that a vault makes any external calls in its transfer/withdraw/etc method.
+
 
 
 ## Vault Status Checks
@@ -75,9 +94,11 @@ Although the vaults themselves implement `checkVaultStatus`, there is no need fo
 
 Upon `requireVaultStatusCheck` call, the CVP will determine whether the current execution context is in a batch and if so, it will defer checking the status for this vault until the end of the execution context. Otherwise, the vault status check will be performed immediately.
 
-Considering the fact that in order to evaluate the vault status, the `checkVaultStatus` may need an access to the snapshot of the initial vault state, it is recommended to implement the following pattern which can be looked up in the reference vault implementation:
-* each action that requires a vault status check, should first make an appropriate snapshot and store the data in transient storage
-* `checkVaultStatus` should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against current state of the vault, and return `false` (or revert) if there is a violation.
+In order to evaluate the vault status, `checkVaultStatus` may need access to a snapshot of the initial vault state. The recommended pattern as implemented in the reference vaults is as follows:
+
+* Each action that requires a vault status check should first make an appropriate snapshot and store the data in transient storage
+* The action should then call `requireVaultStatusCheck`
+* `checkVaultStatus` should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return `false` (or revert) if there is a violation.
 
 As with the account status check, there is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the CVP), then when it calls `requireVaultStatusCheck` on the CVP, the CVP may immediately call back into the vault's `checkVaultStatus` function. A normal reentrancy guard would fail upon re-entering at this point. Because of this, the vault reference implementation relaxes the reentrancy modifier to allow `checkVaultStatus` call while invoking `requireVaultStatusCheck`.
 
@@ -107,6 +128,8 @@ Sub-accounts allow users access to multiple (up to 256) virtual accounts that ar
 
 Since an account can only have one controller at a time (except for mid-transaction), sub-accounts are also the only way an Ethereum account can hold multiple borrows concurrently.
 
+The CVP also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on or off chain. This mapping is populated when an address interacts with the CVP for the first time. In order to resolve a sub-account, it should be shifted right by 8, leaving the first 19 bytes of the address. Looking this up in `ownerLookup` will either return the full address, or `address(0)` if the account has not yet interacted with the CVP.
+
 #### Operators
 
 Operators are a more flexible and powerful version of approvals. While in effect, the operator contract can act on behalf of the specified account. This includes interacting with vaults (ie, withdrawing/borrowing funds), enabling vaults as collateral, etc. Because of this, it is recommended that only trusted and audited contracts, or an EOA held by a trusted individual, be installed as an operator.
@@ -127,11 +150,12 @@ Batches can be composed of calls to the CVP itself, and external `call` calls (w
 Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
 
 
-### callFromControllerToCollateral
+### impersonate
 
-The `callFromControllerToCollateral` function can only be used in one specific case: When a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some of collateral asset to repay the debt.
+The `impersonate` function can only be used in one specific case: When a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some of collateral asset to repay the debt.
 
-This is accomplished is by the controller vault calling `callFromControllerToCollateral` and passing the collateral vault as the target contract and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. The collateral vault does not need to know that the funds are being withdrawn due to a liquidation.
+This is accomplished is by the controller vault calling `impersonate` and passing the collateral vault as the target contract and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. The collateral vault does not need to know that the funds are being withdrawn due to a liquidation.
+
 
 
 ### Execution Contexts
@@ -140,18 +164,38 @@ As mentioned above, when interacting with the CVP, it is often useful to defer c
 
 In order to implement this, the CVP maintains an *execution context* which holds two sets of addresses in regular or transient storage (if supported): `accountStatusChecks` and `vaultStatusChecks`. The execution context will also contain the `onBehalfOfAddress` that has currently been authenticated, so it can be queried for by a vault (see security considerations).
 
-An execution context will exist for the duration of the batch, and then be discarded. Only one execution context can exist at a time. However, nesting batches *is* allowed, because the execution context stores a "depth" value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
+An execution context will exist for the duration of the batch, and is then discarded. Only one execution context can exist at a time. However, nesting batches *is* allowed (see below).
 
 When the execution context is complete, the address sets are iterated over:
 
 * For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied.
 * For each address in `vaultStatusChecks`, call `checkVaultStatus` on the vault address stored in the set and ensure that the vault is satisfied.
 
+Additionally, the execution context contains some locks that protect critical regions from re-entrancy (see below).
+
 #### Nested Execution Contexts
 
 If a vault or other contract is invoked via the CVP, and that contract in turn re-invokes the CVP to call another vault/contract, then the execution context is considered nested. The execution context is however *not* treated as a stack. The sets of deferred account and vault status checks are added to, and only after unwinding the final execution context will they be validated.
 
+Internally, the execution context stores a `batchDepth` value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
+
 The previous value of `onBehalfOfAddress` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAddress` at all times when `msg.sender` is the CVP. However, they can not necessarily rely on this value not changing when they invoke user-controllable callbacks (because they could created a nested context).
+
+#### checksInProgressLock
+
+Although the `checkAccountStatus` function is invoked with `staticcall`, the `checkVaultStatus` is invoked with `call`. This allows vaults to record end-of-batch data summaries in its storage (ie net token in/out flows).
+
+However, if a vault (or something it invokes) calls back into the CVP at this point, an inconsistent state of the deferal checks could be observed. To prevent this, the `checksInProgressLock` mutex is locked while the CVP is resolving the account and vault status check sets.
+
+#### impersonateLock
+
+The typical use-case for impersonation is a liability vault is to seize some collateral assets during a liquidation flow.
+
+However, when interacting with complicated vaults that may invoke external contracts during a withdraw/transfer, a liability vault may want to ensure that no *other* collaterals are removed during the seizure.
+
+In order to simplify the implementation of this check, the `impersonateLock` mutex is locked while invoking a collateral vault during the `impersonate` flow. While locked, no accounts' collateral or controller sets can be modified.
+
+Additionally, during an impersonation, the CVP cannot be re-entered via `call`, `batch`, or `impersonate`.
 
 
 
@@ -180,7 +224,7 @@ In order to take advantage of transient storage, the contracts have been structu
 
 ### Authentication by Vaults
 
-In order to support sub-accounts, operators, and forwarding (ie, liquidations), vaults can be invoked via the CVP's `call` function (or a `batch` or `callFromControllerToCollateral`), which will then execute the requested call on the vault. However, in this case the vault will see the CVP as the `msg.sender`.
+In order to support sub-accounts, operators, and forwarding (ie, liquidations), vaults can be invoked via the CVP's `call`, `batch`, or `impersonate` functions, which will then execute the desired operations on the vault. However, in this case the vault will see the CVP as the `msg.sender`.
 
 When a vault detects that `msg.sender` is the CVP, it should call back into the CVP to retrieve the current execution context using `getExecutionContext`. This will tell the vault three things:
 
@@ -200,6 +244,8 @@ One area where the untrustable CVP address may cause problems is tokens that imp
 
 ### Read-only Re-entrancy
 
-The non-transient storage maintained by the CVP cannot be read while checks are deferred. This is to prevent a class of issues known as read-only re-entrancy.
+The non-transient storage maintained by the CVP *can* be read while checks are deferred. In particular, this includes the lists of collaterals and controllers registered for a given account.
 
-By failing reading the collateral and controller sets in a deferral, it prevents external users that may rely on this information to be seeing a view of it in a transient mid-batch state.
+This should not result in "read-only re-entrancy" problems, because each individual operation will leave these lists in a consistent state. In particular, for a controller to be released, that controller itself must invoke the release, which typically means the debt has been repaid.
+
+If an external contract attempted to read the collateral or controller states of an account in order to enforce some policy of its own, then it is possible that a user could defer liquidity in a batch, repay the loan, invoke the external contract, and then re-take the loan. In this case the external contract would see the controller as being released. However, this same action could be done outside of a deferal by simply taking a flash loan from an external system, rather than using the batch deferal.
