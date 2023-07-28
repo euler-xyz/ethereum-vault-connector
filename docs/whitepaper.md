@@ -128,7 +128,7 @@ Sub-accounts allow users access to multiple (up to 256) virtual accounts that ar
 
 Since an account can only have one controller at a time (except for mid-transaction), sub-accounts are also the only way an Ethereum account can hold multiple borrows concurrently.
 
-The CVP also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on or off chain. This mapping is populated when an address interacts with the CVP for the first time. In order to resolve a sub-account, it should be shifted right by 8, leaving the first 19 bytes of the address. Looking this up in `ownerLookup` will either return the full address, or `address(0)` if the account has not yet interacted with the CVP.
+The CVP also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on or off chain. This mapping is populated when an address interacts with the CVP for the first time. In order to resolve a sub-account, call the `getAccountOwner` function with a sub-account address. It will either return the account's primary address, or revert with an error if the account has not yet interacted with the CVP.
 
 #### Operators
 
