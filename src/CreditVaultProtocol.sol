@@ -85,16 +85,17 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             !haveCommonOwner(msg.sender, account) &&
             !accountOperators[account][msg.sender]
         ) revert CVP_NotAuthorized();
-
-        // if it's an operator calling and we get up to this point
-        // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
-        // must have been called previously and the ownerLookup is already set.
-        // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
-        // ownerLookup is set only once on the initial interaction of the account with the CVP.
-        uint152 prefix = uint152(uint160(account) >> 8);
-        if (ownerLookup[prefix] == address(0)) {
-            ownerLookup[prefix] = msg.sender;
-            emit AccountsOwnerRegistered(prefix, msg.sender);
+        {
+            // if it's an operator calling and we get up to this point
+            // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
+            // must have been called previously and the ownerLookup is already set.
+            // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
+            // ownerLookup is set only once on the initial interaction of the account with the CVP.
+            uint152 prefix = uint152(uint160(account) >> 8);
+            if (ownerLookup[prefix] == address(0)) {
+                ownerLookup[prefix] = msg.sender;
+                emit AccountsOwnerRegistered(prefix, msg.sender);
+            }
         }
 
         _;
@@ -126,13 +127,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice A modifier checks whether msg.sender is the only controller for the account.
     modifier authenticateController(address account) {
         {
-            SetStorage storage controllers = accountControllers[account];
+            uint numOfControllers = accountControllers[account].numElements;
+            address controller = accountControllers[account].firstElement;
 
-            if (controllers.numElements != 1) {
-                revert CVP_ControllerViolation();
-            } else if (controllers.firstElement != msg.sender) {
-                revert CVP_NotAuthorized();
-            }
+            if (numOfControllers != 1) revert CVP_ControllerViolation();
+            else if (controller != msg.sender) revert CVP_NotAuthorized();
         }
         _;
     }
@@ -418,8 +417,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public payable virtual nonReentrant {
         uint batchDepthCache = executionContext.batchDepth;
 
-        if (batchDepthCache >= BATCH_DEPTH__MAX)
+        if (batchDepthCache >= BATCH_DEPTH__MAX) {
             revert CVP_BatchDepthViolation();
+        }
 
         unchecked {
             ++executionContext.batchDepth;
@@ -460,8 +460,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     {
         uint batchDepthCache = executionContext.batchDepth;
 
-        if (batchDepthCache >= BATCH_DEPTH__MAX)
+        if (batchDepthCache >= BATCH_DEPTH__MAX) {
             revert CVP_BatchDepthViolation();
+        }
 
         unchecked {
             ++executionContext.batchDepth;
@@ -565,6 +566,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address[] calldata accounts
     ) public virtual {
         uint batchDepthCache = executionContext.batchDepth;
+
         uint length = accounts.length;
         for (uint i; i < length; ) {
             if (batchDepthCache == BATCH_DEPTH__INIT) {
@@ -615,13 +617,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         uint length = accounts.length;
         for (uint i = 0; i < length; ) {
             address account = accounts[i];
-            SetStorage storage controllers = accountControllers[account];
+            uint numOfControllers = accountControllers[account].numElements;
+            address controller = accountControllers[account].firstElement;
 
-            if (controllers.numElements != 1) {
-                revert CVP_ControllerViolation();
-            } else if (controllers.firstElement != msg.sender) {
-                revert CVP_NotAuthorized();
-            }
+            if (numOfControllers != 1) revert CVP_ControllerViolation();
+            else if (controller != msg.sender) revert CVP_NotAuthorized();
 
             accountStatusChecks.remove(account);
 
@@ -796,7 +796,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             setStorage = vaultStatusChecks;
         }
 
-        uint8 numElements = setStorage.numElements;
+        uint numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
 
         if (returnResult) result = new BatchResult[](numElements);
@@ -804,8 +804,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         if (numElements == 0) return result;
 
         // clear only the number of elements to optimize gas consumption
-        if (setType == SetType.Account) delete accountStatusChecks.numElements;
-        else delete vaultStatusChecks.numElements;
+        if (setType == SetType.Account) accountStatusChecks.numElements = 0;
+        else vaultStatusChecks.numElements = 0;
 
         for (uint i; i < numElements; ) {
             address addressToCheck = i == 0

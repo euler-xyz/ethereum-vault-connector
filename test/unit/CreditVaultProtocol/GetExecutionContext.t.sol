@@ -67,30 +67,11 @@ contract GetExecutionContextTest is Test {
         cvp.invariantsCheck();
         cvp.reset();
 
-<<<<<<< HEAD
         cvp.setBatchDepth(1);
-        cvp.requireAccountStatusCheck(address(1));
-        vm.expectRevert();
-        cvp.invariantsCheck();
-        cvp.reset();
-
-        cvp.setBatchDepth(1);
-=======
-        cvp.setBatchDepth(2);
->>>>>>> 11c92d4 (remove reserved field from SetType and don't delete firstElement in checkStatusAll function instead)
         cvp.requireAccountStatusCheck(address(0));
         vm.expectRevert();
         cvp.invariantsCheck();
         cvp.reset();
-<<<<<<< HEAD
-
-        cvp.setBatchDepth(1);
-        cvp.requireVaultStatusCheck();
-        vm.expectRevert();
-        cvp.invariantsCheck();
-        cvp.reset();
-=======
->>>>>>> 11c92d4 (remove reserved field from SetType and don't delete firstElement in checkStatusAll function instead)
 
         cvp.setBatchDepth(1);
         vm.prank(address(0));
