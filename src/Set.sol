@@ -21,10 +21,11 @@ library Set {
         SetStorage storage setStorage,
         address element
     ) internal returns (bool wasInserted) {
-        uint8 numElements = setStorage.numElements;
+        uint numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
 
         if (numElements != 0) {
-            if (setStorage.firstElement == element) return false;
+            if (firstElement == element) return false;
             for (uint i = 1; i < numElements; ) {
                 if (setStorage.elements[i] == element) return false;
                 unchecked {
@@ -39,7 +40,7 @@ library Set {
         else setStorage.elements[numElements] = element;
 
         unchecked {
-            setStorage.numElements = numElements + 1;
+            setStorage.numElements = uint8(numElements + 1);
         }
 
         return true;
@@ -53,12 +54,13 @@ library Set {
         SetStorage storage setStorage,
         address element
     ) internal returns (bool wasRemoved) {
-        uint8 numElements = setStorage.numElements;
+        uint numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
         uint searchIndex = type(uint).max;
 
         if (numElements == 0) return false;
 
-        if (setStorage.firstElement == element) {
+        if (firstElement == element) {
             searchIndex = 0;
         } else {
             for (uint i = 1; i < numElements; ) {
@@ -103,12 +105,13 @@ library Set {
     function get(
         SetStorage storage setStorage
     ) internal view returns (address[] memory) {
-        uint8 numElements = setStorage.numElements;
+        uint numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
         address[] memory output = new address[](numElements);
-        
+
         if (numElements == 0) return output;
 
-        output[0] = setStorage.firstElement;
+        output[0] = firstElement;
 
         for (uint i = 1; i < numElements; ) {
             output[i] = setStorage.elements[i];
@@ -128,10 +131,11 @@ library Set {
         SetStorage storage setStorage,
         address element
     ) internal view returns (bool) {
-        uint8 numElements = setStorage.numElements;
+        uint numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
 
         if (numElements == 0) return false;
-        if (setStorage.firstElement == element) return true;
+        if (firstElement == element) return true;
 
         for (uint i = 1; i < numElements; ) {
             if (setStorage.elements[i] == element) return true;

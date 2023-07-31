@@ -735,13 +735,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function checkAccountStatusInternal(
         address account
     ) internal view returns (bool isValid, bytes memory data) {
-        SetStorage storage controllers = accountControllers[account];
+        uint numOfControllers = accountControllers[account].numElements;
+        address controller = accountControllers[account].firstElement;
 
-        if (controllers.numElements == 0) return (true, "");
-        else if (controllers.numElements > 1) revert CVP_ControllerViolation();
+        if (numOfControllers == 0) return (true, "");
+        else if (numOfControllers > 1) revert CVP_ControllerViolation();
 
         bool success;
-        (success, data) = controllers.firstElement.staticcall(
+        (success, data) = controller.staticcall(
             abi.encodeWithSelector(
                 ICreditVault.checkAccountStatus.selector,
                 account,
@@ -796,10 +797,15 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
 
         uint8 numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
 
         if (returnResult) result = new BatchResult[](numElements);
 
         if (numElements == 0) return result;
+
+        // clear only the number of elements to optimize gas consumption
+        if (setType == SetType.Account) delete accountStatusChecks.numElements;
+        else delete vaultStatusChecks.numElements;
 
         for (uint i; i < numElements; ) {
             address addressToCheck = i == 0
@@ -825,21 +831,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
                 requireStatusCheck(addressToCheck);
             }
 
-            // do not clear array elements to optimize gas consumption
-            // delete setStorage.elements[i];
-
             unchecked {
                 ++i;
             }
-        }
-
-        // do not clear the first element to optimize gas consumption
-        if (setType == SetType.Account) {
-            delete accountStatusChecks.numElements;
-            //delete accountStatusChecks.firstElement;
-        } else {
-            delete vaultStatusChecks.numElements;
-            //delete vaultStatusChecks.firstElement;
         }
     }
 
