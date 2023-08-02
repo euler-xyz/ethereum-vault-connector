@@ -5,10 +5,10 @@ pragma solidity ^0.8.0;
 interface ICVP {
     struct ExecutionContext {
         uint8 batchDepth;
-        bool checksInProgressLock;
-        bool controllerToCollateralCall;
-        bool ignoreAccountStatusCheck;
+        bool checksLock;
+        bool impersonateLock;
         address onBehalfOfAccount;
+        uint8 reserved;
     }
 
     struct BatchItem {
@@ -108,10 +108,9 @@ interface ICVP {
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 
-    function callFromControllerToCollateral(
+    function impersonate(
         address targetContract,
         address onBehalfOfAccount,
-        bool ignoreAccountStatusCheck,
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 
@@ -129,9 +128,15 @@ interface ICVP {
 
     function requireAccountStatusCheckNow(address account) external;
 
+    function forgiveAccountStatusCheck(address account) external;
+
+    function forgiveAccountsStatusCheck(address[] calldata accounts) external;
+
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) external;
 
     function requireVaultStatusCheck() external;
+
+    function forgiveVaultStatusCheck() external;
 }

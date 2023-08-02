@@ -19,7 +19,7 @@ max_test_rejects = 1_000_000
 seed = "0xee1d0f7d9556539a9c0e26aed5e63556"
 runs = 1000
 
-[profile.default.invariants]
+[profile.default.invariant]
 call_override = false # Override unsafe external calls to perform reentrancy checks
 depth = 20
 runs = 1000

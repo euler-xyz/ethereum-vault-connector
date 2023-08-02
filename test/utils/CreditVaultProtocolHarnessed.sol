@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
 import "src/CreditVaultProtocol.sol";
 import "./mocks/Vault.sol";
 
@@ -54,30 +53,22 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         executionContext.batchDepth = depth;
     }
 
-    function setChecksInProgressLock(bool locked) external {
-        executionContext.checksInProgressLock = locked;
+    function setChecksLock(bool locked) external {
+        executionContext.checksLock = locked;
     }
 
     function setOnBehalfOfAccount(address account) external {
         executionContext.onBehalfOfAccount = account;
     }
 
-    function setControllerToCollateralCall(bool isCalling) external {
-        executionContext.controllerToCollateralCall = isCalling;
-    }
-
-    function setIgnoreAccountStatusCheck(bool ignore) external {
-        executionContext.ignoreAccountStatusCheck = ignore;
+    function setImpersonateLock(bool locked) external {
+        executionContext.impersonateLock = locked;
     }
 
     // function overrides in order to verify the account and vault checks
     function requireAccountStatusCheck(address account) public override {
         super.requireAccountStatusCheck(account);
-
-        if (
-            !executionContext.ignoreAccountStatusCheck ||
-            executionContext.onBehalfOfAccount != account
-        ) expectedAccountsChecked.push(account);
+        expectedAccountsChecked.push(account);
     }
 
     function requireAccountsStatusCheck(
@@ -86,16 +77,11 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
         super.requireAccountsStatusCheck(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
-            if (
-                !executionContext.ignoreAccountStatusCheck ||
-                executionContext.onBehalfOfAccount != accounts[i]
-            ) expectedAccountsChecked.push(accounts[i]);
+            expectedAccountsChecked.push(accounts[i]);
         }
     }
 
-    function requireAccountStatusCheckNow(
-        address account
-    ) public override {
+    function requireAccountStatusCheckNow(address account) public override {
         super.requireAccountStatusCheckNow(account);
 
         expectedAccountsChecked.push(account);
@@ -139,16 +125,12 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             "verifyStorage/checks-deferred"
         );
         require(
-            executionContext.checksInProgressLock == false,
+            executionContext.checksLock == false,
             "verifyStorage/checks-in-progress-lock"
         );
         require(
-            executionContext.controllerToCollateralCall == false,
-            "verifyStorage/controller-to-collateral-call"
-        );
-        require(
-            executionContext.ignoreAccountStatusCheck == false,
-            "verifyStorage/ignore-account-status-check"
+            executionContext.impersonateLock == false,
+            "verifyStorage/impersonate-lock"
         );
         require(
             executionContext.onBehalfOfAccount == address(0),
@@ -159,18 +141,10 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             accountStatusChecks.numElements == 0,
             "verifyStorage/account-status-checks/numElements"
         );
-        require(
-            accountStatusChecks.firstElement == address(0),
-            "verifyStorage/account-status-checks/firstElement"
-        );
 
         require(
             vaultStatusChecks.numElements == 0,
             "verifyStorage/vault-status-checks/numElements"
-        );
-        require(
-            vaultStatusChecks.firstElement == address(0),
-            "verifyStorage/vault-status-checks/firstElement"
         );
 
         // for coverage

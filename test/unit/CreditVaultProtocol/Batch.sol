@@ -19,6 +19,27 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
     }
 }
 
+contract CreditVaultProtocolNoRevert is CreditVaultProtocolHarnessed {
+    using Set for SetStorage;
+
+    function batchRevert(
+        BatchItem[] calldata
+    )
+        public
+        payable
+        override
+        nonReentrant
+        returns (
+            BatchResult[] memory batchItemsResult,
+            BatchResult[] memory accountsStatusResult,
+            BatchResult[] memory vaultsStatusResult
+        )
+    {
+        // doesn't rever as expected
+        return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
+    }
+}
+
 contract BatchTest is Test {
     CreditVaultProtocolHandler internal cvp;
 
@@ -294,15 +315,15 @@ contract BatchTest is Test {
         items[0].msgValue = 0;
         items[0].data = "";
 
-        cvp.setBatchDepth(10);
+        cvp.setBatchDepth(9);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultProtocol.CVP_BatchDepthViolation.selector);
         cvp.batchSimulation(items);
     }
 
-    function test_RevertIfChecksInProgress_Batch(address alice) external {
-        address vault = address(new VaultMaliciousBatch(cvp));
+    function test_RevertIfChecksReentrancy_Batch(address alice) external {
+        address vault = address(new VaultMalicious(cvp));
 
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
         items[0].allowError = false;
@@ -315,22 +336,27 @@ contract BatchTest is Test {
         );
 
         // internal batch in the malicious vault reverts with CVP_ChecksReentrancy error,
-        // check VaultMaliciousBatch implementation
+        // check VaultMalicious implementation
+        VaultMalicious(vault).setFunctionSelectorToCall(ICVP.batch.selector);
+        VaultMalicious(vault).setExpectedErrorSelector(
+            CreditVaultProtocol.CVP_ChecksReentrancy.selector
+        );
+
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
                 CreditVaultProtocol.CVP_VaultStatusViolation.selector,
                 vault,
-                "malicious vault batch"
+                "malicious vault"
             )
         );
         cvp.batch(items);
     }
 
-    function test_RevertIfChecksInProgress_BatchRevert_BatchSimulation(
+    function test_RevertIfChecksReentrancy_BatchRevert_BatchSimulation(
         address alice
     ) external {
-        address vault = address(new VaultMaliciousBatchRevert(cvp));
+        address vault = address(new VaultMalicious(cvp));
 
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
         items[0].allowError = false;
@@ -343,7 +369,7 @@ contract BatchTest is Test {
         );
 
         // internal batch in the malicious vault reverts with CVP_ChecksReentrancy error,
-        // check VaultMaliciousBatchRevert implementation
+        // check VaultMalicious implementation
         // error will be encoded in the result
         ICVP.BatchResult[]
             memory expectedBatchItemsResult = new ICVP.BatchResult[](1);
@@ -362,7 +388,14 @@ contract BatchTest is Test {
         expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
             CreditVaultProtocol.CVP_VaultStatusViolation.selector,
             vault,
-            "malicious vault batch revert"
+            "malicious vault"
+        );
+
+        VaultMalicious(vault).setFunctionSelectorToCall(
+            ICVP.batchRevert.selector
+        );
+        VaultMalicious(vault).setExpectedErrorSelector(
+            CreditVaultProtocol.CVP_ChecksReentrancy.selector
         );
 
         vm.prank(alice);
@@ -377,6 +410,13 @@ contract BatchTest is Test {
         cvp.batchRevert(items);
 
         // same should happen for batchSimulation() but without reverting with standard error
+        VaultMalicious(vault).setFunctionSelectorToCall(
+            ICVP.batchRevert.selector
+        );
+        VaultMalicious(vault).setExpectedErrorSelector(
+            CreditVaultProtocol.CVP_ChecksReentrancy.selector
+        );
+
         vm.prank(alice);
         (
             ICVP.BatchResult[] memory batchItemsResult,
@@ -412,6 +452,85 @@ contract BatchTest is Test {
         assertEq(
             vaultsStatusResult[0].result,
             expectedVaultsStatusResult[0].result
+        );
+    }
+
+    function test_RevertIfImpersonateReentrancy_Batch(address alice) external {
+        vm.assume(alice != address(0));
+
+        address controller = address(new Vault(cvp));
+        address collateral = address(new VaultMalicious(cvp));
+
+        vm.prank(alice);
+        cvp.enableController(alice, controller);
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, collateral);
+
+        // internal batch in the malicious vault reverts with CVP_ImpersonateReentancy error,
+        // check VaultMalicious implementation
+        VaultMalicious(collateral).setFunctionSelectorToCall(
+            ICVP.batch.selector
+        );
+        VaultMalicious(collateral).setExpectedErrorSelector(
+            CreditVaultProtocol.CVP_ImpersonateReentancy.selector
+        );
+
+        vm.prank(controller);
+        (bool success, bytes memory result) = cvp.impersonate(
+            collateral,
+            alice,
+            abi.encodeWithSelector(Vault.requireChecks.selector, alice)
+        );
+
+        assertFalse(success);
+        assertEq(
+            result,
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_VaultStatusViolation.selector,
+                collateral,
+                "malicious vault"
+            )
+        );
+    }
+
+    function test_RevertIfImpersonateReentrancy_BatchRevert_BatchSimulation(
+        address alice
+    ) external {
+        vm.assume(alice != address(0));
+
+        address controller = address(new Vault(cvp));
+        address collateral = address(new VaultMalicious(cvp));
+
+        vm.prank(alice);
+        cvp.enableController(alice, controller);
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, collateral);
+
+        // internal batch in the malicious vault reverts with CVP_ImpersonateReentancy error,
+        // check VaultMalicious implementation
+        VaultMalicious(collateral).setFunctionSelectorToCall(
+            ICVP.batchRevert.selector
+        );
+        VaultMalicious(collateral).setExpectedErrorSelector(
+            CreditVaultProtocol.CVP_ImpersonateReentancy.selector
+        );
+
+        vm.prank(controller);
+        (bool success, bytes memory result) = cvp.impersonate(
+            collateral,
+            alice,
+            abi.encodeWithSelector(Vault.requireChecks.selector, alice)
+        );
+        assertFalse(success);
+        assertEq(
+            result,
+            abi.encodeWithSelector(
+                CreditVaultProtocol.CVP_VaultStatusViolation.selector,
+                collateral,
+                "malicious vault"
+            )
         );
     }
 
@@ -704,5 +823,14 @@ contract BatchTest is Test {
                 keccak256(vaultsStatusResult[0].result)
             );
         }
+    }
+
+    function test_RevertIfBatchRevertDoesntRevert_BatchSimulation(
+        address alice
+    ) external {
+        ICVP cvp_noRevert = new CreditVaultProtocolNoRevert();
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_BatchPanic.selector);
+        cvp_noRevert.batchSimulation(new ICVP.BatchItem[](0));
     }
 }

@@ -155,6 +155,62 @@ contract CollateralsManagementTest is Test {
         cvp.disableCollateral(bob, vault);
     }
 
+    function test_RevertIfChecksReentrancy_CollateralsManagement(
+        address alice
+    ) public {
+        address vault = address(new Vault(cvp));
+
+        cvp.setChecksLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
+        cvp.enableCollateral(alice, vault);
+
+        cvp.setChecksLock(false);
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, vault);
+
+        cvp.setChecksLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
+        cvp.disableCollateral(alice, vault);
+
+        cvp.setChecksLock(false);
+
+        vm.prank(alice);
+        cvp.disableCollateral(alice, vault);
+    }
+
+    function test_RevertIfImpersonateReentrancy_CollateralsManagement(
+        address alice
+    ) public {
+        address vault = address(new Vault(cvp));
+
+        cvp.setImpersonateLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
+        cvp.enableCollateral(alice, vault);
+
+        cvp.setImpersonateLock(false);
+
+        vm.prank(alice);
+        cvp.enableCollateral(alice, vault);
+
+        cvp.setImpersonateLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
+        cvp.disableCollateral(alice, vault);
+
+        cvp.setImpersonateLock(false);
+
+        vm.prank(alice);
+        cvp.disableCollateral(alice, vault);
+    }
+
     function test_RevertIfAccountStatusViolated_CollateralsManagement(
         address alice
     ) public {

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./Set.sol";
+import "./interfaces/ICreditVaultProtocol.sol";
 
 abstract contract TransientStorage {
     enum SetType {
@@ -10,13 +11,14 @@ abstract contract TransientStorage {
         Vault
     }
 
-    constructor() {
-        // set reserved field to 1 in order to optimize gas consumption 
-        // (not to clear the storage slot when 0 elements in the set)
-        accountStatusChecks.reserved = 1;
-        vaultStatusChecks.reserved = 1;
-    }
-
+    ICVP.ExecutionContext internal executionContext;
     SetStorage internal accountStatusChecks;
     SetStorage internal vaultStatusChecks;
+
+    constructor() {
+        // populate the storage slot so that:
+        // - it's cheaper to set batchDepth from 0 to 1
+        // - it's compatible with transient storage (EIP-1153)
+        executionContext.reserved = 1;
+    }
 }
