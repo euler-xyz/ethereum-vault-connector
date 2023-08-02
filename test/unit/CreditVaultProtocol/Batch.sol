@@ -30,9 +30,9 @@ contract CreditVaultProtocolNoRevert is CreditVaultProtocolHarnessed {
         override
         nonReentrant
         returns (
-            BatchResult[] memory batchItemsResult,
-            BatchResult[] memory accountsStatusResult,
-            BatchResult[] memory vaultsStatusResult
+            BatchItemResult[] memory batchItemsResult,
+            BatchItemResult[] memory accountsStatusResult,
+            BatchItemResult[] memory vaultsStatusResult
         )
     {
         // doesn't rever as expected
@@ -62,7 +62,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvp);
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             cvp.enableController.selector,
             alice,
@@ -72,7 +72,7 @@ contract BatchTest is Test {
         items[1].allowError = false;
         items[1].onBehalfOfAccount = alice;
         items[1].targetContract = address(cvp);
-        items[1].msgValue = 0;
+        items[1].value = 0;
         items[1].data = abi.encodeWithSelector(
             cvp.setAccountOperator.selector,
             alice,
@@ -83,7 +83,7 @@ contract BatchTest is Test {
         items[2].allowError = false;
         items[2].onBehalfOfAccount = alicesSubAccount;
         items[2].targetContract = otherVault;
-        items[2].msgValue = 0;
+        items[2].value = 0;
         items[2].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alicesSubAccount
@@ -92,7 +92,7 @@ contract BatchTest is Test {
         items[3].allowError = false;
         items[3].onBehalfOfAccount = address(0);
         items[3].targetContract = controller;
-        items[3].msgValue = seed / 3;
+        items[3].value = seed / 3;
         items[3].data = abi.encodeWithSelector(
             Vault.call.selector,
             otherVault,
@@ -109,7 +109,7 @@ contract BatchTest is Test {
         items[4].allowError = false;
         items[4].onBehalfOfAccount = alice;
         items[4].targetContract = otherVault;
-        items[4].msgValue = type(uint).max;
+        items[4].value = type(uint).max;
         items[4].data = abi.encodeWithSelector(
             Target.callTest.selector,
             address(cvp),
@@ -122,7 +122,7 @@ contract BatchTest is Test {
         items[5].allowError = false;
         items[5].onBehalfOfAccount = alicesSubAccount;
         items[5].targetContract = address(cvp);
-        items[5].msgValue = 0;
+        items[5].value = 0;
         items[5].data = abi.encodeWithSelector(
             cvp.enableController.selector,
             alicesSubAccount,
@@ -147,7 +147,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvp);
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             cvp.call.selector,
             address(cvp),
@@ -165,7 +165,7 @@ contract BatchTest is Test {
         items[0].allowError = true;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvp);
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             cvp.call.selector,
             address(cvp),
@@ -187,7 +187,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             Vault.disableController.selector,
             alice
@@ -196,7 +196,7 @@ contract BatchTest is Test {
         items[1].allowError = false;
         items[1].onBehalfOfAccount = address(0);
         items[1].targetContract = controller;
-        items[1].msgValue = 0;
+        items[1].value = 0;
         items[1].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             bob
@@ -205,7 +205,7 @@ contract BatchTest is Test {
         items[2].allowError = false;
         items[2].onBehalfOfAccount = bob;
         items[2].targetContract = otherVault;
-        items[2].msgValue = 0;
+        items[2].value = 0;
         items[2].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alicesSubAccount
@@ -221,7 +221,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = otherVault;
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(Target.revertEmptyTest.selector);
 
         vm.prank(alice);
@@ -242,7 +242,7 @@ contract BatchTest is Test {
             items[j].allowError = false;
             items[j].onBehalfOfAccount = alice;
             items[j].targetContract = address(cvp);
-            items[j].msgValue = 0;
+            items[j].value = 0;
 
             if (j == items.length - 1) {
                 ICVP.BatchItem[] memory nestedItems = new ICVP.BatchItem[](2);
@@ -250,7 +250,7 @@ contract BatchTest is Test {
                 nestedItems[0].allowError = false;
                 nestedItems[0].onBehalfOfAccount = address(0);
                 nestedItems[0].targetContract = vault;
-                nestedItems[0].msgValue = 0;
+                nestedItems[0].value = 0;
                 nestedItems[0].data = abi.encodeWithSelector(
                     Vault.requireChecks.selector,
                     alice
@@ -259,7 +259,7 @@ contract BatchTest is Test {
                 nestedItems[1].allowError = false;
                 nestedItems[1].onBehalfOfAccount = address(0);
                 nestedItems[1].targetContract = address(cvp);
-                nestedItems[1].msgValue = 0;
+                nestedItems[1].value = 0;
                 nestedItems[1].data = abi.encodeWithSelector(
                     cvp.enableController.selector,
                     alice,
@@ -312,7 +312,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(0);
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = "";
 
         cvp.setBatchDepth(9);
@@ -329,7 +329,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alice
@@ -362,7 +362,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alice
@@ -371,12 +371,12 @@ contract BatchTest is Test {
         // internal batch in the malicious vault reverts with CVP_ChecksReentrancy error,
         // check VaultMalicious implementation
         // error will be encoded in the result
-        ICVP.BatchResult[]
-            memory expectedBatchItemsResult = new ICVP.BatchResult[](1);
-        ICVP.BatchResult[]
-            memory expectedAccountsStatusResult = new ICVP.BatchResult[](1);
-        ICVP.BatchResult[]
-            memory expectedVaultsStatusResult = new ICVP.BatchResult[](1);
+        ICVP.BatchItemResult[]
+            memory expectedBatchItemsResult = new ICVP.BatchItemResult[](1);
+        ICVP.BatchItemResult[]
+            memory expectedAccountsStatusResult = new ICVP.BatchItemResult[](1);
+        ICVP.BatchItemResult[]
+            memory expectedVaultsStatusResult = new ICVP.BatchItemResult[](1);
 
         expectedBatchItemsResult[0].success = true;
         expectedBatchItemsResult[0].result = "";
@@ -419,9 +419,9 @@ contract BatchTest is Test {
 
         vm.prank(alice);
         (
-            ICVP.BatchResult[] memory batchItemsResult,
-            ICVP.BatchResult[] memory accountsStatusResult,
-            ICVP.BatchResult[] memory vaultsStatusResult
+            ICVP.BatchItemResult[] memory batchItemsResult,
+            ICVP.BatchItemResult[] memory accountsStatusResult,
+            ICVP.BatchItemResult[] memory vaultsStatusResult
         ) = cvp.batchSimulation(items);
 
         assertEq(batchItemsResult.length, 1);
@@ -536,12 +536,12 @@ contract BatchTest is Test {
 
     function test_BatchRevert_BatchSimulation(address alice) external {
         ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
-        ICVP.BatchResult[]
-            memory expectedBatchItemsResult = new ICVP.BatchResult[](1);
-        ICVP.BatchResult[]
-            memory expectedAccountsStatusResult = new ICVP.BatchResult[](1);
-        ICVP.BatchResult[]
-            memory expectedVaultsStatusResult = new ICVP.BatchResult[](1);
+        ICVP.BatchItemResult[]
+            memory expectedBatchItemsResult = new ICVP.BatchItemResult[](1);
+        ICVP.BatchItemResult[]
+            memory expectedAccountsStatusResult = new ICVP.BatchItemResult[](1);
+        ICVP.BatchItemResult[]
+            memory expectedVaultsStatusResult = new ICVP.BatchItemResult[](1);
 
         address controller = address(new Vault(cvp));
 
@@ -551,7 +551,7 @@ contract BatchTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alice
@@ -584,15 +584,15 @@ contract BatchTest is Test {
                     err := add(err, 4)
                 }
                 (
-                    ICVP.BatchResult[] memory batchItemsResult,
-                    ICVP.BatchResult[] memory accountsStatusResult,
-                    ICVP.BatchResult[] memory vaultsStatusResult
+                    ICVP.BatchItemResult[] memory batchItemsResult,
+                    ICVP.BatchItemResult[] memory accountsStatusResult,
+                    ICVP.BatchItemResult[] memory vaultsStatusResult
                 ) = abi.decode(
                         err,
                         (
-                            ICVP.BatchResult[],
-                            ICVP.BatchResult[],
-                            ICVP.BatchResult[]
+                            ICVP.BatchItemResult[],
+                            ICVP.BatchItemResult[],
+                            ICVP.BatchItemResult[]
                         )
                     );
 
@@ -640,9 +640,9 @@ contract BatchTest is Test {
         {
             vm.prank(alice);
             (
-                ICVP.BatchResult[] memory batchItemsResult,
-                ICVP.BatchResult[] memory accountsStatusResult,
-                ICVP.BatchResult[] memory vaultsStatusResult
+                ICVP.BatchItemResult[] memory batchItemsResult,
+                ICVP.BatchItemResult[] memory accountsStatusResult,
+                ICVP.BatchItemResult[] memory vaultsStatusResult
             ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
@@ -726,15 +726,15 @@ contract BatchTest is Test {
                     err := add(err, 4)
                 }
                 (
-                    ICVP.BatchResult[] memory batchItemsResult,
-                    ICVP.BatchResult[] memory accountsStatusResult,
-                    ICVP.BatchResult[] memory vaultsStatusResult
+                    ICVP.BatchItemResult[] memory batchItemsResult,
+                    ICVP.BatchItemResult[] memory accountsStatusResult,
+                    ICVP.BatchItemResult[] memory vaultsStatusResult
                 ) = abi.decode(
                         err,
                         (
-                            ICVP.BatchResult[],
-                            ICVP.BatchResult[],
-                            ICVP.BatchResult[]
+                            ICVP.BatchItemResult[],
+                            ICVP.BatchItemResult[],
+                            ICVP.BatchItemResult[]
                         )
                     );
 
@@ -782,9 +782,9 @@ contract BatchTest is Test {
         {
             vm.prank(alice);
             (
-                ICVP.BatchResult[] memory batchItemsResult,
-                ICVP.BatchResult[] memory accountsStatusResult,
-                ICVP.BatchResult[] memory vaultsStatusResult
+                ICVP.BatchItemResult[] memory batchItemsResult,
+                ICVP.BatchItemResult[] memory accountsStatusResult,
+                ICVP.BatchItemResult[] memory vaultsStatusResult
             ) = cvp.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);

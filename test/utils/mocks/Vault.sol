@@ -132,7 +132,7 @@ contract VaultMalicious is Vault {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(0);
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = "";
 
         (bool success, bytes memory err) = address(cvp).call(

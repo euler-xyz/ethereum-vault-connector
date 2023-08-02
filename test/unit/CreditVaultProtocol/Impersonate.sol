@@ -85,7 +85,7 @@ contract ImpersonateTest is Test {
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvp);
-        items[0].msgValue = seed; // this value will get ignored
+        items[0].value = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
             cvp.impersonate.selector,
             collateral,

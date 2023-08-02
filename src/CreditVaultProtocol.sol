@@ -10,7 +10,9 @@ import "./interfaces/ICreditVault.sol";
 contract CreditVaultProtocol is ICVP, TransientStorage {
     using Set for SetStorage;
 
-    // Constants
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                       CONSTANTS                                           //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     string public constant name = "Credit Vault Protocol - CVP";
 
@@ -20,7 +22,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     uint8 internal constant BATCH_DEPTH__INIT = 0;
     uint8 internal constant BATCH_DEPTH__MAX = 9;
 
-    // Storage
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                        STORAGE                                            //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     mapping(address account => mapping(address operator => bool isOperator))
         public accountOperators;
 
@@ -36,7 +41,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
     mapping(uint152 prefix => address owner) internal ownerLookup;
 
-    // Events, Errors
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                        EVENTS                                             //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     event AccountOperatorEnabled(
         address indexed account,
@@ -59,6 +66,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address indexed controller
     );
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                         ERRORS                                            //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     error CVP_NotAuthorized();
     error CVP_AccountOwnerNotRegistered();
     error CVP_InvalidAddress();
@@ -69,13 +80,15 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     error CVP_AccountStatusViolation(address account, bytes data);
     error CVP_VaultStatusViolation(address vault, bytes data);
     error CVP_RevertedBatchResult(
-        BatchResult[] batchItemsResult,
-        BatchResult[] accountsStatusResult,
-        BatchResult[] vaultsStatusResult
+        BatchItemResult[] batchItemsResult,
+        BatchItemResult[] accountsStatusResult,
+        BatchItemResult[] vaultsStatusResult
     );
     error CVP_BatchPanic();
 
-    // Modifiers
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                       MODIFIERS                                           //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @notice A modifier that allows only the owner or an operator of the account to call the function.
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
@@ -136,13 +149,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         _;
     }
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                   PUBLIC FUNCTIONS                                        //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     // Account owner and operators
 
-    /// @notice Checks whether the specified account and the other account have the same owner.
-    /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other.
-    /// @param account The address of the account that is being checked.
-    /// @param otherAccount The address of the other account that is being checked.
-    /// @return A boolean flag that indicates whether the accounts have the same owner.
+    /// @inheritdoc ICVP
     function haveCommonOwner(
         address account,
         address otherAccount
@@ -150,10 +163,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
-    /// @notice Returns the owner for the specified account.
-    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction that requires authentication of any of the 256 accounts that belong to the owner.
-    /// @param account The address of the account whose owner is being retrieved.
-    /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
+    /// @inheritdoc ICVP
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
@@ -162,11 +172,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         if (owner == address(0)) revert CVP_AccountOwnerNotRegistered();
     }
 
-    /// @notice Sets or unsets an operator for an account.
-    /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
+    /// @inheritdoc ICVP
     function setAccountOperator(
         address account,
         address operator,
@@ -196,10 +202,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Execution internals
 
-    /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
-    /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the execution flow is being executed at the moment.
-    /// @return context Current execution context.
-    /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment. Always false if controllerToCheck passed is address(0).
+    /// @inheritdoc ICVP
     function getExecutionContext(
         address controllerToCheck
     )
@@ -215,20 +218,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             );
     }
 
-    /// @notice Checks whether the status check is deferred for a given account.
-    /// @dev The account status check can only be deferred if the execution flow is currently in a batch.
-    /// @param account The address of the account for which it is checked whether the status check is deferred.
-    /// @return A boolean flag that indicates whether the status check is deferred or not.
+    /// @inheritdoc ICVP
     function isAccountStatusCheckDeferred(
         address account
     ) external view returns (bool) {
         return accountStatusChecks.contains(account);
     }
 
-    /// @notice Checks whether the status check is deferred for a given vault.
-    /// @dev The vault status check can only be deferred if the execution flow is currently in a batch.
-    /// @param vault The address of the vault for which it is checked whether the status check is deferred.
-    /// @return A boolean flag that indicates whether the status check is deferred or not.
+    /// @inheritdoc ICVP
     function isVaultStatusCheckDeferred(
         address vault
     ) external view returns (bool) {
@@ -237,21 +234,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Collaterals management
 
-    /// @notice Returns an array of collaterals for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault.
-    /// @param account The address of the account whose collaterals are being queried.
-    /// @return An array of addresses that are the collaterals for the account.
+    /// @inheritdoc ICVP
     function getCollaterals(
         address account
     ) external view returns (address[] memory) {
         return accountCollaterals[account].get();
     }
 
-    /// @notice Returns whether a collateral is enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault.
-    /// @param account The address of the account that is being checked.
-    /// @param vault The address of the collateral that is being checked.
-    /// @return A boolean value that indicates whether the vault is collateral for the account or not.
+    /// @inheritdoc ICVP
     function isCollateralEnabled(
         address account,
         address vault
@@ -259,10 +249,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         return accountCollaterals[account].contains(vault);
     }
 
-    /// @notice Enables a collateral for an account.
-    /// @dev A collaterals is a vault for which account's balances are under the control of the currently chosen controller vault. Only the owner or an operator of the account can call this function. Account status checks are performed.
-    /// @param account The address for which the collateral is being enabled.
-    /// @param vault The address of the collateral being enabled.
+    /// @inheritdoc ICVP
     function enableCollateral(
         address account,
         address vault
@@ -271,10 +258,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         requireAccountStatusCheck(account);
     }
 
-    /// @notice Disables a collateral for an account.
-    /// @dev A collateral is a vault for which account’s balances are under the control of the currently chosen controller vault. Only the owner or an operator of the account can call this function. Account status checks are performed.
-    /// @param account The address for which the collateral is being disabled.
-    /// @param vault The address of the collateral being disabled.
+    /// @inheritdoc ICVP
     function disableCollateral(
         address account,
         address vault
@@ -285,21 +269,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Controllers management
 
-    /// @notice Returns an array of controllers for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the collaterals vaults. A user can have multiple controllers within a batch execution, but only one (or none) can be selected when the account status check is performed upon the batch exit.
-    /// @param account The address of the account whose controllers are being queried.
-    /// @return An array of addresses that are the controllers for the account.
+    /// @inheritdoc ICVP
     function getControllers(
         address account
     ) external view returns (address[] memory) {
         return accountControllers[account].get();
     }
 
-    /// @notice Returns whether a controller is enabled for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults.
-    /// @param account The address of the account that is being checked.
-    /// @param vault The address of the controller that is being checked.
-    /// @return A boolean value that indicates whether the vault is controller for the account or not.
+    /// @inheritdoc ICVP
     function isControllerEnabled(
         address account,
         address vault
@@ -307,10 +284,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         return accountControllers[account].contains(vault);
     }
 
-    /// @notice Enables a controller for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the owner or an operator of the account can call this function. Account status checks are performed.
-    /// @param account The address for which the controller is being enabled.
-    /// @param vault The address of the controller being enabled.
+    /// @inheritdoc ICVP
     function enableController(
         address account,
         address vault
@@ -321,9 +295,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         requireAccountStatusCheck(account);
     }
 
-    /// @notice Disables a controller for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the collaterals vaults. Only the vault itself can call this function which means that msg.sender is treated as a calling vault. Account status checks are performed.
-    /// @param account The address for which the calling controller is being disabled.
+    /// @inheritdoc ICVP
     function disableController(
         address account
     ) public payable virtual nonReentrant {
@@ -335,13 +307,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Call forwarding
 
-    /// @notice Calls to a target contract as per data encoded.
-    /// @dev This function can be used to interact with any contract. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
-    /// @param targetContract The address of the contract to be called.
-    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
-    /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
+    /// @inheritdoc ICVP
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -355,7 +321,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
-        uint msgValue = executionContext.batchDepth == BATCH_DEPTH__INIT
+        uint value = executionContext.batchDepth == BATCH_DEPTH__INIT
             ? msg.value
             : 0;
 
@@ -366,18 +332,12 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         (success, result) = callInternal(
             targetContract,
             onBehalfOfAccount,
-            msgValue,
+            value,
             data
         );
     }
 
-    /// @notice Calls to one of the enabled collateral vaults from currently enabled controller vault for a given account.
-    /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only controller of the onBehalfOfAccount. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
-    /// @param targetContract The address of the contract to be called.
-    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf (impersonate)
-    /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
+    /// @inheritdoc ICVP
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
@@ -391,7 +351,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     {
         if (targetContract == address(this)) revert CVP_InvalidAddress();
 
-        uint msgValue = executionContext.batchDepth == BATCH_DEPTH__INIT
+        uint value = executionContext.batchDepth == BATCH_DEPTH__INIT
             ? msg.value
             : 0;
 
@@ -402,16 +362,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         (success, result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
-            msgValue,
+            value,
             data
         );
     }
 
     // Batching
 
-    /// @notice Defers the account and vault checks until the end of the execution flow and executes a batch of batch items.
-    /// @dev Accounts status checks and vault status checks are performed after all the batch items have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.
-    /// @param items An array of batch items to be executed.
+    /// @inheritdoc ICVP
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
@@ -439,12 +397,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @notice Defers the account and vault checks until the end of the execution flow and executes a batch of batch items.
-    /// @dev This function always reverts as it's only used for simulation purposes. Accounts status checks and vault status checks are performed after all the batch items have been executed.
-    /// @param items An array of batch items to be executed.
-    /// @return batchItemsResult An array of batch item results for each item.
-    /// @return accountsStatusResult An array of account status results for each account.
-    /// @return vaultsStatusResult An array of vault status results for each vault.
+    /// @inheritdoc ICVP
     function batchRevert(
         BatchItem[] calldata items
     )
@@ -453,9 +406,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         virtual
         nonReentrant
         returns (
-            BatchResult[] memory batchItemsResult,
-            BatchResult[] memory accountsStatusResult,
-            BatchResult[] memory vaultsStatusResult
+            BatchItemResult[] memory batchItemsResult,
+            BatchItemResult[] memory accountsStatusResult,
+            BatchItemResult[] memory vaultsStatusResult
         )
     {
         uint batchDepthCache = executionContext.batchDepth;
@@ -488,6 +441,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         );
     }
 
+    /// @inheritdoc ICVP
     function batchSimulation(
         BatchItem[] calldata items
     )
@@ -495,9 +449,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         payable
         virtual
         returns (
-            BatchResult[] memory batchItemsResult,
-            BatchResult[] memory accountsStatusResult,
-            BatchResult[] memory vaultsStatusResult
+            BatchItemResult[] memory batchItemsResult,
+            BatchItemResult[] memory accountsStatusResult,
+            BatchItemResult[] memory vaultsStatusResult
         )
     {
         (bool success, bytes memory result) = address(this).delegatecall(
@@ -515,25 +469,22 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
 
         (batchItemsResult, accountsStatusResult, vaultsStatusResult) = abi
-            .decode(result, (BatchResult[], BatchResult[], BatchResult[]));
+            .decode(
+                result,
+                (BatchItemResult[], BatchItemResult[], BatchItemResult[])
+            );
     }
 
     // Account Status Check
 
-    /// @notice Checks the status of an account and returns whether it is valid or not.
-    /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
-    /// @param account The address of the account to be checked.
-    /// @return isValid A boolean value that indicates whether the account is valid or not.
+    /// @inheritdoc ICVP
     function checkAccountStatus(
         address account
     ) public view returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
-    /// @notice Checks the status of multiple accounts and returns an array of boolean values that indicate whether each account is valid or not.
-    /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
-    /// @param accounts An array of addresses of the accounts to be checked.
-    /// @return isValid An array of boolean values that indicate whether each account is valid or not.
+    /// @inheritdoc ICVP
     function checkAccountsStatus(
         address[] calldata accounts
     ) public view returns (bool[] memory isValid) {
@@ -548,9 +499,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @notice Checks the status of an account and reverts if it is not valid.
-    /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. The account status is checked only if not explicitly ordered to be ignored for the current onBehalfOfAccount.
-    /// @param account The address of the account to be checked.
+    /// @inheritdoc ICVP
     function requireAccountStatusCheck(address account) public virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
@@ -559,9 +508,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the execution flow. Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid. The account status is checked only if not explicitly ordered to be ignored for the current onBehalfOfAccount.
-    /// @param accounts An array of addresses of the accounts to be checked.
+    /// @inheritdoc ICVP
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
@@ -581,17 +528,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @notice Immediately checks the status of an account and reverts if it is not valid.
-    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account was previously added to a set to be checked later, it is removed.
-    /// @param account The address of the account to be checked.
+    /// @inheritdoc ICVP
     function requireAccountStatusCheckNow(address account) public virtual {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
 
-    /// @notice Immediately checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev Account status checks are performed on the fly regardless of the current execution context state. If account was previously added to a set to be checked later, it is removed.
-    /// @param accounts An array of addresses of the accounts to be checked.
+    /// @inheritdoc ICVP
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
@@ -607,12 +550,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
+    /// @inheritdoc ICVP
     function forgiveAccountStatusCheck(
         address account
     ) public virtual authenticateController(account) {
         accountStatusChecks.remove(account);
     }
 
+    /// @inheritdoc ICVP
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
@@ -635,8 +580,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Vault Status Check
 
-    /// @notice Checks the status of a vault and reverts if it is not valid.
-    /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the execution flow. This function can only be called by the vault itself.
+    /// @inheritdoc ICVP
     function requireVaultStatusCheck() public virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
@@ -645,16 +589,19 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
+    /// @inheritdoc ICVP
     function forgiveVaultStatusCheck() external {
         vaultStatusChecks.remove(msg.sender);
     }
 
-    // INTERNAL FUNCTIONS
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                  INTERNAL FUNCTIONS                                       //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     function callInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint msgValue,
+        uint value,
         bytes calldata data
     )
         internal
@@ -665,17 +612,17 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     {
         if (targetContract == ERC1820_REGISTRY) revert CVP_InvalidAddress();
 
-        msgValue = msgValue == type(uint).max
-            ? address(this).balance
-            : msgValue;
+        value = value == type(uint).max 
+            ? address(this).balance 
+            : value;
 
-        (success, result) = targetContract.call{value: msgValue}(data);
+        (success, result) = targetContract.call{value: value}(data);
     }
 
     function impersonateInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint msgValue,
+        uint value,
         bytes calldata data
     )
         internal
@@ -689,7 +636,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
         executionContext.impersonateLock = true;
 
-        (success, result) = targetContract.call{value: msgValue}(data);
+        (success, result) = targetContract.call{value: value}(data);
 
         executionContext.impersonateLock = false;
     }
@@ -697,8 +644,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
-    ) internal returns (BatchResult[] memory batchItemsResult) {
-        if (returnResult) batchItemsResult = new BatchResult[](items.length);
+    ) internal returns (BatchItemResult[] memory batchItemsResult) {
+        if (returnResult) {
+            batchItemsResult = new BatchItemResult[](items.length);
+        }
 
         uint length = items.length;
         for (uint i; i < length; ) {
@@ -717,7 +666,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
                 (success, result) = callInternal(
                     targetContract,
                     onBehalfOfAccount,
-                    item.msgValue,
+                    item.value,
                     item.data
                 );
             }
@@ -784,7 +733,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function checkStatusAll(
         SetType setType,
         bool returnResult
-    ) private returns (BatchResult[] memory result) {
+    ) private returns (BatchItemResult[] memory result) {
         function(address) returns (bool, bytes memory) checkStatus;
         function(address) requireStatusCheck;
         SetStorage storage setStorage;
@@ -802,7 +751,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         uint numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
 
-        if (returnResult) result = new BatchResult[](numElements);
+        if (returnResult) result = new BatchItemResult[](numElements);
 
         if (numElements == 0) return result;
 

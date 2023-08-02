@@ -9,7 +9,7 @@ contract Target {
     function callTest(
         address cvp,
         address msgSender,
-        uint msgValue,
+        uint value,
         bool checksDeferred,
         address onBehalfOfAccount
     ) external payable returns (uint) {
@@ -17,7 +17,7 @@ contract Target {
             .getExecutionContext(address(0));
 
         require(msg.sender == msgSender, "ct/invalid-sender");
-        require(msg.value == msgValue, "ct/invalid-msg-value");
+        require(msg.value == value, "ct/invalid-msg-value");
         require(
             context.batchDepth != 0 == checksDeferred,
             "ct/invalid-checks-deferred"
@@ -33,7 +33,7 @@ contract Target {
     function impersonateTest(
         address cvp,
         address msgSender,
-        uint msgValue,
+        uint value,
         bool checksDeferred,
         address onBehalfOfAccount
     ) external payable returns (uint) {
@@ -41,7 +41,7 @@ contract Target {
             .getExecutionContext(address(0));
 
         require(msg.sender == msgSender, "it/invalid-sender");
-        require(msg.value == msgValue, "it/invalid-msg-value");
+        require(msg.value == value, "it/invalid-msg-value");
         require(
             context.batchDepth != 0 == checksDeferred,
             "it/invalid-checks-deferred"

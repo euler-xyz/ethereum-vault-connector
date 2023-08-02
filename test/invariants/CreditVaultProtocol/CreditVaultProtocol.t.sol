@@ -120,7 +120,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     function callInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint msgValue,
+        uint value,
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         if (uint160(targetContract) <= 10) return (true, "");
@@ -131,7 +131,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         (success, result) = super.callInternal(
             targetContract,
             onBehalfOfAccount,
-            msgValue,
+            value,
             data
         );
     }
@@ -171,7 +171,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         if (items.length > Set.MAX_ELEMENTS) return;
 
         for (uint i = 0; i < items.length; i++) {
-            if (uint160(items[i].msgValue) > type(uint128).max) return;
+            if (uint160(items[i].value) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
         }
@@ -187,12 +187,12 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         payable
         override
         returns (
-            BatchResult[] memory batchItemsResult,
-            BatchResult[] memory accountsStatusResult,
-            BatchResult[] memory vaultsStatusResult
+            BatchItemResult[] memory batchItemsResult,
+            BatchItemResult[] memory accountsStatusResult,
+            BatchItemResult[] memory vaultsStatusResult
         )
     {
-        BatchResult[] memory x = new BatchResult[](0);
+        BatchItemResult[] memory x = new BatchItemResult[](0);
         return (x, x, x);
     }
 
@@ -203,12 +203,12 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         payable
         override
         returns (
-            BatchResult[] memory batchItemsResult,
-            BatchResult[] memory accountsStatusResult,
-            BatchResult[] memory vaultsStatusResult
+            BatchItemResult[] memory batchItemsResult,
+            BatchItemResult[] memory accountsStatusResult,
+            BatchItemResult[] memory vaultsStatusResult
         )
     {
-        BatchResult[] memory x = new BatchResult[](0);
+        BatchItemResult[] memory x = new BatchItemResult[](0);
         return (x, x, x);
     }
 
