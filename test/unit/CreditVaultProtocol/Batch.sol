@@ -19,6 +19,27 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
     }
 }
 
+contract CreditVaultProtocolNoRevert is CreditVaultProtocolHarnessed {
+    using Set for SetStorage;
+
+    function batchRevert(
+        BatchItem[] calldata
+    )
+        public
+        payable
+        override
+        nonReentrant
+        returns (
+            BatchResult[] memory batchItemsResult,
+            BatchResult[] memory accountsStatusResult,
+            BatchResult[] memory vaultsStatusResult
+        )
+    {
+        // doesn't rever as expected
+        return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
+    }
+}
+
 contract BatchTest is Test {
     CreditVaultProtocolHandler internal cvp;
 
@@ -802,5 +823,14 @@ contract BatchTest is Test {
                 keccak256(vaultsStatusResult[0].result)
             );
         }
+    }
+
+    function test_RevertIfBatchRevertDoesntRevert_BatchSimulation(
+        address alice
+    ) external {
+        ICVP cvp_noRevert = new CreditVaultProtocolNoRevert();
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultProtocol.CVP_BatchPanic.selector);
+        cvp_noRevert.batchSimulation(new ICVP.BatchItem[](0));
     }
 }
