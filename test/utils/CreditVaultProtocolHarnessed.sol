@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
 import "src/CreditVaultProtocol.sol";
 import "./mocks/Vault.sol";
 
@@ -142,18 +141,10 @@ contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
             accountStatusChecks.numElements == 0,
             "verifyStorage/account-status-checks/numElements"
         );
-        require(
-            accountStatusChecks.firstElement == address(0),
-            "verifyStorage/account-status-checks/firstElement"
-        );
 
         require(
             vaultStatusChecks.numElements == 0,
             "verifyStorage/vault-status-checks/numElements"
-        );
-        require(
-            vaultStatusChecks.firstElement == address(0),
-            "verifyStorage/vault-status-checks/firstElement"
         );
 
         // for coverage

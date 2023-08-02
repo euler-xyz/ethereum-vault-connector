@@ -85,16 +85,17 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             !haveCommonOwner(msg.sender, account) &&
             !accountOperators[account][msg.sender]
         ) revert CVP_NotAuthorized();
-
-        // if it's an operator calling and we get up to this point
-        // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
-        // must have been called previously and the ownerLookup is already set.
-        // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
-        // ownerLookup is set only once on the initial interaction of the account with the CVP.
-        uint152 prefix = uint152(uint160(account) >> 8);
-        if (ownerLookup[prefix] == address(0)) {
-            ownerLookup[prefix] = msg.sender;
-            emit AccountsOwnerRegistered(prefix, msg.sender);
+        {
+            // if it's an operator calling and we get up to this point
+            // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
+            // must have been called previously and the ownerLookup is already set.
+            // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
+            // ownerLookup is set only once on the initial interaction of the account with the CVP.
+            uint152 prefix = uint152(uint160(account) >> 8);
+            if (ownerLookup[prefix] == address(0)) {
+                ownerLookup[prefix] = msg.sender;
+                emit AccountsOwnerRegistered(prefix, msg.sender);
+            }
         }
 
         _;
@@ -126,13 +127,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice A modifier checks whether msg.sender is the only controller for the account.
     modifier authenticateController(address account) {
         {
-            SetStorage storage controllers = accountControllers[account];
+            uint numOfControllers = accountControllers[account].numElements;
+            address controller = accountControllers[account].firstElement;
 
-            if (controllers.numElements != 1) {
-                revert CVP_ControllerViolation();
-            } else if (controllers.firstElement != msg.sender) {
-                revert CVP_NotAuthorized();
-            }
+            if (numOfControllers != 1) revert CVP_ControllerViolation();
+            else if (controller != msg.sender) revert CVP_NotAuthorized();
         }
         _;
     }
@@ -418,8 +417,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public payable virtual nonReentrant {
         uint batchDepthCache = executionContext.batchDepth;
 
-        if (batchDepthCache >= BATCH_DEPTH__MAX)
+        if (batchDepthCache >= BATCH_DEPTH__MAX) {
             revert CVP_BatchDepthViolation();
+        }
 
         unchecked {
             ++executionContext.batchDepth;
@@ -460,8 +460,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     {
         uint batchDepthCache = executionContext.batchDepth;
 
-        if (batchDepthCache >= BATCH_DEPTH__MAX)
+        if (batchDepthCache >= BATCH_DEPTH__MAX) {
             revert CVP_BatchDepthViolation();
+        }
 
         unchecked {
             ++executionContext.batchDepth;
@@ -538,7 +539,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public view returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
-        for (uint i; i < accounts.length; ) {
+        uint length = accounts.length;
+        for (uint i; i < length; ) {
             (isValid[i], ) = checkAccountStatusInternal(accounts[i]);
             unchecked {
                 ++i;
@@ -565,7 +567,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) public virtual {
         uint batchDepthCache = executionContext.batchDepth;
 
-        for (uint i = 0; i < accounts.length; ) {
+        uint length = accounts.length;
+        for (uint i; i < length; ) {
             if (batchDepthCache == BATCH_DEPTH__INIT) {
                 requireAccountStatusCheckInternal(accounts[i]);
             } else {
@@ -592,9 +595,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
-        for (uint i; i < accounts.length; ) {
-            requireAccountStatusCheckInternal(accounts[i]);
-            accountStatusChecks.remove(accounts[i]);
+        uint length = accounts.length;
+        for (uint i; i < length; ) {
+            address account = accounts[i];
+            requireAccountStatusCheckInternal(account);
+            accountStatusChecks.remove(account);
 
             unchecked {
                 ++i;
@@ -614,13 +619,11 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
-            SetStorage storage controllers = accountControllers[account];
+            uint numOfControllers = accountControllers[account].numElements;
+            address controller = accountControllers[account].firstElement;
 
-            if (controllers.numElements != 1) {
-                revert CVP_ControllerViolation();
-            } else if (controllers.firstElement != msg.sender) {
-                revert CVP_NotAuthorized();
-            }
+            if (numOfControllers != 1) revert CVP_ControllerViolation();
+            else if (controller != msg.sender) revert CVP_NotAuthorized();
 
             accountStatusChecks.remove(account);
 
@@ -697,14 +700,15 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) internal returns (BatchResult[] memory batchItemsResult) {
         if (returnResult) batchItemsResult = new BatchResult[](items.length);
 
-        for (uint i; i < items.length; ) {
+        uint length = items.length;
+        for (uint i; i < length; ) {
             BatchItem calldata item = items[i];
             address targetContract = item.targetContract;
             bool success;
             bytes memory result;
 
             if (targetContract == address(this)) {
-                (success, result) = targetContract.delegatecall(item.data);
+                (success, result) = address(this).delegatecall(item.data);
             } else {
                 address onBehalfOfAccount = item.onBehalfOfAccount == address(0)
                     ? msg.sender
@@ -734,13 +738,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function checkAccountStatusInternal(
         address account
     ) internal view returns (bool isValid, bytes memory data) {
-        SetStorage storage controllers = accountControllers[account];
+        uint numOfControllers = accountControllers[account].numElements;
+        address controller = accountControllers[account].firstElement;
 
-        if (controllers.numElements == 0) return (true, "");
-        else if (controllers.numElements > 1) revert CVP_ControllerViolation();
+        if (numOfControllers == 0) return (true, "");
+        else if (numOfControllers > 1) revert CVP_ControllerViolation();
 
         bool success;
-        (success, data) = controllers.firstElement.staticcall(
+        (success, data) = controller.staticcall(
             abi.encodeWithSelector(
                 ICreditVault.checkAccountStatus.selector,
                 account,
@@ -794,12 +799,16 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             setStorage = vaultStatusChecks;
         }
 
+        uint numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
-        uint8 numElements = setStorage.numElements;
 
         if (returnResult) result = new BatchResult[](numElements);
 
         if (numElements == 0) return result;
+
+        // clear only the number of elements to optimize gas consumption
+        if (setType == SetType.Account) accountStatusChecks.numElements = 0;
+        else vaultStatusChecks.numElements = 0;
 
         for (uint i; i < numElements; ) {
             address addressToCheck = i == 0
@@ -825,19 +834,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
                 requireStatusCheck(addressToCheck);
             }
 
-            // do not clear array elements to optimize gas consumption
-            // delete setStorage.elements[i];
             unchecked {
                 ++i;
             }
-        }
-
-        if (setType == SetType.Account) {
-            delete accountStatusChecks.numElements;
-            delete accountStatusChecks.firstElement;
-        } else {
-            delete vaultStatusChecks.numElements;
-            delete vaultStatusChecks.firstElement;
         }
     }
 
@@ -860,13 +859,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         assert(!context.checksLock);
         assert(!context.impersonateLock);
         assert(context.onBehalfOfAccount == address(0));
-
-        SetStorage storage asChecks = accountStatusChecks;
-        assert(asChecks.firstElement == address(0));
-        assert(asChecks.numElements == 0);
-
-        SetStorage storage vsChecks = vaultStatusChecks;
-        assert(vsChecks.firstElement == address(0));
-        assert(vsChecks.numElements == 0);
+        assert(accountStatusChecks.numElements == 0);
+        assert(vaultStatusChecks.numElements == 0);
     }
 }
