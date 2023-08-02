@@ -604,13 +604,15 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     function forgiveAccountStatusCheck(
         address account
-    ) external authenticateController(account) {
+    ) public virtual authenticateController(account) {
         accountStatusChecks.remove(account);
     }
 
-    function forgiveAccountsStatusCheck(address[] calldata accounts) external {
+    function forgiveAccountsStatusCheck(
+        address[] calldata accounts
+    ) public virtual {
         uint length = accounts.length;
-        for (uint i = 0; i < length; ) {
+        for (uint i; i < length; ) {
             address account = accounts[i];
             SetStorage storage controllers = accountControllers[account];
 
@@ -653,6 +655,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         bytes calldata data
     )
         internal
+        virtual
         ownerOrOperator(onBehalfOfAccount)
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)

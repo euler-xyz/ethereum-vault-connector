@@ -117,6 +117,25 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         (success, result) = super.call(targetContract, onBehalfOfAccount, data);
     }
 
+    function callInternal(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint msgValue,
+        bytes calldata data
+    ) internal override returns (bool success, bytes memory result) {
+        if (uint160(targetContract) <= 10) return (true, "");
+        if (targetContract == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)
+            return (true, "");
+        setup(onBehalfOfAccount, targetContract);
+
+        (success, result) = super.callInternal(
+            targetContract,
+            onBehalfOfAccount,
+            msgValue,
+            data
+        );
+    }
+
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
@@ -125,16 +144,27 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         if (uint160(msg.sender) <= 10) return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
+
+        if (onBehalfOfAccount == address(0)) {
+            onBehalfOfAccount = msg.sender;
+        }
+
         setup(onBehalfOfAccount, msg.sender);
         setup(onBehalfOfAccount, targetContract);
-        accountControllers[onBehalfOfAccount].insert(msg.sender);
+
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
+
+        SetStorage memory cache = accountControllers[onBehalfOfAccount];
+        accountControllers[onBehalfOfAccount].numElements = 1;
+        accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
         (success, result) = super.impersonate(
             targetContract,
             onBehalfOfAccount,
             data
         );
+
+        accountControllers[onBehalfOfAccount] = cache;
     }
 
     function batch(BatchItem[] calldata items) public payable override {
@@ -162,7 +192,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
             BatchResult[] memory vaultsStatusResult
         )
     {
-        BatchResult[] memory x;
+        BatchResult[] memory x = new BatchResult[](0);
         return (x, x, x);
     }
 
@@ -178,7 +208,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
             BatchResult[] memory vaultsStatusResult
         )
     {
-        BatchResult[] memory x;
+        BatchResult[] memory x = new BatchResult[](0);
         return (x, x, x);
     }
 
@@ -196,6 +226,40 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
         super.requireAccountsStatusCheckNow(accounts);
     }
 
+    function forgiveAccountStatusCheck(address account) public override {
+        if (msg.sender == address(0)) return;
+
+        SetStorage memory cache = accountControllers[account];
+        accountControllers[account].numElements = 1;
+        accountControllers[account].firstElement = msg.sender;
+
+        super.forgiveAccountStatusCheck(account);
+
+        accountControllers[account] = cache;
+    }
+
+    function forgiveAccountsStatusCheck(
+        address[] calldata accounts
+    ) public override {
+        if (msg.sender == address(0)) return;
+        if (accounts.length > Set.MAX_ELEMENTS) return;
+
+        SetStorage[] memory cache = new SetStorage[](accounts.length);
+        for (uint i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+            cache[i] = accountControllers[account];
+            accountControllers[account].numElements = 1;
+            accountControllers[account].firstElement = msg.sender;
+        }
+
+        super.forgiveAccountsStatusCheck(accounts);
+
+        for (uint i = accounts.length; i > 0; i--) {
+            address account = accounts[i - 1];
+            accountControllers[account] = cache[i - 1];
+        }
+    }
+
     function requireAccountStatusCheckInternal(address) internal pure override {
         return;
     }
@@ -207,7 +271,7 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     function exposeAccountCollaterals(
         address account
     ) external view returns (SetStorage memory) {
-        return accountControllers[account];
+        return accountCollaterals[account];
     }
 
     function exposeAccountControllers(
@@ -303,12 +367,12 @@ contract CreditVaultProtocolInvariants is Test {
                         accountCollaterals.firstElement != address(0))
             );
 
-            for (uint j = 0; j < accountCollateralsArray.length; j++) {
+            for (uint j = 1; j < accountCollaterals.numElements; j++) {
                 assertTrue(accountCollateralsArray[j] != address(0));
             }
 
             // verify that none entry is duplicated
-            for (uint j = 1; j < accountCollateralsArray.length; j++) {
+            for (uint j = 1; j < accountCollaterals.numElements; j++) {
                 for (uint k = 0; k < j; k++) {
                     assertTrue(
                         accountCollateralsArray[j] != accountCollateralsArray[k]
