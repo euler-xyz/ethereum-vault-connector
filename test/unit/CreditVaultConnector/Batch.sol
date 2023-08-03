@@ -129,7 +129,8 @@ contract BatchTest is Test {
             controller
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         cvc.handlerBatch{value: seed}(items);
 
         assertTrue(cvc.isControllerEnabled(alice, controller));

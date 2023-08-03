@@ -59,7 +59,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(controller, seed);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         (bool success, bytes memory result) = cvc.handlerImpersonate{
             value: seed
         }(collateral, alice, data);
@@ -93,7 +94,8 @@ contract ImpersonateTest is Test {
             data
         );
 
-        hoax(controller, seed);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         cvc.batch(items);
         cvc.verifyVaultStatusChecks();
         cvc.verifyAccountStatusChecks();
@@ -119,7 +121,8 @@ contract ImpersonateTest is Test {
             controller
         );
 
-        hoax(controller, seed);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         (success, result) = cvc.handlerImpersonate{value: seed}(
             collateral,
             address(0),
@@ -157,7 +160,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
         (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
@@ -195,7 +199,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
         (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
@@ -227,7 +232,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         (bool success, ) = cvc.handlerImpersonate{value: seed}(
             address(cvc),
@@ -261,7 +267,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(controller, seed);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
         (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
@@ -305,7 +312,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(controller_1, seed);
+        vm.deal(controller_1, seed);
+        vm.prank(controller_1);
         vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
         (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
@@ -345,7 +353,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(randomAddress, seed);
+        vm.deal(randomAddress, seed);
+        vm.prank(randomAddress);
         vm.expectRevert(
             abi.encodeWithSelector(
                 CreditVaultConnector.CVC_NotAuthorized.selector
@@ -388,7 +397,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        hoax(controller, seed);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         vm.expectRevert(
             abi.encodeWithSelector(
                 CreditVaultConnector.CVC_NotAuthorized.selector
