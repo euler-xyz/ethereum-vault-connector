@@ -4,12 +4,12 @@ pragma solidity ^0.8.0;
 
 import "./Target.sol";
 import "src/interfaces/ICreditVault.sol";
-import "src/interfaces/ICreditVaultProtocol.sol";
-import "src/CreditVaultProtocol.sol";
+import "src/interfaces/ICreditVaultConnector.sol";
+import "src/CreditVaultConnector.sol";
 
 // mock vault contract that implements required interface and helps with status checks verification
 contract Vault is ICreditVault, Target {
-    ICVP public immutable cvp;
+    ICVC public immutable cvc;
 
     uint internal vaultStatusState;
     uint internal accountStatusState;
@@ -17,8 +17,8 @@ contract Vault is ICreditVault, Target {
     bool[] internal vaultStatusChecked;
     address[] internal accountStatusChecked;
 
-    constructor(ICVP _cvp) {
-        cvp = _cvp;
+    constructor(ICVC _cvc) {
+        cvc = _cvc;
     }
 
     function reset() external {
@@ -62,7 +62,7 @@ contract Vault is ICreditVault, Target {
     }
 
     function disableController(address account) external virtual override {
-        cvp.disableController(account);
+        cvc.disableController(account);
     }
 
     function checkVaultStatus()
@@ -88,8 +88,8 @@ contract Vault is ICreditVault, Target {
     }
 
     function requireChecks(address account) external payable {
-        cvp.requireAccountStatusCheck(account);
-        cvp.requireVaultStatusCheck();
+        cvc.requireAccountStatusCheck(account);
+        cvc.requireVaultStatusCheck();
     }
 
     function call(address target, bytes memory data) external payable {
@@ -102,7 +102,7 @@ contract VaultMalicious is Vault {
     bytes4 internal functionSelectorToCall;
     bytes4 internal expectedErrorSelector;
 
-    constructor(ICVP _cvp) Vault(_cvp) {}
+    constructor(ICVC _cvc) Vault(_cvc) {}
 
     function setFunctionSelectorToCall(bytes4 selector) external {
         functionSelectorToCall = selector;
@@ -120,7 +120,7 @@ contract VaultMalicious is Vault {
         override
         returns (bool, bytes memory)
     {
-        // try to reenter the CVP batch. if it were possible, one could defer other vaults status checks
+        // try to reenter the CVC batch. if it were possible, one could defer other vaults status checks
         // by entering a batch here and making the checkStatusAll() malfunction. possible attack:
         // - execute a batch with any item that calls checkVaultStatus() on vault A
         // - checkStatusAll() calls checkVaultStatus() on vault A
@@ -128,14 +128,14 @@ contract VaultMalicious is Vault {
         // - because checks are deferred, checkVaultStatus() on vault B is not executed the right away
         // - control is handed over back to checkStatusAll() which had numElements = 1 when entering the loop
         // - the loop ends and "delete vaultStatusChecks" is called removing the vault status check scheduled on vault B
-        ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(0);
-        items[0].msgValue = 0;
+        items[0].value = 0;
         items[0].data = "";
 
-        (bool success, bytes memory err) = address(cvp).call(
+        (bool success, bytes memory err) = address(cvc).call(
             abi.encodeWithSelector(functionSelectorToCall, items)
         );
 

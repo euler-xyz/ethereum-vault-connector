@@ -3,13 +3,13 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultProtocolHarnessed.sol";
+import "../../utils/CreditVaultConnectorHarness.sol";
 
 contract IsAccountStatusCheckDeferredTest is Test {
-    CreditVaultProtocolHarnessed internal cvp;
+    CreditVaultConnectorHarness internal cvc;
 
     function setUp() public {
-        cvp = new CreditVaultProtocolHarnessed();
+        cvc = new CreditVaultConnectorHarness();
     }
 
     function test_IsAccountStatusCheckDeferred(
@@ -20,21 +20,21 @@ contract IsAccountStatusCheckDeferredTest is Test {
 
         for (uint i = 0; i < numberOfAccounts; ++i) {
             // we're not in a batch thus the check will not get deferred
-            cvp.setBatchDepth(0);
+            cvc.setBatchDepth(0);
 
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
+            assertFalse(cvc.isAccountStatusCheckDeferred(account));
 
-            cvp.requireAccountStatusCheck(account);
-            assertFalse(cvp.isAccountStatusCheckDeferred(account));
+            cvc.requireAccountStatusCheck(account);
+            assertFalse(cvc.isAccountStatusCheckDeferred(account));
 
             // simulate being in a batch
-            cvp.setBatchDepth(1);
+            cvc.setBatchDepth(1);
 
-            cvp.requireAccountStatusCheck(account);
-            assertTrue(cvp.isAccountStatusCheckDeferred(account));
+            cvc.requireAccountStatusCheck(account);
+            assertTrue(cvc.isAccountStatusCheckDeferred(account));
         }
     }
 }

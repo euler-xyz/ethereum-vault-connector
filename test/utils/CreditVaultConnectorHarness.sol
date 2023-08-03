@@ -2,12 +2,12 @@
 
 pragma solidity ^0.8.0;
 
-import "src/CreditVaultProtocol.sol";
+import "src/CreditVaultConnector.sol";
 import "./mocks/Vault.sol";
 
-// helper contract that allows to set CVP's internal state and overrides original
-// CVP functions in order to verify the account and vault checks
-contract CreditVaultProtocolHarnessed is CreditVaultProtocol {
+// helper contract that allows to set CVC's internal state and overrides original
+// CVC functions in order to verify the account and vault checks
+contract CreditVaultConnectorHarness is CreditVaultConnector {
     using Set for SetStorage;
 
     address[] internal expectedAccountsChecked;

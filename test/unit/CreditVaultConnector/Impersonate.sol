@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultProtocolHarnessed.sol";
+import "../../utils/CreditVaultConnectorHarness.sol";
 
-contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
+contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
 
     function handlerImpersonate(
@@ -31,96 +31,96 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
 }
 
 contract ImpersonateTest is Test {
-    CreditVaultProtocolHandler internal cvp;
+    CreditVaultConnectorHandler internal cvc;
 
     function setUp() public {
-        cvp = new CreditVaultProtocolHandler();
+        cvc = new CreditVaultConnectorHandler();
     }
 
     function test_Impersonate(address alice, uint96 seed) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
-        vm.assume(collateral != address(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
+        vm.assume(collateral != address(cvc));
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(controller, seed);
-        (bool success, bytes memory result) = cvp.handlerImpersonate{
+        (bool success, bytes memory result) = cvc.handlerImpersonate{
             value: seed
         }(collateral, alice, data);
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
 
-        cvp.clearExpectedChecks();
+        cvc.clearExpectedChecks();
         Vault(controller).clearChecks();
 
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             0, // we're expecting ETH not to get forwarded
             true,
             alice
         );
 
-        ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
-        items[0].targetContract = address(cvp);
-        items[0].msgValue = seed; // this value will get ignored
+        items[0].targetContract = address(cvc);
+        items[0].value = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
-            cvp.impersonate.selector,
+            cvc.impersonate.selector,
             collateral,
             alice,
             data
         );
 
         hoax(controller, seed);
-        cvp.batch(items);
-        cvp.verifyVaultStatusChecks();
-        cvp.verifyAccountStatusChecks();
+        cvc.batch(items);
+        cvc.verifyVaultStatusChecks();
+        cvc.verifyAccountStatusChecks();
 
         // this call should also succeed if the onBehalfOfAccount address passed is 0.
         // it should be replaced with msg.sender note that in this case the controller
         // tries to act on behalf of itself
         vm.prank(controller);
-        cvp.enableCollateral(controller, collateral);
+        cvc.enableCollateral(controller, collateral);
 
         vm.prank(controller);
-        cvp.enableController(controller, controller);
+        cvc.enableController(controller, controller);
 
-        cvp.clearExpectedChecks();
+        cvc.clearExpectedChecks();
         Vault(controller).clearChecks();
 
         data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             controller
         );
 
         hoax(controller, seed);
-        (success, result) = cvp.handlerImpersonate{value: seed}(
+        (success, result) = cvc.handlerImpersonate{value: seed}(
             collateral,
             address(0),
             data
@@ -136,30 +136,30 @@ contract ImpersonateTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
-        vm.assume(collateral != address(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
+        vm.assume(collateral != address(cvc));
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
-        cvp.setChecksLock(true);
+        cvc.setChecksLock(true);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(address(cvp)).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            Target(address(cvc)).impersonateTest.selector,
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
             alice,
             data
@@ -174,30 +174,30 @@ contract ImpersonateTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
-        vm.assume(collateral != address(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
+        vm.assume(collateral != address(cvc));
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
-        cvp.setImpersonateLock(true);
+        cvc.setImpersonateLock(true);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(address(cvp)).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            Target(address(cvc)).impersonateTest.selector,
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
             alice,
             data
@@ -212,25 +212,25 @@ contract ImpersonateTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
-        address controller = address(new Vault(cvp));
+        address controller = address(new Vault(cvc));
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
-        // target contract is the CVP
+        // target contract is the CVC
         bytes memory data = abi.encodeWithSelector(
-            Target(address(cvp)).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            Target(address(cvc)).impersonateTest.selector,
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
-            address(cvp),
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
+            address(cvc),
             alice,
             data
         );
@@ -244,26 +244,26 @@ contract ImpersonateTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
 
-        vm.assume(collateral != address(cvp));
+        vm.assume(collateral != address(cvc));
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         bytes memory data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(controller, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
             alice,
             data
@@ -278,36 +278,36 @@ contract ImpersonateTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
-        address collateral = address(new Vault(cvp));
-        address controller_1 = address(new Vault(cvp));
-        address controller_2 = address(new Vault(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller_1 = address(new Vault(cvc));
+        address controller_2 = address(new Vault(cvc));
 
-        vm.assume(collateral != address(cvp));
+        vm.assume(collateral != address(cvc));
 
         // mock checks deferred to enable multiple controllers
-        cvp.setBatchDepth(1);
+        cvc.setBatchDepth(1);
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller_1);
+        cvc.enableController(alice, controller_1);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller_2);
+        cvc.enableController(alice, controller_2);
 
         bytes memory data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(controller_1, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_ControllerViolation.selector);
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
             alice,
             data
@@ -324,22 +324,22 @@ contract ImpersonateTest is Test {
         vm.assume(alice != address(0));
         vm.assume(uint160(randomAddress) > 10);
 
-        address collateral = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
 
-        vm.assume(collateral != address(cvp));
+        vm.assume(collateral != address(cvc));
         vm.assume(randomAddress != controller);
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
@@ -348,10 +348,10 @@ contract ImpersonateTest is Test {
         hoax(randomAddress, seed);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.CVP_NotAuthorized.selector
+                CreditVaultConnector.CVC_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
             alice,
             data
@@ -366,23 +366,23 @@ contract ImpersonateTest is Test {
         uint seed
     ) public {
         vm.assume(alice != address(0));
-        vm.assume(targetContract != address(cvp));
+        vm.assume(targetContract != address(cvc));
 
-        address collateral = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
 
         vm.assume(targetContract != collateral);
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, collateral);
+        cvc.enableCollateral(alice, collateral);
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
             Target(collateral).impersonateTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
@@ -391,10 +391,10 @@ contract ImpersonateTest is Test {
         hoax(controller, seed);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.CVP_NotAuthorized.selector
+                CreditVaultConnector.CVC_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvp.handlerImpersonate{value: seed}(
+        (bool success, ) = cvc.handlerImpersonate{value: seed}(
             targetContract,
             alice,
             data

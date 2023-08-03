@@ -3,10 +3,10 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "src/CreditVaultProtocol.sol";
+import "src/CreditVaultConnector.sol";
 
 contract SetAccountOperatorTest is Test {
-    CreditVaultProtocol internal cvp;
+    CreditVaultConnector internal cvc;
 
     event AccountOperatorEnabled(
         address indexed account,
@@ -22,75 +22,75 @@ contract SetAccountOperatorTest is Test {
     );
 
     function setUp() public {
-        cvp = new CreditVaultProtocol();
+        cvc = new CreditVaultConnector();
     }
 
     function test_SetAccountOperator(address alice, address operator) public {
         vm.assume(alice != address(0));
-        vm.assume(!cvp.haveCommonOwner(alice, operator));
+        vm.assume(!cvc.haveCommonOwner(alice, operator));
 
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
 
-            assertFalse(cvp.accountOperators(account, operator));
+            assertFalse(cvc.accountOperators(account, operator));
 
             if (i == 0) {
                 vm.expectRevert(
-                    CreditVaultProtocol.CVP_AccountOwnerNotRegistered.selector
+                    CreditVaultConnector.CVC_AccountOwnerNotRegistered.selector
                 );
-                cvp.getAccountOwner(account);
+                cvc.getAccountOwner(account);
             } else {
-                assertEq(cvp.getAccountOwner(account), alice);
+                assertEq(cvc.getAccountOwner(account), alice);
             }
 
             vm.prank(alice);
             if (i == 0) {
-                vm.expectEmit(true, true, false, false, address(cvp));
+                vm.expectEmit(true, true, false, false, address(cvc));
                 emit AccountsOwnerRegistered(
                     uint152(uint160(alice) >> 8),
                     alice
                 );
             }
-            vm.expectEmit(true, true, false, false, address(cvp));
+            vm.expectEmit(true, true, false, false, address(cvc));
             emit AccountOperatorEnabled(account, operator);
             vm.recordLogs();
-            cvp.setAccountOperator(account, operator, true);
+            cvc.setAccountOperator(account, operator, true);
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-            assertTrue(cvp.accountOperators(account, operator));
-            assertEq(cvp.getAccountOwner(account), alice);
+            assertTrue(cvc.accountOperators(account, operator));
+            assertEq(cvc.getAccountOwner(account), alice);
 
             // early return if the operator is already enabled
             vm.prank(alice);
             vm.recordLogs();
-            cvp.setAccountOperator(account, operator, true);
+            cvc.setAccountOperator(account, operator, true);
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 0);
-            assertTrue(cvp.accountOperators(account, operator));
-            assertEq(cvp.getAccountOwner(account), alice);
+            assertTrue(cvc.accountOperators(account, operator));
+            assertEq(cvc.getAccountOwner(account), alice);
 
             vm.prank(alice);
-            vm.expectEmit(true, true, false, false, address(cvp));
+            vm.expectEmit(true, true, false, false, address(cvc));
             emit AccountOperatorDisabled(account, operator);
             vm.recordLogs();
-            cvp.setAccountOperator(account, operator, false);
+            cvc.setAccountOperator(account, operator, false);
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            assertFalse(cvp.accountOperators(account, operator));
-            assertEq(cvp.getAccountOwner(account), alice);
+            assertFalse(cvc.accountOperators(account, operator));
+            assertEq(cvc.getAccountOwner(account), alice);
 
             // early return if the operator is already disabled
             vm.prank(alice);
             vm.recordLogs();
-            cvp.setAccountOperator(account, operator, false);
+            cvc.setAccountOperator(account, operator, false);
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 0);
-            assertFalse(cvp.accountOperators(account, operator));
-            assertEq(cvp.getAccountOwner(account), alice);
+            assertFalse(cvc.accountOperators(account, operator));
+            assertEq(cvc.getAccountOwner(account), alice);
         }
     }
 
@@ -98,15 +98,15 @@ contract SetAccountOperatorTest is Test {
         address alice,
         address operator
     ) public {
-        vm.assume(!cvp.haveCommonOwner(alice, operator));
+        vm.assume(!cvc.haveCommonOwner(alice, operator));
 
         address account = address(uint160(uint160(alice) ^ 256));
 
-        assertFalse(cvp.accountOperators(account, operator));
+        assertFalse(cvc.accountOperators(account, operator));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        cvp.setAccountOperator(account, operator, true);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setAccountOperator(account, operator, true);
     }
 
     function test_RevertIfOperatorIsSendersAccount_SetAccountOperator(
@@ -115,10 +115,10 @@ contract SetAccountOperatorTest is Test {
     ) public {
         address operator = address(uint160(uint160(alice) ^ subAccountId));
 
-        assertFalse(cvp.accountOperators(alice, operator));
+        assertFalse(cvc.accountOperators(alice, operator));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
-        cvp.setAccountOperator(alice, operator, true);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        cvc.setAccountOperator(alice, operator, true);
     }
 }

@@ -6,7 +6,7 @@ solc = "0.8.19"
 optimizer_runs = 10000
 ignored_error_codes = ["unreachable"]
 gas_reports = [
-    "CreditVaultProtocol"
+    "CreditVaultConnector"
 ]
 remappings = [
     "src=src/",
@@ -28,7 +28,7 @@ runs = 1000
 [profile.smt.model_checker]
 engine = "chc"
 timeout = 100_000
-contracts = {"./src/CreditVaultProtocol.sol" = ["CreditVaultProtocol"]}
+contracts = {"./src/CreditVaultConnector.sol" = ["CreditVaultConnector"]}
 invariants = ["contract", "reentrancy"]
 targets = [
     "assert",
@@ -38,5 +38,3 @@ targets = [
     "overflow",
     "underflow",
 ]
-
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
