@@ -162,7 +162,7 @@ This is accomplished is by the controller vault calling `impersonate` and passin
 
 As mentioned above, when interacting with the CVP, it is often useful to defer certain checks until the end of the transaction. This allows a user to temporarily violate some of the constraints imposed by the vaults being interacted with, so long as the constraints are satisfied at the end of the transaction.
 
-In order to implement this, the CVP maintains an *execution context* which holds two sets of addresses in regular or transient storage (if supported): `accountStatusChecks` and `vaultStatusChecks`. The execution context will also contain the `onBehalfOfAddress` that has currently been authenticated, so it can be queried for by a vault (see security considerations).
+In order to implement this, the CVP maintains an *execution context* which holds two sets of addresses in regular or transient storage (if supported): `accountStatusChecks` and `vaultStatusChecks`. The execution context will also contain the `onBehalfOfAccount` that has currently been authenticated, so it can be queried for by a vault (see security considerations).
 
 An execution context will exist for the duration of the batch, and is then discarded. Only one execution context can exist at a time. However, nesting batches *is* allowed (see below).
 
@@ -179,13 +179,13 @@ If a vault or other contract is invoked via the CVP, and that contract in turn r
 
 Internally, the execution context stores a `batchDepth` value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
 
-The previous value of `onBehalfOfAddress` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAddress` at all times when `msg.sender` is the CVP. However, they can not necessarily rely on this value not changing when they invoke user-controllable callbacks (because they could created a nested context).
+The previous value of `onBehalfOfAccount` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAccount` at all times when `msg.sender` is the CVP. However, they can not necessarily rely on this value not changing when they invoke user-controllable callbacks (because they could created a nested context).
 
-#### checksInProgressLock
+#### checksLock
 
 Although the `checkAccountStatus` function is invoked with `staticcall`, the `checkVaultStatus` is invoked with `call`. This allows vaults to record end-of-batch data summaries in its storage (ie net token in/out flows).
 
-However, if a vault (or something it invokes) calls back into the CVP at this point, an inconsistent state of the deferal checks could be observed. To prevent this, the `checksInProgressLock` mutex is locked while the CVP is resolving the account and vault status check sets.
+However, if a vault (or something it invokes) calls back into the CVP at this point, an inconsistent state of the deferal checks could be observed. To prevent this, the `checksLock` mutex is locked while the CVP is resolving the account and vault status check sets.
 
 #### impersonateLock
 
@@ -226,11 +226,15 @@ In order to take advantage of transient storage, the contracts have been structu
 
 In order to support sub-accounts, operators, and forwarding (ie, liquidations), vaults can be invoked via the CVP's `call`, `batch`, or `impersonate` functions, which will then execute the desired operations on the vault. However, in this case the vault will see the CVP as the `msg.sender`.
 
-When a vault detects that `msg.sender` is the CVP, it should call back into the CVP to retrieve the current execution context using `getExecutionContext`. This will tell the vault three things:
+When a vault detects that `msg.sender` is the CVP, it should call back into the CVP to retrieve the current execution context using `getExecutionContext`. This will tell the vault two things:
 
-* The `onBehalfOfAddress` that has been authenticated by the CVP. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
-* Whether or not account/vault status checks have been deferred
-* Whether or not the vault calling `getExecutionContext` is currently enabled as a controller for the current `onBehalfOfAddress` account. This information is only considered valid when `getExecutionContext` is invoked with `controllerEnabledCheck` set to `true`. When `controllerEnabledCheck` is set to `false` (which optimizes gas consumption), the value returned is always `false`. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account.
+* The `context` which is a copy of the current `executionContext` which consists of five fields:
+** The `batchDepth` which indicates current depth of nested batches. If the `batchDepth` is greater than `0`, the account/vault status checks are considered to be deferred.
+** The `checksLock` which indicates state of the account/vault status checks reentrancy lock. If `checksLock` is `true`, the account/vault status checks are in progress.
+** The `impersonateLock` which indicates state of the impersonation reentrancy lock. If `impersonateLock` is `true`, the it means `impersonate()` function is currently being executed.
+** The `onBehalfOfAccount` which indicated the account that has been authenticated by the CVP. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
+** `reserved` which is reserved for gas optimization purposes.
+* The `controllerEnabled` which indicates whether or not the `controllerToCheck` vault address, with which the function has been invoked, is currently enabled as a controller for the current `onBehalfOfAccount` account. This information is only considered valid when `getExecutionContext` is invoked with `controllerToCheck` set to non-zero address. When `controllerToCheck` is set to zero address (which optimizes gas consumption), the value returned is always `false`. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account.
 
 ### CVP Contract Privileges
 
