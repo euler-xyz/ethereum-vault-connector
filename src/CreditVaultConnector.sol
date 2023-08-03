@@ -4,17 +4,17 @@ pragma solidity ^0.8.0;
 
 import "./Set.sol";
 import "./TransientStorage.sol";
-import "./interfaces/ICreditVaultProtocol.sol";
+import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 
-contract CreditVaultProtocol is ICVP, TransientStorage {
+contract CreditVaultConnector is ICVC, TransientStorage {
     using Set for SetStorage;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       CONSTANTS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    string public constant name = "Credit Vault Protocol - CVP";
+    string public constant name = "Credit Vault Connector (CVC)";
 
     address internal constant ERC1820_REGISTRY =
         0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
@@ -32,10 +32,10 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
-    // Every Ethereum address has 256 accounts in the CVP (including the primary account - called the owner).
+    // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
     // addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address.
-    // In order to record the owner of a group of 256 accounts, the CVP uses a definition of a prefix. A prefix is a part
+    // In order to record the owner of a group of 256 accounts, the CVC uses a definition of a prefix. A prefix is a part
     // of an address having the first 19 bytes common with any of the 256 account addresses belonging to the same group.
     // account/152 -> prefix/152
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
@@ -70,21 +70,21 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     //                                         ERRORS                                            //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    error CVP_NotAuthorized();
-    error CVP_AccountOwnerNotRegistered();
-    error CVP_InvalidAddress();
-    error CVP_ChecksReentrancy();
-    error CVP_ImpersonateReentancy();
-    error CVP_BatchDepthViolation();
-    error CVP_ControllerViolation();
-    error CVP_AccountStatusViolation(address account, bytes data);
-    error CVP_VaultStatusViolation(address vault, bytes data);
-    error CVP_RevertedBatchResult(
+    error CVC_NotAuthorized();
+    error CVC_AccountOwnerNotRegistered();
+    error CVC_InvalidAddress();
+    error CVC_ChecksReentrancy();
+    error CVC_ImpersonateReentancy();
+    error CVC_BatchDepthViolation();
+    error CVC_ControllerViolation();
+    error CVC_AccountStatusViolation(address account, bytes data);
+    error CVC_VaultStatusViolation(address vault, bytes data);
+    error CVC_RevertedBatchResult(
         BatchItemResult[] batchItemsResult,
         BatchItemResult[] accountsStatusResult,
         BatchItemResult[] vaultsStatusResult
     );
-    error CVP_BatchPanic();
+    error CVC_BatchPanic();
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
@@ -97,13 +97,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         if (
             !haveCommonOwner(msg.sender, account) &&
             !accountOperators[account][msg.sender]
-        ) revert CVP_NotAuthorized();
+        ) revert CVC_NotAuthorized();
         {
             // if it's an operator calling and we get up to this point
             // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
             // must have been called previously and the ownerLookup is already set.
             // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
-            // ownerLookup is set only once on the initial interaction of the account with the CVP.
+            // ownerLookup is set only once on the initial interaction of the account with the CVC.
             uint152 prefix = uint152(uint160(account) >> 8);
             if (ownerLookup[prefix] == address(0)) {
                 ownerLookup[prefix] = msg.sender;
@@ -120,8 +120,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             bool checksLock = executionContext.checksLock;
             bool impersonateLock = executionContext.impersonateLock;
 
-            if (checksLock) revert CVP_ChecksReentrancy();
-            else if (impersonateLock) revert CVP_ImpersonateReentancy();
+            if (checksLock) revert CVC_ChecksReentrancy();
+            else if (impersonateLock) revert CVC_ImpersonateReentancy();
         }
         _;
     }
@@ -129,7 +129,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) {
-        // must be cached in case of CVP reentrancy
+        // must be cached in case of CVC reentrancy
         address onBehalfOfAccountCache = executionContext.onBehalfOfAccount;
 
         executionContext.onBehalfOfAccount = account;
@@ -143,8 +143,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             uint numOfControllers = accountControllers[account].numElements;
             address controller = accountControllers[account].firstElement;
 
-            if (numOfControllers != 1) revert CVP_ControllerViolation();
-            else if (controller != msg.sender) revert CVP_NotAuthorized();
+            if (numOfControllers != 1) revert CVC_ControllerViolation();
+            else if (controller != msg.sender) revert CVC_NotAuthorized();
         }
         _;
     }
@@ -155,7 +155,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Account owner and operators
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function haveCommonOwner(
         address account,
         address otherAccount
@@ -163,16 +163,16 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
         owner = ownerLookup[uint152(uint160(account) >> 8)];
 
-        if (owner == address(0)) revert CVP_AccountOwnerNotRegistered();
+        if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function setAccountOperator(
         address account,
         address operator,
@@ -181,9 +181,9 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         // only the account owner can call this function for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
         if (!haveCommonOwner(msg.sender, account)) {
-            revert CVP_NotAuthorized();
+            revert CVC_NotAuthorized();
         } else if (haveCommonOwner(msg.sender, operator)) {
-            revert CVP_InvalidAddress();
+            revert CVC_InvalidAddress();
         }
 
         uint152 prefix = uint152(uint160(account) >> 8);
@@ -202,7 +202,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Execution internals
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function getExecutionContext(
         address controllerToCheck
     )
@@ -218,14 +218,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             );
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function isAccountStatusCheckDeferred(
         address account
     ) external view returns (bool) {
         return accountStatusChecks.contains(account);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function isVaultStatusCheckDeferred(
         address vault
     ) external view returns (bool) {
@@ -234,14 +234,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Collaterals management
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function getCollaterals(
         address account
     ) external view returns (address[] memory) {
         return accountCollaterals[account].get();
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function isCollateralEnabled(
         address account,
         address vault
@@ -249,7 +249,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         return accountCollaterals[account].contains(vault);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function enableCollateral(
         address account,
         address vault
@@ -258,7 +258,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         requireAccountStatusCheck(account);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function disableCollateral(
         address account,
         address vault
@@ -269,14 +269,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Controllers management
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function getControllers(
         address account
     ) external view returns (address[] memory) {
         return accountControllers[account].get();
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function isControllerEnabled(
         address account,
         address vault
@@ -284,7 +284,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         return accountControllers[account].contains(vault);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function enableController(
         address account,
         address vault
@@ -295,7 +295,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         requireAccountStatusCheck(account);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function disableController(
         address account
     ) public payable virtual nonReentrant {
@@ -307,7 +307,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Call forwarding
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -319,7 +319,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         nonReentrant
         returns (bool success, bytes memory result)
     {
-        if (targetContract == address(this)) revert CVP_InvalidAddress();
+        if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         uint value = executionContext.batchDepth == BATCH_DEPTH__INIT
             ? msg.value
@@ -337,7 +337,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         );
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
@@ -349,7 +349,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         nonReentrant
         returns (bool success, bytes memory result)
     {
-        if (targetContract == address(this)) revert CVP_InvalidAddress();
+        if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         uint value = executionContext.batchDepth == BATCH_DEPTH__INIT
             ? msg.value
@@ -369,14 +369,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Batching
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
         uint batchDepthCache = executionContext.batchDepth;
 
         if (batchDepthCache >= BATCH_DEPTH__MAX) {
-            revert CVP_BatchDepthViolation();
+            revert CVC_BatchDepthViolation();
         }
 
         unchecked {
@@ -397,7 +397,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function batchRevert(
         BatchItem[] calldata items
     )
@@ -414,7 +414,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         uint batchDepthCache = executionContext.batchDepth;
 
         if (batchDepthCache >= BATCH_DEPTH__MAX) {
-            revert CVP_BatchDepthViolation();
+            revert CVC_BatchDepthViolation();
         }
 
         unchecked {
@@ -434,14 +434,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             executionContext.checksLock = false;
         }
 
-        revert CVP_RevertedBatchResult(
+        revert CVC_RevertedBatchResult(
             batchItemsResult,
             accountsStatusResult,
             vaultsStatusResult
         );
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function batchSimulation(
         BatchItem[] calldata items
     )
@@ -459,8 +459,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         );
 
         if (success) {
-            revert CVP_BatchPanic();
-        } else if (bytes4(result) != CVP_RevertedBatchResult.selector) {
+            revert CVC_BatchPanic();
+        } else if (bytes4(result) != CVC_RevertedBatchResult.selector) {
             revertBytes(result);
         }
 
@@ -477,14 +477,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Account Status Check
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function checkAccountStatus(
         address account
     ) public view returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
     ) public view returns (bool[] memory isValid) {
@@ -499,7 +499,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function requireAccountStatusCheck(address account) public virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
@@ -508,7 +508,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
@@ -528,13 +528,13 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function requireAccountStatusCheckNow(address account) public virtual {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
@@ -550,14 +550,14 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function forgiveAccountStatusCheck(
         address account
     ) public virtual authenticateController(account) {
         accountStatusChecks.remove(account);
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
@@ -567,8 +567,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
             uint numOfControllers = accountControllers[account].numElements;
             address controller = accountControllers[account].firstElement;
 
-            if (numOfControllers != 1) revert CVP_ControllerViolation();
-            else if (controller != msg.sender) revert CVP_NotAuthorized();
+            if (numOfControllers != 1) revert CVC_ControllerViolation();
+            else if (controller != msg.sender) revert CVC_NotAuthorized();
 
             accountStatusChecks.remove(account);
 
@@ -580,7 +580,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
     // Vault Status Check
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function requireVaultStatusCheck() public virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
@@ -589,7 +589,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         }
     }
 
-    /// @inheritdoc ICVP
+    /// @inheritdoc ICVC
     function forgiveVaultStatusCheck() external {
         vaultStatusChecks.remove(msg.sender);
     }
@@ -610,7 +610,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
-        if (targetContract == ERC1820_REGISTRY) revert CVP_InvalidAddress();
+        if (targetContract == ERC1820_REGISTRY) revert CVC_InvalidAddress();
 
         value = value == type(uint).max 
             ? address(this).balance 
@@ -631,7 +631,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         returns (bool success, bytes memory result)
     {
         if (!accountCollaterals[onBehalfOfAccount].contains(targetContract)) {
-            revert CVP_NotAuthorized();
+            revert CVC_NotAuthorized();
         }
 
         executionContext.impersonateLock = true;
@@ -691,7 +691,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
         address controller = accountControllers[account].firstElement;
 
         if (numOfControllers == 0) return (true, "");
-        else if (numOfControllers > 1) revert CVP_ControllerViolation();
+        else if (numOfControllers > 1) revert CVC_ControllerViolation();
 
         bool success;
         (success, data) = controller.staticcall(
@@ -710,7 +710,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     ) internal virtual {
         (bool isValid, bytes memory data) = checkAccountStatusInternal(account);
 
-        if (!isValid) revert CVP_AccountStatusViolation(account, data);
+        if (!isValid) revert CVC_AccountStatusViolation(account, data);
     }
 
     function checkVaultStatusInternal(
@@ -727,7 +727,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
     function requireVaultStatusCheckInternal(address vault) internal virtual {
         (bool isValid, bytes memory data) = checkVaultStatusInternal(vault);
 
-        if (!isValid) revert CVP_VaultStatusViolation(vault, data);
+        if (!isValid) revert CVC_VaultStatusViolation(vault, data);
     }
 
     function checkStatusAll(
@@ -770,8 +770,8 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
 
                 if (!result[i].success) {
                     bytes4 violationSelector = setType == SetType.Account
-                        ? CVP_AccountStatusViolation.selector
-                        : CVP_VaultStatusViolation.selector;
+                        ? CVC_AccountStatusViolation.selector
+                        : CVC_VaultStatusViolation.selector;
 
                     result[i].result = abi.encodeWithSelector(
                         violationSelector,
@@ -797,7 +797,7 @@ contract CreditVaultProtocol is ICVP, TransientStorage {
                 revert(add(32, errMsg), mload(errMsg))
             }
         }
-        revert("CVP-empty-error");
+        revert("CVC-empty-error");
     }
 
     // Formal verification

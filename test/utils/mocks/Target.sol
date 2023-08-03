@@ -2,18 +2,18 @@
 
 pragma solidity ^0.8.0;
 
-import "src/interfaces/ICreditVaultProtocol.sol";
+import "src/interfaces/ICreditVaultConnector.sol";
 
-// mock target contract that allows to test call() and impersonate() functions of the CVP
+// mock target contract that allows to test call() and impersonate() functions of the CVC
 contract Target {
     function callTest(
-        address cvp,
+        address cvc,
         address msgSender,
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
     ) external payable returns (uint) {
-        (ICVP.ExecutionContext memory context, ) = ICVP(cvp)
+        (ICVC.ExecutionContext memory context, ) = ICVC(cvc)
             .getExecutionContext(address(0));
 
         require(msg.sender == msgSender, "ct/invalid-sender");
@@ -31,13 +31,13 @@ contract Target {
     }
 
     function impersonateTest(
-        address cvp,
+        address cvc,
         address msgSender,
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
     ) external payable returns (uint) {
-        (ICVP.ExecutionContext memory context, ) = ICVP(cvp)
+        (ICVC.ExecutionContext memory context, ) = ICVC(cvc)
             .getExecutionContext(address(0));
 
         require(msg.sender == msgSender, "it/invalid-sender");
@@ -56,16 +56,16 @@ contract Target {
         // therefore it's not necessary to fully verify it here
         if (checksDeferred) {
             require(
-                !ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
+                !ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
                 "it/1"
             );
-            ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
+            ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
             require(
-                ICVP(cvp).isAccountStatusCheckDeferred(onBehalfOfAccount),
+                ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
                 "it/2"
             );
         } else {
-            ICVP(cvp).requireAccountStatusCheck(onBehalfOfAccount);
+            ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
         }
 
         return msg.value;

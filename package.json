@@ -1,10 +1,10 @@
 {
-  "name": "euler-cvp",
+  "name": "euler-cvc",
   "version": "1.0.0",
   "main": "index.js",
-  "repository": "https://github.com/euler-xyz/euler-cvp.git",
-  "author": "kasperpawlowski <kasperpawlowski@gmail.com>",
-  "license": "MIT",
+  "repository": "https://github.com/euler-xyz/euler-cvc.git",
+  "author": "Euler Labs",
+  "license": "GPL-2.0-or-later",
   "scripts": {
     "prettier": "prettier --write src/ test/"
   },

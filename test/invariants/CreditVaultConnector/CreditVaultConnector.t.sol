@@ -3,13 +3,13 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "src/CreditVaultProtocol.sol";
+import "src/CreditVaultConnector.sol";
 
 contract VaultMock is ICreditVault {
-    ICVP public immutable cvp;
+    ICVC public immutable cvc;
 
-    constructor(ICVP _cvp) {
-        cvp = _cvp;
+    constructor(ICVC _cvc) {
+        cvc = _cvc;
     }
 
     function disableController(address account) public override {}
@@ -31,22 +31,22 @@ contract VaultMock is ICreditVault {
     }
 
     fallback(bytes calldata) external payable returns (bytes memory) {
-        cvp.requireAccountStatusCheck(address(0));
-        cvp.requireVaultStatusCheck();
+        cvc.requireAccountStatusCheck(address(0));
+        cvc.requireVaultStatusCheck();
         return "";
     }
 
     receive() external payable {}
 }
 
-contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
+contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
     using Set for SetStorage;
 
     address internal vaultMock;
     address[] public touchedAccounts;
 
     constructor() {
-        vaultMock = address(new VaultMock(ICVP(address(this))));
+        vaultMock = address(new VaultMock(ICVC(address(this))));
     }
 
     function getTouchedAccounts() external view returns (address[] memory) {
@@ -289,21 +289,21 @@ contract CreditVaultProtocolHandler is CreditVaultProtocol, Test {
     }
 }
 
-contract CreditVaultProtocolInvariants is Test {
-    CreditVaultProtocolHandler internal cvp;
+contract CreditVaultConnectorInvariants is Test {
+    CreditVaultConnectorHandler internal cvc;
 
     function setUp() public {
-        cvp = new CreditVaultProtocolHandler();
+        cvc = new CreditVaultConnectorHandler();
 
-        targetContract(address(cvp));
+        targetContract(address(cvc));
     }
 
     function invariant_invariantsCheck() external view {
-        cvp.invariantsCheck();
+        cvc.invariantsCheck();
     }
 
     function invariant_executionContext() external {
-        (ICVP.ExecutionContext memory context, bool controllerEnabled) = cvp
+        (ICVC.ExecutionContext memory context, bool controllerEnabled) = cvc
             .getExecutionContext(address(this));
 
         assertEq(context.batchDepth, 0);
@@ -317,20 +317,20 @@ contract CreditVaultProtocolInvariants is Test {
         (
             SetStorage memory accountStatusChecks,
             SetStorage memory vaultStatusChecks
-        ) = cvp.exposeTransientStorage();
+        ) = cvc.exposeTransientStorage();
 
         assertTrue(accountStatusChecks.numElements == 0);
         assertTrue(vaultStatusChecks.numElements == 0);
     }
 
     function invariant_controllers_collaterals() external {
-        address[] memory touchedAccounts = cvp.getTouchedAccounts();
+        address[] memory touchedAccounts = cvc.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
             // controllers
-            SetStorage memory accountControllers = cvp.exposeAccountControllers(
+            SetStorage memory accountControllers = cvc.exposeAccountControllers(
                 touchedAccounts[i]
             );
-            address[] memory accountControllersArray = cvp.getControllers(
+            address[] memory accountControllersArray = cvc.getControllers(
                 touchedAccounts[i]
             );
 
@@ -350,10 +350,10 @@ contract CreditVaultProtocolInvariants is Test {
             }
 
             // collaterals
-            SetStorage memory accountCollaterals = cvp.exposeAccountCollaterals(
+            SetStorage memory accountCollaterals = cvc.exposeAccountCollaterals(
                 touchedAccounts[i]
             );
-            address[] memory accountCollateralsArray = cvp.getCollaterals(
+            address[] memory accountCollateralsArray = cvc.getCollaterals(
                 touchedAccounts[i]
             );
 

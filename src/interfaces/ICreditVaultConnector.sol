@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-interface ICVP {
+interface ICVC {
     struct ExecutionContext {
         uint8 batchDepth;
         bool checksLock;
@@ -35,7 +35,7 @@ interface ICVP {
     ) external pure returns (bool);
 
     /// @notice Returns the owner for the specified account.
-    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVP that requires authentication of an owner.
+    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
     /// @param account The address of the account whose owner is being retrieved.
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);

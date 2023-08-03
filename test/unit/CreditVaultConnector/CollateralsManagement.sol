@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultProtocolHarnessed.sol";
+import "../../utils/CreditVaultConnectorHarness.sol";
 
-contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
+contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
 
     function handlerEnableCollateral(address account, address vault) external {
@@ -34,10 +34,10 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
 }
 
 contract CollateralsManagementTest is Test {
-    CreditVaultProtocolHandler internal cvp;
+    CreditVaultConnectorHandler internal cvc;
 
     function setUp() public {
-        cvp = new CreditVaultProtocolHandler();
+        cvc = new CreditVaultConnectorHandler();
     }
 
     function test_CollateralsManagement(
@@ -53,40 +53,40 @@ contract CollateralsManagementTest is Test {
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
         vm.expectRevert(
-            CreditVaultProtocol.CVP_AccountOwnerNotRegistered.selector
+            CreditVaultConnector.CVC_AccountOwnerNotRegistered.selector
         );
-        cvp.getAccountOwner(account);
+        cvc.getAccountOwner(account);
 
         // test collaterals management with use of an operator
         address msgSender = alice;
         if (
             seed % 2 == 0 &&
-            !cvp.haveCommonOwner(account, address(uint160(seed)))
+            !cvc.haveCommonOwner(account, address(uint160(seed)))
         ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            cvp.setAccountOperator(account, msgSender, true);
-            assertEq(cvp.getAccountOwner(account), alice);
+            cvc.setAccountOperator(account, msgSender, true);
+            assertEq(cvc.getAccountOwner(account), alice);
         }
 
         // enable a controller to check if account status check works properly
-        address controller = address(new Vault(cvp));
+        address controller = address(new Vault(cvc));
         if (seed % 3 == 0) {
             vm.prank(alice);
-            cvp.enableController(account, controller);
-            assertEq(cvp.getAccountOwner(account), alice);
+            cvc.enableController(account, controller);
+            assertEq(cvc.getAccountOwner(account), alice);
         }
 
         // enabling collaterals
         for (uint i = 1; i <= numberOfVaults; ++i) {
             Vault(controller).clearChecks();
-            address[] memory collateralsPre = cvp.getCollaterals(account);
+            address[] memory collateralsPre = cvc.getCollaterals(account);
 
             address vault = i % 5 == 0
                 ? collateralsPre[seed % collateralsPre.length]
-                : address(new Vault(cvp));
+                : address(new Vault(cvc));
 
-            bool alreadyEnabled = cvp.isCollateralEnabled(account, vault);
+            bool alreadyEnabled = cvc.isCollateralEnabled(account, vault);
 
             assert(
                 (alreadyEnabled && i % 5 == 0) ||
@@ -94,9 +94,9 @@ contract CollateralsManagementTest is Test {
             );
 
             vm.prank(msgSender);
-            cvp.handlerEnableCollateral(account, vault);
+            cvc.handlerEnableCollateral(account, vault);
 
-            address[] memory collateralsPost = cvp.getCollaterals(account);
+            address[] memory collateralsPost = cvc.getCollaterals(account);
 
             if (alreadyEnabled) {
                 assertEq(collateralsPost.length, collateralsPre.length);
@@ -111,15 +111,15 @@ contract CollateralsManagementTest is Test {
         }
 
         // disabling collaterals
-        while (cvp.getCollaterals(account).length > 0) {
+        while (cvc.getCollaterals(account).length > 0) {
             Vault(controller).clearChecks();
-            address[] memory collateralsPre = cvp.getCollaterals(account);
+            address[] memory collateralsPre = cvc.getCollaterals(account);
             address vault = collateralsPre[seed % collateralsPre.length];
 
             vm.prank(msgSender);
-            cvp.handlerDisableCollateral(account, vault);
+            cvc.handlerDisableCollateral(account, vault);
 
-            address[] memory collateralsPost = cvp.getCollaterals(account);
+            address[] memory collateralsPost = cvc.getCollaterals(account);
 
             assertEq(collateralsPost.length, collateralsPre.length - 1);
 
@@ -133,123 +133,123 @@ contract CollateralsManagementTest is Test {
         address alice,
         address bob
     ) public {
-        vm.assume(!cvp.haveCommonOwner(alice, bob));
+        vm.assume(!cvc.haveCommonOwner(alice, bob));
 
-        address vault = address(new Vault(cvp));
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        cvp.enableCollateral(bob, vault);
+        address vault = address(new Vault(cvc));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        cvp.disableCollateral(bob, vault);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.enableCollateral(bob, vault);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.disableCollateral(bob, vault);
 
         vm.prank(bob);
-        cvp.setAccountOperator(bob, alice, true);
+        cvc.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        cvp.enableCollateral(bob, vault);
+        cvc.enableCollateral(bob, vault);
 
         vm.prank(alice);
-        cvp.disableCollateral(bob, vault);
+        cvc.disableCollateral(bob, vault);
     }
 
     function test_RevertIfChecksReentrancy_CollateralsManagement(
         address alice
     ) public {
-        address vault = address(new Vault(cvp));
+        address vault = address(new Vault(cvc));
 
-        cvp.setChecksLock(true);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
-        cvp.enableCollateral(alice, vault);
-
-        cvp.setChecksLock(false);
+        cvc.setChecksLock(true);
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, vault);
+        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        cvc.enableCollateral(alice, vault);
 
-        cvp.setChecksLock(true);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
-        cvp.disableCollateral(alice, vault);
-
-        cvp.setChecksLock(false);
+        cvc.setChecksLock(false);
 
         vm.prank(alice);
-        cvp.disableCollateral(alice, vault);
+        cvc.enableCollateral(alice, vault);
+
+        cvc.setChecksLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        cvc.disableCollateral(alice, vault);
+
+        cvc.setChecksLock(false);
+
+        vm.prank(alice);
+        cvc.disableCollateral(alice, vault);
     }
 
     function test_RevertIfImpersonateReentrancy_CollateralsManagement(
         address alice
     ) public {
-        address vault = address(new Vault(cvp));
+        address vault = address(new Vault(cvc));
 
-        cvp.setImpersonateLock(true);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
-        cvp.enableCollateral(alice, vault);
-
-        cvp.setImpersonateLock(false);
+        cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        cvp.enableCollateral(alice, vault);
+        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        cvc.enableCollateral(alice, vault);
 
-        cvp.setImpersonateLock(true);
-
-        vm.prank(alice);
-        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
-        cvp.disableCollateral(alice, vault);
-
-        cvp.setImpersonateLock(false);
+        cvc.setImpersonateLock(false);
 
         vm.prank(alice);
-        cvp.disableCollateral(alice, vault);
+        cvc.enableCollateral(alice, vault);
+
+        cvc.setImpersonateLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        cvc.disableCollateral(alice, vault);
+
+        cvc.setImpersonateLock(false);
+
+        vm.prank(alice);
+        cvc.disableCollateral(alice, vault);
     }
 
     function test_RevertIfAccountStatusViolated_CollateralsManagement(
         address alice
     ) public {
-        address vault = address(new Vault(cvp));
-        address controller = address(new Vault(cvp));
+        address vault = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
 
         vm.prank(alice);
-        cvp.enableController(alice, controller);
+        cvc.enableController(alice, controller);
 
         Vault(controller).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                CreditVaultConnector.CVC_AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
         );
-        cvp.enableCollateral(alice, vault);
+        cvc.enableCollateral(alice, vault);
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultProtocol.CVP_AccountStatusViolation.selector,
+                CreditVaultConnector.CVC_AccountStatusViolation.selector,
                 alice,
                 "account status violation"
             )
         );
-        cvp.disableCollateral(alice, vault);
+        cvc.disableCollateral(alice, vault);
 
         Vault(controller).setAccountStatusState(0); // account status is NOT violated
 
         Vault(controller).clearChecks();
         vm.prank(alice);
-        cvp.enableCollateral(alice, vault);
+        cvc.enableCollateral(alice, vault);
 
         Vault(controller).clearChecks();
         vm.prank(alice);
-        cvp.disableCollateral(alice, vault);
+        cvc.disableCollateral(alice, vault);
     }
 }

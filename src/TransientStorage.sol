@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./Set.sol";
-import "./interfaces/ICreditVaultProtocol.sol";
+import "./interfaces/ICreditVaultConnector.sol";
 
 abstract contract TransientStorage {
     enum SetType {
@@ -11,7 +11,7 @@ abstract contract TransientStorage {
         Vault
     }
 
-    ICVP.ExecutionContext internal executionContext;
+    ICVC.ExecutionContext internal executionContext;
     SetStorage internal accountStatusChecks;
     SetStorage internal vaultStatusChecks;
 

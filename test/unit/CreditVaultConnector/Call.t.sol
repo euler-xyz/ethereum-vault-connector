@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultProtocolHarnessed.sol";
+import "../../utils/CreditVaultConnectorHarness.sol";
 
-contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
+contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
 
     function handlerCall(
@@ -20,10 +20,10 @@ contract CreditVaultProtocolHandler is CreditVaultProtocolHarnessed {
 }
 
 contract CallTest is Test {
-    CreditVaultProtocolHandler internal cvp;
+    CreditVaultConnectorHandler internal cvc;
 
     function setUp() public {
-        cvp = new CreditVaultProtocolHandler();
+        cvc = new CreditVaultConnectorHandler();
     }
 
     function test_Call(address alice, uint96 seed) public {
@@ -32,7 +32,7 @@ contract CallTest is Test {
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(uint160(alice) ^ 256));
             vm.prank(account);
-            cvp.setAccountOperator(account, alice, true);
+            cvc.setAccountOperator(account, alice, true);
         } else {
             // in this case the account is alice's sub-account
             account = address(uint160(uint160(alice) ^ (seed % 256)));
@@ -40,19 +40,19 @@ contract CallTest is Test {
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvp));
+        vm.assume(targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             account
         );
 
         hoax(alice, seed);
-        (bool success, bytes memory result) = cvp.handlerCall{value: seed}(
+        (bool success, bytes memory result) = cvc.handlerCall{value: seed}(
             targetContract,
             account,
             data
@@ -64,41 +64,41 @@ contract CallTest is Test {
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             0, // we're expecting ETH not to get forwarded
             true,
             account
         );
 
-        ICVP.BatchItem[] memory items = new ICVP.BatchItem[](1);
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
         items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
-        items[0].targetContract = address(cvp);
+        items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
-            cvp.call.selector,
+            cvc.call.selector,
             targetContract,
             account,
             data
         );
 
         hoax(alice, seed);
-        cvp.batch(items);
+        cvc.batch(items);
 
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
         data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        (success, result) = cvp.handlerCall{value: seed}(
+        (success, result) = cvc.handlerCall{value: seed}(
             targetContract,
             address(0),
             data
@@ -113,24 +113,24 @@ contract CallTest is Test {
         address bob,
         uint seed
     ) public {
-        vm.assume(!cvp.haveCommonOwner(alice, bob));
+        vm.assume(!cvc.haveCommonOwner(alice, bob));
         vm.assume(bob != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvp));
+        vm.assume(targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
-            address(cvp),
+            address(cvc),
+            address(cvc),
             seed,
             false,
             alice
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_NotAuthorized.selector);
-        (bool success, ) = cvp.handlerCall{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             bob,
             data
@@ -144,13 +144,13 @@ contract CallTest is Test {
         uint seed
     ) public {
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvp));
+        vm.assume(targetContract != address(cvc));
 
-        cvp.setChecksLock(true);
+        cvc.setChecksLock(true);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
+            address(cvc),
             targetContract,
             seed,
             false,
@@ -158,8 +158,8 @@ contract CallTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_ChecksReentrancy.selector);
-        (bool success, ) = cvp.handlerCall{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             alice,
             data
@@ -173,13 +173,13 @@ contract CallTest is Test {
         uint seed
     ) public {
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvp));
+        vm.assume(targetContract != address(cvc));
 
-        cvp.setImpersonateLock(true);
+        cvc.setImpersonateLock(true);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
+            address(cvc),
             targetContract,
             seed,
             false,
@@ -187,8 +187,8 @@ contract CallTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_ImpersonateReentancy.selector);
-        (bool success, ) = cvp.handlerCall{value: seed}(
+        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             alice,
             data
@@ -203,12 +203,12 @@ contract CallTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
-        // target contract is the CVP
-        address targetContract = address(cvp);
+        // target contract is the CVC
+        address targetContract = address(cvc);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
+            address(cvc),
             targetContract,
             seed,
             false,
@@ -216,9 +216,9 @@ contract CallTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
 
-        (bool success, ) = cvp.handlerCall{value: seed}(
+        (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             alice,
             data
@@ -234,7 +234,7 @@ contract CallTest is Test {
 
         data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvp),
+            address(cvc),
             targetContract,
             seed,
             false,
@@ -242,9 +242,9 @@ contract CallTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultProtocol.CVP_InvalidAddress.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
 
-        (success, ) = cvp.handlerCall{value: seed}(targetContract, alice, data);
+        (success, ) = cvc.handlerCall{value: seed}(targetContract, alice, data);
 
         assertFalse(success);
     }

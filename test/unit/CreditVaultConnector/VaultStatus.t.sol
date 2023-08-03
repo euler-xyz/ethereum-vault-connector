@@ -3,13 +3,13 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultProtocolHarnessed.sol";
+import "../../utils/CreditVaultConnectorHarness.sol";
 
 contract VaultStatusTest is Test {
-    CreditVaultProtocolHarnessed internal cvp;
+    CreditVaultConnectorHarness internal cvc;
 
     function setUp() public {
-        cvp = new CreditVaultProtocolHarnessed();
+        cvc = new CreditVaultConnectorHarness();
     }
 
     function test_RequireVaultStatusCheck(
@@ -19,7 +19,7 @@ contract VaultStatusTest is Test {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new Vault(cvp));
+            address vault = address(new Vault(cvc));
 
             // check all the options: vault state is ok, vault state is violated with
             // controller returning false and reverting
@@ -35,7 +35,7 @@ contract VaultStatusTest is Test {
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(
                     abi.encodeWithSelector(
-                        CreditVaultProtocol.CVP_VaultStatusViolation.selector,
+                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
                         vault,
                         uint160(vault) % 3 == 1
                             ? bytes("vault status violation")
@@ -46,9 +46,9 @@ contract VaultStatusTest is Test {
                     )
                 );
             }
-            cvp.requireVaultStatusCheck();
-            cvp.verifyVaultStatusChecks();
-            cvp.clearExpectedChecks();
+            cvc.requireVaultStatusCheck();
+            cvc.verifyVaultStatusChecks();
+            cvc.clearExpectedChecks();
         }
     }
 
@@ -59,7 +59,7 @@ contract VaultStatusTest is Test {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new Vault(cvp));
+            address vault = address(new Vault(cvc));
 
             // check all the options: vault state is ok, vault state is violated with
             // controller returning false and reverting
@@ -72,28 +72,28 @@ contract VaultStatusTest is Test {
             );
 
             Vault(vault).setVaultStatusState(1);
-            cvp.setBatchDepth(1);
+            cvc.setBatchDepth(1);
 
             vm.prank(vault);
 
             // even though the vault status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the vaults to the set
             // so that the checks can be performed later
-            cvp.requireVaultStatusCheck();
+            cvc.requireVaultStatusCheck();
 
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // checks no longer deferred
-                cvp.setBatchDepth(0);
+                cvc.setBatchDepth(0);
 
                 vm.prank(vault);
                 vm.expectRevert(
                     abi.encodeWithSelector(
-                        CreditVaultProtocol.CVP_VaultStatusViolation.selector,
+                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
                         vault,
                         "vault status violation"
                     )
                 );
-                cvp.requireVaultStatusCheck();
+                cvc.requireVaultStatusCheck();
             }
         }
     }
@@ -102,18 +102,18 @@ contract VaultStatusTest is Test {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new Vault(cvp));
+            address vault = address(new Vault(cvc));
 
             // vault status check will be scheduled for later due to deferred state
-            cvp.setBatchDepth(1);
+            cvc.setBatchDepth(1);
 
             vm.prank(vault);
-            cvp.requireVaultStatusCheck();
+            cvc.requireVaultStatusCheck();
 
-            assertTrue(cvp.isVaultStatusCheckDeferred(vault));
+            assertTrue(cvc.isVaultStatusCheckDeferred(vault));
             vm.prank(vault);
-            cvp.forgiveVaultStatusCheck();
-            assertFalse(cvp.isVaultStatusCheckDeferred(vault));
+            cvc.forgiveVaultStatusCheck();
+            assertFalse(cvc.isVaultStatusCheckDeferred(vault));
         }
     }
 }
