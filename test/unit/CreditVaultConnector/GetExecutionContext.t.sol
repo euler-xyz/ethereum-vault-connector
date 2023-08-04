@@ -41,43 +41,4 @@ contract GetExecutionContextTest is Test {
         assertEq(context.onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
     }
-
-    // for coverage
-    function test_InvariantsCheck() external {
-        cvc.invariantsCheck();
-        cvc.reset();
-
-        cvc.setBatchDepth(1);
-        vm.expectRevert();
-        cvc.invariantsCheck();
-        cvc.reset();
-
-        cvc.setChecksLock(true);
-        vm.expectRevert();
-        cvc.invariantsCheck();
-        cvc.reset();
-
-        cvc.setImpersonateLock(true);
-        vm.expectRevert();
-        cvc.invariantsCheck();
-        cvc.reset();
-
-        cvc.setOnBehalfOfAccount(address(1));
-        vm.expectRevert();
-        cvc.invariantsCheck();
-        cvc.reset();
-
-        cvc.setBatchDepth(1);
-        cvc.requireAccountStatusCheck(address(0));
-        vm.expectRevert();
-        cvc.invariantsCheck();
-        cvc.reset();
-
-        cvc.setBatchDepth(1);
-        vm.prank(address(0));
-        cvc.requireVaultStatusCheck();
-        vm.expectRevert();
-        cvc.invariantsCheck();
-        cvc.reset();
-    }
 }

@@ -78,12 +78,21 @@ contract SetTest is Test {
 
     function test_RevertIfTooManyElements_Insert(uint seed) public {
         vm.assume(seed > 100);
-        
+
         for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {
-            assertEq(setStorage.insert(address(uint160(uint(bytes32(keccak256(abi.encode(seed, i))))))), true);
+            assertEq(
+                setStorage.insert(
+                    address(
+                        uint160(uint(bytes32(keccak256(abi.encode(seed, i)))))
+                    )
+                ),
+                true
+            );
         }
 
         vm.expectRevert(Set.TooManyElements.selector);
-        setStorage.insert(address(uint160(uint(bytes32(keccak256(abi.encode(seed, seed)))))));
+        setStorage.insert(
+            address(uint160(uint(bytes32(keccak256(abi.encode(seed, seed))))))
+        );
     }
 }

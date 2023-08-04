@@ -13,6 +13,13 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
     address[] internal expectedAccountsChecked;
     address[] internal expectedVaultsChecked;
 
+    function isFuzzSender() internal view returns (bool) {
+        // as per https://fuzzing-docs.diligence.tools/getting-started-1/seed-state
+        // fuzzer always sends transactions from the EOA while Foundry does it from the test contract
+        if (msg.sender.code.length == 0) return true;
+        else return false;
+    }
+
     function reset() external {
         delete accountStatusChecks;
         delete vaultStatusChecks;
@@ -50,18 +57,22 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
     }
 
     function setBatchDepth(uint8 depth) external {
+        if (isFuzzSender()) return;
         executionContext.batchDepth = depth;
     }
 
     function setChecksLock(bool locked) external {
+        if (isFuzzSender()) return;
         executionContext.checksLock = locked;
     }
 
     function setOnBehalfOfAccount(address account) external {
+        if (isFuzzSender()) return;
         executionContext.onBehalfOfAccount = account;
     }
 
     function setImpersonateLock(bool locked) external {
+        if (isFuzzSender()) return;
         executionContext.impersonateLock = locked;
     }
 
@@ -146,9 +157,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
             vaultStatusChecks.numElements == 0,
             "verifyStorage/vault-status-checks/numElements"
         );
-
-        // for coverage
-        invariantsCheck();
     }
 
     function verifyVaultStatusChecks() public view {

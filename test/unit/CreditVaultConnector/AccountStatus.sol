@@ -106,7 +106,9 @@ contract AccountStatusTest is Test {
 
                 vm.expectRevert(
                     abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                        CreditVaultConnector
+                            .CVC_AccountStatusViolation
+                            .selector,
                         account,
                         uint160(account) % 3 == 1
                             ? bytes("account status violation")
@@ -268,7 +270,9 @@ contract AccountStatusTest is Test {
 
                 vm.expectRevert(
                     abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                        CreditVaultConnector
+                            .CVC_AccountStatusViolation
+                            .selector,
                         account,
                         uint160(account) % 3 == 1
                             ? bytes("account status violation")

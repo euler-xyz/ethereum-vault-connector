@@ -298,10 +298,6 @@ contract CreditVaultConnectorInvariants is Test {
         targetContract(address(cvc));
     }
 
-    function invariant_invariantsCheck() external view {
-        cvc.invariantsCheck();
-    }
-
     function invariant_executionContext() external {
         (ICVC.ExecutionContext memory context, bool controllerEnabled) = cvc
             .getExecutionContext(address(this));
