@@ -37,7 +37,7 @@ However, suppose a user wants to take out a borrow from a separate vault. In thi
 
 ## Account Status Checks
 
-Account status checks are implemented by vaults to enforce liquidity checks. Vaults should expose an external view `checkAccountStatus` function that will receive an account and this account's list of enabled collaterals. If the account has not borrowed anything from this vault then this function should return `true`. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state, either returning `true` or failing by returning `false` (or throwing an exception).
+Account status checks are implemented by vaults to enforce liquidity checks. Vaults should expose an external `checkAccountStatus` function that will receive an account and this account's list of enabled collaterals. If the account has not borrowed anything from this vault then this function should return `true`. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state, either returning `true` or failing by returning `false` (or throwing an exception).
 
 ### Collateral Validity
 

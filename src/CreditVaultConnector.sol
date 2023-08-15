@@ -95,7 +95,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
         if (
-            !haveCommonOwner(msg.sender, account) &&
+            (uint160(account) | 0xFF) != (uint160(msg.sender) | 0xFF) &&
             !accountOperators[account][msg.sender]
         ) revert CVC_NotAuthorized();
         {
@@ -159,7 +159,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function haveCommonOwner(
         address account,
         address otherAccount
-    ) public pure returns (bool) {
+    ) external pure returns (bool) {
         return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
@@ -180,9 +180,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     ) public payable virtual {
         // only the account owner can call this function for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
-        if (!haveCommonOwner(msg.sender, account)) {
+        if ((uint160(account) | 0xFF) != (uint160(msg.sender) | 0xFF)) {
             revert CVC_NotAuthorized();
-        } else if (haveCommonOwner(msg.sender, operator)) {
+        } else if ((uint160(operator) | 0xFF) == (uint160(msg.sender) | 0xFF)) {
             revert CVC_InvalidAddress();
         }
 
@@ -478,16 +478,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     // Account Status Check
 
     /// @inheritdoc ICVC
-    function checkAccountStatus(
-        address account
-    ) public view returns (bool isValid) {
+    function checkAccountStatus(address account) public returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
     /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
-    ) public view returns (bool[] memory isValid) {
+    ) public returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
         uint length = accounts.length;
@@ -612,9 +610,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     {
         if (targetContract == ERC1820_REGISTRY) revert CVC_InvalidAddress();
 
-        value = value == type(uint).max 
-            ? address(this).balance 
-            : value;
+        value = value == type(uint).max ? address(this).balance : value;
 
         (success, result) = targetContract.call{value: value}(data);
     }
@@ -686,7 +682,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     function checkAccountStatusInternal(
         address account
-    ) internal view returns (bool isValid, bytes memory data) {
+    ) internal returns (bool isValid, bytes memory data) {
         uint numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
 
@@ -694,7 +690,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         else if (numOfControllers > 1) revert CVC_ControllerViolation();
 
         bool success;
-        (success, data) = controller.staticcall(
+        (success, data) = controller.call(
             abi.encodeWithSelector(
                 ICreditVault.checkAccountStatus.selector,
                 account,

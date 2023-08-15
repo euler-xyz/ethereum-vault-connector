@@ -8,7 +8,7 @@ interface ICreditVault {
     function checkAccountStatus(
         address account,
         address[] calldata collaterals
-    ) external view returns (bool isValid, bytes memory data);
+    ) external returns (bool isValid, bytes memory data);
 
     function checkVaultStatus()
         external
