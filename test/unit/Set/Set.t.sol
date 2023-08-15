@@ -11,6 +11,9 @@ contract SetTest is Test {
     uint counter;
 
     function test_InsertRemove(address[] memory elements, uint64 seed) public {
+        // ------------------ SETUP ----------------------
+        delete setStorage;
+
         // ------------------ INSERTING ------------------
         // make the first two elements identical to exercise an edge case
         if (++counter % 10 == 0 && elements.length >= 2) {
@@ -77,6 +80,7 @@ contract SetTest is Test {
     }
 
     function test_RevertIfTooManyElements_Insert(uint seed) public {
+        delete setStorage;
         vm.assume(seed > 100);
 
         for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {

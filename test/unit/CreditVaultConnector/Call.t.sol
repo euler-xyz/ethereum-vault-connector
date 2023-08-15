@@ -209,6 +209,9 @@ contract CallTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
+        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        setUp();
+
         // target contract is the CVC
         address targetContract = address(cvc);
 
