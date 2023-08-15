@@ -49,6 +49,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return expectedVaultsChecked;
     }
 
+    function getAccountOwnerNoRevert(
+        address account
+    ) external view returns (address) {
+        return ownerLookup[uint152(uint160(account) >> 8)];
+    }
+
     function setBatchDepth(uint8 depth) external {
         executionContext.batchDepth = depth;
     }

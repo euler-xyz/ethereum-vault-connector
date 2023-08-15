@@ -94,18 +94,23 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
-        if (
-            (uint160(account) | 0xFF) != (uint160(msg.sender) | 0xFF) &&
-            !accountOperators[account][msg.sender]
-        ) revert CVC_NotAuthorized();
         {
+            uint152 prefix = uint152(uint160(account) >> 8);
+            address owner = ownerLookup[prefix];
+            if (
+                !(owner == msg.sender ||
+                    (owner == address(0) &&
+                        (uint160(account) | 0xFF) ==
+                        (uint160(msg.sender) | 0xFF)) ||
+                    accountOperators[account][msg.sender])
+            ) revert CVC_NotAuthorized();
+
             // if it's an operator calling and we get up to this point
             // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
             // must have been called previously and the ownerLookup is already set.
             // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
             // ownerLookup is set only once on the initial interaction of the account with the CVC.
-            uint152 prefix = uint152(uint160(account) >> 8);
-            if (ownerLookup[prefix] == address(0)) {
+            if (owner == address(0)) {
                 ownerLookup[prefix] = msg.sender;
                 emit AccountsOwnerRegistered(prefix, msg.sender);
             }
@@ -178,16 +183,22 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         address operator,
         bool isAuthorized
     ) public payable virtual {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        address owner = ownerLookup[prefix];
+
         // only the account owner can call this function for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
-        if ((uint160(account) | 0xFF) != (uint160(msg.sender) | 0xFF)) {
+        if (
+            !(owner == msg.sender ||
+                (owner == address(0) &&
+                    (uint160(account) | 0xFF) == (uint160(msg.sender) | 0xFF)))
+        ) {
             revert CVC_NotAuthorized();
         } else if ((uint160(operator) | 0xFF) == (uint160(msg.sender) | 0xFF)) {
             revert CVC_InvalidAddress();
         }
 
-        uint152 prefix = uint152(uint160(account) >> 8);
-        if (ownerLookup[prefix] == address(0)) {
+        if (owner == address(0)) {
             ownerLookup[prefix] = msg.sender;
             emit AccountsOwnerRegistered(prefix, msg.sender);
         }
