@@ -478,14 +478,16 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     // Account Status Check
 
     /// @inheritdoc ICVC
-    function checkAccountStatus(address account) public returns (bool isValid) {
+    function checkAccountStatus(
+        address account
+    ) public payable returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
     /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
-    ) public returns (bool[] memory isValid) {
+    ) public payable returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
         uint length = accounts.length;
@@ -498,7 +500,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireAccountStatusCheck(address account) public virtual {
+    function requireAccountStatusCheck(address account) public payable virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
         } else {
@@ -509,7 +511,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireAccountsStatusCheck(
         address[] calldata accounts
-    ) public virtual {
+    ) public payable virtual {
         uint batchDepthCache = executionContext.batchDepth;
 
         uint length = accounts.length;
@@ -527,7 +529,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireAccountStatusCheckNow(address account) public virtual {
+    function requireAccountStatusCheckNow(
+        address account
+    ) public payable virtual {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
@@ -535,7 +539,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) public virtual {
+    ) public payable virtual {
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
@@ -551,14 +555,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function forgiveAccountStatusCheck(
         address account
-    ) public virtual authenticateController(account) {
+    ) public payable virtual authenticateController(account) {
         accountStatusChecks.remove(account);
     }
 
     /// @inheritdoc ICVC
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
-    ) public virtual {
+    ) public payable virtual {
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
@@ -579,7 +583,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     // Vault Status Check
 
     /// @inheritdoc ICVC
-    function requireVaultStatusCheck() public virtual {
+    function requireVaultStatusCheck() public payable virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
         } else {
@@ -588,7 +592,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function forgiveVaultStatusCheck() external {
+    function forgiveVaultStatusCheck() external payable {
         vaultStatusChecks.remove(msg.sender);
     }
 
