@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultConnectorHarness.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -49,7 +49,7 @@ contract CollateralsManagementTest is Test {
         vm.assume(alice != address(0));
         vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
         vm.assume(seed > 1000);
-        
+
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();
 

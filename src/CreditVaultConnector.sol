@@ -7,9 +7,6 @@ import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 
-/// #define canActOnBehalf(address msgSender, address account) bool = (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF) || accountOperators[account][msgSender];
-
-/// #if_succeeds "each account has at most 1 controller" forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 contract CreditVaultConnector is ICVC, TransientStorage {
     using Set for SetStorage;
 
@@ -158,7 +155,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Account owner and operators
 
-    /** @dev See {ICVC-haveCommonOwner}. */
+    /// @inheritdoc ICVC
     function haveCommonOwner(
         address account,
         address otherAccount
@@ -166,7 +163,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
-    /** @dev See {ICVC-getAccountOwner}. */
+    /// @inheritdoc ICVC
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
@@ -175,9 +172,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
     }
 
-    /** @dev See {ICVC-setAccountOperator}. */
-    /// #if_succeeds "only the account owner can call this" haveCommonOwner(msg.sender, account);
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(msg.sender, operator);
+    /// @inheritdoc ICVC
     function setAccountOperator(
         address account,
         address operator,
@@ -207,7 +202,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Execution internals
 
-    /** @dev See {ICVC-getExecutionContext}. */
+    /// @inheritdoc ICVC
     function getExecutionContext(
         address controllerToCheck
     )
@@ -223,14 +218,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             );
     }
 
-    /** @dev See {ICVC-isAccountStatusCheckDeferred}. */
+    /// @inheritdoc ICVC
     function isAccountStatusCheckDeferred(
         address account
     ) external view returns (bool) {
         return accountStatusChecks.contains(account);
     }
 
-    /** @dev See {ICVC-isVaultStatusCheckDeferred}. */
+    /// @inheritdoc ICVC
     function isVaultStatusCheckDeferred(
         address vault
     ) external view returns (bool) {
@@ -239,14 +234,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Collaterals management
 
-    /** @dev See {ICVC-getCollaterals}. */
+    /// @inheritdoc ICVC
     function getCollaterals(
         address account
     ) external view returns (address[] memory) {
         return accountCollaterals[account].get();
     }
 
-    /** @dev See {ICVC-isCollateralEnabled}. */
+    /// @inheritdoc ICVC
     function isCollateralEnabled(
         address account,
         address vault
@@ -254,11 +249,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         return accountCollaterals[account].contains(vault);
     }
 
-    /** @dev See {ICVC-enableCollateral}. */
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
-    /// #if_succeeds "number of vault is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
+    /// @inheritdoc ICVC
     function enableCollateral(
         address account,
         address vault
@@ -267,11 +258,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         requireAccountStatusCheck(account);
     }
 
-    /** @dev See {ICVC-disableCollateral}. */
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
-    /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
+    /// @inheritdoc ICVC
     function disableCollateral(
         address account,
         address vault
@@ -282,14 +269,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Controllers management
 
-    /** @dev See {ICVC-getControllers}. */
+    /// @inheritdoc ICVC
     function getControllers(
         address account
     ) external view returns (address[] memory) {
         return accountControllers[account].get();
     }
 
-    /** @dev See {ICVC-isControllerEnabled}. */
+    /// @inheritdoc ICVC
     function isControllerEnabled(
         address account,
         address vault
@@ -297,11 +284,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         return accountControllers[account].contains(vault);
     }
 
-    /** @dev See {ICVC-enableController}. */
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
-    /// #if_succeeds "number of vault is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
+    /// @inheritdoc ICVC
     function enableController(
         address account,
         address vault
@@ -312,10 +295,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         requireAccountStatusCheck(account);
     }
 
-    /** @dev See {ICVC-disableController}. */
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeeds "the vault is not present the collateral set 2" !accountControllers[account].contains(msg.sender);
-    /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountControllers[account].numElements == accountControllers[account].get().length;
+    /// @inheritdoc ICVC
     function disableController(
         address account
     ) public payable virtual nonReentrant {
@@ -327,10 +307,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Call forwarding
 
-    /** @dev See {ICVC-call}. */
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, onBehalfOfAccount);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
+    /// @inheritdoc ICVC
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -360,10 +337,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         );
     }
 
-    /** @dev See {ICVC-impersonate}. */
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetContract);
-    /// #if_succeds "the target cannot be this contract" targetContract != address(this);
+    /// @inheritdoc ICVC
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
@@ -399,11 +373,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Batching
 
-    /** @dev See {ICVC-batch}. */
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
-    /// #if_succeds "batch depth doesn't change pre- and post- execution" old(executionContext.batchDepth) == executionContext.batchDepth;
-    /// #if_succeds "checks are properly executed 1" executionContext.batchDepth == BATCH_DEPTH__INIT && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
-    /// #if_succeds "checks are properly executed 2" executionContext.batchDepth == BATCH_DEPTH__INIT && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
+    /// @inheritdoc ICVC
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
@@ -431,8 +401,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /** @dev See {ICVC-batchRevert}. */
-    /// #if_succeds "this function must always revert" false;
+    /// @inheritdoc ICVC
     function batchRevert(
         BatchItem[] calldata items
     )
@@ -476,7 +445,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         );
     }
 
-    /** @dev See {ICVC-batchSimulation}. */
+    /// @inheritdoc ICVC
     function batchSimulation(
         BatchItem[] calldata items
     )
@@ -512,14 +481,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Account Status Check
 
-    /** @dev See {ICVC-checkAccountStatus}. */
+    /// @inheritdoc ICVC
     function checkAccountStatus(
         address account
     ) public view returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
-    /** @dev See {ICVC-checkAccountsStatus}. */
+    /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
     ) public view returns (bool[] memory isValid) {
@@ -534,8 +503,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /** @dev See {ICVC-requireAccountStatusCheck}. */
-    /// #if_succeds "account is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> accountStatusChecks.contains(account);
+    /// @inheritdoc ICVC
     function requireAccountStatusCheck(address account) public virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
@@ -544,8 +512,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /** @dev See {ICVC-requireAccountsStatusCheck}. */
-    /// #if_succeds "accounts are added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> forall(address i in accounts) accountStatusChecks.contains(i);
+    /// @inheritdoc ICVC
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
@@ -565,15 +532,13 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /** @dev See {ICVC-requireAccountStatusCheckNow}. */
-    /// #if_succeds "account is never added to the set or it's removed if previously present" !accountStatusChecks.contains(account);
+    /// @inheritdoc ICVC
     function requireAccountStatusCheckNow(address account) public virtual {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
 
-    /** @dev See {ICVC-requireAccountsStatusCheckNow}. */
-    /// #if_succeds "accounts are never added to the set or they're removed if previously present" forall(address i in accounts) !accountStatusChecks.contains(i);
+    /// @inheritdoc ICVC
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public virtual {
@@ -589,16 +554,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /** @dev See {ICVC-forgiveAccountStatusCheck}. */
-    /// #if_succeds "account is never present in the set after calling this" !accountStatusChecks.contains(account);
+    /// @inheritdoc ICVC
     function forgiveAccountStatusCheck(
         address account
     ) public virtual authenticateController(account) {
         accountStatusChecks.remove(account);
     }
 
-    /** @dev See {ICVC-forgiveAccountsStatusCheck}. */
-    /// #if_succeds "accounts are never present in the set after calling this" forall(address i in accounts) !accountStatusChecks.contains(i);
+    /// @inheritdoc ICVC
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
     ) public virtual {
@@ -621,8 +584,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     // Vault Status Check
 
-    /** @dev See {ICVC-requireVaultStatusCheck}. */
-    /// #if_succeds "vault is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> vaultStatusChecks.contains(msg.sender);
+    /// @inheritdoc ICVC
     function requireVaultStatusCheck() public virtual {
         if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
@@ -631,9 +593,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /** @dev See {ICVC-forgiveVaultStatusCheck}. */
-    /// #if_succeds "vault is never present in the set after calling this" !vaultStatusChecks.contains(msg.sender);
-    function forgiveVaultStatusCheck() external {
+    /// @inheritdoc ICVC
+    function forgiveVaultStatusCheck() public virtual {
         vaultStatusChecks.remove(msg.sender);
     }
 
@@ -660,7 +621,6 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         (success, result) = targetContract.call{value: value}(data);
     }
 
-    /// #if_succeeds "impersonate reentrancy guard must be locked" executionContext.impersonateLock;
     function impersonateInternal(
         address targetContract,
         address onBehalfOfAccount,
@@ -668,6 +628,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         bytes calldata data
     )
         internal
+        virtual
         authenticateController(onBehalfOfAccount)
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
@@ -679,11 +640,10 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         (success, result) = targetContract.call{value: value}(data);
     }
 
-    /// #if_succeeds "batch depth is in range" executionContext.batchDepth > BATCH_DEPTH__INIT && executionContext.batchDepth <= BATCH_DEPTH__MAX;
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
-    ) internal returns (BatchItemResult[] memory batchItemsResult) {
+    ) internal virtual returns (BatchItemResult[] memory batchItemsResult) {
         if (returnResult) {
             batchItemsResult = new BatchItemResult[](items.length);
         }
@@ -723,10 +683,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    /// #if_succeeds "must have at most one controller" accountControllers[account].numElements <= 1;
     function checkAccountStatusInternal(
         address account
-    ) internal view returns (bool isValid, bytes memory data) {
+    ) internal view virtual returns (bool isValid, bytes memory data) {
         uint numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
 
@@ -770,14 +729,10 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         if (!isValid) revert CVC_VaultStatusViolation(vault, data);
     }
 
-    /// #if_succeeds "checks reentrancy guard must be locked" executionContext.checksLock;
-    /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
-    /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
-    /// #if_succeeds "execution context stays untouched" old(keccak256(abi.encode(executionContext))) == keccak256(abi.encode(executionContext));
     function checkStatusAll(
         SetType setType,
         bool returnResult
-    ) private returns (BatchItemResult[] memory result) {
+    ) internal virtual returns (BatchItemResult[] memory result) {
         function(address) returns (bool, bytes memory) checkStatus;
         function(address) requireStatusCheck;
         SetStorage storage setStorage;
