@@ -183,9 +183,7 @@ The previous value of `onBehalfOfAccount` is stored in a local "cache" variable 
 
 #### checksLock
 
-Although the `checkAccountStatus` function is invoked with `staticcall`, the `checkVaultStatus` is invoked with `call`. This allows vaults to record end-of-batch data summaries in its storage (ie net token in/out flows).
-
-However, if a vault (or something it invokes) calls back into the CVC at this point, an inconsistent state of the deferal checks could be observed. To prevent this, the `checksLock` mutex is locked while the CVC is resolving the account and vault status check sets.
+To prevent calls back into the CVC that may result in inconsistent state, the `checksLock` mutex is locked while the CVC is resolving the account and vault status check sets.
 
 #### impersonateLock
 
@@ -224,7 +222,7 @@ In order to take advantage of transient storage, the contracts have been structu
 
 ### Authentication by Vaults
 
-In order to support sub-accounts, operators, and forwarding (ie, liquidations), vaults can be invoked via the CVC's `call`, `batch`, or `impersonate` functions, which will then execute the desired operations on the vault. However, in this case the vault will see the CVC as the `msg.sender`.
+In order to support sub-accounts, operators, and impersonating (ie, liquidations), vaults can be invoked via the CVC's `call`, `batch`, or `impersonate` functions, which will then execute the desired operations on the vault. However, in this case the vault will see the CVC as the `msg.sender`.
 
 When a vault detects that `msg.sender` is the CVC, it should call back into the CVC to retrieve the current execution context using `getExecutionContext`. This will tell the vault two things:
 
@@ -232,7 +230,7 @@ When a vault detects that `msg.sender` is the CVC, it should call back into the 
 ** The `batchDepth` which indicates current depth of nested batches. If the `batchDepth` is greater than `0`, the account/vault status checks are considered to be deferred.
 ** The `checksLock` which indicates state of the account/vault status checks reentrancy lock. If `checksLock` is `true`, the account/vault status checks are in progress.
 ** The `impersonateLock` which indicates state of the impersonation reentrancy lock. If `impersonateLock` is `true`, the it means `impersonate()` function is currently being executed.
-** The `onBehalfOfAccount` which indicated the account that has been authenticated by the CVC. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
+** The `onBehalfOfAccount` which indicates the account that has been authenticated by the CVC. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
 ** `reserved` which is reserved for gas optimization purposes.
 * The `controllerEnabled` which indicates whether or not the `controllerToCheck` vault address, with which the function has been invoked, is currently enabled as a controller for the current `onBehalfOfAccount` account. This information is only considered valid when `getExecutionContext` is invoked with `controllerToCheck` set to non-zero address. When `controllerToCheck` is set to zero address (which optimizes gas consumption), the value returned is always `false`. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account.
 
