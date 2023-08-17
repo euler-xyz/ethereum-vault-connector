@@ -100,8 +100,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             if (
                 !(owner == msg.sender ||
                     (owner == address(0) &&
-                        (uint160(account) | 0xFF) ==
-                        (uint160(msg.sender) | 0xFF)) ||
+                        haveCommonOwnerInternal(account, msg.sender)) ||
                     accountOperators[account][msg.sender])
             ) revert CVC_NotAuthorized();
 
@@ -165,7 +164,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         address account,
         address otherAccount
     ) external pure returns (bool) {
-        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
+        return haveCommonOwnerInternal(account, otherAccount);
     }
 
     /// @inheritdoc ICVC
@@ -191,10 +190,10 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         if (
             !(owner == msg.sender ||
                 (owner == address(0) &&
-                    (uint160(account) | 0xFF) == (uint160(msg.sender) | 0xFF)))
+                    haveCommonOwnerInternal(account, msg.sender)))
         ) {
             revert CVC_NotAuthorized();
-        } else if ((uint160(operator) | 0xFF) == (uint160(msg.sender) | 0xFF)) {
+        } else if (haveCommonOwnerInternal(operator, msg.sender)) {
             revert CVC_InvalidAddress();
         }
 
@@ -800,7 +799,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
     }
 
-    // Error handling
+    // Auxiliary functions
+
+    function haveCommonOwnerInternal(
+        address account,
+        address otherAccount
+    ) internal pure returns (bool) {
+        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
+    }
 
     function revertBytes(bytes memory errMsg) internal pure {
         if (errMsg.length != 0) {
