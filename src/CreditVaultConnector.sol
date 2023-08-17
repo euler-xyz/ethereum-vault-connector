@@ -674,7 +674,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             if (returnResult) {
                 batchItemsResult[i].success = success;
                 batchItemsResult[i].result = result;
-            } else if (!(success || item.allowError)) {
+            } else if (!success) {
                 revertBytes(result);
             }
 

@@ -59,7 +59,6 @@ contract BatchTest is Test {
         vm.assume(bob != controller);
 
         // -------------- FIRST BATCH -------------------------
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvc);
         items[0].value = 0;
@@ -69,7 +68,6 @@ contract BatchTest is Test {
             controller
         );
 
-        items[1].allowError = false;
         items[1].onBehalfOfAccount = alice;
         items[1].targetContract = address(cvc);
         items[1].value = 0;
@@ -80,7 +78,6 @@ contract BatchTest is Test {
             true
         );
 
-        items[2].allowError = false;
         items[2].onBehalfOfAccount = alicesSubAccount;
         items[2].targetContract = otherVault;
         items[2].value = 0;
@@ -89,7 +86,6 @@ contract BatchTest is Test {
             alicesSubAccount
         );
 
-        items[3].allowError = false;
         items[3].onBehalfOfAccount = address(0);
         items[3].targetContract = controller;
         items[3].value = seed / 3;
@@ -106,7 +102,6 @@ contract BatchTest is Test {
             )
         );
 
-        items[4].allowError = false;
         items[4].onBehalfOfAccount = alice;
         items[4].targetContract = otherVault;
         items[4].value = type(uint).max;
@@ -119,7 +114,6 @@ contract BatchTest is Test {
             alice
         );
 
-        items[5].allowError = false;
         items[5].onBehalfOfAccount = alicesSubAccount;
         items[5].targetContract = address(cvc);
         items[5].value = 0;
@@ -144,7 +138,6 @@ contract BatchTest is Test {
         // -------------- SECOND BATCH -------------------------
         items = new ICVC.BatchItem[](1);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvc);
         items[0].value = 0;
@@ -160,31 +153,8 @@ contract BatchTest is Test {
         cvc.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
-        items = new ICVC.BatchItem[](1);
-
-        items[0].allowError = true;
-        items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = address(cvc);
-        items[0].value = 0;
-        items[0].data = abi.encodeWithSelector(
-            cvc.call.selector,
-            address(cvc),
-            alice,
-            ""
-        );
-
-        // no revert this time because error is allowed
-        vm.prank(bob);
-        cvc.handlerBatch(items);
-
-        cvc.reset();
-        Vault(controller).reset();
-        Vault(otherVault).reset();
-
-        // -------------- FOURTH BATCH -------------------------
         items = new ICVC.BatchItem[](3);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
         items[0].value = 0;
@@ -193,7 +163,6 @@ contract BatchTest is Test {
             alice
         );
 
-        items[1].allowError = false;
         items[1].onBehalfOfAccount = address(0);
         items[1].targetContract = controller;
         items[1].value = 0;
@@ -202,7 +171,6 @@ contract BatchTest is Test {
             bob
         );
 
-        items[2].allowError = false;
         items[2].onBehalfOfAccount = bob;
         items[2].targetContract = otherVault;
         items[2].value = 0;
@@ -215,10 +183,9 @@ contract BatchTest is Test {
         cvc.handlerBatch(items);
         assertFalse(cvc.isControllerEnabled(alice, controller));
 
-        // -------------- FIFTH BATCH -------------------------
+        // -------------- FOURTH BATCH -------------------------
         items = new ICVC.BatchItem[](1);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = otherVault;
         items[0].value = 0;
@@ -239,7 +206,6 @@ contract BatchTest is Test {
 
         for (int i = int(items.length - 1); i >= 0; --i) {
             uint j = uint(i);
-            items[j].allowError = false;
             items[j].onBehalfOfAccount = alice;
             items[j].targetContract = address(cvc);
             items[j].value = 0;
@@ -247,7 +213,6 @@ contract BatchTest is Test {
             if (j == items.length - 1) {
                 ICVC.BatchItem[] memory nestedItems = new ICVC.BatchItem[](2);
 
-                nestedItems[0].allowError = false;
                 nestedItems[0].onBehalfOfAccount = address(0);
                 nestedItems[0].targetContract = vault;
                 nestedItems[0].value = 0;
@@ -256,7 +221,6 @@ contract BatchTest is Test {
                     alice
                 );
 
-                nestedItems[1].allowError = false;
                 nestedItems[1].onBehalfOfAccount = address(0);
                 nestedItems[1].targetContract = address(cvc);
                 nestedItems[1].value = 0;
@@ -309,7 +273,6 @@ contract BatchTest is Test {
     ) external {
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(0);
         items[0].value = 0;
@@ -326,7 +289,6 @@ contract BatchTest is Test {
         address vault = address(new VaultMalicious(cvc));
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
         items[0].value = 0;
@@ -359,7 +321,6 @@ contract BatchTest is Test {
         address vault = address(new VaultMalicious(cvc));
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = vault;
         items[0].value = 0;
@@ -548,7 +509,6 @@ contract BatchTest is Test {
         vm.prank(alice);
         cvc.enableController(alice, controller);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
         items[0].value = 0;
