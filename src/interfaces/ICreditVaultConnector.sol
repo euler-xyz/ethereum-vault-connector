@@ -170,36 +170,44 @@ interface ICVC {
 
     /// @notice Defers the account and vault status checks until the end of the execution flow and executes a batch of batch items.
     /// @dev This function always reverts as it's only used for simulation purposes. Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed.
-    /// @param items An array of batch items to be executed.
+    /// @param batchItems An array of batch items to be executed.
+    /// @param postBatchItems An array of batch items to be executed after the batch items and deferred checks. Can only include static calls.
     /// @return batchItemsResult An array of batch item results for each item.
     /// @return accountsStatusResult An array of account status results for each account.
     /// @return vaultsStatusResult An array of vault status results for each vault.
+    /// @return postBatchItemsResult An array of batch item results for each post batch item.
     function batchRevert(
-        BatchItem[] calldata items
+        BatchItem[] calldata batchItems,
+        BatchItem[] calldata postBatchItems
     )
         external
         payable
         returns (
             BatchItemResult[] memory batchItemsResult,
             BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory vaultsStatusResult,
+            BatchItemResult[] memory postBatchItemsResult
         );
 
     /// @notice Defers the account and vault status checks until the end of the execution flow and executes a batch of batch items.
     /// @dev This function does not modify state and should only be used for simulation purposes. Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed.
-    /// @param items An array of batch items to be executed.
+    /// @param batchItems An array of batch items to be executed.
+    /// @param postBatchItems An array of batch items to be executed after the batch items and deferred checks. Can only include static calls.
     /// @return batchItemsResult An array of batch item results for each item.
     /// @return accountsStatusResult An array of account status results for each account.
     /// @return vaultsStatusResult An array of vault status results for each vault.
+    /// @return postBatchItemsResult An array of batch item results for each post batch item.
     function batchSimulation(
-        BatchItem[] calldata items
+        BatchItem[] calldata batchItems,
+        BatchItem[] calldata postBatchItems
     )
         external
         payable
         returns (
             BatchItemResult[] memory batchItemsResult,
             BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory vaultsStatusResult,
+            BatchItemResult[] memory postBatchItemsResult
         );
 
     /// @notice Checks the status of an account and returns whether it is valid or not.

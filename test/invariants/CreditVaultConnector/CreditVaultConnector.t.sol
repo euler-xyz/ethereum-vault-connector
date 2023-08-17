@@ -181,35 +181,39 @@ contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
     }
 
     function batchRevert(
+        BatchItem[] calldata,
         BatchItem[] calldata
     )
         public
         payable
         override
         returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory,
+            BatchItemResult[] memory,
+            BatchItemResult[] memory,
+            BatchItemResult[] memory
         )
     {
         BatchItemResult[] memory x = new BatchItemResult[](0);
-        return (x, x, x);
+        return (x, x, x, x);
     }
 
     function batchSimulation(
+        BatchItem[] calldata,
         BatchItem[] calldata
     )
         public
         payable
         override
         returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory,
+            BatchItemResult[] memory,
+            BatchItemResult[] memory,
+            BatchItemResult[] memory
         )
     {
         BatchItemResult[] memory x = new BatchItemResult[](0);
-        return (x, x, x);
+        return (x, x, x, x);
     }
 
     function requireAccountsStatusCheck(

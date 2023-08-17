@@ -82,7 +82,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     error CVC_RevertedBatchResult(
         BatchItemResult[] batchItemsResult,
         BatchItemResult[] accountsStatusResult,
-        BatchItemResult[] vaultsStatusResult
+        BatchItemResult[] vaultsStatusResult,
+        BatchItemResult[] postBatchItemsResult
     );
     error CVC_BatchPanic();
 
@@ -399,7 +400,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     /// @inheritdoc ICVC
     function batchRevert(
-        BatchItem[] calldata items
+        BatchItem[] calldata batchItems,
+        BatchItem[] calldata postBatchItems
     )
         public
         payable
@@ -408,7 +410,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         returns (
             BatchItemResult[] memory batchItemsResult,
             BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory vaultsStatusResult,
+            BatchItemResult[] memory postBatchItemsResult
         )
     {
         uint batchDepthCache = executionContext.batchDepth;
@@ -421,7 +424,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             ++executionContext.batchDepth;
         }
 
-        batchItemsResult = batchInternal(items, true);
+        batchItemsResult = batchInternal(batchItems, true);
 
         unchecked {
             --executionContext.batchDepth;
@@ -434,16 +437,20 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             executionContext.checksLock = false;
         }
 
+        postBatchItemsResult = postBatchInternal(postBatchItems);
+
         revert CVC_RevertedBatchResult(
             batchItemsResult,
             accountsStatusResult,
-            vaultsStatusResult
+            vaultsStatusResult,
+            postBatchItemsResult
         );
     }
 
     /// @inheritdoc ICVC
     function batchSimulation(
-        BatchItem[] calldata items
+        BatchItem[] calldata batchItems,
+        BatchItem[] calldata postBatchItems
     )
         public
         payable
@@ -451,11 +458,16 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         returns (
             BatchItemResult[] memory batchItemsResult,
             BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory vaultsStatusResult,
+            BatchItemResult[] memory postBatchItemsResult
         )
     {
         (bool success, bytes memory result) = address(this).delegatecall(
-            abi.encodeWithSelector(this.batchRevert.selector, items)
+            abi.encodeWithSelector(
+                this.batchRevert.selector,
+                batchItems,
+                postBatchItems
+            )
         );
 
         if (success) {
@@ -468,11 +480,20 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             result := add(result, 4)
         }
 
-        (batchItemsResult, accountsStatusResult, vaultsStatusResult) = abi
-            .decode(
-                result,
-                (BatchItemResult[], BatchItemResult[], BatchItemResult[])
-            );
+        (
+            batchItemsResult,
+            accountsStatusResult,
+            vaultsStatusResult,
+            postBatchItemsResult
+        ) = abi.decode(
+            result,
+            (
+                BatchItemResult[],
+                BatchItemResult[],
+                BatchItemResult[],
+                BatchItemResult[]
+            )
+        );
     }
 
     // Account Status Check
@@ -612,9 +633,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     {
         if (targetContract == ERC1820_REGISTRY) revert CVC_InvalidAddress();
 
-        value = value == type(uint).max 
-            ? address(this).balance 
-            : value;
+        value = value == type(uint).max ? address(this).balance : value;
 
         (success, result) = targetContract.call{value: value}(data);
     }
@@ -645,11 +664,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         BatchItem[] calldata items,
         bool returnResult
     ) internal returns (BatchItemResult[] memory batchItemsResult) {
+        uint length = items.length;
+
         if (returnResult) {
             batchItemsResult = new BatchItemResult[](items.length);
         }
 
-        uint length = items.length;
         for (uint i; i < length; ) {
             BatchItem calldata item = items[i];
             address targetContract = item.targetContract;
@@ -677,6 +697,25 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             } else if (!(success || item.allowError)) {
                 revertBytes(result);
             }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function postBatchInternal(
+        BatchItem[] calldata items
+    ) internal returns (BatchItemResult[] memory postBatchItemsResult) {
+        uint length = items.length;
+        postBatchItemsResult = new BatchItemResult[](items.length);
+
+        for (uint i; i < length; ) {
+            BatchItem calldata item = items[i];
+            (
+                postBatchItemsResult[i].success,
+                postBatchItemsResult[i].result
+            ) = item.targetContract.staticcall(item.data);
 
             unchecked {
                 ++i;

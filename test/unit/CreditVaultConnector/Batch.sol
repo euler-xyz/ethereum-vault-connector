@@ -23,6 +23,7 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
     using Set for SetStorage;
 
     function batchRevert(
+        BatchItem[] calldata,
         BatchItem[] calldata
     )
         public
@@ -32,11 +33,17 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
         returns (
             BatchItemResult[] memory batchItemsResult,
             BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            BatchItemResult[] memory vaultsStatusResult,
+            BatchItemResult[] memory postBatchItemsResult
         )
     {
         // doesn't rever as expected
-        return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
+        return (
+            batchItemsResult,
+            accountsStatusResult,
+            vaultsStatusResult,
+            postBatchItemsResult
+        );
     }
 }
 
@@ -266,12 +273,18 @@ contract BatchTest is Test {
                     vault
                 );
 
-                items[j].data = abi.encodeWithSelector(
-                    seed % 2 == 0
-                        ? cvc.batch.selector
-                        : cvc.batchRevert.selector,
-                    nestedItems
-                );
+                if (seed % 2 == 0) {
+                    items[j].data = abi.encodeWithSelector(
+                        cvc.batch.selector,
+                        nestedItems
+                    );
+                } else {
+                    items[j].data = abi.encodeWithSelector(
+                        cvc.batchRevert.selector,
+                        nestedItems,
+                        new ICVC.BatchItem[](0)
+                    );
+                }
             } else {
                 ICVC.BatchItem[] memory nestedItems = new ICVC.BatchItem[](1);
                 nestedItems[0] = items[j + 1];
@@ -307,19 +320,13 @@ contract BatchTest is Test {
     function test_RevertIfDeferralDepthExceeded_BatchSimulation(
         address alice
     ) external {
-        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-
-        items[0].allowError = false;
-        items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = address(0);
-        items[0].value = 0;
-        items[0].data = "";
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](0);
 
         cvc.setBatchDepth(9);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_BatchDepthViolation.selector);
-        cvc.batchSimulation(items);
+        cvc.batchSimulation(items, items);
     }
 
     function test_RevertIfChecksReentrancy_Batch(address alice) external {
@@ -377,6 +384,8 @@ contract BatchTest is Test {
             memory expectedAccountsStatusResult = new ICVC.BatchItemResult[](1);
         ICVC.BatchItemResult[]
             memory expectedVaultsStatusResult = new ICVC.BatchItemResult[](1);
+        ICVC.BatchItemResult[]
+            memory expectedPostBatchItemsResult = new ICVC.BatchItemResult[](0);
 
         expectedBatchItemsResult[0].success = true;
         expectedBatchItemsResult[0].result = "";
@@ -404,10 +413,11 @@ contract BatchTest is Test {
                 CreditVaultConnector.CVC_RevertedBatchResult.selector,
                 expectedBatchItemsResult,
                 expectedAccountsStatusResult,
-                expectedVaultsStatusResult
+                expectedVaultsStatusResult,
+                expectedPostBatchItemsResult
             )
         );
-        cvc.batchRevert(items);
+        cvc.batchRevert(items, new ICVC.BatchItem[](0));
 
         // same should happen for batchSimulation() but without reverting with standard error
         VaultMalicious(vault).setFunctionSelectorToCall(
@@ -421,8 +431,9 @@ contract BatchTest is Test {
         (
             ICVC.BatchItemResult[] memory batchItemsResult,
             ICVC.BatchItemResult[] memory accountsStatusResult,
-            ICVC.BatchItemResult[] memory vaultsStatusResult
-        ) = cvc.batchSimulation(items);
+            ICVC.BatchItemResult[] memory vaultsStatusResult,
+            ICVC.BatchItemResult[] memory postBatchItemsResult
+        ) = cvc.batchSimulation(items, new ICVC.BatchItem[](0));
 
         assertEq(batchItemsResult.length, 1);
         assertEq(
@@ -453,6 +464,8 @@ contract BatchTest is Test {
             vaultsStatusResult[0].result,
             expectedVaultsStatusResult[0].result
         );
+
+        assertEq(postBatchItemsResult.length, 0);
     }
 
     function test_RevertIfImpersonateReentrancy_Batch(address alice) external {
@@ -536,12 +549,15 @@ contract BatchTest is Test {
 
     function test_BatchRevert_BatchSimulation(address alice) external {
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
+        ICVC.BatchItem[] memory postItems = new ICVC.BatchItem[](1);
         ICVC.BatchItemResult[]
             memory expectedBatchItemsResult = new ICVC.BatchItemResult[](1);
         ICVC.BatchItemResult[]
             memory expectedAccountsStatusResult = new ICVC.BatchItemResult[](1);
         ICVC.BatchItemResult[]
             memory expectedVaultsStatusResult = new ICVC.BatchItemResult[](1);
+        ICVC.BatchItemResult[]
+            memory expectedPostBatchItemsResult = new ICVC.BatchItemResult[](1);
 
         address controller = address(new Vault(cvc));
 
@@ -557,6 +573,15 @@ contract BatchTest is Test {
             alice
         );
 
+        postItems[0].allowError = false;
+        postItems[0].onBehalfOfAccount = address(0);
+        postItems[0].targetContract = address(cvc);
+        postItems[0].value = 0;
+        postItems[0].data = abi.encodeWithSelector(
+            ICVC.getControllers.selector,
+            alice
+        );
+
         expectedBatchItemsResult[0].success = true;
         expectedBatchItemsResult[0].result = "";
 
@@ -566,13 +591,18 @@ contract BatchTest is Test {
         expectedVaultsStatusResult[0].success = true;
         expectedVaultsStatusResult[0].result = "";
 
+        address[] memory controllers = new address[](1);
+        controllers[0] = controller;
+        expectedPostBatchItemsResult[0].success = true;
+        expectedPostBatchItemsResult[0].result = abi.encode(controllers);
+
         // regular batch doesn't revert
         vm.prank(alice);
         cvc.batch(items);
 
         {
             vm.prank(alice);
-            try cvc.batchRevert(items) {
+            try cvc.batchRevert(items, postItems) {
                 assert(false);
             } catch (bytes memory err) {
                 assertEq(
@@ -586,10 +616,12 @@ contract BatchTest is Test {
                 (
                     ICVC.BatchItemResult[] memory batchItemsResult,
                     ICVC.BatchItemResult[] memory accountsStatusResult,
-                    ICVC.BatchItemResult[] memory vaultsStatusResult
+                    ICVC.BatchItemResult[] memory vaultsStatusResult,
+                    ICVC.BatchItemResult[] memory postBatchItemsResult
                 ) = abi.decode(
                         err,
                         (
+                            ICVC.BatchItemResult[],
                             ICVC.BatchItemResult[],
                             ICVC.BatchItemResult[],
                             ICVC.BatchItemResult[]
@@ -634,6 +666,19 @@ contract BatchTest is Test {
                     keccak256(expectedVaultsStatusResult[0].result),
                     keccak256(vaultsStatusResult[0].result)
                 );
+
+                assertEq(
+                    expectedPostBatchItemsResult.length,
+                    postBatchItemsResult.length
+                );
+                assertEq(
+                    expectedPostBatchItemsResult[0].success,
+                    postBatchItemsResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedPostBatchItemsResult[0].result),
+                    keccak256(postBatchItemsResult[0].result)
+                );
             }
         }
 
@@ -642,8 +687,9 @@ contract BatchTest is Test {
             (
                 ICVC.BatchItemResult[] memory batchItemsResult,
                 ICVC.BatchItemResult[] memory accountsStatusResult,
-                ICVC.BatchItemResult[] memory vaultsStatusResult
-            ) = cvc.batchSimulation(items);
+                ICVC.BatchItemResult[] memory vaultsStatusResult,
+                ICVC.BatchItemResult[] memory postBatchItemsResult
+            ) = cvc.batchSimulation(items, postItems);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
             assertEq(
@@ -680,11 +726,44 @@ contract BatchTest is Test {
                 keccak256(expectedVaultsStatusResult[0].result),
                 keccak256(vaultsStatusResult[0].result)
             );
+
+            assertEq(
+                expectedPostBatchItemsResult.length,
+                postBatchItemsResult.length
+            );
+            assertEq(
+                expectedPostBatchItemsResult[0].success,
+                postBatchItemsResult[0].success
+            );
+            assertEq(
+                keccak256(expectedPostBatchItemsResult[0].result),
+                keccak256(postBatchItemsResult[0].result)
+            );
         }
 
         // invalidate both checks
         Vault(controller).setVaultStatusState(1);
         Vault(controller).setAccountStatusState(1);
+
+        // update post batch operations
+        postItems = new ICVC.BatchItem[](2);
+
+        postItems[0].allowError = false;
+        postItems[0].onBehalfOfAccount = address(0);
+        postItems[0].targetContract = controller;
+        postItems[0].value = 0;
+        postItems[0].data = abi.encodeWithSelector(
+            Vault.checkVaultStatus.selector
+        );
+
+        postItems[1].allowError = false;
+        postItems[1].onBehalfOfAccount = address(0);
+        postItems[1].targetContract = controller;
+        postItems[1].value = 0;
+        postItems[1].data = abi.encodeWithSelector(
+            ICVC.getExecutionContext.selector,
+            address(0)
+        );
 
         // update expected behavior
         expectedAccountsStatusResult[0].success = false;
@@ -701,6 +780,16 @@ contract BatchTest is Test {
             "vault status violation"
         );
 
+        expectedPostBatchItemsResult = new ICVC.BatchItemResult[](2);
+        expectedPostBatchItemsResult[0].success = true;
+        expectedPostBatchItemsResult[0].result = abi.encode(
+            false,
+            "vault status violation"
+        );
+
+        expectedPostBatchItemsResult[1].success = false;
+        expectedPostBatchItemsResult[1].result = "";
+
         // regular batch reverts now
         vm.prank(alice);
         vm.expectRevert(
@@ -714,7 +803,7 @@ contract BatchTest is Test {
 
         {
             vm.prank(alice);
-            try cvc.batchRevert(items) {
+            try cvc.batchRevert(items, postItems) {
                 assert(false);
             } catch (bytes memory err) {
                 assertEq(
@@ -728,10 +817,12 @@ contract BatchTest is Test {
                 (
                     ICVC.BatchItemResult[] memory batchItemsResult,
                     ICVC.BatchItemResult[] memory accountsStatusResult,
-                    ICVC.BatchItemResult[] memory vaultsStatusResult
+                    ICVC.BatchItemResult[] memory vaultsStatusResult,
+                    ICVC.BatchItemResult[] memory postBatchItemsResult
                 ) = abi.decode(
                         err,
                         (
+                            ICVC.BatchItemResult[],
                             ICVC.BatchItemResult[],
                             ICVC.BatchItemResult[],
                             ICVC.BatchItemResult[]
@@ -776,6 +867,27 @@ contract BatchTest is Test {
                     keccak256(expectedVaultsStatusResult[0].result),
                     keccak256(vaultsStatusResult[0].result)
                 );
+
+                assertEq(
+                    expectedPostBatchItemsResult.length,
+                    postBatchItemsResult.length
+                );
+                assertEq(
+                    expectedPostBatchItemsResult[0].success,
+                    postBatchItemsResult[0].success
+                );
+                assertEq(
+                    keccak256(expectedPostBatchItemsResult[0].result),
+                    keccak256(postBatchItemsResult[0].result)
+                );
+                assertEq(
+                    expectedPostBatchItemsResult[1].success,
+                    postBatchItemsResult[1].success
+                );
+                assertEq(
+                    keccak256(expectedPostBatchItemsResult[1].result),
+                    keccak256(postBatchItemsResult[1].result)
+                );
             }
         }
 
@@ -784,8 +896,9 @@ contract BatchTest is Test {
             (
                 ICVC.BatchItemResult[] memory batchItemsResult,
                 ICVC.BatchItemResult[] memory accountsStatusResult,
-                ICVC.BatchItemResult[] memory vaultsStatusResult
-            ) = cvc.batchSimulation(items);
+                ICVC.BatchItemResult[] memory vaultsStatusResult,
+                ICVC.BatchItemResult[] memory postBatchItemsResult
+            ) = cvc.batchSimulation(items, postItems);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
             assertEq(
@@ -822,7 +935,68 @@ contract BatchTest is Test {
                 keccak256(expectedVaultsStatusResult[0].result),
                 keccak256(vaultsStatusResult[0].result)
             );
+
+            assertEq(
+                expectedPostBatchItemsResult.length,
+                postBatchItemsResult.length
+            );
+            assertEq(
+                expectedPostBatchItemsResult[0].success,
+                postBatchItemsResult[0].success
+            );
+            assertEq(
+                keccak256(expectedPostBatchItemsResult[0].result),
+                keccak256(postBatchItemsResult[0].result)
+            );
+            assertEq(
+                expectedPostBatchItemsResult[1].success,
+                postBatchItemsResult[1].success
+            );
+            assertEq(
+                keccak256(expectedPostBatchItemsResult[1].result),
+                keccak256(postBatchItemsResult[1].result)
+            );
         }
+    }
+
+    function test_RevertIfPostBatchItemIsNonStaticCall_BatchRevert_Batch_Simulation(
+        address alice
+    ) external {
+        Vault vault = new Vault(cvc);
+
+        ICVC.BatchItem[] memory postItems = new ICVC.BatchItem[](1);
+
+        // trying to enable collateral is a non-static call
+        postItems[0].allowError = false;
+        postItems[0].onBehalfOfAccount = address(0);
+        postItems[0].targetContract = address(vault);
+        postItems[0].value = 0;
+        postItems[0].data = abi.encodeWithSelector(Vault.reset.selector);
+
+        ICVC.BatchItemResult[]
+            memory expectedResult = new ICVC.BatchItemResult[](1);
+        expectedResult[0].success = false;
+        expectedResult[0].result = "";
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_RevertedBatchResult.selector,
+                new ICVC.BatchItemResult[](0),
+                new ICVC.BatchItemResult[](0),
+                new ICVC.BatchItemResult[](0),
+                expectedResult
+            )
+        );
+        cvc.batchRevert(new ICVC.BatchItem[](0), postItems);
+
+        vm.prank(alice);
+        (, , , ICVC.BatchItemResult[] memory postBatchItemsResult) = cvc
+            .batchSimulation(new ICVC.BatchItem[](0), postItems);
+
+        assertEq(1, postBatchItemsResult.length);
+        assertEq(false, postBatchItemsResult[0].success);
+        assertEq(0, postBatchItemsResult[0].result.length);
     }
 
     function test_RevertIfBatchRevertDoesntRevert_BatchSimulation(
@@ -831,6 +1005,9 @@ contract BatchTest is Test {
         ICVC cvc_noRevert = new CreditVaultConnectorNoRevert();
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_BatchPanic.selector);
-        cvc_noRevert.batchSimulation(new ICVC.BatchItem[](0));
+        cvc_noRevert.batchSimulation(
+            new ICVC.BatchItem[](0),
+            new ICVC.BatchItem[](0)
+        );
     }
 }
