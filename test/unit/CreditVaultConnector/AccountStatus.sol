@@ -258,13 +258,10 @@ contract AccountStatusTest is Test {
             Vault(controller).clearChecks();
             cvc.clearExpectedChecks();
 
-            // account status check will be performeded on the fly despite checks deferral
-            cvc.setBatchDepth(1);
-
             assertTrue(cvc.isAccountStatusCheckDeferred(account));
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
                 // for later check
-                invalidAccounts[invalidAccountsCounter++] = accounts[i];
+                invalidAccounts[invalidAccountsCounter++] = account;
 
                 vm.expectRevert(
                     abi.encodeWithSelector(
@@ -297,8 +294,6 @@ contract AccountStatusTest is Test {
         }
         cvc.clearExpectedChecks();
 
-        cvc.setBatchDepth(1);
-
         for (uint i = 0; i < accounts.length; ++i) {
             assertTrue(cvc.isAccountStatusCheckDeferred(accounts[i]));
         }
@@ -317,10 +312,12 @@ contract AccountStatusTest is Test {
             );
         }
         cvc.requireAccountsStatusCheckNow(accounts);
-        assertEq(
-            cvc.isAccountStatusCheckDeferred(accounts[0]),
-            invalidAccountsCounter > 0
-        );
+        for (uint i = 0; i < accounts.length; ++i) {
+            assertEq(
+                cvc.isAccountStatusCheckDeferred(accounts[i]),
+                invalidAccountsCounter > 0
+            );
+        }
         cvc.verifyAccountStatusChecks();
     }
 

@@ -254,6 +254,18 @@ interface ICVC {
     /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the transaction (vault status check is considered deferred). This function can only be called by the vault itself.
     function requireVaultStatusCheck() external;
 
+    /// @notice Immediately checks the status of a vault if the check had been deferred by it prior to this call. It reverts if status is not valid.
+    /// @dev Vault status check is performed on the fly regardless of the current execution context state, but only if the check had been deferred by the vault prior to this call. If vault status check was previously deferred, it is removed from the set.
+    /// @param vault The address of the vault to be checked.
+    function requireVaultStatusCheckNow(address vault) external;
+
+    /// @notice Immediately checks the status of multiple vaults if their checks have been deferred by them prior to this call. It reverts if any of the statuses is not valid.
+    /// @dev Vault status checks are performed on the fly regardless of the current execution context state, but only if the check for a vault had been deferred by it prior to this call. If given vault status check was previously deferred, it is removed from the set.
+    /// @param vaults An array of addresses of the vaults to be checked.
+    function requireVaultsStatusCheckNow(
+        address[] calldata vaults
+    ) external;
+
     /// @notice Forgives previously deferred vault status check.
     /// @dev Vault address is removed from the set of addresses for which status checks are deferred. This function can only be called by the vault itself.
     function forgiveVaultStatusCheck() external;

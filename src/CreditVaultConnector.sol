@@ -590,6 +590,32 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
+    function requireVaultStatusCheckNow(address vault) public virtual {
+        if (vaultStatusChecks.contains(vault)) {
+            requireVaultStatusCheckInternal(vault);
+            vaultStatusChecks.remove(vault);
+        }
+    }
+
+    /// @inheritdoc ICVC
+    function requireVaultsStatusCheckNow(
+        address[] calldata vaults
+    ) public virtual {
+        uint length = vaults.length;
+        for (uint i; i < length; ) {
+            address vault = vaults[i];
+            if (vaultStatusChecks.contains(vault)) {
+                requireVaultStatusCheckInternal(vault);
+                vaultStatusChecks.remove(vault);
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @inheritdoc ICVC
     function forgiveVaultStatusCheck() external {
         vaultStatusChecks.remove(msg.sender);
     }
