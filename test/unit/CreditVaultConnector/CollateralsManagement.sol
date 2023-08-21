@@ -65,7 +65,12 @@ contract CollateralsManagementTest is Test {
         ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            cvc.setAccountOperator(account, msgSender, true);
+            cvc.setAccountOperator(
+                account,
+                msgSender,
+                true,
+                uint40(block.timestamp + 100)
+            );
             assertEq(cvc.getAccountOwner(account), alice);
         }
 
@@ -147,7 +152,7 @@ contract CollateralsManagementTest is Test {
         cvc.disableCollateral(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, true);
+        cvc.setAccountOperator(bob, alice, true, uint40(block.timestamp + 100));
 
         vm.prank(alice);
         cvc.enableCollateral(bob, vault);

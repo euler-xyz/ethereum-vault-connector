@@ -34,21 +34,61 @@ interface ICVC {
         address otherAccount
     ) external pure returns (bool);
 
+    /// @notice Returns the operator details for the specified account.
+    /// @param account The address of the account whose operator detaile are being retrieved.
+    /// @param operator The address of the operator whose details are being retrieved.
+    /// @return isAuthorized A boolean flag that indicates whether the operator is authorized or not.
+    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely.
+    function getAccountOperator(
+        address account,
+        address operator
+    ) external view returns (bool isAuthorized, uint40 expiryTimestamp);
+
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
     /// @param account The address of the account whose owner is being retrieved.
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
+    /// @notice Returns the next nonce to be used for the specified account.
+    /// @param account The address of the account whose next nonce is being retrieved.
+    /// @return nextNonce The next nonce to be used for the specified account.
+    function getAccountNextNonce(
+        address account
+    ) external view returns (uint40 nextNonce);
+
     /// @notice Sets or unsets an operator for an account.
     /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
+    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely. If type(uint40).max, the operator is authorized only for a duration of a single block.
     function setAccountOperator(
         address account,
         address operator,
-        bool isAuthorized
+        bool isAuthorized,
+        uint40 expiryTimestamp
+    ) external payable;
+
+    /// @notice Sets or unsets an operator for an account using EIP-712 standard.
+    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
+    /// @param account The address of the account whose operator is being set or unset.
+    /// @param operator The address of the operator that is being authorized or deauthorized.
+    /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
+    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely. If type(uint40).max, the operator is authorized only for a duration of a single block.
+    /// @param deadline The timestamp before which the signature must be submitted.
+    /// @param v The recovery id of the signature.
+    /// @param r The first 32 bytes of the signature.
+    /// @param s The second 32 bytes of the signature.
+    function setAccountOperatorPermit(
+        address account,
+        address operator,
+        bool isAuthorized,
+        uint40 expiryTimestamp,
+        uint40 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     ) external payable;
 
     /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the action is being executed at the moment.

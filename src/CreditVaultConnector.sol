@@ -2,12 +2,14 @@
 
 pragma solidity ^0.8.0;
 
+import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
+import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
 import "./Set.sol";
 import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 
-contract CreditVaultConnector is ICVC, TransientStorage {
+contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     using Set for SetStorage;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,15 +24,25 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     uint8 internal constant BATCH_DEPTH__INIT = 0;
     uint8 internal constant BATCH_DEPTH__MAX = 9;
 
+    bytes32 internal constant OPERATOR_PERMIT_TYPEHASH =
+        keccak256(
+            "OperatorPermit(address account,address operator,bool isAuthorized,uint40 expiryTimestamp,uint40 nonce,uint40 deadline)"
+        );
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        STORAGE                                            //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    mapping(address account => mapping(address operator => bool isOperator))
-        public accountOperators;
-
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
+
+    struct OperatorStorage {
+        bool isAuthorized;
+        uint40 expiryTimestamp;
+    }
+
+    mapping(address account => mapping(address operator => OperatorStorage))
+        internal operatorLookup;
 
     // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
@@ -39,7 +51,13 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     // of an address having the first 19 bytes common with any of the 256 account addresses belonging to the same group.
     // account/152 -> prefix/152
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
-    mapping(uint152 prefix => address owner) internal ownerLookup;
+
+    struct OwnerStorage {
+        address owner;
+        uint40 nonce;
+    }
+
+    mapping(uint152 prefix => OwnerStorage) internal ownerLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        EVENTS                                             //
@@ -47,7 +65,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     event AccountOperatorEnabled(
         address indexed account,
-        address indexed operator
+        address indexed operator,
+        uint expiryTimestamp
     );
     event AccountOperatorDisabled(
         address indexed account,
@@ -73,6 +92,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
     error CVC_InvalidAddress();
+    error CVC_InvalidTimestamp();
     error CVC_ChecksReentrancy();
     error CVC_ImpersonateReentancy();
     error CVC_BatchDepthViolation();
@@ -87,6 +107,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     error CVC_BatchPanic();
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
+    //                                      CONSTRUCTOR                                          //
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    constructor() EIP712(name, "1") {}
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -94,24 +120,30 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier ownerOrOperator(address account) {
-        {
-            uint152 prefix = uint152(uint160(account) >> 8);
-            address owner = ownerLookup[prefix];
-            if (
-                !(owner == msg.sender ||
-                    (owner == address(0) &&
-                        haveCommonOwnerInternal(account, msg.sender)) ||
-                    accountOperators[account][msg.sender])
-            ) revert CVC_NotAuthorized();
-
-            // if it's an operator calling and we get up to this point
-            // (thanks to accountOperators[account][msg.sender] == true), it means that the function setAccountOperator()
-            // must have been called previously and the ownerLookup is already set.
+        if (haveCommonOwnerInternal(account, msg.sender)) {
             // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
             // ownerLookup is set only once on the initial interaction of the account with the CVC.
+            uint152 prefix = uint152(uint160(account) >> 8);
+            address owner = ownerLookup[prefix].owner;
+
             if (owner == address(0)) {
-                ownerLookup[prefix] = msg.sender;
+                ownerLookup[prefix].owner = msg.sender;
                 emit AccountsOwnerRegistered(prefix, msg.sender);
+            } else if (owner != msg.sender) {
+                revert CVC_NotAuthorized();
+            }
+        } else {
+            bool isAuthorized = operatorLookup[account][msg.sender]
+                .isAuthorized;
+            uint expiryTimestamp = operatorLookup[account][msg.sender]
+                .expiryTimestamp;
+
+            if (
+                !(isAuthorized &&
+                    (expiryTimestamp == 0 ||
+                        expiryTimestamp >= block.timestamp))
+            ) {
+                revert CVC_NotAuthorized();
             }
         }
 
@@ -168,22 +200,41 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
+    function getAccountOperator(
+        address account,
+        address operator
+    ) external view returns (bool isAuthorized, uint40 expiryTimestamp) {
+        isAuthorized = operatorLookup[account][operator].isAuthorized;
+        expiryTimestamp = operatorLookup[account][operator].expiryTimestamp;
+    }
+
+    /// @inheritdoc ICVC
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
-        owner = ownerLookup[uint152(uint160(account) >> 8)];
+        uint152 prefix = uint152(uint160(account) >> 8);
+        owner = ownerLookup[prefix].owner;
 
         if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
+    }
+
+    /// @inheritdoc ICVC
+    function getAccountNextNonce(
+        address account
+    ) external view returns (uint40 nextNonce) {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        nextNonce = ownerLookup[prefix].nonce + 1;
     }
 
     /// @inheritdoc ICVC
     function setAccountOperator(
         address account,
         address operator,
-        bool isAuthorized
+        bool isAuthorized,
+        uint40 expiryTimestamp
     ) public payable virtual {
         uint152 prefix = uint152(uint160(account) >> 8);
-        address owner = ownerLookup[prefix];
+        address owner = ownerLookup[prefix].owner;
 
         // only the account owner can call this function for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
@@ -198,16 +249,73 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         }
 
         if (owner == address(0)) {
-            ownerLookup[prefix] = msg.sender;
+            ownerLookup[prefix].owner = msg.sender;
             emit AccountsOwnerRegistered(prefix, msg.sender);
         }
 
-        if (accountOperators[account][operator] == isAuthorized) return;
+        setAccountOperatorInternal(
+            account,
+            operator,
+            isAuthorized,
+            expiryTimestamp
+        );
+    }
 
-        accountOperators[account][operator] = isAuthorized;
+    /// @inheritdoc ICVC
+    function setAccountOperatorPermit(
+        address account,
+        address operator,
+        bool isAuthorized,
+        uint40 expiryTimestamp,
+        uint40 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public payable virtual {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        address owner = ownerLookup[prefix].owner;
+        uint40 nonce = ownerLookup[prefix].nonce;
 
-        if (isAuthorized) emit AccountOperatorEnabled(account, operator);
-        else emit AccountOperatorDisabled(account, operator);
+        bytes32 structHash = keccak256(
+            abi.encode(
+                OPERATOR_PERMIT_TYPEHASH,
+                account,
+                operator,
+                isAuthorized,
+                expiryTimestamp,
+                nonce + 1,
+                deadline
+            )
+        );
+
+        address signer = ECDSA.recover(_hashTypedDataV4(structHash), v, r, s);
+
+        // only the account owner can sign the message for any of its 256 accounts.
+        // the operator cannot be one of the 256 accounts that belong to the owner
+        if (
+            !(owner == signer ||
+                (owner == address(0) &&
+                    haveCommonOwnerInternal(account, signer))) &&
+            deadline >= block.timestamp
+        ) {
+            revert CVC_NotAuthorized();
+        } else if (haveCommonOwnerInternal(operator, signer)) {
+            revert CVC_InvalidAddress();
+        }
+
+        ownerLookup[prefix].nonce = nonce + 1;
+
+        if (owner == address(0)) {
+            ownerLookup[prefix].owner = signer;
+            emit AccountsOwnerRegistered(prefix, signer);
+        }
+
+        setAccountOperatorInternal(
+            account,
+            operator,
+            isAuthorized,
+            expiryTimestamp
+        );
     }
 
     // Execution internals
@@ -806,6 +914,41 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         address otherAccount
     ) internal pure returns (bool) {
         return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
+    }
+
+    function setAccountOperatorInternal(
+        address account,
+        address operator,
+        bool isAuthorized,
+        uint40 expiryTimestamp
+    ) internal {
+        OperatorStorage memory operatorCache = operatorLookup[account][
+            operator
+        ];
+
+        if (
+            operatorCache.isAuthorized == isAuthorized &&
+            operatorCache.expiryTimestamp == expiryTimestamp
+        ) return;
+
+        if (expiryTimestamp != 0 && expiryTimestamp < block.timestamp) {
+            revert CVC_InvalidTimestamp();
+        }
+
+        operatorLookup[account][operator] = OperatorStorage({
+            isAuthorized: isAuthorized,
+            expiryTimestamp: isAuthorized
+                ? expiryTimestamp == type(uint40).max
+                    ? uint40(block.timestamp)
+                    : expiryTimestamp
+                : 0
+        });
+
+        if (isAuthorized) {
+            emit AccountOperatorEnabled(account, operator, expiryTimestamp);
+        } else {
+            emit AccountOperatorDisabled(account, operator);
+        }
     }
 
     function revertBytes(bytes memory errMsg) internal pure {
