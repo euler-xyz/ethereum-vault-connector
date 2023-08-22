@@ -218,19 +218,21 @@ contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
 
     function requireAccountsStatusCheck(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         if (accounts.length > Set.MAX_ELEMENTS) return;
         super.requireAccountsStatusCheck(accounts);
     }
 
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         if (accounts.length > Set.MAX_ELEMENTS) return;
         super.requireAccountsStatusCheckNow(accounts);
     }
 
-    function forgiveAccountStatusCheck(address account) public override {
+    function forgiveAccountStatusCheck(
+        address account
+    ) public payable override {
         if (msg.sender == address(0)) return;
 
         SetStorage memory cache = accountControllers[account];
@@ -244,7 +246,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
 
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         if (msg.sender == address(0)) return;
         if (accounts.length > Set.MAX_ELEMENTS) return;
 

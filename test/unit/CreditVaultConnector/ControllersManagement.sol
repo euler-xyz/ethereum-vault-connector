@@ -141,10 +141,11 @@ contract ControllersManagementTest is Test {
         assertFalse(cvc.isControllerEnabled(account, vault));
     }
 
-    function test_RevertIfNotOwnerAndNotOperator_EnableController(
+    function test_RevertIfNotOwnerOrNotOperator_EnableController(
         address alice,
         address bob
     ) public {
+        vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
