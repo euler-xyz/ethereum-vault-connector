@@ -12,7 +12,6 @@ interface ICVC {
     }
 
     struct BatchItem {
-        bool allowError;
         address targetContract;
         address onBehalfOfAccount;
         uint value;

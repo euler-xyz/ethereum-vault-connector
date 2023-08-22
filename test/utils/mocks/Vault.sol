@@ -129,7 +129,6 @@ contract VaultMalicious is Vault {
         // - control is handed over back to checkStatusAll() which had numElements = 1 when entering the loop
         // - the loop ends and "delete vaultStatusChecks" is called removing the vault status check scheduled on vault B
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(0);
         items[0].value = 0;
