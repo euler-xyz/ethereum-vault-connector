@@ -130,6 +130,11 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         _;
     }
 
+    modifier nonReentrantChecks() {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+        _;
+    }
+
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) {
@@ -510,13 +515,10 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireAccountStatusCheck(address account) public payable virtual {
-        bool checksLock = executionContext.checksLock;
-        uint batchDepth = executionContext.batchDepth;
-
-        if (checksLock) revert CVC_ChecksReentrancy();
-
-        if (batchDepth == BATCH_DEPTH__INIT) {
+    function requireAccountStatusCheck(
+        address account
+    ) public payable virtual nonReentrantChecks {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
         } else {
             accountStatusChecks.insert(account);
@@ -526,12 +528,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireAccountsStatusCheck(
         address[] calldata accounts
-    ) public payable virtual {
-        bool checksLock = executionContext.checksLock;
+    ) public payable virtual nonReentrantChecks {
         uint batchDepth = executionContext.batchDepth;
-
-        if (checksLock) revert CVC_ChecksReentrancy();
-
         uint length = accounts.length;
         for (uint i; i < length; ) {
             if (batchDepth == BATCH_DEPTH__INIT) {
@@ -549,9 +547,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireAccountStatusCheckNow(
         address account
-    ) public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    ) public payable virtual nonReentrantChecks {
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
@@ -559,9 +555,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    ) public payable virtual nonReentrantChecks {
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
@@ -575,9 +569,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireAllAccountsStatusCheckNow() public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    function requireAllAccountsStatusCheckNow()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
         executionContext.checksLock = true;
         checkStatusAll(SetType.Account, false);
         executionContext.checksLock = false;
@@ -586,18 +583,20 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function forgiveAccountStatusCheck(
         address account
-    ) public payable virtual authenticateController(account) {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    )
+        public
+        payable
+        virtual
+        nonReentrantChecks
+        authenticateController(account)
+    {
         accountStatusChecks.remove(account);
     }
 
     /// @inheritdoc ICVC
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
-    ) public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    ) public payable virtual nonReentrantChecks {
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
@@ -618,13 +617,13 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     // Vault Status Check
 
     /// @inheritdoc ICVC
-    function requireVaultStatusCheck() public payable virtual {
-        bool checksLock = executionContext.checksLock;
-        uint batchDepth = executionContext.batchDepth;
-
-        if (checksLock) revert CVC_ChecksReentrancy();
-
-        if (batchDepth == BATCH_DEPTH__INIT) {
+    function requireVaultStatusCheck()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
         } else {
             vaultStatusChecks.insert(msg.sender);
@@ -632,9 +631,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireVaultStatusCheckNow(address vault) public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    function requireVaultStatusCheckNow(
+        address vault
+    ) public payable virtual nonReentrantChecks {
         if (vaultStatusChecks.contains(vault)) {
             requireVaultStatusCheckInternal(vault);
             vaultStatusChecks.remove(vault);
@@ -644,9 +643,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireVaultsStatusCheckNow(
         address[] calldata vaults
-    ) public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    ) public payable virtual nonReentrantChecks {
         uint length = vaults.length;
         for (uint i; i < length; ) {
             address vault = vaults[i];
@@ -662,18 +659,19 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireAllVaultsStatusCheckNow() public payable virtual {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    function requireAllVaultsStatusCheckNow()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
         executionContext.checksLock = true;
         checkStatusAll(SetType.Vault, false);
         executionContext.checksLock = false;
     }
 
     /// @inheritdoc ICVC
-    function forgiveVaultStatusCheck() external payable {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
-
+    function forgiveVaultStatusCheck() external payable nonReentrantChecks {
         vaultStatusChecks.remove(msg.sender);
     }
 
