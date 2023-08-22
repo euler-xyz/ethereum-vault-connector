@@ -129,10 +129,11 @@ contract CollateralsManagementTest is Test {
         }
     }
 
-    function test_RevertIfNotOwnerAndNotOperator_CollateralsManagement(
+    function test_RevertIfNotOwnerOrNotOperator_CollateralsManagement(
         address alice,
         address bob
     ) public {
+        vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));

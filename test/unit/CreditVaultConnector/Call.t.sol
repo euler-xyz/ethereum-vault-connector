@@ -113,6 +113,7 @@ contract CallTest is Test {
         address bob,
         uint seed
     ) public {
+        vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
         vm.assume(bob != address(0));
 

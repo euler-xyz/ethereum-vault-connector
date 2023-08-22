@@ -32,7 +32,8 @@ contract AccountStatusTest is Test {
 
             address controller = address(new Vault(cvc));
 
-            vm.prank(account);
+            address owner = cvc.getAccountOwnerNoRevert(account);
+            vm.prank(owner == address(0) ? account : owner);
             cvc.enableController(account, controller);
 
             // check all the options: account state is ok, account state is violated with
@@ -106,7 +107,9 @@ contract AccountStatusTest is Test {
 
                 vm.expectRevert(
                     abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                        CreditVaultConnector
+                            .CVC_AccountStatusViolation
+                            .selector,
                         account,
                         uint160(account) % 3 == 1
                             ? bytes("account status violation")
@@ -268,7 +271,9 @@ contract AccountStatusTest is Test {
 
                 vm.expectRevert(
                     abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                        CreditVaultConnector
+                            .CVC_AccountStatusViolation
+                            .selector,
                         account,
                         uint160(account) % 3 == 1
                             ? bytes("account status violation")
