@@ -2,14 +2,12 @@
 
 pragma solidity ^0.8.0;
 
-import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
-import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
 import "./Set.sol";
 import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 
-contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
+contract CreditVaultConnector is TransientStorage, ICVC {
     using Set for SetStorage;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -17,17 +15,20 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     string public constant name = "Credit Vault Connector (CVC)";
-
-    address internal constant ERC1820_REGISTRY =
-        0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
+    string public constant version = "1";
 
     uint8 internal constant BATCH_DEPTH__INIT = 0;
     uint8 internal constant BATCH_DEPTH__MAX = 9;
+
+    address internal constant ERC1820_REGISTRY =
+        0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
     bytes32 internal constant OPERATOR_PERMIT_TYPEHASH =
         keccak256(
             "OperatorPermit(address account,address operator,bool isAuthorized,uint40 expiryTimestamp,uint40 nonce,uint40 deadline)"
         );
+
+    bytes32 internal immutable EIP_712_DOMAIN_SEPARATOR;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        STORAGE                                            //
@@ -35,14 +36,6 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
 
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
-
-    struct OperatorStorage {
-        bool isAuthorized;
-        uint40 expiryTimestamp;
-    }
-
-    mapping(address account => mapping(address operator => OperatorStorage))
-        internal operatorLookup;
 
     // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
@@ -52,12 +45,16 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     // account/152 -> prefix/152
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
 
-    struct OwnerStorage {
-        address owner;
+    mapping(uint152 prefix => address) internal ownerLookup;
+
+    struct OperatorStorage {
+        bool isAuthorized;
+        uint40 expiryTimestamp;
         uint40 nonce;
     }
 
-    mapping(uint152 prefix => OwnerStorage) internal ownerLookup;
+    mapping(address account => mapping(address operator => OperatorStorage))
+        internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        EVENTS                                             //
@@ -92,7 +89,9 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
     error CVC_InvalidAddress();
+    error CVC_InvalidNonce();
     error CVC_InvalidTimestamp();
+    error CVC_InvalidSignature();
     error CVC_ChecksReentrancy();
     error CVC_ImpersonateReentancy();
     error CVC_BatchDepthViolation();
@@ -110,24 +109,59 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     //                                      CONSTRUCTOR                                          //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    constructor() EIP712(name, "1") {}
+    constructor() {
+        bytes32 TYPE_HASH = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+        bytes32 hashedName = keccak256(bytes(name));
+        bytes32 hashedVersion = keccak256(bytes(version));
+
+        EIP_712_DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                TYPE_HASH,
+                hashedName,
+                hashedVersion,
+                block.chainid,
+                address(this)
+            )
+        );
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice A modifier that allows only the owner or an operator of the account to call the function.
-    /// @dev The owner of an account is an address that matches first 19 bytes of the account address. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
-    /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
-    modifier ownerOrOperator(address account) {
+    /// @notice A modifier that allows only the owner of the account to call the function.
+    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup.
+    /// @param account The address of the account for which it is checked whether msg.sender is the owner.
+    modifier onlyOwner(address account) {
         if (haveCommonOwnerInternal(account, msg.sender)) {
-            // if it's not an operator calling, it means that owner is msg.sender and the ownerLookup will be set if needed.
-            // ownerLookup is set only once on the initial interaction of the account with the CVC.
             uint152 prefix = uint152(uint160(account) >> 8);
-            address owner = ownerLookup[prefix].owner;
+            address owner = ownerLookup[prefix];
 
             if (owner == address(0)) {
-                ownerLookup[prefix].owner = msg.sender;
+                ownerLookup[prefix] = msg.sender;
+                emit AccountsOwnerRegistered(prefix, msg.sender);
+            } else if (owner != msg.sender) {
+                revert CVC_NotAuthorized();
+            }
+        } else {
+            revert CVC_NotAuthorized();
+        }
+
+        _;
+    }
+
+    /// @notice A modifier that allows only the owner or an operator of the account to call the function.
+    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
+    /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
+    modifier onlyOwnerOrOperator(address account) {
+        if (haveCommonOwnerInternal(account, msg.sender)) {
+            uint152 prefix = uint152(uint160(account) >> 8);
+            address owner = ownerLookup[prefix];
+
+            if (owner == address(0)) {
+                ownerLookup[prefix] = msg.sender;
                 emit AccountsOwnerRegistered(prefix, msg.sender);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
@@ -200,30 +234,31 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function getAccountOperator(
-        address account,
-        address operator
-    ) external view returns (bool isAuthorized, uint40 expiryTimestamp) {
-        isAuthorized = operatorLookup[account][operator].isAuthorized;
-        expiryTimestamp = operatorLookup[account][operator].expiryTimestamp;
-    }
-
-    /// @inheritdoc ICVC
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
         uint152 prefix = uint152(uint160(account) >> 8);
-        owner = ownerLookup[prefix].owner;
+        owner = ownerLookup[prefix];
 
         if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
     }
 
     /// @inheritdoc ICVC
-    function getAccountNextNonce(
-        address account
-    ) external view returns (uint40 nextNonce) {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        nextNonce = ownerLookup[prefix].nonce + 1;
+    function getAccountOperator(
+        address account,
+        address operator
+    )
+        external
+        view
+        returns (bool isAuthorized, uint40 expiryTimestamp, uint40 nonce)
+    {
+        OperatorStorage memory operatorCache = operatorLookup[account][
+            operator
+        ];
+
+        isAuthorized = operatorCache.isAuthorized;
+        expiryTimestamp = operatorCache.expiryTimestamp;
+        nonce = operatorCache.nonce;
     }
 
     /// @inheritdoc ICVC
@@ -232,32 +267,18 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
         address operator,
         bool isAuthorized,
         uint40 expiryTimestamp
-    ) public payable virtual {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        address owner = ownerLookup[prefix].owner;
-
-        // only the account owner can call this function for any of its 256 accounts.
+    ) public payable virtual onlyOwner(account) {
         // the operator cannot be one of the 256 accounts that belong to the owner
-        if (
-            !(owner == msg.sender ||
-                (owner == address(0) &&
-                    haveCommonOwnerInternal(account, msg.sender)))
-        ) {
-            revert CVC_NotAuthorized();
-        } else if (haveCommonOwnerInternal(operator, msg.sender)) {
+        if (haveCommonOwnerInternal(operator, msg.sender)) {
             revert CVC_InvalidAddress();
-        }
-
-        if (owner == address(0)) {
-            ownerLookup[prefix].owner = msg.sender;
-            emit AccountsOwnerRegistered(prefix, msg.sender);
         }
 
         setAccountOperatorInternal(
             account,
             operator,
             isAuthorized,
-            expiryTimestamp
+            expiryTimestamp,
+            false
         );
     }
 
@@ -272,10 +293,10 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
         bytes32 r,
         bytes32 s
     ) public payable virtual {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        address owner = ownerLookup[prefix].owner;
-        uint40 nonce = ownerLookup[prefix].nonce;
+        if (deadline >= block.timestamp) revert CVC_InvalidTimestamp();
 
+        uint40 nonce = operatorLookup[account][operator].nonce;
+        bytes32 domainSeparator = EIP_712_DOMAIN_SEPARATOR;
         bytes32 structHash = keccak256(
             abi.encode(
                 OPERATOR_PERMIT_TYPEHASH,
@@ -288,25 +309,34 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
             )
         );
 
-        address signer = ECDSA.recover(_hashTypedDataV4(structHash), v, r, s);
+        // Assembly block from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+        bytes32 data;
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, "\x19\x01")
+            mstore(add(ptr, 0x02), domainSeparator)
+            mstore(add(ptr, 0x22), structHash)
+            data := keccak256(ptr, 0x42)
+        }
+
+        address signer = recoverSigner(data, v, r, s);
+        uint152 prefix = uint152(uint160(account) >> 8);
+        address owner = ownerLookup[prefix];
 
         // only the account owner can sign the message for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
         if (
             !(owner == signer ||
                 (owner == address(0) &&
-                    haveCommonOwnerInternal(account, signer))) &&
-            deadline >= block.timestamp
+                    haveCommonOwnerInternal(account, signer)))
         ) {
             revert CVC_NotAuthorized();
         } else if (haveCommonOwnerInternal(operator, signer)) {
             revert CVC_InvalidAddress();
         }
 
-        ownerLookup[prefix].nonce = nonce + 1;
-
         if (owner == address(0)) {
-            ownerLookup[prefix].owner = signer;
+            ownerLookup[prefix] = signer;
             emit AccountsOwnerRegistered(prefix, signer);
         }
 
@@ -314,8 +344,22 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
             account,
             operator,
             isAuthorized,
-            expiryTimestamp
+            expiryTimestamp,
+            true
         );
+    }
+
+    /// @inheritdoc ICVC
+    function setNonce(
+        address account,
+        address operator,
+        uint40 newNonce
+    ) external payable onlyOwner(account) {
+        uint nonce = operatorLookup[account][operator].nonce;
+
+        if (newNonce <= nonce) revert CVC_InvalidNonce();
+
+        operatorLookup[account][operator].nonce = newNonce;
     }
 
     // Execution internals
@@ -371,7 +415,7 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     function enableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) nonReentrant {
+    ) public payable virtual onlyOwnerOrOperator(account) nonReentrant {
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -380,7 +424,7 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     function disableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) nonReentrant {
+    ) public payable virtual onlyOwnerOrOperator(account) nonReentrant {
         accountCollaterals[account].remove(vault);
         requireAccountStatusCheck(account);
     }
@@ -406,7 +450,7 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     function enableController(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) nonReentrant {
+    ) public payable virtual onlyOwnerOrOperator(account) nonReentrant {
         if (accountControllers[account].insert(vault)) {
             emit ControllerEnabled(account, vault);
         }
@@ -726,7 +770,7 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
     )
         internal
         virtual
-        ownerOrOperator(onBehalfOfAccount)
+        onlyOwnerOrOperator(onBehalfOfAccount)
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
@@ -920,7 +964,8 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
         address account,
         address operator,
         bool isAuthorized,
-        uint40 expiryTimestamp
+        uint40 expiryTimestamp,
+        bool incrementNonce
     ) internal {
         OperatorStorage memory operatorCache = operatorLookup[account][
             operator
@@ -941,13 +986,47 @@ contract CreditVaultConnector is EIP712, TransientStorage, ICVC {
                 ? expiryTimestamp == type(uint40).max
                     ? uint40(block.timestamp)
                     : expiryTimestamp
-                : 0
+                : 0,
+            nonce: incrementNonce
+                ? operatorCache.nonce + 1
+                : operatorCache.nonce
         });
 
         if (isAuthorized) {
             emit AccountOperatorEnabled(account, operator, expiryTimestamp);
         } else {
             emit AccountOperatorDisabled(account, operator);
+        }
+    }
+
+    // From https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+    function recoverSigner(
+        bytes32 hash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal pure returns (address signer) {
+        // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+        // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+        // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+        // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+        //
+        // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+        // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+        // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+        // these malleable signatures as well.
+        if (
+            uint256(s) >
+            0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
+        ) {
+            revert CVC_InvalidSignature();
+        }
+
+        // If the signature is valid (and not malleable), return the signer address
+        signer = ecrecover(hash, v, r, s);
+
+        if (signer == address(0)) {
+            revert CVC_InvalidSignature();
         }
     }
 

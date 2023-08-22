@@ -34,28 +34,25 @@ interface ICVC {
         address otherAccount
     ) external pure returns (bool);
 
-    /// @notice Returns the operator details for the specified account.
-    /// @param account The address of the account whose operator detaile are being retrieved.
-    /// @param operator The address of the operator whose details are being retrieved.
-    /// @return isAuthorized A boolean flag that indicates whether the operator is authorized or not.
-    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely.
-    function getAccountOperator(
-        address account,
-        address operator
-    ) external view returns (bool isAuthorized, uint40 expiryTimestamp);
-
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
     /// @param account The address of the account whose owner is being retrieved.
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the next nonce to be used for the specified account.
-    /// @param account The address of the account whose next nonce is being retrieved.
-    /// @return nextNonce The next nonce to be used for the specified account.
-    function getAccountNextNonce(
-        address account
-    ) external view returns (uint40 nextNonce);
+    /// @notice Returns the operator details for the specified account.
+    /// @param account The address of the account whose operator detaile are being retrieved.
+    /// @param operator The address of the operator whose details are being retrieved.
+    /// @return isAuthorized A boolean flag that indicates whether the operator is authorized or not.
+    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely.
+    /// @return nonce The nonce of the operator for the account.
+    function getAccountOperator(
+        address account,
+        address operator
+    )
+        external
+        view
+        returns (bool isAuthorized, uint40 expiryTimestamp, uint40 nonce);
 
     /// @notice Sets or unsets an operator for an account.
     /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner.
@@ -89,6 +86,17 @@ interface ICVC {
         uint8 v,
         bytes32 r,
         bytes32 s
+    ) external payable;
+
+    /// @notice Sets new nonce for the specified operator of the account.
+    /// @dev Only the owner of the account can call this function. New nonce cannot be lower than the current one.
+    /// @param account The address of the account whose operator's nonce is being set.
+    /// @param operator The address of the operator whose nonce is being set.
+    /// @param newNonce The new nonce of the operator for the account.
+    function setNonce(
+        address account,
+        address operator,
+        uint40 newNonce
     ) external payable;
 
     /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the action is being executed at the moment.

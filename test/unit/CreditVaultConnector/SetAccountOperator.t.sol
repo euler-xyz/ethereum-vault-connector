@@ -32,7 +32,7 @@ contract SetAccountOperatorTest is Test {
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
 
-            (bool isAuthorized, uint40 expiryTimestamp) = cvc
+            (bool isAuthorized, uint40 expiryTimestamp, ) = cvc
                 .getAccountOperator(account, operator);
             assertEq(isAuthorized, false);
             assertEq(expiryTimestamp, 0);
@@ -66,7 +66,7 @@ contract SetAccountOperatorTest is Test {
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-            (isAuthorized, expiryTimestamp) = cvc.getAccountOperator(
+            (isAuthorized, expiryTimestamp, ) = cvc.getAccountOperator(
                 account,
                 operator
             );
@@ -86,7 +86,7 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 0);
-            (isAuthorized, expiryTimestamp) = cvc.getAccountOperator(
+            (isAuthorized, expiryTimestamp, ) = cvc.getAccountOperator(
                 account,
                 operator
             );
@@ -107,7 +107,7 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            (isAuthorized, expiryTimestamp) = cvc.getAccountOperator(
+            (isAuthorized, expiryTimestamp, ) = cvc.getAccountOperator(
                 account,
                 operator
             );
@@ -127,7 +127,7 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 0);
-            (isAuthorized, expiryTimestamp) = cvc.getAccountOperator(
+            (isAuthorized, expiryTimestamp, ) = cvc.getAccountOperator(
                 account,
                 operator
             );
@@ -146,7 +146,7 @@ contract SetAccountOperatorTest is Test {
 
         address account = address(uint160(uint160(alice) ^ 256));
 
-        (bool isAuthorized, uint40 expiryTimestamp) = cvc.getAccountOperator(
+        (bool isAuthorized, uint40 expiryTimestamp, ) = cvc.getAccountOperator(
             account,
             operator
         );
@@ -169,7 +169,7 @@ contract SetAccountOperatorTest is Test {
     ) public {
         address operator = address(uint160(uint160(alice) ^ subAccountId));
 
-        (bool isAuthorized, uint40 expiryTimestamp) = cvc.getAccountOperator(
+        (bool isAuthorized, uint40 expiryTimestamp, ) = cvc.getAccountOperator(
             alice,
             operator
         );

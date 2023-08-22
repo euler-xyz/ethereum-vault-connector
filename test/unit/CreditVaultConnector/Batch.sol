@@ -135,7 +135,7 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        (bool isAuthorized, uint40 expiryTimestamp) = cvc.getAccountOperator(
+        (bool isAuthorized, uint40 expiryTimestamp, ) = cvc.getAccountOperator(
             alice,
             bob
         );
