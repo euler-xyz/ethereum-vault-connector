@@ -212,20 +212,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
         return (x, x, x);
     }
 
-    function requireAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable override {
-        if (accounts.length > Set.MAX_ELEMENTS) return;
-        super.requireAccountsStatusCheck(accounts);
-    }
-
-    function requireAccountsStatusCheckNow(
-        address[] calldata accounts
-    ) public payable override {
-        if (accounts.length > Set.MAX_ELEMENTS) return;
-        super.requireAccountsStatusCheckNow(accounts);
-    }
-
     function forgiveAccountStatusCheck(
         address account
     ) public payable override {

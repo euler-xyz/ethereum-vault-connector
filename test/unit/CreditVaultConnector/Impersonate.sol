@@ -43,6 +43,7 @@ contract ImpersonateTest is Test {
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
         vm.assume(collateral != address(cvc));
+        vm.assume(alice != controller);
 
         vm.prank(alice);
         cvc.enableCollateral(alice, collateral);

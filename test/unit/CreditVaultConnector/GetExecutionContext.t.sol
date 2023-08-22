@@ -68,12 +68,14 @@ contract GetExecutionContextTest is Test {
         cvc.reset();
 
         cvc.setBatchDepth(1);
+        cvc.setChecksLock(false);
         cvc.requireAccountStatusCheck(address(0));
         vm.expectRevert();
         cvc.invariantsCheck();
         cvc.reset();
 
         cvc.setBatchDepth(1);
+        cvc.setChecksLock(false);
         vm.prank(address(0));
         cvc.requireVaultStatusCheck();
         vm.expectRevert();

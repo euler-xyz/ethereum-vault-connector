@@ -125,7 +125,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             bool impersonateLock = executionContext.impersonateLock;
 
             if (checksLock) revert CVC_ChecksReentrancy();
-            else if (impersonateLock) revert CVC_ImpersonateReentancy();
+            if (impersonateLock) revert CVC_ImpersonateReentancy();
         }
         _;
     }
@@ -383,9 +383,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
-        uint batchDepthCache = executionContext.batchDepth;
+        uint batchDepth = executionContext.batchDepth;
 
-        if (batchDepthCache >= BATCH_DEPTH__MAX) {
+        if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
@@ -399,7 +399,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             --executionContext.batchDepth;
         }
 
-        if (batchDepthCache == BATCH_DEPTH__INIT) {
+        if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
@@ -421,9 +421,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        uint batchDepthCache = executionContext.batchDepth;
+        uint batchDepth = executionContext.batchDepth;
 
-        if (batchDepthCache >= BATCH_DEPTH__MAX) {
+        if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
@@ -437,7 +437,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             --executionContext.batchDepth;
         }
 
-        if (batchDepthCache == BATCH_DEPTH__INIT) {
+        if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
@@ -511,7 +511,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     /// @inheritdoc ICVC
     function requireAccountStatusCheck(address account) public payable virtual {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+        bool checksLock = executionContext.checksLock;
+        uint batchDepth = executionContext.batchDepth;
+
+        if (checksLock) revert CVC_ChecksReentrancy();
+
+        if (batchDepth == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
         } else {
             accountStatusChecks.insert(account);
@@ -522,11 +527,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public payable virtual {
-        uint batchDepthCache = executionContext.batchDepth;
+        bool checksLock = executionContext.checksLock;
+        uint batchDepth = executionContext.batchDepth;
+
+        if (checksLock) revert CVC_ChecksReentrancy();
 
         uint length = accounts.length;
         for (uint i; i < length; ) {
-            if (batchDepthCache == BATCH_DEPTH__INIT) {
+            if (batchDepth == BATCH_DEPTH__INIT) {
                 requireAccountStatusCheckInternal(accounts[i]);
             } else {
                 accountStatusChecks.insert(accounts[i]);
@@ -542,6 +550,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function requireAccountStatusCheckNow(
         address account
     ) public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
     }
@@ -550,6 +560,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
     ) public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
@@ -563,9 +575,20 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
+    function requireAllAccountsStatusCheckNow() public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
+        executionContext.checksLock = true;
+        checkStatusAll(SetType.Account, false);
+        executionContext.checksLock = false;
+    }
+
+    /// @inheritdoc ICVC
     function forgiveAccountStatusCheck(
         address account
     ) public payable virtual authenticateController(account) {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         accountStatusChecks.remove(account);
     }
 
@@ -573,6 +596,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
     ) public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
@@ -594,7 +619,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     /// @inheritdoc ICVC
     function requireVaultStatusCheck() public payable virtual {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+        bool checksLock = executionContext.checksLock;
+        uint batchDepth = executionContext.batchDepth;
+
+        if (checksLock) revert CVC_ChecksReentrancy();
+
+        if (batchDepth == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
         } else {
             vaultStatusChecks.insert(msg.sender);
@@ -602,7 +632,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function requireVaultStatusCheckNow(address vault) public virtual {
+    function requireVaultStatusCheckNow(address vault) public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         if (vaultStatusChecks.contains(vault)) {
             requireVaultStatusCheckInternal(vault);
             vaultStatusChecks.remove(vault);
@@ -612,7 +644,9 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function requireVaultsStatusCheckNow(
         address[] calldata vaults
-    ) public virtual {
+    ) public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         uint length = vaults.length;
         for (uint i; i < length; ) {
             address vault = vaults[i];
@@ -628,7 +662,18 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
+    function requireAllVaultsStatusCheckNow() public payable virtual {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
+        executionContext.checksLock = true;
+        checkStatusAll(SetType.Vault, false);
+        executionContext.checksLock = false;
+    }
+
+    /// @inheritdoc ICVC
     function forgiveVaultStatusCheck() external payable {
+        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
         vaultStatusChecks.remove(msg.sender);
     }
 
@@ -681,11 +726,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         BatchItem[] calldata items,
         bool returnResult
     ) internal returns (BatchItemResult[] memory batchItemsResult) {
+        uint length = items.length;
+
         if (returnResult) {
-            batchItemsResult = new BatchItemResult[](items.length);
+            batchItemsResult = new BatchItemResult[](length);
         }
 
-        uint length = items.length;
         for (uint i; i < length; ) {
             BatchItem calldata item = items[i];
             address targetContract = item.targetContract;
@@ -792,8 +838,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         if (numElements == 0) return result;
 
         // clear only the number of elements to optimize gas consumption
-        if (setType == SetType.Account) accountStatusChecks.numElements = 0;
-        else vaultStatusChecks.numElements = 0;
+        setStorage.numElements = 0;
 
         for (uint i; i < numElements; ) {
             address addressToCheck = i == 0
