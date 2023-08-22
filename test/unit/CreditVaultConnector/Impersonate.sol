@@ -82,7 +82,6 @@ contract ImpersonateTest is Test {
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored

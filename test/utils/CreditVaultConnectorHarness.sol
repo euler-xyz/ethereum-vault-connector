@@ -49,6 +49,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return expectedVaultsChecked;
     }
 
+    function getAccountOwnerNoRevert(
+        address account
+    ) external view returns (address) {
+        return ownerLookup[uint152(uint160(account) >> 8)];
+    }
+
     function setBatchDepth(uint8 depth) external {
         executionContext.batchDepth = depth;
     }
@@ -66,14 +72,16 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
     }
 
     // function overrides in order to verify the account and vault checks
-    function requireAccountStatusCheck(address account) public override {
+    function requireAccountStatusCheck(
+        address account
+    ) public payable override {
         super.requireAccountStatusCheck(account);
         expectedAccountsChecked.push(account);
     }
 
     function requireAccountsStatusCheck(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         super.requireAccountsStatusCheck(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
@@ -81,7 +89,9 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         }
     }
 
-    function requireAccountStatusCheckNow(address account) public override {
+    function requireAccountStatusCheckNow(
+        address account
+    ) public payable override {
         super.requireAccountStatusCheckNow(account);
 
         expectedAccountsChecked.push(account);
@@ -89,7 +99,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
 
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         super.requireAccountsStatusCheckNow(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
@@ -97,7 +107,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         }
     }
 
-    function requireVaultStatusCheck() public override {
+    function requireVaultStatusCheck() public payable override {
         super.requireVaultStatusCheck();
 
         expectedVaultsChecked.push(msg.sender);

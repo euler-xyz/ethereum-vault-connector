@@ -12,7 +12,6 @@ interface ICVC {
     }
 
     struct BatchItem {
-        bool allowError;
         address targetContract;
         address onBehalfOfAccount;
         uint value;
@@ -208,7 +207,7 @@ interface ICVC {
     /// @return isValid A boolean value that indicates whether the account is valid or not.
     function checkAccountStatus(
         address account
-    ) external view returns (bool isValid);
+    ) external payable returns (bool isValid);
 
     /// @notice Checks the status of multiple accounts and returns an array of boolean values that indicate whether each account is valid or not.
     /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
@@ -216,43 +215,47 @@ interface ICVC {
     /// @return isValid An array of boolean values that indicate whether each account is valid or not.
     function checkAccountsStatus(
         address[] calldata accounts
-    ) external view returns (bool[] memory isValid);
+    ) external payable returns (bool[] memory isValid);
 
     /// @notice Checks the status of an account and reverts if it is not valid.
     /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the transaction (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
-    function requireAccountStatusCheck(address account) external;
+    function requireAccountStatusCheck(address account) external payable;
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
     /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the transaction (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
-    function requireAccountsStatusCheck(address[] calldata accounts) external;
+    function requireAccountsStatusCheck(
+        address[] calldata accounts
+    ) external payable;
 
     /// @notice Immediately checks the status of an account and reverts if it is not valid.
     /// @dev Account status check is performed on the fly regardless of the current execution context state. If account status check was previously deferred, it is removed from the set.
     /// @param account The address of the account to be checked.
-    function requireAccountStatusCheckNow(address account) external;
+    function requireAccountStatusCheckNow(address account) external payable;
 
     /// @notice Immediately checks the status of multiple accounts and reverts if any of them is not valid.
     /// @dev Account status checks are performed on the fly regardless of the current execution context state. If account status check was previously deferred, it is removed from the set.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) external;
+    ) external payable;
 
     /// @notice Forgives previously deferred account status check.
     /// @dev Account address is removed from the set of addresses for which status checks are deferred. This function can only be called by the currently enabled controller of a given account.
     /// @param account The address of the account for which the status check is forgiven.
-    function forgiveAccountStatusCheck(address account) external;
+    function forgiveAccountStatusCheck(address account) external payable;
 
     /// @notice Forgives previously deferred account status checks.
     /// @dev Account addresses are removed from the set of addresses for which status checks are deferred. This function can only be called by the currently enabled controller of a given account.
     /// @param accounts An array of addresses of the accounts for which the status checks are forgiven.
-    function forgiveAccountsStatusCheck(address[] calldata accounts) external;
+    function forgiveAccountsStatusCheck(
+        address[] calldata accounts
+    ) external payable;
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
     /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the transaction (vault status check is considered deferred). This function can only be called by the vault itself.
-    function requireVaultStatusCheck() external;
+    function requireVaultStatusCheck() external payable;
 
     /// @notice Immediately checks the status of a vault if the check had been deferred by it prior to this call. It reverts if status is not valid.
     /// @dev Vault status check is performed on the fly regardless of the current execution context state, but only if the check had been deferred by the vault prior to this call. If vault status check was previously deferred, it is removed from the set.
@@ -268,5 +271,5 @@ interface ICVC {
 
     /// @notice Forgives previously deferred vault status check.
     /// @dev Vault address is removed from the set of addresses for which status checks are deferred. This function can only be called by the vault itself.
-    function forgiveVaultStatusCheck() external;
+    function forgiveVaultStatusCheck() external payable;
 }
