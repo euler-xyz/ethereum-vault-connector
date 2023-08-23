@@ -25,7 +25,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     bytes32 internal constant OPERATOR_PERMIT_TYPEHASH =
         keccak256(
-            "OperatorPermit(address account,address operator,bool isAuthorized,uint40 expiryTimestamp,uint40 nonce,uint40 deadline)"
+            "OperatorPermit(address account,address operator,bool isAuthorized,uint40 authorizationExpiryTimestamp,uint40 magicNumber,uint40 deadline)"
         );
 
     bytes32 internal immutable EIP_712_DOMAIN_SEPARATOR;
@@ -49,8 +49,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     struct OperatorStorage {
         bool isAuthorized;
-        uint40 expiryTimestamp;
-        uint40 nonce;
+        uint40 authorizationExpiryTimestamp;
+        uint40 magicNumber;
     }
 
     mapping(address account => mapping(address operator => OperatorStorage))
@@ -63,7 +63,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     event AccountOperatorEnabled(
         address indexed account,
         address indexed operator,
-        uint expiryTimestamp
+        uint authorizationExpiryTimestamp
     );
     event AccountOperatorDisabled(
         address indexed account,
@@ -89,7 +89,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
     error CVC_InvalidAddress();
-    error CVC_InvalidNonce();
     error CVC_InvalidTimestamp();
     error CVC_InvalidSignature();
     error CVC_ChecksReentrancy();
@@ -169,13 +168,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         } else {
             bool isAuthorized = operatorLookup[account][msg.sender]
                 .isAuthorized;
-            uint expiryTimestamp = operatorLookup[account][msg.sender]
-                .expiryTimestamp;
+            uint authorizationExpiryTimestamp = operatorLookup[account][
+                msg.sender
+            ].authorizationExpiryTimestamp;
 
             if (
                 !(isAuthorized &&
-                    (expiryTimestamp == 0 ||
-                        expiryTimestamp >= block.timestamp))
+                    (authorizationExpiryTimestamp == 0 ||
+                        authorizationExpiryTimestamp >= block.timestamp))
             ) {
                 revert CVC_NotAuthorized();
             }
@@ -250,15 +250,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     )
         external
         view
-        returns (bool isAuthorized, uint40 expiryTimestamp, uint40 nonce)
+        returns (
+            bool isAuthorized,
+            uint40 authorizationExpiryTimestamp,
+            uint40 magicNumber
+        )
     {
         OperatorStorage memory operatorCache = operatorLookup[account][
             operator
         ];
 
         isAuthorized = operatorCache.isAuthorized;
-        expiryTimestamp = operatorCache.expiryTimestamp;
-        nonce = operatorCache.nonce;
+        authorizationExpiryTimestamp = operatorCache
+            .authorizationExpiryTimestamp;
+        magicNumber = operatorCache.magicNumber;
     }
 
     /// @inheritdoc ICVC
@@ -287,15 +292,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         bool isAuthorized,
-        uint40 expiryTimestamp,
+        uint40 authorizationExpiryTimestamp,
         uint40 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) public payable virtual {
-        if (deadline >= block.timestamp) revert CVC_InvalidTimestamp();
+        if (deadline < block.timestamp) revert CVC_InvalidTimestamp();
 
-        uint40 nonce = operatorLookup[account][operator].nonce;
+        uint40 magicNumber = operatorLookup[account][operator].magicNumber;
         bytes32 domainSeparator = EIP_712_DOMAIN_SEPARATOR;
         bytes32 structHash = keccak256(
             abi.encode(
@@ -303,23 +308,23 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 account,
                 operator,
                 isAuthorized,
-                expiryTimestamp,
-                nonce + 1,
+                authorizationExpiryTimestamp,
+                magicNumber,
                 deadline
             )
         );
 
         // Assembly block from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
-        bytes32 data;
+        bytes32 permit;
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, "\x19\x01")
             mstore(add(ptr, 0x02), domainSeparator)
             mstore(add(ptr, 0x22), structHash)
-            data := keccak256(ptr, 0x42)
+            permit := keccak256(ptr, 0x42)
         }
 
-        address signer = recoverSigner(data, v, r, s);
+        address signer = recoverSigner(permit, v, r, s);
         uint152 prefix = uint152(uint160(account) >> 8);
         address owner = ownerLookup[prefix];
 
@@ -344,22 +349,17 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             account,
             operator,
             isAuthorized,
-            expiryTimestamp,
+            authorizationExpiryTimestamp,
             true
         );
     }
 
     /// @inheritdoc ICVC
-    function setNonce(
+    function invalidateAccountOperatorPermits(
         address account,
-        address operator,
-        uint40 newNonce
+        address operator
     ) external payable onlyOwner(account) {
-        uint nonce = operatorLookup[account][operator].nonce;
-
-        if (newNonce <= nonce) revert CVC_InvalidNonce();
-
-        operatorLookup[account][operator].nonce = newNonce;
+        operatorLookup[account][operator].magicNumber = uint40(block.timestamp);
     }
 
     // Execution internals
@@ -964,8 +964,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         bool isAuthorized,
-        uint40 expiryTimestamp,
-        bool incrementNonce
+        uint40 authorizationExpiryTimestamp,
+        bool updateMagicNumber
     ) internal {
         OperatorStorage memory operatorCache = operatorLookup[account][
             operator
@@ -973,27 +973,28 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         if (
             operatorCache.isAuthorized == isAuthorized &&
-            operatorCache.expiryTimestamp == expiryTimestamp
+            operatorCache.authorizationExpiryTimestamp ==
+            authorizationExpiryTimestamp
         ) return;
-
-        if (expiryTimestamp != 0 && expiryTimestamp < block.timestamp) {
-            revert CVC_InvalidTimestamp();
-        }
 
         operatorLookup[account][operator] = OperatorStorage({
             isAuthorized: isAuthorized,
-            expiryTimestamp: isAuthorized
-                ? expiryTimestamp == type(uint40).max
+            authorizationExpiryTimestamp: isAuthorized
+                ? authorizationExpiryTimestamp == type(uint40).max
                     ? uint40(block.timestamp)
-                    : expiryTimestamp
+                    : authorizationExpiryTimestamp
                 : 0,
-            nonce: incrementNonce
-                ? operatorCache.nonce + 1
-                : operatorCache.nonce
+            magicNumber: updateMagicNumber
+                ? uint40(block.timestamp)
+                : operatorCache.magicNumber
         });
 
         if (isAuthorized) {
-            emit AccountOperatorEnabled(account, operator, expiryTimestamp);
+            emit AccountOperatorEnabled(
+                account,
+                operator,
+                authorizationExpiryTimestamp
+            );
         } else {
             emit AccountOperatorDisabled(account, operator);
         }
