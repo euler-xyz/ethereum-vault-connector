@@ -74,7 +74,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     error CVC_AccountOwnerNotRegistered();
     error CVC_InvalidAddress();
     error CVC_ChecksReentrancy();
-    error CVC_ImpersonateReentancy();
+    error CVC_ImpersonateReentrancy();
     error CVC_BatchDepthViolation();
     error CVC_ControllerViolation();
     error CVC_AccountStatusViolation(address account, bytes data);
@@ -125,15 +125,18 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             bool impersonateLock = executionContext.impersonateLock;
 
             if (checksLock) revert CVC_ChecksReentrancy();
-            if (impersonateLock) revert CVC_ImpersonateReentancy();
+            if (impersonateLock) revert CVC_ImpersonateReentrancy();
         }
         _;
     }
 
-    /// @notice A modifier that checks for checks in progress reentrancy.
+    /// @notice A modifier that checks for checks in progress reentrancy and sets the lock.
     modifier nonReentrantChecks() {
         if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+
+        executionContext.checksLock = true;
         _;
+        executionContext.checksLock = false;
     }
 
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
@@ -496,14 +499,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function checkAccountStatus(
         address account
-    ) public payable returns (bool isValid) {
+    ) public payable nonReentrantChecks returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
     /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
-    ) public payable returns (bool[] memory isValid) {
+    ) public payable nonReentrantChecks returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
         uint length = accounts.length;
@@ -549,8 +552,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function requireAccountStatusCheckNow(
         address account
     ) public payable virtual nonReentrantChecks {
-        requireAccountStatusCheckInternal(account);
         accountStatusChecks.remove(account);
+        requireAccountStatusCheckInternal(account);
     }
 
     /// @inheritdoc ICVC
@@ -560,8 +563,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         uint length = accounts.length;
         for (uint i; i < length; ) {
             address account = accounts[i];
-            requireAccountStatusCheckInternal(account);
             accountStatusChecks.remove(account);
+            requireAccountStatusCheckInternal(account);
 
             unchecked {
                 ++i;
@@ -576,9 +579,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         virtual
         nonReentrantChecks
     {
-        executionContext.checksLock = true;
         checkStatusAll(SetType.Account, false);
-        executionContext.checksLock = false;
     }
 
     /// @inheritdoc ICVC
@@ -635,9 +636,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function requireVaultStatusCheckNow(
         address vault
     ) public payable virtual nonReentrantChecks {
-        if (vaultStatusChecks.contains(vault)) {
+        if (vaultStatusChecks.remove(vault)) {
             requireVaultStatusCheckInternal(vault);
-            vaultStatusChecks.remove(vault);
         }
     }
 
@@ -648,9 +648,8 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         uint length = vaults.length;
         for (uint i; i < length; ) {
             address vault = vaults[i];
-            if (vaultStatusChecks.contains(vault)) {
+            if (vaultStatusChecks.remove(vault)) {
                 requireVaultStatusCheckInternal(vault);
-                vaultStatusChecks.remove(vault);
             }
 
             unchecked {
@@ -666,9 +665,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         virtual
         nonReentrantChecks
     {
-        executionContext.checksLock = true;
         checkStatusAll(SetType.Vault, false);
-        executionContext.checksLock = false;
     }
 
     /// @inheritdoc ICVC

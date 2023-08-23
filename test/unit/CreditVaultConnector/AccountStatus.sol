@@ -63,6 +63,66 @@ contract AccountStatusTest is Test {
         }
     }
 
+    function test_RevertIfChecksReentrancy_CheckAccountsStatus(
+        uint8 index,
+        address[] calldata accounts
+    ) external {
+        vm.assume(index < accounts.length);
+        vm.assume(accounts.length > 0 && accounts.length <= Set.MAX_ELEMENTS);
+
+        cvc.setChecksLock(true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            )
+        );
+        cvc.checkAccountStatus(accounts[index]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            )
+        );
+        cvc.checkAccountsStatus(accounts);
+
+        cvc.setChecksLock(false);
+        cvc.checkAccountStatus(accounts[index]);
+        cvc.checkAccountsStatus(accounts);
+    }
+
+    function test_AcquireChecksLock_CheckAccountsStatus(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+
+            controllers[i] = address(new VaultMalicious(cvc));
+
+            vm.prank(accounts[i]);
+            cvc.enableController(accounts[i], controllers[i]);
+
+            VaultMalicious(controllers[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+
+            // function will return false because malicious vault encounter CVC_ChecksReentrancy error
+            assertFalse(cvc.checkAccountStatus(accounts[i]));
+        }
+
+        bool[] memory result = cvc.checkAccountsStatus(accounts);
+        for (uint i; i < result.length; ++i) {
+            assertFalse(result[i]);
+        }
+    }
+
     function test_RequireAccountsStatusCheck(
         uint8 numberOfAccounts,
         bytes memory seed,
@@ -243,6 +303,49 @@ contract AccountStatusTest is Test {
         cvc.requireAccountsStatusCheck(accounts);
     }
 
+    function test_AcquireChecksLock_RequireAccountsStatusChecks(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+
+            controllers[i] = address(new VaultMalicious(cvc));
+
+            vm.prank(accounts[i]);
+            cvc.enableController(accounts[i], controllers[i]);
+
+            VaultMalicious(controllers[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+
+            // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                    accounts[i],
+                    "malicious vault"
+                )
+            );
+            cvc.requireAccountStatusCheck(accounts[i]);
+        }
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                accounts[0],
+                "malicious vault"
+            )
+        );
+        cvc.requireAccountsStatusCheck(accounts);
+    }
+
     function test_RequireAccountsStatusCheckNow(
         uint8 numberOfAccounts,
         bytes memory seed,
@@ -384,6 +487,49 @@ contract AccountStatusTest is Test {
         cvc.requireAccountsStatusCheckNow(accounts);
     }
 
+    function test_AcquireChecksLock_RequireAccountsStatusChecksNow(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+
+            controllers[i] = address(new VaultMalicious(cvc));
+
+            vm.prank(accounts[i]);
+            cvc.enableController(accounts[i], controllers[i]);
+
+            VaultMalicious(controllers[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+
+            // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                    accounts[i],
+                    "malicious vault"
+                )
+            );
+            cvc.requireAccountStatusCheckNow(accounts[i]);
+        }
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                accounts[0],
+                "malicious vault"
+            )
+        );
+        cvc.requireAccountsStatusCheckNow(accounts);
+    }
+
     function test_RequireAllAccountsStatusCheckNow(
         uint8 numberOfAccounts,
         bytes memory seed,
@@ -507,6 +653,42 @@ contract AccountStatusTest is Test {
                     CreditVaultConnector.CVC_ChecksReentrancy.selector
                 )
             );
+        cvc.requireAllAccountsStatusCheckNow();
+    }
+
+    function test_AcquireChecksLock_RequireAllAccountsStatusChecksNow(
+        uint8 numberOfAccounts,
+        bytes memory seed
+    ) external {
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
+
+        address[] memory accounts = new address[](numberOfAccounts);
+        address[] memory controllers = new address[](numberOfAccounts);
+        for (uint i = 0; i < numberOfAccounts; i++) {
+            accounts[i] = address(
+                uint160(uint(keccak256(abi.encode(i, seed))))
+            );
+
+            controllers[i] = address(new VaultMalicious(cvc));
+
+            vm.prank(accounts[i]);
+            cvc.enableController(accounts[i], controllers[i]);
+
+            VaultMalicious(controllers[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+        }
+
+        cvc.setBatchDepth(1);
+        cvc.requireAccountsStatusCheck(accounts);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_AccountStatusViolation.selector,
+                accounts[0],
+                "malicious vault"
+            )
+        );
         cvc.requireAllAccountsStatusCheckNow();
     }
 

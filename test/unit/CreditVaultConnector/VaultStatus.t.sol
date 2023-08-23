@@ -125,6 +125,32 @@ contract VaultStatusTest is Test {
         cvc.requireVaultStatusCheck();
     }
 
+    function test_AcquireChecksLock_RequireVaultStatusChecks(
+        uint8 numberOfVaults
+    ) external {
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
+
+        address[] memory vaults = new address[](numberOfVaults);
+        for (uint i = 0; i < numberOfVaults; i++) {
+            vaults[i] = address(new VaultMalicious(cvc));
+
+            VaultMalicious(vaults[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+
+            vm.prank(vaults[i]);
+            // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
+                    vaults[i],
+                    "malicious vault"
+                )
+            );
+            cvc.requireVaultStatusCheck();
+        }
+    }
+
     function test_RequireVaultsStatusCheckNow(
         uint8 vaultsNumber,
         uint notRequestedVaultIndex,
@@ -364,6 +390,45 @@ contract VaultStatusTest is Test {
         cvc.requireVaultsStatusCheckNow(vaults);
     }
 
+    function test_AcquireChecksLock_RequireVaultsStatusChecksNow(
+        uint8 numberOfVaults
+    ) external {
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
+
+        address[] memory vaults = new address[](numberOfVaults);
+        for (uint i = 0; i < numberOfVaults; i++) {
+            vaults[i] = address(new VaultMalicious(cvc));
+
+            cvc.setBatchDepth(1);
+
+            vm.prank(vaults[i]);
+            cvc.requireVaultStatusCheck();
+
+            VaultMalicious(vaults[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+
+            // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
+                    vaults[i],
+                    "malicious vault"
+                )
+            );
+            cvc.requireVaultStatusCheckNow(vaults[i]);
+        }
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_VaultStatusViolation.selector,
+                vaults[0],
+                "malicious vault"
+            )
+        );
+        cvc.requireVaultsStatusCheckNow(vaults);
+    }
+
     function test_RequireAllVaultsStatusCheckNow(
         uint8 numberOfVaults,
         bool allStatusesValid
@@ -478,6 +543,35 @@ contract VaultStatusTest is Test {
                     CreditVaultConnector.CVC_ChecksReentrancy.selector
                 )
             );
+        cvc.requireAllVaultsStatusCheckNow();
+    }
+
+    function test_AcquireChecksLock_RequireAllVaultsStatusChecksNow(
+        uint8 numberOfVaults
+    ) external {
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
+
+        address[] memory vaults = new address[](numberOfVaults);
+        for (uint i = 0; i < numberOfVaults; i++) {
+            vaults[i] = address(new VaultMalicious(cvc));
+
+            cvc.setBatchDepth(1);
+
+            vm.prank(vaults[i]);
+            cvc.requireVaultStatusCheck();
+
+            VaultMalicious(vaults[i]).setExpectedErrorSelector(
+                CreditVaultConnector.CVC_ChecksReentrancy.selector
+            );
+        }
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                CreditVaultConnector.CVC_VaultStatusViolation.selector,
+                vaults[0],
+                "malicious vault"
+            )
+        );
         cvc.requireAllVaultsStatusCheckNow();
     }
 
