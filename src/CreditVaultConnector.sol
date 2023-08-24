@@ -45,7 +45,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     // account/152 -> prefix/152
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
 
-    mapping(uint152 prefix => address) internal ownerLookup;
+    struct OwnerStorage {
+        address owner;
+        uint40 magicNumber;
+    }
+
+    mapping(uint152 prefix => OwnerStorage) internal ownerLookup;
 
     struct OperatorStorage {
         bool isAuthorized;
@@ -90,6 +95,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     error CVC_AccountOwnerNotRegistered();
     error CVC_InvalidAddress();
     error CVC_InvalidTimestamp();
+    error CVC_InvalidMagicNumber();
     error CVC_InvalidSignature();
     error CVC_ChecksReentrancy();
     error CVC_ImpersonateReentancy();
@@ -136,10 +142,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     modifier onlyOwner(address account) {
         if (haveCommonOwnerInternal(account, msg.sender)) {
             uint152 prefix = uint152(uint160(account) >> 8);
-            address owner = ownerLookup[prefix];
+            address owner = ownerLookup[prefix].owner;
 
             if (owner == address(0)) {
-                ownerLookup[prefix] = msg.sender;
+                ownerLookup[prefix].owner = msg.sender;
                 emit AccountsOwnerRegistered(prefix, msg.sender);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
@@ -157,10 +163,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     modifier onlyOwnerOrOperator(address account) {
         if (haveCommonOwnerInternal(account, msg.sender)) {
             uint152 prefix = uint152(uint160(account) >> 8);
-            address owner = ownerLookup[prefix];
+            address owner = ownerLookup[prefix].owner;
 
             if (owner == address(0)) {
-                ownerLookup[prefix] = msg.sender;
+                ownerLookup[prefix].owner = msg.sender;
                 emit AccountsOwnerRegistered(prefix, msg.sender);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
@@ -238,7 +244,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account
     ) external view returns (address owner) {
         uint152 prefix = uint152(uint160(account) >> 8);
-        owner = ownerLookup[prefix];
+        owner = ownerLookup[prefix].owner;
 
         if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
     }
@@ -298,35 +304,18 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bytes32 r,
         bytes32 s
     ) public payable virtual {
-        if (deadline < block.timestamp) revert CVC_InvalidTimestamp();
-
-        uint40 magicNumber = operatorLookup[account][operator].magicNumber;
-        bytes32 domainSeparator = EIP_712_DOMAIN_SEPARATOR;
-        bytes32 structHash = keccak256(
-            abi.encode(
-                OPERATOR_PERMIT_TYPEHASH,
-                account,
-                operator,
-                isAuthorized,
-                authorizationExpiryTimestamp,
-                magicNumber,
-                deadline
-            )
+        address signer = getPermitSigner(
+            account,
+            operator,
+            isAuthorized,
+            authorizationExpiryTimestamp,
+            deadline,
+            v,
+            r,
+            s
         );
-
-        // Assembly block from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
-        bytes32 permit;
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, "\x19\x01")
-            mstore(add(ptr, 0x02), domainSeparator)
-            mstore(add(ptr, 0x22), structHash)
-            permit := keccak256(ptr, 0x42)
-        }
-
-        address signer = recoverSigner(permit, v, r, s);
         uint152 prefix = uint152(uint160(account) >> 8);
-        address owner = ownerLookup[prefix];
+        address owner = ownerLookup[prefix].owner;
 
         // only the account owner can sign the message for any of its 256 accounts.
         // the operator cannot be one of the 256 accounts that belong to the owner
@@ -341,7 +330,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
 
         if (owner == address(0)) {
-            ownerLookup[prefix] = signer;
+            ownerLookup[prefix].owner = signer;
             emit AccountsOwnerRegistered(prefix, signer);
         }
 
@@ -352,6 +341,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             authorizationExpiryTimestamp,
             true
         );
+    }
+
+    /// @inheritdoc ICVC
+    function invalidateAllPermits() external payable onlyOwner(msg.sender) {
+        uint152 prefix = uint152(uint160(msg.sender) >> 8);
+        ownerLookup[prefix].magicNumber = uint40(block.timestamp);
     }
 
     /// @inheritdoc ICVC
@@ -998,6 +993,53 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         } else {
             emit AccountOperatorDisabled(account, operator);
         }
+    }
+
+    function getPermitSigner(
+        address account,
+        address operator,
+        bool isAuthorized,
+        uint40 authorizationExpiryTimestamp,
+        uint40 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal view returns (address signer) {
+        if (deadline < block.timestamp) revert CVC_InvalidTimestamp();
+
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint magicNumberOwner = ownerLookup[prefix].magicNumber;
+        uint magicNumberOperator = operatorLookup[account][operator]
+            .magicNumber;
+
+        if (magicNumberOwner > magicNumberOperator) {
+            revert CVC_InvalidMagicNumber();
+        }
+
+        bytes32 domainSeparator = EIP_712_DOMAIN_SEPARATOR;
+        bytes32 structHash = keccak256(
+            abi.encode(
+                OPERATOR_PERMIT_TYPEHASH,
+                account,
+                operator,
+                isAuthorized,
+                authorizationExpiryTimestamp,
+                uint40(magicNumberOperator),
+                deadline
+            )
+        );
+
+        // Assembly block from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+        bytes32 permit;
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, "\x19\x01")
+            mstore(add(ptr, 0x02), domainSeparator)
+            mstore(add(ptr, 0x22), structHash)
+            permit := keccak256(ptr, 0x42)
+        }
+
+        signer = recoverSigner(permit, v, r, s);
     }
 
     // From https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol

@@ -92,6 +92,9 @@ interface ICVC {
         bytes32 s
     ) external payable;
 
+    /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have magic number less than the current timestamp.
+    function invalidateAllPermits() external payable;
+
     /// @notice Invalidates permits signed for an operator of an account which have magic number less than the current timestamp.
     /// @dev Only the owner of the account can call this function.
     /// @param account The address of the account whose operator's permits are being invalidated.
