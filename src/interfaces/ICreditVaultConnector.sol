@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 interface ICVC {
     struct ExecutionContext {
@@ -76,20 +76,18 @@ interface ICVC {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
-    /// @param authorizationExpiryTimestamp The timestamp after which the operator is no longer authorized.
+    /// @param authorizationExpiryTimestamp The timestamp after which the operator is no longer authorized. If type(uint40).max, the operator is authorized only for a duration of a single block.
     /// @param deadline The timestamp before which the signature must be submitted.
-    /// @param v The recovery id of the signature.
-    /// @param r The first 32 bytes of the signature.
-    /// @param s The second 32 bytes of the signature.
+    /// @param signature The signature that is used to authorize or deauthorize the operator.
+    /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
     function setAccountOperatorPermit(
         address account,
         address operator,
         bool isAuthorized,
         uint40 authorizationExpiryTimestamp,
         uint40 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        bytes calldata signature,
+        address ERC1271Signer
     ) external payable;
 
     /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have magic number less than the current timestamp.

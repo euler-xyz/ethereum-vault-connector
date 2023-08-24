@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./Set.sol";
 import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
+import "./interfaces/IERC1271.sol";
 
 contract CreditVaultConnector is TransientStorage, ICVC {
     using Set for SetStorage;
@@ -28,7 +29,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             "OperatorPermit(address account,address operator,bool isAuthorized,uint40 authorizationExpiryTimestamp,uint40 magicNumber,uint40 deadline)"
         );
 
-    bytes32 internal immutable EIP_712_DOMAIN_SEPARATOR;
+    bytes32 internal immutable EIP712_DOMAIN_SEPARATOR;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        STORAGE                                            //
@@ -121,7 +122,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bytes32 hashedName = keccak256(bytes(name));
         bytes32 hashedVersion = keccak256(bytes(version));
 
-        EIP_712_DOMAIN_SEPARATOR = keccak256(
+        EIP712_DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 TYPE_HASH,
                 hashedName,
@@ -279,12 +280,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bool isAuthorized,
         uint40 expiryTimestamp
     ) public payable virtual onlyOwner(account) {
-        // the operator cannot be one of the 256 accounts that belong to the owner
-        if (haveCommonOwnerInternal(operator, msg.sender)) {
-            revert CVC_InvalidAddress();
-        }
-
         setAccountOperatorInternal(
+            msg.sender,
             account,
             operator,
             isAuthorized,
@@ -300,41 +297,46 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bool isAuthorized,
         uint40 authorizationExpiryTimestamp,
         uint40 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        bytes calldata signature,
+        address ERC1271Signer
     ) public payable virtual {
-        address signer = getPermitSigner(
+        bytes32 permit = getOperatorPermit(
             account,
             operator,
             isAuthorized,
             authorizationExpiryTimestamp,
-            deadline,
-            v,
-            r,
-            s
+            deadline
         );
         uint152 prefix = uint152(uint160(account) >> 8);
         address owner = ownerLookup[prefix].owner;
 
-        // only the account owner can sign the message for any of its 256 accounts.
-        // the operator cannot be one of the 256 accounts that belong to the owner
-        if (
-            !(owner == signer ||
+        address signer;
+        bool isValid;
+        if (signature.length == 65) {
+            signer = recoverECDSASigner(permit, signature);
+            isValid = (owner == signer ||
                 (owner == address(0) &&
-                    haveCommonOwnerInternal(account, signer)))
-        ) {
-            revert CVC_NotAuthorized();
-        } else if (haveCommonOwnerInternal(operator, signer)) {
-            revert CVC_InvalidAddress();
+                    haveCommonOwnerInternal(signer, account)));
         }
 
+        // If no ECDSA match, try ERC-1271
+        if (!isValid) {
+            signer = owner != address(0) ? owner : ERC1271Signer;
+            isValid =
+                haveCommonOwnerInternal(signer, account) &&
+                isValidERC1271Signature(signer, permit, signature);
+        }
+
+        // If still no match, revert
+        if (!isValid) revert CVC_NotAuthorized();
+
         if (owner == address(0)) {
-            ownerLookup[prefix].owner = signer;
+            ownerLookup[prefix].owner = owner = signer;
             emit AccountsOwnerRegistered(prefix, signer);
         }
 
         setAccountOperatorInternal(
+            owner,
             account,
             operator,
             isAuthorized,
@@ -612,7 +614,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         )
     {
         (bool success, bytes memory result) = address(this).delegatecall(
-            abi.encodeWithSelector(this.batchRevert.selector, items)
+            abi.encodeCall(this.batchRevert, items)
         );
 
         if (success) {
@@ -852,10 +854,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         bool success;
         (success, data) = controller.call(
-            abi.encodeWithSelector(
-                ICreditVault.checkAccountStatus.selector,
-                account,
-                accountCollaterals[account].get()
+            abi.encodeCall(
+                ICreditVault.checkAccountStatus,
+                (account, accountCollaterals[account].get())
             )
         );
 
@@ -875,7 +876,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) internal returns (bool isValid, bytes memory data) {
         bool success;
         (success, data) = vault.call(
-            abi.encodeWithSelector(ICreditVault.checkVaultStatus.selector)
+            abi.encodeCall(ICreditVault.checkVaultStatus, ())
         );
 
         if (success) (isValid, data) = abi.decode(data, (bool, bytes));
@@ -956,12 +957,18 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     function setAccountOperatorInternal(
+        address owner,
         address account,
         address operator,
         bool isAuthorized,
         uint40 authorizationExpiryTimestamp,
         bool updateMagicNumber
     ) internal {
+        // the operator cannot be one of the 256 accounts that belong to the owner
+        if (haveCommonOwnerInternal(owner, operator)) {
+            revert CVC_InvalidAddress();
+        }
+
         OperatorStorage memory operatorCache = operatorLookup[account][
             operator
         ];
@@ -995,16 +1002,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
-    function getPermitSigner(
+    function getOperatorPermit(
         address account,
         address operator,
         bool isAuthorized,
         uint40 authorizationExpiryTimestamp,
-        uint40 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) internal view returns (address signer) {
+        uint40 deadline
+    ) internal view returns (bytes32 permit) {
         if (deadline < block.timestamp) revert CVC_InvalidTimestamp();
 
         uint152 prefix = uint152(uint160(account) >> 8);
@@ -1016,7 +1020,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidMagicNumber();
         }
 
-        bytes32 domainSeparator = EIP_712_DOMAIN_SEPARATOR;
+        bytes32 domainSeparator = EIP712_DOMAIN_SEPARATOR;
         bytes32 structHash = keccak256(
             abi.encode(
                 OPERATOR_PERMIT_TYPEHASH,
@@ -1029,8 +1033,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             )
         );
 
-        // Assembly block from https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
-        bytes32 permit;
+        // Assembly block based on:
+        // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, "\x19\x01")
@@ -1038,17 +1042,29 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             mstore(add(ptr, 0x22), structHash)
             permit := keccak256(ptr, 0x42)
         }
-
-        signer = recoverSigner(permit, v, r, s);
     }
 
-    // From https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
-    function recoverSigner(
+    // Based on:
+    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+    function recoverECDSASigner(
         bytes32 hash,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        bytes memory signature
     ) internal pure returns (address signer) {
+        if (signature.length != 65) revert CVC_InvalidSignature();
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        // ecrecover takes the signature parameters, and the only way to get them
+        // currently is to use assembly.
+        /// @solidity memory-safe-assembly
+        assembly {
+            r := mload(add(signature, 0x20))
+            s := mload(add(signature, 0x40))
+            v := byte(0, mload(add(signature, 0x60)))
+        }
+
         // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
         // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
         // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
@@ -1071,6 +1087,23 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (signer == address(0)) {
             revert CVC_InvalidSignature();
         }
+    }
+
+    // Based on:
+    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/SignatureChecker.sol
+    function isValidERC1271Signature(
+        address signer,
+        bytes32 hash,
+        bytes memory signature
+    ) internal view returns (bool) {
+        (bool success, bytes memory result) = signer.staticcall(
+            abi.encodeCall(IERC1271.isValidSignature, (hash, signature))
+        );
+
+        return (success &&
+            result.length >= 32 &&
+            abi.decode(result, (bytes32)) ==
+            bytes32(IERC1271.isValidSignature.selector));
     }
 
     function revertBytes(bytes memory errMsg) internal pure {
