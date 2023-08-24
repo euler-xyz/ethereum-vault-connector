@@ -272,7 +272,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function enableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) nonReentrant {
+    ) public payable virtual nonReentrant ownerOrOperator(account) {
         accountCollaterals[account].insert(vault);
         requireAccountStatusCheck(account);
     }
@@ -281,7 +281,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function disableCollateral(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) nonReentrant {
+    ) public payable virtual nonReentrant ownerOrOperator(account) {
         accountCollaterals[account].remove(vault);
         requireAccountStatusCheck(account);
     }
@@ -307,7 +307,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function enableController(
         address account,
         address vault
-    ) public payable virtual ownerOrOperator(account) nonReentrant {
+    ) public payable virtual nonReentrant ownerOrOperator(account) {
         if (accountControllers[account].insert(vault)) {
             emit ControllerEnabled(account, vault);
         }
