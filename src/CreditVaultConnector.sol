@@ -118,7 +118,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         _;
     }
 
-    /// @notice A modifier that checks for checks in progress and impersonate reentrancy.
+    /// @notice A modifier that verifies whether account or vault status checks are reentered as well as checks for impersonate reentrancy.
     modifier nonReentrant() {
         {
             bool checksLock = executionContext.checksLock;
@@ -130,7 +130,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         _;
     }
 
-    /// @notice A modifier that checks for checks in progress reentrancy and sets the lock.
+    /// @notice A modifier that verifies whether account or vault status checks are reentered and sets the lock.
     modifier nonReentrantChecks() {
         if (executionContext.checksLock) revert CVC_ChecksReentrancy();
 
