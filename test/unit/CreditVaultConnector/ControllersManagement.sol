@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultConnectorHarness.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -202,7 +202,9 @@ contract ControllersManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         cvc.enableController(alice, vault);
 
         cvc.setImpersonateLock(false);
@@ -213,7 +215,9 @@ contract ControllersManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(vault);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         cvc.disableController(alice);
 
         cvc.setImpersonateLock(false);

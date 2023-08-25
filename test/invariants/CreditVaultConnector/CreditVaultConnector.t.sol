@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "src/CreditVaultConnector.sol";
+import "src/test/CreditVaultConnectorScribble.sol";
 
 contract VaultMock is ICreditVault {
     ICVC public immutable cvc;
@@ -39,7 +39,7 @@ contract VaultMock is ICreditVault {
     receive() external payable {}
 }
 
-contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
+contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     using Set for SetStorage;
 
     address internal vaultMock;
@@ -218,20 +218,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnector, Test {
         return (x, x, x);
     }
 
-    function requireAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable override {
-        if (accounts.length > Set.MAX_ELEMENTS) return;
-        super.requireAccountsStatusCheck(accounts);
-    }
-
-    function requireAccountsStatusCheckNow(
-        address[] calldata accounts
-    ) public payable override {
-        if (accounts.length > Set.MAX_ELEMENTS) return;
-        super.requireAccountsStatusCheckNow(accounts);
-    }
-
     function forgiveAccountStatusCheck(
         address account
     ) public payable override {
@@ -304,10 +290,6 @@ contract CreditVaultConnectorInvariants is Test {
         cvc = new CreditVaultConnectorHandler();
 
         targetContract(address(cvc));
-    }
-
-    function invariant_invariantsCheck() external view {
-        cvc.invariantsCheck();
     }
 
     function invariant_executionContext() external {

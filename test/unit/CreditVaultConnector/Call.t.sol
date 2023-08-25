@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultConnectorHarness.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -56,7 +56,8 @@ contract CallTest is Test {
             account
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         (bool success, bytes memory result) = cvc.handlerCall{value: seed}(
             targetContract,
             account,
@@ -78,7 +79,6 @@ contract CallTest is Test {
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored
@@ -89,7 +89,8 @@ contract CallTest is Test {
             data
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         cvc.batch(items);
 
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
@@ -102,7 +103,8 @@ contract CallTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         (success, result) = cvc.handlerCall{value: seed}(
             targetContract,
             address(0),
@@ -134,7 +136,8 @@ contract CallTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
         (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
@@ -163,7 +166,8 @@ contract CallTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
         (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
@@ -192,8 +196,11 @@ contract CallTest is Test {
             alice
         );
 
-        hoax(alice, seed);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.deal(alice, seed);
+        vm.prank(alice);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             alice,
@@ -209,6 +216,9 @@ contract CallTest is Test {
     ) public {
         vm.assume(alice != address(0));
 
+        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        setUp();
+
         // target contract is the CVC
         address targetContract = address(cvc);
 
@@ -221,7 +231,8 @@ contract CallTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
 
         (bool success, ) = cvc.handlerCall{value: seed}(
@@ -247,7 +258,8 @@ contract CallTest is Test {
             alice
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
 
         (success, ) = cvc.handlerCall{value: seed}(targetContract, alice, data);

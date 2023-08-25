@@ -62,6 +62,8 @@ NOTE: It may be tempting to allow a large set of collateral assets for a Credit 
 
 NOTE: There is a subtle complication that Credit Vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked without Status Checks being deferred (i.e. vault called directly, not via the CVC), then when it calls `require(Account|Vault)StatusCheck` on the CVC, the CVC may immediately call back into the vault's `check(Account|Vault)Status` function. A normal reentrancy guard would fail upon re-entering at this point. Because of this, the vault implementation should relax the reentrancy modifier to allow `check(Account|Vault)Status` call while invoking `require(Account|Vault)StatusCheck`.
 
+NOTE: It is critical to protect `check(Account|Vault)Status` function against reentrancy as it may get called mid-operation when the state of the vault is not consistent, i.e. `require(Account|Vault)StatusNow` function may get called by ERC-777 hook on transfer leading to the immediate call of `check(Account|Vault)Status` in the middle of the operation.
+
 NOTE: Care should be taken not to transfer any assets to the Accounts other than the Account Owner (ID 0). Otherwise, the assets may be lost forever.
 
 NOTE: If a Credit Vault attempted to read the Collateral or Controller states of an Account on the CVC in order to enforce some policy of its own, then it is possible that a user could defer checks in a batch in order to be able to transiently violate them to satisfy the Credit Vault's policy. For this reason, Credit Vaults should not rely on the Controller or Collateral sets of an Account if checks are deferred.

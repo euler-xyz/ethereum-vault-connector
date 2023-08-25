@@ -183,7 +183,9 @@ The previous value of `onBehalfOfAccount` is stored in a local "cache" variable 
 
 #### checksLock
 
-To prevent calls back into the CVC that may result in inconsistent state, the `checksLock` mutex is locked while the CVC is resolving the account and vault status check sets.
+The CVC invokes the `checkAccountStatus` and `checkVaultStatus` using call instead of staticcall so that controllers can checkpoint state during these operations. However, because of this there is a danger that the CVC could be re-entered during these operations, either directly by a controller, or indirectly by a contract it invokes.
+
+Because of this, the CVC maintains a `checksLock` mutex that is acquired before unwinding the sets of accounts and vaults that need checking. This mutex is also checked during operations that alter these sets. If it did not do this, then information cached by the higher-level unwinding function (such as the sizes of the sets) could become inconsistent with the underlying storage, which could be used to bypass these critical checks.
 
 #### impersonateLock
 

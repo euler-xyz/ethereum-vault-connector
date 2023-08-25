@@ -1,0 +1,17 @@
+analyze:
+  remappings:
+    - "forge-std/=lib/forge-std/src/"
+  solc-version: "0.8.19"
+fuzz:
+  ide: foundry
+  enable_cheat_codes: true
+  quick_check: False
+  build_directory: out
+  sources_directory: src
+  project: "CVC"
+  rpc_url: http://127.0.0.1:8545
+  deployed_contract_address: "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+  number_of_cores: 32
+  time_limit: 1hour
+  targets:
+    - "src/test/CreditVaultConnectorScribble.sol"

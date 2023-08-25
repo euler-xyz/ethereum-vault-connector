@@ -2,16 +2,23 @@
 
 pragma solidity ^0.8.20;
 
-import "src/CreditVaultConnector.sol";
-import "./mocks/Vault.sol";
+import "src/test/CreditVaultConnectorScribble.sol";
+import "test/utils/mocks/Vault.sol";
 
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks
-contract CreditVaultConnectorHarness is CreditVaultConnector {
+contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     using Set for SetStorage;
 
     address[] internal expectedAccountsChecked;
     address[] internal expectedVaultsChecked;
+
+    function isFuzzSender() internal view returns (bool) {
+        // as per https://fuzzing-docs.diligence.tools/getting-started-1/seed-state
+        // fuzzer always sends transactions from the EOA while Foundry does it from the test contract
+        if (msg.sender.code.length == 0) return true;
+        else return false;
+    }
 
     function reset() external {
         delete accountStatusChecks;
@@ -49,25 +56,23 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return expectedVaultsChecked;
     }
 
-    function getAccountOwnerNoRevert(
-        address account
-    ) external view returns (address) {
-        return ownerLookup[uint152(uint160(account) >> 8)].owner;
-    }
-
     function setBatchDepth(uint8 depth) external {
+        if (isFuzzSender()) return;
         executionContext.batchDepth = depth;
     }
 
     function setChecksLock(bool locked) external {
+        if (isFuzzSender()) return;
         executionContext.checksLock = locked;
     }
 
     function setOnBehalfOfAccount(address account) external {
+        if (isFuzzSender()) return;
         executionContext.onBehalfOfAccount = account;
     }
 
     function setImpersonateLock(bool locked) external {
+        if (isFuzzSender()) return;
         executionContext.impersonateLock = locked;
     }
 
@@ -107,10 +112,48 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         }
     }
 
+    function requireAllAccountsStatusCheckNow() public payable override {
+        address[] memory accounts = accountStatusChecks.get();
+
+        super.requireAllAccountsStatusCheckNow();
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            expectedAccountsChecked.push(accounts[i]);
+        }
+    }
+
     function requireVaultStatusCheck() public payable override {
         super.requireVaultStatusCheck();
 
         expectedVaultsChecked.push(msg.sender);
+    }
+
+    function requireVaultStatusCheckNow(address vault) public payable override {
+        if (vaultStatusChecks.contains(vault))
+            expectedVaultsChecked.push(vault);
+
+        super.requireVaultStatusCheckNow(vault);
+    }
+
+    function requireVaultsStatusCheckNow(
+        address[] calldata vaults
+    ) public payable override {
+        for (uint i = 0; i < vaults.length; ++i) {
+            if (vaultStatusChecks.contains(vaults[i]))
+                expectedVaultsChecked.push(vaults[i]);
+        }
+
+        super.requireVaultsStatusCheckNow(vaults);
+    }
+
+    function requireAllVaultsStatusCheckNow() public payable override {
+        address[] memory vaults = vaultStatusChecks.get();
+
+        super.requireAllVaultsStatusCheckNow();
+
+        for (uint i = 0; i < vaults.length; ++i) {
+            expectedVaultsChecked.push(vaults[i]);
+        }
     }
 
     function requireAccountStatusCheckInternal(
@@ -156,9 +199,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
             vaultStatusChecks.numElements == 0,
             "verifyStorage/vault-status-checks/numElements"
         );
-
-        // for coverage
-        invariantsCheck();
     }
 
     function verifyVaultStatusChecks() public view {
