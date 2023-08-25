@@ -7,6 +7,7 @@ interface ICVC {
         uint8 batchDepth;
         bool checksLock;
         bool impersonateLock;
+        bool singleBatchOperatorPermit;
         address onBehalfOfAccount;
         uint8 reserved;
     }
@@ -63,7 +64,7 @@ interface ICVC {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
-    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely. If type(uint40).max, the operator is authorized only for a duration of a single block.
+    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely. If type(uint40).max, the authorization is only valid for the duration of one transaction that exercises the permit.
     function setAccountOperator(
         address account,
         address operator,
@@ -76,7 +77,7 @@ interface ICVC {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
-    /// @param authorizationExpiryTimestamp The timestamp after which the operator is no longer authorized. If type(uint40).max, the operator is authorized only for a duration of a single block.
+    /// @param authorizationExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely. If type(uint40).max, the authorization is only valid for the duration of one transaction that exercises the permit.
     /// @param deadline The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to authorize or deauthorize the operator.
     /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.

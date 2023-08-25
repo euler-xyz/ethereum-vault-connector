@@ -55,6 +55,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     struct OperatorStorage {
         bool isAuthorized;
+        bool singleBatchOperatorPermit;
         uint40 authorizationExpiryTimestamp;
         uint40 magicNumber;
     }
@@ -173,21 +174,47 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 revert CVC_NotAuthorized();
             }
         } else {
-            bool isAuthorized = operatorLookup[account][msg.sender]
-                .isAuthorized;
-            uint authorizationExpiryTimestamp = operatorLookup[account][
+            OperatorStorage memory operatorCache = operatorLookup[account][
                 msg.sender
-            ].authorizationExpiryTimestamp;
+            ];
+            bool singleBatchOperatorPermit = operatorCache
+                .singleBatchOperatorPermit;
+            uint authorizationExpiryTimestamp = operatorCache
+                .authorizationExpiryTimestamp;
 
-            if (
-                !(isAuthorized &&
-                    (authorizationExpiryTimestamp == 0 ||
-                        authorizationExpiryTimestamp >= block.timestamp))
-            ) {
+            // operatorCache.singleBatchOperatorPermit can only be true when authorizationExpiryTimestamp == block.timestamp.
+            // hence we can save the executionContext SLOAD here by adding the if statement
+            if (authorizationExpiryTimestamp == block.timestamp) {
+                singleBatchOperatorPermit =
+                    singleBatchOperatorPermit &&
+                    executionContext.singleBatchOperatorPermit;
+            }
+
+            // if the permit was exercised in the past and the authorization expires now (authorizationExpiryTimestamp == block.timestamp),
+            // but the single batch operator permit is not activated, unfortunately we have to revert. in such a case
+            // there's no way to distinguish if the operator tries to execute multiple transactions within the same block
+            // after the using permit with the special value of type(uint40).max, or it's a legitimate permit from the past
+            bool timestampValid = (authorizationExpiryTimestamp == 0 ||
+                authorizationExpiryTimestamp > block.timestamp ||
+                singleBatchOperatorPermit);
+
+            if (!(operatorCache.isAuthorized && timestampValid)) {
                 revert CVC_NotAuthorized();
             }
         }
 
+        _;
+    }
+
+    /// @notice A modifier checks whether msg.sender is the only controller for the account.
+    modifier onlyController(address account) {
+        {
+            uint numOfControllers = accountControllers[account].numElements;
+            address controller = accountControllers[account].firstElement;
+
+            if (numOfControllers != 1) revert CVC_ControllerViolation();
+            else if (controller != msg.sender) revert CVC_NotAuthorized();
+        }
         _;
     }
 
@@ -212,18 +239,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         executionContext.onBehalfOfAccount = account;
         _;
         executionContext.onBehalfOfAccount = onBehalfOfAccountCache;
-    }
-
-    /// @notice A modifier checks whether msg.sender is the only controller for the account.
-    modifier authenticateController(address account) {
-        {
-            uint numOfControllers = accountControllers[account].numElements;
-            address controller = accountControllers[account].firstElement;
-
-            if (numOfControllers != 1) revert CVC_ControllerViolation();
-            else if (controller != msg.sender) revert CVC_NotAuthorized();
-        }
-        _;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -553,6 +568,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
             executionContext.checksLock = false;
+
+            if (executionContext.singleBatchOperatorPermit) {
+                executionContext.singleBatchOperatorPermit = false;
+                invalidateSingleBatchOperatorPermits();
+            }
         }
     }
 
@@ -591,6 +611,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
             executionContext.checksLock = false;
+
+            if (executionContext.singleBatchOperatorPermit) {
+                executionContext.singleBatchOperatorPermit = false;
+                invalidateSingleBatchOperatorPermits();
+            }
         }
 
         revert CVC_RevertedBatchResult(
@@ -714,7 +739,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function forgiveAccountStatusCheck(
         address account
-    ) public payable virtual authenticateController(account) {
+    ) public payable virtual onlyController(account) {
         accountStatusChecks.remove(account);
     }
 
@@ -785,7 +810,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bytes calldata data
     )
         internal
-        authenticateController(onBehalfOfAccount)
+        onlyController(onBehalfOfAccount)
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
@@ -947,15 +972,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
-    // Auxiliary functions
-
-    function haveCommonOwnerInternal(
-        address account,
-        address otherAccount
-    ) internal pure returns (bool) {
-        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
-    }
-
     function setAccountOperatorInternal(
         address owner,
         address account,
@@ -967,6 +983,40 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         // the operator cannot be one of the 256 accounts that belong to the owner
         if (haveCommonOwnerInternal(owner, operator)) {
             revert CVC_InvalidAddress();
+        }
+
+        bool singleBatchOperatorPermit;
+        if (isAuthorized) {
+            // single batch permit is only activated if the permit was requested with
+            // the special vaule of type(uint40).max
+            if (authorizationExpiryTimestamp == type(uint40).max) {
+                singleBatchOperatorPermit = true;
+                authorizationExpiryTimestamp = uint40(block.timestamp);
+            }
+        } else {
+            authorizationExpiryTimestamp = 0;
+        }
+
+        if (
+            authorizationExpiryTimestamp != 0 &&
+            authorizationExpiryTimestamp < block.timestamp
+        ) {
+            revert CVC_InvalidTimestamp();
+        }
+
+        // if the permit is not set within a batch, then the single batch permit is not activated.
+        // it's important that the single batch permit is only activated if it's the operator calling
+        if (
+            executionContext.batchDepth == BATCH_DEPTH__INIT ||
+            msg.sender != operator
+        ) {
+            singleBatchOperatorPermit = false;
+        } else if (singleBatchOperatorPermit) {
+            // if the permit is set within a batch and it's the operator calling, then the single
+            // batch permit is activated. gather all the accounts for which the single batch permits
+            // are activated so that they can be invalidated at the end of the top batch
+            executionContext.singleBatchOperatorPermit = true;
+            singleBatchOperatorPermits.insert(account);
         }
 
         OperatorStorage memory operatorCache = operatorLookup[account][
@@ -981,11 +1031,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         operatorLookup[account][operator] = OperatorStorage({
             isAuthorized: isAuthorized,
-            authorizationExpiryTimestamp: isAuthorized
-                ? authorizationExpiryTimestamp == type(uint40).max
-                    ? uint40(block.timestamp)
-                    : authorizationExpiryTimestamp
-                : 0,
+            singleBatchOperatorPermit: singleBatchOperatorPermit,
+            authorizationExpiryTimestamp: authorizationExpiryTimestamp,
             magicNumber: updateMagicNumber
                 ? uint40(block.timestamp)
                 : operatorCache.magicNumber
@@ -1002,6 +1049,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
+    // Permit-related functions
+
     function getOperatorPermit(
         address account,
         address operator,
@@ -1013,10 +1062,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         uint152 prefix = uint152(uint160(account) >> 8);
         uint magicNumberOwner = ownerLookup[prefix].magicNumber;
-        uint magicNumberOperator = operatorLookup[account][operator]
+        uint magicNumberAccountOperator = operatorLookup[account][operator]
             .magicNumber;
 
-        if (magicNumberOwner > magicNumberOperator) {
+        if (magicNumberOwner > magicNumberAccountOperator) {
             revert CVC_InvalidMagicNumber();
         }
 
@@ -1028,7 +1077,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 operator,
                 isAuthorized,
                 authorizationExpiryTimestamp,
-                uint40(magicNumberOperator),
+                uint40(magicNumberAccountOperator),
                 deadline
             )
         );
@@ -1104,6 +1153,37 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             result.length >= 32 &&
             abi.decode(result, (bytes32)) ==
             bytes32(IERC1271.isValidSignature.selector));
+    }
+
+    function invalidateSingleBatchOperatorPermits() internal {
+        uint numElements = singleBatchOperatorPermits.numElements;
+        address firstElement = singleBatchOperatorPermits.firstElement;
+
+        // clear only the number of elements to optimize gas consumption
+        singleBatchOperatorPermits.numElements = 0;
+
+        for (uint i; i < numElements; ) {
+            address account = i == 0
+                ? firstElement
+                : singleBatchOperatorPermits.elements[i];
+
+            // the operator is msg.sender. only in that case the single batch permit could have been activated
+            operatorLookup[account][msg.sender]
+                .singleBatchOperatorPermit = false;
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    // Auxiliary functions
+
+    function haveCommonOwnerInternal(
+        address account,
+        address otherAccount
+    ) internal pure returns (bool) {
+        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
     }
 
     function revertBytes(bytes memory errMsg) internal pure {
