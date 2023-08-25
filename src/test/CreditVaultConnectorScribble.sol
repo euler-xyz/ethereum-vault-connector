@@ -21,7 +21,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vault is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     function enableCollateral(
@@ -32,7 +32,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     function disableCollateral(
@@ -43,7 +43,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vault is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
     function enableController(
@@ -53,7 +53,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.enableController(account, vault);
     }
 
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is not present the collateral set 2" !accountControllers[account].contains(msg.sender);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountControllers[account].numElements == accountControllers[account].get().length;
     function disableController(
@@ -63,7 +63,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, onBehalfOfAccount);
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
     function call(
         address targetContract,
@@ -79,7 +79,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         return super.call(targetContract, onBehalfOfAccount, data);
     }
 
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetContract);
     /// #if_succeds "the target cannot be this contract" targetContract != address(this);
     function impersonate(
@@ -96,7 +96,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         return super.impersonate(targetContract, onBehalfOfAccount, data);
     }
 
-    /// #if_succeds "is non-reentant" !executionContext.checksLock && !executionContext.impersonateLock;
+    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeds "batch depth doesn't change pre- and post- execution" old(executionContext.batchDepth) == executionContext.batchDepth;
     /// #if_succeds "checks are properly executed 1" executionContext.batchDepth == BATCH_DEPTH__INIT && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
     /// #if_succeds "checks are properly executed 2" executionContext.batchDepth == BATCH_DEPTH__INIT && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
@@ -122,6 +122,23 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         return super.batchRevert(items);
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "account is never added to the set or it's still present" old(accountStatusChecks.contains(account)) == accountStatusChecks.contains(account);
+    function checkAccountStatus(
+        address account
+    ) public payable virtual override returns (bool isValid) {
+        return super.checkAccountStatus(account);
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "accounts are never added to the set or they're still present" forall(address i in accounts) old(accountStatusChecks.contains(i)) == accountStatusChecks.contains(i);
+    function checkAccountsStatus(
+        address[] calldata accounts
+    ) public payable virtual override returns (bool[] memory isValid) {
+        return super.checkAccountsStatus(accounts);
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "account is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> accountStatusChecks.contains(account);
     function requireAccountStatusCheck(
         address account
@@ -129,6 +146,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.requireAccountStatusCheck(account);
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "accounts are added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> forall(address i in accounts) accountStatusChecks.contains(i);
     function requireAccountsStatusCheck(
         address[] calldata accounts
@@ -136,6 +154,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.requireAccountsStatusCheck(accounts);
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "account is never added to the set or it's removed if previously present" !accountStatusChecks.contains(account);
     function requireAccountStatusCheckNow(
         address account
@@ -143,6 +162,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.requireAccountStatusCheckNow(account);
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "accounts are never added to the set or they're removed if previously present" forall(address i in accounts) !accountStatusChecks.contains(i);
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
@@ -150,7 +170,18 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.requireAccountsStatusCheckNow(accounts);
     }
 
-    /** @dev See {ICVC-forgiveAccountStatusCheck}. */
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "the set is empty after calling this" accountStatusChecks.numElements == 0;
+    function requireAllAccountsStatusCheckNow()
+        public
+        payable
+        virtual
+        override
+    {
+        super.requireAllAccountsStatusCheckNow();
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "account is never present in the set after calling this" !accountStatusChecks.contains(account);
     function forgiveAccountStatusCheck(
         address account
@@ -158,6 +189,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.forgiveAccountStatusCheck(account);
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "accounts are never present in the set after calling this" forall(address i in accounts) !accountStatusChecks.contains(i);
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
@@ -165,11 +197,40 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.forgiveAccountsStatusCheck(accounts);
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "vault is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> vaultStatusChecks.contains(msg.sender);
     function requireVaultStatusCheck() public payable virtual override {
         super.requireVaultStatusCheck();
     }
 
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(vault);
+    function requireVaultStatusCheckNow(
+        address vault
+    ) public payable virtual override {
+        super.requireVaultStatusCheckNow(vault);
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "vaults are never added to the set or they're removed if previously present" forall(address i in vaults) !vaultStatusChecks.contains(i);
+    function requireVaultsStatusCheckNow(
+        address[] calldata vaults
+    ) public payable virtual override {
+        super.requireVaultsStatusCheckNow(vaults);
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "the set is empty after calling this" vaultStatusChecks.numElements == 0;
+    function requireAllVaultsStatusCheckNow()
+        public
+        payable
+        virtual
+        override
+    {
+        super.requireAllVaultsStatusCheckNow();
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "vault is never present in the set after calling this" !vaultStatusChecks.contains(msg.sender);
     function forgiveVaultStatusCheck() public payable override {
         super.forgiveVaultStatusCheck();

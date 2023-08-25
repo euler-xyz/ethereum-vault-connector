@@ -503,14 +503,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function checkAccountStatus(
         address account
-    ) public payable nonReentrantChecks returns (bool isValid) {
+    ) public payable virtual nonReentrantChecks returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
     /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
-    ) public payable nonReentrantChecks returns (bool[] memory isValid) {
+    ) public payable virtual nonReentrantChecks returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
         uint length = accounts.length;
@@ -673,7 +673,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function forgiveVaultStatusCheck() public payable virtual nonReentrantChecks {
+    function forgiveVaultStatusCheck()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
         vaultStatusChecks.remove(msg.sender);
     }
 

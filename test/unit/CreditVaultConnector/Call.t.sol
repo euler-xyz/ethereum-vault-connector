@@ -193,7 +193,9 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             alice,
