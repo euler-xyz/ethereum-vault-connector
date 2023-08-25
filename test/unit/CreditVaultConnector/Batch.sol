@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultConnectorHarness.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -123,7 +123,8 @@ contract BatchTest is Test {
             controller
         );
 
-        hoax(alice, seed);
+        vm.deal(alice, seed);
+        vm.prank(alice);
         cvc.handlerBatch{value: seed}(items);
 
         assertTrue(cvc.isControllerEnabled(alice, controller));

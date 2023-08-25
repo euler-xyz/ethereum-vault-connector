@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultConnectorHarness.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 
 contract IsVaultStatusCheckDeferredTest is Test {
     CreditVaultConnectorHarness internal cvc;

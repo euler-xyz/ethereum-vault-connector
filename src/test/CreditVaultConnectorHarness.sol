@@ -2,16 +2,23 @@
 
 pragma solidity ^0.8.0;
 
-import "src/CreditVaultConnector.sol";
-import "./mocks/Vault.sol";
+import "src/test/CreditVaultConnectorScribble.sol";
+import "test/utils/mocks/Vault.sol";
 
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks
-contract CreditVaultConnectorHarness is CreditVaultConnector {
+contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     using Set for SetStorage;
 
     address[] internal expectedAccountsChecked;
     address[] internal expectedVaultsChecked;
+
+    function isFuzzSender() internal view returns (bool) {
+        // as per https://fuzzing-docs.diligence.tools/getting-started-1/seed-state
+        // fuzzer always sends transactions from the EOA while Foundry does it from the test contract
+        if (msg.sender.code.length == 0) return true;
+        else return false;
+    }
 
     function reset() external {
         delete accountStatusChecks;
@@ -49,25 +56,23 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return expectedVaultsChecked;
     }
 
-    function getAccountOwnerNoRevert(
-        address account
-    ) external view returns (address) {
-        return ownerLookup[uint152(uint160(account) >> 8)];
-    }
-
     function setBatchDepth(uint8 depth) external {
+        if (isFuzzSender()) return;
         executionContext.batchDepth = depth;
     }
 
     function setChecksLock(bool locked) external {
+        if (isFuzzSender()) return;
         executionContext.checksLock = locked;
     }
 
     function setOnBehalfOfAccount(address account) external {
+        if (isFuzzSender()) return;
         executionContext.onBehalfOfAccount = account;
     }
 
     function setImpersonateLock(bool locked) external {
+        if (isFuzzSender()) return;
         executionContext.impersonateLock = locked;
     }
 
@@ -194,9 +199,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
             vaultStatusChecks.numElements == 0,
             "verifyStorage/vault-status-checks/numElements"
         );
-
-        // for coverage
-        invariantsCheck();
     }
 
     function verifyVaultStatusChecks() public view {

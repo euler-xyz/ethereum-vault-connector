@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../utils/CreditVaultConnectorHarness.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 
 contract AccountStatusTest is Test {
     CreditVaultConnectorHarness internal cvc;
@@ -32,8 +32,13 @@ contract AccountStatusTest is Test {
 
             address controller = address(new Vault(cvc));
 
-            address owner = cvc.getAccountOwnerNoRevert(account);
-            vm.prank(owner == address(0) ? account : owner);
+            address owner;
+            try cvc.getAccountOwner(account) returns (address _owner) {
+                owner = _owner;
+            } catch {
+                owner = account;
+            }
+            vm.prank(owner);
             cvc.enableController(account, controller);
 
             // check all the options: account state is ok, account state is violated with

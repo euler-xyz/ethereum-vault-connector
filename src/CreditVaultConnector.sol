@@ -378,12 +378,16 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             ? msg.sender
             : onBehalfOfAccount;
 
+        executionContext.impersonateLock = true;
+
         (success, result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
             value,
             data
         );
+
+        executionContext.impersonateLock = false;
     }
 
     // Batching
@@ -499,14 +503,14 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     /// @inheritdoc ICVC
     function checkAccountStatus(
         address account
-    ) public payable nonReentrantChecks returns (bool isValid) {
+    ) public payable virtual nonReentrantChecks returns (bool isValid) {
         (isValid, ) = checkAccountStatusInternal(account);
     }
 
     /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
-    ) public payable nonReentrantChecks returns (bool[] memory isValid) {
+    ) public payable virtual nonReentrantChecks returns (bool[] memory isValid) {
         isValid = new bool[](accounts.length);
 
         uint length = accounts.length;
@@ -669,7 +673,12 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     }
 
     /// @inheritdoc ICVC
-    function forgiveVaultStatusCheck() external payable nonReentrantChecks {
+    function forgiveVaultStatusCheck()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
         vaultStatusChecks.remove(msg.sender);
     }
 
@@ -703,6 +712,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
         bytes calldata data
     )
         internal
+        virtual
         authenticateController(onBehalfOfAccount)
         onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
@@ -711,17 +721,13 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             revert CVC_NotAuthorized();
         }
 
-        executionContext.impersonateLock = true;
-
         (success, result) = targetContract.call{value: value}(data);
-
-        executionContext.impersonateLock = false;
     }
 
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
-    ) internal returns (BatchItemResult[] memory batchItemsResult) {
+    ) internal virtual returns (BatchItemResult[] memory batchItemsResult) {
         uint length = items.length;
 
         if (returnResult) {
@@ -764,7 +770,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
 
     function checkAccountStatusInternal(
         address account
-    ) internal returns (bool isValid, bytes memory data) {
+    ) internal virtual returns (bool isValid, bytes memory data) {
         uint numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
 
@@ -811,7 +817,7 @@ contract CreditVaultConnector is ICVC, TransientStorage {
     function checkStatusAll(
         SetType setType,
         bool returnResult
-    ) private returns (BatchItemResult[] memory result) {
+    ) internal virtual returns (BatchItemResult[] memory result) {
         function(address) returns (bool, bytes memory) checkStatus;
         function(address) requireStatusCheck;
         SetStorage storage setStorage;
@@ -882,17 +888,5 @@ contract CreditVaultConnector is ICVC, TransientStorage {
             }
         }
         revert("CVC-empty-error");
-    }
-
-    // Formal verification
-
-    function invariantsCheck() public view {
-        ExecutionContext memory context = executionContext;
-        assert(context.batchDepth == BATCH_DEPTH__INIT);
-        assert(!context.checksLock);
-        assert(!context.impersonateLock);
-        assert(context.onBehalfOfAccount == address(0));
-        assert(accountStatusChecks.numElements == 0);
-        assert(vaultStatusChecks.numElements == 0);
     }
 }

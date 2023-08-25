@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 
 import "./Target.sol";
 import "src/interfaces/ICreditVault.sol";
-import "src/interfaces/ICreditVaultConnector.sol";
-import "src/CreditVaultConnector.sol";
 
 // mock vault contract that implements required interface and helps with status checks verification
 contract Vault is ICreditVault, Target {
