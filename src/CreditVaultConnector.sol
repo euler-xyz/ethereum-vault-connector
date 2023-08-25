@@ -306,14 +306,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function setAccountOperatorPermit(
+    function setAccountOperatorPermitECDSA(
         address account,
         address operator,
         bool isAuthorized,
         uint40 authorizationExpiryTimestamp,
         uint40 deadline,
-        bytes calldata signature,
-        address ERC1271Signer
+        bytes calldata signature
     ) public payable virtual {
         bytes32 permit = getOperatorPermit(
             account,
@@ -324,30 +323,62 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         );
         uint152 prefix = uint152(uint160(account) >> 8);
         address owner = ownerLookup[prefix].owner;
+        address signer = recoverECDSASigner(permit, signature);
 
-        address signer;
-        bool isValid;
-        if (signature.length == 65) {
-            signer = recoverECDSASigner(permit, signature);
-            isValid = (owner == signer ||
+        if (
+            !(owner == signer ||
                 (owner == address(0) &&
-                    haveCommonOwnerInternal(signer, account)));
+                    haveCommonOwnerInternal(signer, account)))
+        ) {
+            revert CVC_NotAuthorized();
         }
-
-        // If no ECDSA match, try ERC-1271
-        if (!isValid) {
-            signer = owner != address(0) ? owner : ERC1271Signer;
-            isValid =
-                haveCommonOwnerInternal(signer, account) &&
-                isValidERC1271Signature(signer, permit, signature);
-        }
-
-        // If still no match, revert
-        if (!isValid) revert CVC_NotAuthorized();
 
         if (owner == address(0)) {
             ownerLookup[prefix].owner = owner = signer;
-            emit AccountsOwnerRegistered(prefix, signer);
+            emit AccountsOwnerRegistered(prefix, owner);
+        }
+
+        setAccountOperatorInternal(
+            owner,
+            account,
+            operator,
+            isAuthorized,
+            authorizationExpiryTimestamp,
+            true
+        );
+    }
+
+    /// @inheritdoc ICVC
+    function setAccountOperatorPermitERC1271(
+        address account,
+        address operator,
+        bool isAuthorized,
+        uint40 authorizationExpiryTimestamp,
+        uint40 deadline,
+        bytes calldata signature,
+        address erc1271Signer
+    ) public payable virtual {
+        bytes32 permit = getOperatorPermit(
+            account,
+            operator,
+            isAuthorized,
+            authorizationExpiryTimestamp,
+            deadline
+        );
+        uint152 prefix = uint152(uint160(account) >> 8);
+        address owner = ownerLookup[prefix].owner;
+        address signer = owner != address(0) ? owner : erc1271Signer;
+
+        if (
+            !(haveCommonOwnerInternal(signer, account) &&
+                isValidERC1271Signature(signer, permit, signature))
+        ) {
+            revert CVC_NotAuthorized();
+        }
+
+        if (owner == address(0)) {
+            ownerLookup[prefix].owner = owner = signer;
+            emit AccountsOwnerRegistered(prefix, owner);
         }
 
         setAccountOperatorInternal(

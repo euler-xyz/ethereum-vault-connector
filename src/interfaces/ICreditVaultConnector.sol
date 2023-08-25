@@ -72,7 +72,24 @@ interface ICVC {
         uint40 expiryTimestamp
     ) external payable;
 
-    /// @notice Sets or unsets an operator for an account using EIP-712 standard.
+    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ECDSA signature.
+    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
+    /// @param account The address of the account whose operator is being set or unset.
+    /// @param operator The address of the operator that is being authorized or deauthorized.
+    /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
+    /// @param authorizationExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0, the operator is authorized indefinitely. If type(uint40).max, the authorization is only valid for the duration of one transaction that exercises the permit.
+    /// @param deadline The timestamp before which the signature must be submitted.
+    /// @param signature The signature that is used to authorize or deauthorize the operator.
+    function setAccountOperatorPermitECDSA(
+        address account,
+        address operator,
+        bool isAuthorized,
+        uint40 authorizationExpiryTimestamp,
+        uint40 deadline,
+        bytes calldata signature
+    ) external payable;
+
+    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ERC-1271 signature.
     /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
@@ -81,7 +98,7 @@ interface ICVC {
     /// @param deadline The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to authorize or deauthorize the operator.
     /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
-    function setAccountOperatorPermit(
+    function setAccountOperatorPermitERC1271(
         address account,
         address operator,
         bool isAuthorized,
