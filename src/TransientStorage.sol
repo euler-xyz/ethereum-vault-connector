@@ -14,7 +14,6 @@ abstract contract TransientStorage {
     ICVC.ExecutionContext internal executionContext;
     SetStorage internal accountStatusChecks;
     SetStorage internal vaultStatusChecks;
-    SetStorage internal singleBatchOperatorPermits;
 
     constructor() {
         // populate the storage slot so that:

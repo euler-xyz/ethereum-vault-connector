@@ -7,7 +7,6 @@ interface ICVC {
         uint8 batchDepth;
         bool checksLock;
         bool impersonateLock;
-        bool singleBatchOperatorPermit;
         address onBehalfOfAccount;
         uint8 reserved;
     }
