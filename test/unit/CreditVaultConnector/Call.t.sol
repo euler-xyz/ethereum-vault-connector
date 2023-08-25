@@ -187,7 +187,9 @@ contract CallTest is Test {
         );
 
         hoax(alice, seed);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         (bool success, ) = cvc.handlerCall{value: seed}(
             targetContract,
             alice,

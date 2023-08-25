@@ -107,10 +107,48 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         }
     }
 
+    function requireAllAccountsStatusCheckNow() public payable override {
+        address[] memory accounts = accountStatusChecks.get();
+
+        super.requireAllAccountsStatusCheckNow();
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            expectedAccountsChecked.push(accounts[i]);
+        }
+    }
+
     function requireVaultStatusCheck() public payable override {
         super.requireVaultStatusCheck();
 
         expectedVaultsChecked.push(msg.sender);
+    }
+
+    function requireVaultStatusCheckNow(address vault) public payable override {
+        if (vaultStatusChecks.contains(vault))
+            expectedVaultsChecked.push(vault);
+
+        super.requireVaultStatusCheckNow(vault);
+    }
+
+    function requireVaultsStatusCheckNow(
+        address[] calldata vaults
+    ) public payable override {
+        for (uint i = 0; i < vaults.length; ++i) {
+            if (vaultStatusChecks.contains(vaults[i]))
+                expectedVaultsChecked.push(vaults[i]);
+        }
+
+        super.requireVaultsStatusCheckNow(vaults);
+    }
+
+    function requireAllVaultsStatusCheckNow() public payable override {
+        address[] memory vaults = vaultStatusChecks.get();
+
+        super.requireAllVaultsStatusCheckNow();
+
+        for (uint i = 0; i < vaults.length; ++i) {
+            expectedVaultsChecked.push(vaults[i]);
+        }
     }
 
     function requireAccountStatusCheckInternal(
