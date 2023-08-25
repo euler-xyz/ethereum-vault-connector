@@ -141,10 +141,11 @@ contract ControllersManagementTest is Test {
         assertFalse(cvc.isControllerEnabled(account, vault));
     }
 
-    function test_RevertIfNotOwnerAndNotOperator_EnableController(
+    function test_RevertIfNotOwnerOrNotOperator_EnableController(
         address alice,
         address bob
     ) public {
+        vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -196,7 +197,9 @@ contract ControllersManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         cvc.enableController(alice, vault);
 
         cvc.setImpersonateLock(false);
@@ -207,7 +210,9 @@ contract ControllersManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(vault);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         cvc.disableController(alice);
 
         cvc.setImpersonateLock(false);

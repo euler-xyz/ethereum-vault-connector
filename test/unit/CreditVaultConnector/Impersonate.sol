@@ -43,6 +43,7 @@ contract ImpersonateTest is Test {
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
         vm.assume(collateral != address(cvc));
+        vm.assume(!cvc.haveCommonOwner(alice, controller));
 
         vm.prank(alice);
         cvc.enableCollateral(alice, collateral);
@@ -83,7 +84,6 @@ contract ImpersonateTest is Test {
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].allowError = false;
         items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored
@@ -201,7 +201,7 @@ contract ImpersonateTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentrancy.selector);
         (bool success, ) = cvc.handlerImpersonate{value: seed}(
             collateral,
             alice,

@@ -125,28 +125,28 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeds "account is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> accountStatusChecks.contains(account);
     function requireAccountStatusCheck(
         address account
-    ) public virtual override {
+    ) public payable virtual override {
         super.requireAccountStatusCheck(account);
     }
 
     /// #if_succeds "accounts are added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> forall(address i in accounts) accountStatusChecks.contains(i);
     function requireAccountsStatusCheck(
         address[] calldata accounts
-    ) public virtual override {
+    ) public payable virtual override {
         super.requireAccountsStatusCheck(accounts);
     }
 
     /// #if_succeds "account is never added to the set or it's removed if previously present" !accountStatusChecks.contains(account);
     function requireAccountStatusCheckNow(
         address account
-    ) public virtual override {
+    ) public payable virtual override {
         super.requireAccountStatusCheckNow(account);
     }
 
     /// #if_succeds "accounts are never added to the set or they're removed if previously present" forall(address i in accounts) !accountStatusChecks.contains(i);
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) public virtual override {
+    ) public payable virtual override {
         super.requireAccountsStatusCheckNow(accounts);
     }
 
@@ -154,24 +154,24 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeds "account is never present in the set after calling this" !accountStatusChecks.contains(account);
     function forgiveAccountStatusCheck(
         address account
-    ) public virtual override {
+    ) public payable virtual override {
         super.forgiveAccountStatusCheck(account);
     }
 
     /// #if_succeds "accounts are never present in the set after calling this" forall(address i in accounts) !accountStatusChecks.contains(i);
     function forgiveAccountsStatusCheck(
         address[] calldata accounts
-    ) public virtual override {
+    ) public payable virtual override {
         super.forgiveAccountsStatusCheck(accounts);
     }
 
     /// #if_succeds "vault is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> vaultStatusChecks.contains(msg.sender);
-    function requireVaultStatusCheck() public virtual override {
+    function requireVaultStatusCheck() public payable virtual override {
         super.requireVaultStatusCheck();
     }
 
     /// #if_succeds "vault is never present in the set after calling this" !vaultStatusChecks.contains(msg.sender);
-    function forgiveVaultStatusCheck() public override {
+    function forgiveVaultStatusCheck() public payable override {
         super.forgiveVaultStatusCheck();
     }
 
@@ -202,7 +202,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "must have at most one controller" accountControllers[account].numElements <= 1;
     function checkAccountStatusInternal(
         address account
-    ) internal view override returns (bool isValid, bytes memory data) {
+    ) internal override returns (bool isValid, bytes memory data) {
         return super.checkAccountStatusInternal(account);
     }
 

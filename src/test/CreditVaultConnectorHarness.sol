@@ -56,6 +56,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         return expectedVaultsChecked;
     }
 
+    function getAccountOwnerNoRevert(
+        address account
+    ) external view returns (address) {
+        return ownerLookup[uint152(uint160(account) >> 8)];
+    }
+
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
         executionContext.batchDepth = depth;
@@ -77,14 +83,16 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     }
 
     // function overrides in order to verify the account and vault checks
-    function requireAccountStatusCheck(address account) public override {
+    function requireAccountStatusCheck(
+        address account
+    ) public payable override {
         super.requireAccountStatusCheck(account);
         expectedAccountsChecked.push(account);
     }
 
     function requireAccountsStatusCheck(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         super.requireAccountsStatusCheck(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
@@ -92,7 +100,9 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
-    function requireAccountStatusCheckNow(address account) public override {
+    function requireAccountStatusCheckNow(
+        address account
+    ) public payable override {
         super.requireAccountStatusCheckNow(account);
 
         expectedAccountsChecked.push(account);
@@ -100,7 +110,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function requireAccountsStatusCheckNow(
         address[] calldata accounts
-    ) public override {
+    ) public payable override {
         super.requireAccountsStatusCheckNow(accounts);
 
         for (uint i = 0; i < accounts.length; ++i) {
@@ -108,10 +118,48 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
-    function requireVaultStatusCheck() public override {
+    function requireAllAccountsStatusCheckNow() public payable override {
+        address[] memory accounts = accountStatusChecks.get();
+
+        super.requireAllAccountsStatusCheckNow();
+
+        for (uint i = 0; i < accounts.length; ++i) {
+            expectedAccountsChecked.push(accounts[i]);
+        }
+    }
+
+    function requireVaultStatusCheck() public payable override {
         super.requireVaultStatusCheck();
 
         expectedVaultsChecked.push(msg.sender);
+    }
+
+    function requireVaultStatusCheckNow(address vault) public payable override {
+        if (vaultStatusChecks.contains(vault))
+            expectedVaultsChecked.push(vault);
+
+        super.requireVaultStatusCheckNow(vault);
+    }
+
+    function requireVaultsStatusCheckNow(
+        address[] calldata vaults
+    ) public payable override {
+        for (uint i = 0; i < vaults.length; ++i) {
+            if (vaultStatusChecks.contains(vaults[i]))
+                expectedVaultsChecked.push(vaults[i]);
+        }
+
+        super.requireVaultsStatusCheckNow(vaults);
+    }
+
+    function requireAllVaultsStatusCheckNow() public payable override {
+        address[] memory vaults = vaultStatusChecks.get();
+
+        super.requireAllVaultsStatusCheckNow();
+
+        for (uint i = 0; i < vaults.length; ++i) {
+            expectedVaultsChecked.push(vaults[i]);
+        }
     }
 
     function requireAccountStatusCheckInternal(

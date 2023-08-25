@@ -132,10 +132,11 @@ contract CollateralsManagementTest is Test {
         }
     }
 
-    function test_RevertIfNotOwnerAndNotOperator_CollateralsManagement(
+    function test_RevertIfNotOwnerOrNotOperator_CollateralsManagement(
         address alice,
         address bob
     ) public {
+        vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -194,7 +195,9 @@ contract CollateralsManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         cvc.enableCollateral(alice, vault);
 
         cvc.setImpersonateLock(false);
@@ -205,7 +208,9 @@ contract CollateralsManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ImpersonateReentancy.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+        );
         cvc.disableCollateral(alice, vault);
 
         cvc.setImpersonateLock(false);

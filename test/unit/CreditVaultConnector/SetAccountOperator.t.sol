@@ -98,6 +98,7 @@ contract SetAccountOperatorTest is Test {
         address alice,
         address operator
     ) public {
+        vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
 
         address account = address(uint160(uint160(alice) ^ 256));

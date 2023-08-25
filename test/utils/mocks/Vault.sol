@@ -78,7 +78,7 @@ contract Vault is ICreditVault, Target {
     function checkAccountStatus(
         address,
         address[] memory
-    ) external view virtual override returns (bool isValid, bytes memory data) {
+    ) external virtual override returns (bool isValid, bytes memory data) {
         if (accountStatusState == 0) return (true, "");
         else if (accountStatusState == 1)
             return (false, "account status violation");
@@ -90,27 +90,30 @@ contract Vault is ICreditVault, Target {
         cvc.requireVaultStatusCheck();
     }
 
-    function call(address target, bytes memory data) external payable {
+    function call(address target, bytes memory data) external payable virtual {
         (bool success, ) = target.call{value: msg.value}(data);
         require(success, "call/failed");
     }
 }
 
 contract VaultMalicious is Vault {
-    bytes4 internal functionSelectorToCall;
     bytes4 internal expectedErrorSelector;
 
     constructor(ICVC _cvc) Vault(_cvc) {}
-
-    function setFunctionSelectorToCall(bytes4 selector) external {
-        functionSelectorToCall = selector;
-    }
 
     function setExpectedErrorSelector(bytes4 selector) external {
         expectedErrorSelector = selector;
     }
 
-    function disableController(address account) external override {}
+    function callBatch() external payable {
+        (bool success, bytes memory result) = address(cvc).call(
+            abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
+        );
+
+        require(!success, "callBatch/succeeded");
+        if (bytes4(result) == expectedErrorSelector)
+            revert("callBatch/expected-error");
+    }
 
     function checkVaultStatus()
         external
@@ -118,34 +121,31 @@ contract VaultMalicious is Vault {
         override
         returns (bool, bytes memory)
     {
-        // try to reenter the CVC batch. if it were possible, one could defer other vaults status checks
-        // by entering a batch here and making the checkStatusAll() malfunction. possible attack:
-        // - execute a batch with any item that calls checkVaultStatus() on vault A
-        // - checkStatusAll() calls checkVaultStatus() on vault A
-        // - vault A reenters a batch with any item that calls checkVaultStatus() on vault B
-        // - because checks are deferred, checkVaultStatus() on vault B is not executed the right away
-        // - control is handed over back to checkStatusAll() which had numElements = 1 when entering the loop
-        // - the loop ends and "delete vaultStatusChecks" is called removing the vault status check scheduled on vault B
-        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-        items[0].allowError = false;
-        items[0].onBehalfOfAccount = address(0);
-        items[0].targetContract = address(0);
-        items[0].value = 0;
-        items[0].data = "";
+        if (expectedErrorSelector == 0) return (true, "");
 
-        (bool success, bytes memory err) = address(cvc).call(
-            abi.encodeWithSelector(functionSelectorToCall, items)
+        (bool success, bytes memory result) = address(cvc).call(
+            abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
         );
 
-        assert(!success);
-        assert(bytes4(err) == expectedErrorSelector);
+        if (success || bytes4(result) != expectedErrorSelector)
+            return (true, "");
+
         return (false, "malicious vault");
     }
 
     function checkAccountStatus(
         address,
         address[] memory
-    ) external pure override returns (bool isValid, bytes memory data) {
-        return (true, "");
+    ) external override returns (bool isValid, bytes memory data) {
+        if (expectedErrorSelector == 0) return (true, "");
+
+        (bool success, bytes memory result) = address(cvc).call(
+            abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
+        );
+
+        if (success || bytes4(result) != expectedErrorSelector)
+            return (true, "");
+
+        return (false, "malicious vault");
     }
 }
