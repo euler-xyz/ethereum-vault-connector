@@ -4,24 +4,76 @@ pragma solidity ^0.8.0;
 
 import "../CreditVaultConnector.sol";
 
-/// #define canActOnBehalf(address msgSender, address account) bool = msgSender == ownerLookup[uint152(uint160(account) >> 8)] || (msgSender == address(0) && (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF)) || accountOperators[account][msgSender];
+/// #define ownerOrOperator(address msgSender, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)].owner == msgSender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF));) || operatorLookup[account][msgSender].authorizationExpiryTimestamp >= block.timestamp;
 
 /// #if_succeeds "each account has at most 1 controller" forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 contract CreditVaultConnectorScribble is CreditVaultConnector {
     using Set for SetStorage;
 
-    /// #if_succeeds "only the account owner can call this" haveCommonOwner(msg.sender, account);
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(msg.sender, operator);
+    /// #if_succeeds "only the account owner can call this" ownerLookup[uint152(uint160(account) >> 8)].owner == msg.sender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF));
+    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
+    /// #if_succeeds "magic number is not updated" old(operatorLookup[account][operator].magicNumber) == operatorLookup[account][operator].magicNumber;
     function setAccountOperator(
         address account,
         address operator,
-        bool isAuthorized,
         uint40 expiryTimestamp
     ) public payable virtual override {
-        super.setAccountOperator(account, operator, isAuthorized, expiryTimestamp);
+        super.setAccountOperator(account, operator, expiryTimestamp);
     }
 
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
+    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
+    /// #if_succeeds "magic number is updated" operatorLookup[account][operator].magicNumber == block.timestamp;
+    function setAccountOperatorPermitECDSA(
+        address account,
+        address operator,
+        uint40 authorizationExpiryTimestamp,
+        uint40 deadline,
+        bytes calldata signature
+    ) public payable virtual override {
+        super.setAccountOperatorPermitECDSA(
+            account,
+            operator,
+            authorizationExpiryTimestamp,
+            deadline,
+            signature
+        );
+    }
+
+    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
+    /// #if_succeeds "magic number is updated" operatorLookup[account][operator].magicNumber == block.timestamp;
+    function setAccountOperatorPermitERC1271(
+        address account,
+        address operator,
+        uint40 authorizationExpiryTimestamp,
+        uint40 deadline,
+        bytes calldata signature,
+        address erc1271Signer
+    ) public payable virtual override {
+        super.setAccountOperatorPermitERC1271(
+            account,
+            operator,
+            authorizationExpiryTimestamp,
+            deadline,
+            signature,
+            erc1271Signer
+        );
+    }
+
+    /// #if_succeeds "magic number is updated" ownerLookup[uint152(uint160(msg.sender) >> 8)].magicNumber == block.timestamp;
+    function invalidateAllPermits() public payable virtual override {
+        super.invalidateAllPermits();
+    }
+
+    /// #if_succeeds "only the account owner can call this" ownerLookup[uint152(uint160(account) >> 8)].owner == msg.sender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF));
+    /// #if_succeeds "magic number is updated" operatorLookup[account][operator].magicNumber == block.timestamp;
+    function invalidateAccountOperatorPermits(
+        address account,
+        address operator
+    ) public payable virtual override {
+        super.invalidateAccountOperatorPermits(account, operator);
+    }
+
+    /// #if_succeds "only the account owner or operator can call this" ownerOrOperator(msg.sender, account);
     /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vault is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
@@ -32,7 +84,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.enableCollateral(account, vault);
     }
 
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
+    /// #if_succeds "only the account owner or operator can call this" ownerOrOperator(msg.sender, account);
     /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
@@ -43,7 +95,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.disableCollateral(account, vault);
     }
 
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, account);
+    /// #if_succeds "only the account owner or operator can call this" ownerOrOperator(msg.sender, account);
     /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vault is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
@@ -63,7 +115,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.disableController(account);
     }
 
-    /// #if_succeds "only the account owner or operator can call this" canActOnBehalf(msg.sender, onBehalfOfAccount);
+    /// #if_succeds "only the account owner or operator can call this" ownerOrOperator(msg.sender, onBehalfOfAccount);
     /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
     function call(
@@ -222,12 +274,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
     /// #if_succeds "the set is empty after calling this" vaultStatusChecks.numElements == 0;
-    function requireAllVaultsStatusCheckNow()
-        public
-        payable
-        virtual
-        override
-    {
+    function requireAllVaultsStatusCheckNow() public payable virtual override {
         super.requireAllVaultsStatusCheckNow();
     }
 

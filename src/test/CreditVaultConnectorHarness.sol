@@ -76,6 +76,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         executionContext.impersonateLock = locked;
     }
 
+    function getMagicNumbers(address account, address operator) external view returns (uint40 magicNumberOwner, uint40 magicNumberAccountOperator) {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        magicNumberOwner = ownerLookup[prefix].magicNumber;
+        magicNumberAccountOperator = operatorLookup[account][operator].magicNumber;
+    }
+
     // function overrides in order to verify the account and vault checks
     function requireAccountStatusCheck(
         address account

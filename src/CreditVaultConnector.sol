@@ -18,18 +18,18 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     string public constant name = "Credit Vault Connector (CVC)";
     string public constant version = "1";
 
+    bytes32 public constant OPERATOR_PERMIT_TYPEHASH =
+        keccak256(
+            "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 magicNumber,uint40 deadline)"
+        );
+
+    bytes32 public immutable EIP712_DOMAIN_SEPARATOR;
+
     uint8 internal constant BATCH_DEPTH__INIT = 0;
     uint8 internal constant BATCH_DEPTH__MAX = 9;
 
     address internal constant ERC1820_REGISTRY =
         0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-
-    bytes32 internal constant OPERATOR_PERMIT_TYPEHASH =
-        keccak256(
-            "OperatorPermit(address account,address operator,bool isAuthorized,uint40 authorizationExpiryTimestamp,uint40 magicNumber,uint40 deadline)"
-        );
-
-    bytes32 internal immutable EIP712_DOMAIN_SEPARATOR;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        STORAGE                                            //
@@ -54,8 +54,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     mapping(uint152 prefix => OwnerStorage) internal ownerLookup;
 
     struct OperatorStorage {
-        bool isAuthorized;
-        uint40 authorizationExpiryTimestamp;
+        uint40 authExpiryTimestamp;
         uint40 magicNumber;
     }
 
@@ -66,18 +65,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     //                                        EVENTS                                             //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    event AccountOperatorEnabled(
-        address indexed account,
-        address indexed operator,
-        uint authorizationExpiryTimestamp
-    );
-    event AccountOperatorDisabled(
-        address indexed account,
-        address indexed operator
-    );
     event AccountsOwnerRegistered(
         uint152 indexed prefix,
         address indexed owner
+    );
+    event AccountOperatorAuthorized(
+        address indexed account,
+        address indexed operator,
+        uint authExpiryTimestamp
     );
     event ControllerEnabled(
         address indexed account,
@@ -96,7 +91,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     error CVC_AccountOwnerNotRegistered();
     error CVC_InvalidAddress();
     error CVC_InvalidTimestamp();
-    error CVC_InvalidMagicNumber();
     error CVC_InvalidSignature();
     error CVC_ChecksReentrancy();
     error CVC_ImpersonateReentrancy();
@@ -146,8 +140,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             address owner = ownerLookup[prefix].owner;
 
             if (owner == address(0)) {
-                ownerLookup[prefix].owner = msg.sender;
-                emit AccountsOwnerRegistered(prefix, msg.sender);
+                ownerLookup[prefix].owner = owner = msg.sender;
+                emit AccountsOwnerRegistered(prefix, owner);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
             }
@@ -167,21 +161,16 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             address owner = ownerLookup[prefix].owner;
 
             if (owner == address(0)) {
-                ownerLookup[prefix].owner = msg.sender;
-                emit AccountsOwnerRegistered(prefix, msg.sender);
+                ownerLookup[prefix].owner = owner = msg.sender;
+                emit AccountsOwnerRegistered(prefix, owner);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
             }
-        } else {
-            bool isAuthorized = operatorLookup[account][msg.sender]
-                .isAuthorized;
-            uint authorizationExpiryTimestamp = operatorLookup[account][msg.sender]
-                .authorizationExpiryTimestamp;
-
-            if (!(isAuthorized && (authorizationExpiryTimestamp == 0 ||
-                authorizationExpiryTimestamp >= block.timestamp))) {
-                revert CVC_NotAuthorized();
-            }
+        } else if (
+            operatorLookup[account][msg.sender].authExpiryTimestamp <
+            block.timestamp
+        ) {
+            revert CVC_NotAuthorized();
         }
 
         _;
@@ -235,7 +224,25 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     //                                   PUBLIC FUNCTIONS                                        //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    // Account owner and operators
+    // Execution internals
+
+    /// @inheritdoc ICVC
+    function getExecutionContext(
+        address controllerToCheck
+    )
+        external
+        view
+        returns (ExecutionContext memory context, bool controllerEnabled)
+    {
+        context = executionContext;
+        controllerEnabled = controllerToCheck == address(0)
+            ? false
+            : accountControllers[context.onBehalfOfAccount].contains(
+                controllerToCheck
+            );
+    }
+
+    // Owners and operators
 
     /// @inheritdoc ICVC
     function haveCommonOwner(
@@ -259,38 +266,47 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function getAccountOperator(
         address account,
         address operator
-    )
-        external
-        view
-        returns (
-            bool isAuthorized,
-            uint40 authorizationExpiryTimestamp,
-            uint40 magicNumber
-        )
-    {
-        OperatorStorage memory operatorCache = operatorLookup[account][
-            operator
-        ];
+    ) external view returns (uint40 authExpiryTimestamp, uint40 magicNumber) {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint40 magicNumberOwner = ownerLookup[prefix].magicNumber;
+        uint40 magicNumberAccountOperator = operatorLookup[account][operator].magicNumber;
 
-        isAuthorized = operatorCache.isAuthorized;
-        authorizationExpiryTimestamp = operatorCache
-            .authorizationExpiryTimestamp;
-        magicNumber = operatorCache.magicNumber;
+        authExpiryTimestamp = operatorLookup[account][operator].authExpiryTimestamp;
+        magicNumber = magicNumberOwner > magicNumberAccountOperator
+            ? magicNumberOwner
+            : magicNumberAccountOperator;
+    }
+
+    /// @inheritdoc ICVC
+    function invalidateAllPermits()
+        public
+        payable
+        virtual
+        onlyOwner(msg.sender)
+    {
+        uint152 prefix = uint152(uint160(msg.sender) >> 8);
+        ownerLookup[prefix].magicNumber = uint40(block.timestamp);
+    }
+
+    /// @inheritdoc ICVC
+    function invalidateAccountOperatorPermits(
+        address account,
+        address operator
+    ) public payable virtual onlyOwner(account) {
+        operatorLookup[account][operator].magicNumber = uint40(block.timestamp);
     }
 
     /// @inheritdoc ICVC
     function setAccountOperator(
         address account,
         address operator,
-        bool isAuthorized,
-        uint40 expiryTimestamp
+        uint40 authExpiryTimestamp
     ) public payable virtual onlyOwner(account) {
         setAccountOperatorInternal(
             msg.sender,
             account,
             operator,
-            isAuthorized,
-            expiryTimestamp,
+            authExpiryTimestamp,
             false
         );
     }
@@ -299,16 +315,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function setAccountOperatorPermitECDSA(
         address account,
         address operator,
-        bool isAuthorized,
-        uint40 authorizationExpiryTimestamp,
+        uint40 authExpiryTimestamp,
         uint40 deadline,
         bytes calldata signature
     ) public payable virtual {
         bytes32 permit = getOperatorPermit(
             account,
             operator,
-            isAuthorized,
-            authorizationExpiryTimestamp,
+            authExpiryTimestamp,
             deadline
         );
         uint152 prefix = uint152(uint160(account) >> 8);
@@ -332,8 +346,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             owner,
             account,
             operator,
-            isAuthorized,
-            authorizationExpiryTimestamp,
+            authExpiryTimestamp,
             true
         );
     }
@@ -342,8 +355,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function setAccountOperatorPermitERC1271(
         address account,
         address operator,
-        bool isAuthorized,
-        uint40 authorizationExpiryTimestamp,
+        uint40 authExpiryTimestamp,
         uint40 deadline,
         bytes calldata signature,
         address erc1271Signer
@@ -351,8 +363,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bytes32 permit = getOperatorPermit(
             account,
             operator,
-            isAuthorized,
-            authorizationExpiryTimestamp,
+            authExpiryTimestamp,
             deadline
         );
         uint152 prefix = uint152(uint160(account) >> 8);
@@ -375,56 +386,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             owner,
             account,
             operator,
-            isAuthorized,
-            authorizationExpiryTimestamp,
+            authExpiryTimestamp,
             true
         );
-    }
-
-    /// @inheritdoc ICVC
-    function invalidateAllPermits() external payable onlyOwner(msg.sender) {
-        uint152 prefix = uint152(uint160(msg.sender) >> 8);
-        ownerLookup[prefix].magicNumber = uint40(block.timestamp);
-    }
-
-    /// @inheritdoc ICVC
-    function invalidateAccountOperatorPermits(
-        address account,
-        address operator
-    ) external payable onlyOwner(account) {
-        operatorLookup[account][operator].magicNumber = uint40(block.timestamp);
-    }
-
-    // Execution internals
-
-    /// @inheritdoc ICVC
-    function getExecutionContext(
-        address controllerToCheck
-    )
-        external
-        view
-        returns (ExecutionContext memory context, bool controllerEnabled)
-    {
-        context = executionContext;
-        controllerEnabled = controllerToCheck == address(0)
-            ? false
-            : accountControllers[context.onBehalfOfAccount].contains(
-                controllerToCheck
-            );
-    }
-
-    /// @inheritdoc ICVC
-    function isAccountStatusCheckDeferred(
-        address account
-    ) external view returns (bool) {
-        return accountStatusChecks.contains(account);
-    }
-
-    /// @inheritdoc ICVC
-    function isVaultStatusCheckDeferred(
-        address vault
-    ) external view returns (bool) {
-        return vaultStatusChecks.contains(vault);
     }
 
     // Collaterals management
@@ -677,6 +641,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     // Account Status Check
 
     /// @inheritdoc ICVC
+    function isAccountStatusCheckDeferred(
+        address account
+    ) external view returns (bool) {
+        return accountStatusChecks.contains(account);
+    }
+
+    /// @inheritdoc ICVC
     function checkAccountStatus(
         address account
     ) public payable virtual nonReentrantChecks returns (bool isValid) {
@@ -686,7 +657,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function checkAccountsStatus(
         address[] calldata accounts
-    ) public payable virtual nonReentrantChecks returns (bool[] memory isValid) {
+    )
+        public
+        payable
+        virtual
+        nonReentrantChecks
+        returns (bool[] memory isValid)
+    {
         isValid = new bool[](accounts.length);
 
         uint length = accounts.length;
@@ -793,6 +770,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     // Vault Status Check
 
     /// @inheritdoc ICVC
+    function isVaultStatusCheckDeferred(
+        address vault
+    ) external view returns (bool) {
+        return vaultStatusChecks.contains(vault);
+    }
+
+    /// @inheritdoc ICVC
     function requireVaultStatusCheck()
         public
         payable
@@ -855,6 +839,43 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                  INTERNAL FUNCTIONS                                       //
     ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    function setAccountOperatorInternal(
+        address owner,
+        address account,
+        address operator,
+        uint40 authExpiryTimestamp,
+        bool updateMagicNumber
+    ) internal {
+        // the operator cannot be one of the 256 accounts that belong to the owner
+        if (haveCommonOwnerInternal(owner, operator)) {
+            revert CVC_InvalidAddress();
+        }
+
+        if (authExpiryTimestamp == type(uint40).max) {
+            authExpiryTimestamp = uint40(block.timestamp);
+        }
+
+        if (
+            operatorLookup[account][operator].authExpiryTimestamp !=
+            authExpiryTimestamp
+        ) {
+            operatorLookup[account][operator]
+                .authExpiryTimestamp = authExpiryTimestamp;
+
+            emit AccountOperatorAuthorized(
+                account,
+                operator,
+                authExpiryTimestamp
+            );
+        }
+
+        if (updateMagicNumber) {
+            operatorLookup[account][operator].magicNumber = uint40(
+                block.timestamp
+            );
+        }
+    }
 
     function callInternal(
         address targetContract,
@@ -1041,80 +1062,22 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
-    function setAccountOperatorInternal(
-        address owner,
-        address account,
-        address operator,
-        bool isAuthorized,
-        uint40 authorizationExpiryTimestamp,
-        bool updateMagicNumber
-    ) internal {
-        // the operator cannot be one of the 256 accounts that belong to the owner
-        if (haveCommonOwnerInternal(owner, operator)) {
-            revert CVC_InvalidAddress();
-        }
-
-        authorizationExpiryTimestamp = isAuthorized
-            ? authorizationExpiryTimestamp == type(uint40).max
-                ? type(uint40).max
-                : authorizationExpiryTimestamp
-            : 0;
-
-        if (
-            authorizationExpiryTimestamp != 0 &&
-            authorizationExpiryTimestamp < block.timestamp
-        ) {
-            revert CVC_InvalidTimestamp();
-        }
-
-        OperatorStorage memory operatorCache = operatorLookup[account][
-            operator
-        ];
-
-        if (
-            operatorCache.isAuthorized == isAuthorized &&
-            operatorCache.authorizationExpiryTimestamp ==
-            authorizationExpiryTimestamp
-        ) return;
-
-        operatorLookup[account][operator] = OperatorStorage({
-            isAuthorized: isAuthorized,
-            authorizationExpiryTimestamp: authorizationExpiryTimestamp,
-            magicNumber: updateMagicNumber
-                ? uint40(block.timestamp)
-                : operatorCache.magicNumber
-        });
-
-        if (isAuthorized) {
-            emit AccountOperatorEnabled(
-                account,
-                operator,
-                authorizationExpiryTimestamp
-            );
-        } else {
-            emit AccountOperatorDisabled(account, operator);
-        }
-    }
-
     // Permit-related functions
 
     function getOperatorPermit(
         address account,
         address operator,
-        bool isAuthorized,
-        uint40 authorizationExpiryTimestamp,
+        uint40 authExpiryTimestamp,
         uint40 deadline
     ) internal view returns (bytes32 permit) {
         if (deadline < block.timestamp) revert CVC_InvalidTimestamp();
 
         uint152 prefix = uint152(uint160(account) >> 8);
         uint magicNumberOwner = ownerLookup[prefix].magicNumber;
-        uint magicNumberAccountOperator = operatorLookup[account][operator]
-            .magicNumber;
-
-        if (magicNumberOwner > magicNumberAccountOperator) {
-            revert CVC_InvalidMagicNumber();
-        }
+        uint magicNumberAccountOperator = operatorLookup[account][operator].magicNumber;
+        uint nextMagicNumber = magicNumberOwner > magicNumberAccountOperator
+            ? magicNumberOwner
+            : magicNumberAccountOperator;
 
         bytes32 domainSeparator = EIP712_DOMAIN_SEPARATOR;
         bytes32 structHash = keccak256(
@@ -1122,9 +1085,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 OPERATOR_PERMIT_TYPEHASH,
                 account,
                 operator,
-                isAuthorized,
-                authorizationExpiryTimestamp,
-                uint40(magicNumberAccountOperator),
+                authExpiryTimestamp,
+                uint40(nextMagicNumber),
                 deadline
             )
         );
@@ -1137,7 +1099,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             mstore(add(ptr, 0x02), domainSeparator)
             mstore(add(ptr, 0x22), structHash)
             permit := keccak256(ptr, 0x42)
-        }
+        }  
     }
 
     // Based on:
@@ -1180,9 +1142,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         // If the signature is valid (and not malleable), return the signer address
         signer = ecrecover(hash, v, r, s);
 
-        if (signer == address(0)) {
-            revert CVC_InvalidSignature();
-        }
+        if (signer == address(0)) revert CVC_InvalidSignature();
     }
 
     // Based on:
@@ -1191,15 +1151,16 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) internal view returns (bool) {
+    ) internal view returns (bool isValid) {
         (bool success, bytes memory result) = signer.staticcall(
             abi.encodeCall(IERC1271.isValidSignature, (hash, signature))
         );
 
-        return (success &&
+        isValid =
+            success &&
             result.length >= 32 &&
             abi.decode(result, (bytes32)) ==
-            bytes32(IERC1271.isValidSignature.selector));
+            bytes32(IERC1271.isValidSignature.selector);
     }
 
     // Auxiliary functions

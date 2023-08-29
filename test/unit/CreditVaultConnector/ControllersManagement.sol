@@ -76,7 +76,6 @@ contract ControllersManagementTest is Test {
             cvc.setAccountOperator(
                 account,
                 msgSender,
-                true,
                 uint40(block.timestamp + 100)
             );
         }
@@ -160,7 +159,7 @@ contract ControllersManagementTest is Test {
         cvc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, true, uint40(block.timestamp + 100));
+        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
 
         vm.prank(alice);
         cvc.handlerEnableController(bob, vault);

@@ -11,7 +11,8 @@ gas_reports = [
 remappings = [
     "src=src/",
     "test=test/",
-    "forge-std/=lib/forge-std/src/"
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin/=lib/openzeppelin-contracts/contracts"
 ]
 
 

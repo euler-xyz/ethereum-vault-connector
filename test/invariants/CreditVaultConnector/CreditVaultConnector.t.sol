@@ -55,24 +55,20 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        operatorLookup[account][msg.sender].isAuthorized = true;
+        operatorLookup[account][msg.sender].authExpiryTimestamp = uint40(
+            block.timestamp + 10
+        );
         vm.etch(vault, vaultMock.code);
     }
 
     function setAccountOperator(
         address account,
         address operator,
-        bool isAuthorized,
         uint40 expiryTimestamp
     ) public payable override {
         if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) return;
         account = msg.sender;
-        super.setAccountOperator(
-            account,
-            operator,
-            isAuthorized,
-            expiryTimestamp
-        );
+        super.setAccountOperator(account, operator, expiryTimestamp);
     }
 
     function enableCollateral(

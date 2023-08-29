@@ -75,8 +75,7 @@ contract BatchTest is Test {
             cvc.setAccountOperator.selector,
             alice,
             bob,
-            true,
-            uint40(block.timestamp + 1000)
+            type(uint40).max
         );
 
         items[2].onBehalfOfAccount = alicesSubAccount;
@@ -130,12 +129,12 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        (bool isAuthorized, uint40 expiryTimestamp, ) = cvc.getAccountOperator(
+        (uint40 expiryTimestamp, uint40 magicValue) = cvc.getAccountOperator(
             alice,
             bob
         );
-        assertEq(isAuthorized, true);
-        //assertEq(expiryTimestamp, 0);
+        assertEq(expiryTimestamp, block.timestamp);
+        assertEq(magicValue, 0);
         assertEq(address(otherVault).balance, seed);
 
         cvc.reset();

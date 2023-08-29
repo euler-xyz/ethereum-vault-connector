@@ -35,7 +35,6 @@ contract CallTest is Test {
             cvc.setAccountOperator(
                 account,
                 alice,
-                true,
                 uint40(block.timestamp + 100)
             );
         } else {
