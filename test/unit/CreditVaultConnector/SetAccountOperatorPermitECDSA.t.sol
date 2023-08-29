@@ -76,9 +76,9 @@ abstract contract EIP712 {
 }
 
 contract Signer is EIP712, Test {
-    ICVC private immutable cvc;
+    CreditVaultConnector private immutable cvc;
 
-    constructor(ICVC _cvc) EIP712(_cvc.name(), _cvc.version()) {
+    constructor(CreditVaultConnector _cvc) EIP712(_cvc.name(), _cvc.version()) {
         cvc = _cvc;
     }
 

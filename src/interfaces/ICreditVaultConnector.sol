@@ -23,18 +23,6 @@ interface ICVC {
         bytes result;
     }
 
-    // @notice Returns the name of the contract.
-    // @return name The name of the contract.
-    function name() external pure returns (string memory);
-
-    // @notice Returns the version of the contract.
-    // @return version The version of the contract.
-    function version() external pure returns (string memory);
-
-    // @notice Returns the EIP-712 typehash for the operator permit.
-    // @return OPERATOR_PERMIT_TYPEHASH The EIP-712 typehash for the operator permit.
-    function OPERATOR_PERMIT_TYPEHASH() external pure returns (bytes32);
-
     /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the action is being executed at the moment.
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the action is being executed at the moment.
     /// @return context Current execution context.
