@@ -269,9 +269,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) external view returns (uint40 authExpiryTimestamp, uint40 magicNumber) {
         uint152 prefix = uint152(uint160(account) >> 8);
         uint40 magicNumberOwner = ownerLookup[prefix].magicNumber;
-        uint40 magicNumberAccountOperator = operatorLookup[account][operator].magicNumber;
+        uint40 magicNumberAccountOperator = operatorLookup[account][operator]
+            .magicNumber;
 
-        authExpiryTimestamp = operatorLookup[account][operator].authExpiryTimestamp;
+        authExpiryTimestamp = operatorLookup[account][operator]
+            .authExpiryTimestamp;
         magicNumber = magicNumberOwner > magicNumberAccountOperator
             ? magicNumberOwner
             : magicNumberAccountOperator;
@@ -1074,7 +1076,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         uint152 prefix = uint152(uint160(account) >> 8);
         uint magicNumberOwner = ownerLookup[prefix].magicNumber;
-        uint magicNumberAccountOperator = operatorLookup[account][operator].magicNumber;
+        uint magicNumberAccountOperator = operatorLookup[account][operator]
+            .magicNumber;
         uint nextMagicNumber = magicNumberOwner > magicNumberAccountOperator
             ? magicNumberOwner
             : magicNumberAccountOperator;
@@ -1099,7 +1102,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             mstore(add(ptr, 0x02), domainSeparator)
             mstore(add(ptr, 0x22), structHash)
             permit := keccak256(ptr, 0x42)
-        }  
+        }
     }
 
     // Based on:

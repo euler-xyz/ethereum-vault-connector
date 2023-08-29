@@ -11,8 +11,9 @@ abstract contract EIP712 {
     using ShortStrings for *;
 
     bytes32 internal constant _TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     bytes32 internal immutable _hashedName;
     bytes32 internal immutable _hashedVersion;
@@ -67,7 +68,9 @@ abstract contract EIP712 {
      * address signer = ECDSA.recover(digest, signature);
      * ```
      */
-    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
+    function _hashTypedDataV4(
+        bytes32 structHash
+    ) internal view virtual returns (bytes32) {
         return ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
     }
 }
@@ -80,7 +83,16 @@ contract Signer is EIP712, Test {
     }
 
     function _buildDomainSeparator() internal view override returns (bytes32) {
-        return keccak256(abi.encode(_TYPE_HASH, _hashedName, _hashedVersion, block.chainid, address(cvc)));
+        return
+            keccak256(
+                abi.encode(
+                    _TYPE_HASH,
+                    _hashedName,
+                    _hashedVersion,
+                    block.chainid,
+                    address(cvc)
+                )
+            );
     }
 
     function signPermit(
@@ -101,7 +113,10 @@ contract Signer is EIP712, Test {
                 deadline
             )
         );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, _hashTypedDataV4(structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            privateKey,
+            _hashTypedDataV4(structHash)
+        );
         signature = abi.encodePacked(r, s, v);
     }
 }
@@ -131,7 +146,11 @@ contract SetAccountOperatorPermitECDSATest is Test {
         uint40 authExpiry,
         uint40 seed
     ) public {
-        vm.assume(privateKey > 0 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337);
+        vm.assume(
+            privateKey > 0 &&
+                privateKey <
+                115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
         address alice = vm.addr(privateKey);
 
         vm.assume(!cvc.haveCommonOwner(alice, operator));
@@ -179,15 +198,19 @@ contract SetAccountOperatorPermitECDSATest is Test {
             vm.expectEmit(true, true, false, true, address(cvc));
             emit AccountOperatorAuthorized(account, operator, authExpiry);
             vm.recordLogs();
-            cvc.setAccountOperatorPermitECDSA(account, operator, authExpiry, uint40(block.timestamp), signature);
+            cvc.setAccountOperatorPermitECDSA(
+                account,
+                operator,
+                authExpiry,
+                uint40(block.timestamp),
+                signature
+            );
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             {
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc.getAccountOperator(
-                    account,
-                    operator
-                );
+                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
+                    .getAccountOperator(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(magicNumber, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -195,7 +218,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
 
             // it's not possible to carry out a reply attack
             vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-            cvc.setAccountOperatorPermitECDSA(account, operator, authExpiry, uint40(block.timestamp), signature);
+            cvc.setAccountOperatorPermitECDSA(
+                account,
+                operator,
+                authExpiry,
+                uint40(block.timestamp),
+                signature
+            );
 
             // early return if the operator is already enabled with the same expiry timestamp
             vm.warp(block.timestamp + 1);
@@ -206,17 +235,21 @@ contract SetAccountOperatorPermitECDSATest is Test {
                 uint40(block.timestamp + 1),
                 privateKey
             );
-            
+
             vm.recordLogs();
-            cvc.setAccountOperatorPermitECDSA(account, operator, authExpiry, uint40(block.timestamp + 1), signature);
+            cvc.setAccountOperatorPermitECDSA(
+                account,
+                operator,
+                authExpiry,
+                uint40(block.timestamp + 1),
+                signature
+            );
             logs = vm.getRecordedLogs();
 
             {
                 assertEq(logs.length, 0);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc.getAccountOperator(
-                    account,
-                    operator
-                );
+                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
+                    .getAccountOperator(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(magicNumber, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -235,20 +268,24 @@ contract SetAccountOperatorPermitECDSATest is Test {
             vm.expectEmit(true, true, false, true, address(cvc));
             emit AccountOperatorAuthorized(account, operator, authExpiry + 1);
             vm.recordLogs();
-            cvc.setAccountOperatorPermitECDSA(account, operator, authExpiry + 1, uint40(block.timestamp), signature);
+            cvc.setAccountOperatorPermitECDSA(
+                account,
+                operator,
+                authExpiry + 1,
+                uint40(block.timestamp),
+                signature
+            );
             logs = vm.getRecordedLogs();
 
             {
                 assertEq(logs.length, 1);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc.getAccountOperator(
-                    account,
-                    operator
-                );
+                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
+                    .getAccountOperator(account, operator);
                 assertEq(expiryTimestamp, authExpiry + 1);
                 assertEq(magicNumber, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
-            
+
             // deauthorize the operator
             vm.warp(block.timestamp + 1);
             signature = signer.signPermit(
@@ -260,11 +297,7 @@ contract SetAccountOperatorPermitECDSATest is Test {
             );
 
             vm.expectEmit(true, true, false, true, address(cvc));
-            emit AccountOperatorAuthorized(
-                account,
-                operator,
-                1
-            );
+            emit AccountOperatorAuthorized(account, operator, 1);
             vm.recordLogs();
             cvc.setAccountOperatorPermitECDSA(
                 account,
@@ -277,10 +310,8 @@ contract SetAccountOperatorPermitECDSATest is Test {
 
             {
                 assertEq(logs.length, 1);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc.getAccountOperator(
-                    account,
-                    operator
-                );
+                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
+                    .getAccountOperator(account, operator);
                 assertEq(expiryTimestamp, 1);
                 assertEq(magicNumber, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -308,10 +339,8 @@ contract SetAccountOperatorPermitECDSATest is Test {
 
             {
                 assertEq(logs.length, 0);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc.getAccountOperator(
-                    account,
-                    operator
-                );
+                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
+                    .getAccountOperator(account, operator);
                 assertEq(expiryTimestamp, 1);
                 assertEq(magicNumber, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -330,15 +359,19 @@ contract SetAccountOperatorPermitECDSATest is Test {
             vm.expectEmit(true, true, false, true, address(cvc));
             emit AccountOperatorAuthorized(account, operator, block.timestamp);
             vm.recordLogs();
-            cvc.setAccountOperatorPermitECDSA(account, operator, type(uint40).max, uint40(block.timestamp), signature);
+            cvc.setAccountOperatorPermitECDSA(
+                account,
+                operator,
+                type(uint40).max,
+                uint40(block.timestamp),
+                signature
+            );
             logs = vm.getRecordedLogs();
 
             {
                 assertTrue(logs.length == 1);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc.getAccountOperator(
-                    account,
-                    operator
-                );
+                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
+                    .getAccountOperator(account, operator);
                 assertEq(expiryTimestamp, block.timestamp);
                 assertEq(magicNumber, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -350,7 +383,11 @@ contract SetAccountOperatorPermitECDSATest is Test {
         uint privateKey,
         address operator
     ) public {
-        vm.assume(privateKey > 0 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337);
+        vm.assume(
+            privateKey > 0 &&
+                privateKey <
+                115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
         address alice = vm.addr(privateKey);
         vm.assume(!cvc.haveCommonOwner(alice, operator));
 
@@ -364,7 +401,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
         );
 
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(account, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            account,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         // succeeds if signer is authorized
         account = address(uint160(uint160(alice) ^ 255));
@@ -376,7 +419,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             privateKey
         );
 
-        cvc.setAccountOperatorPermitECDSA(account, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            account,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         // reverts if signer is not a registered owner
         vm.warp(block.timestamp + 1);
@@ -389,14 +438,24 @@ contract SetAccountOperatorPermitECDSATest is Test {
         );
 
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(account, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            account,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
     }
 
     function test_RevertIfOperatorIsOwnersAccount_SetAccountOperatorPermitECDSA(
         uint privateKey,
         uint8 subAccountId
     ) public {
-        vm.assume(privateKey > 0 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337);
+        vm.assume(
+            privateKey > 0 &&
+                privateKey <
+                115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
         address alice = vm.addr(privateKey);
         address operator = address(uint160(uint160(alice) ^ subAccountId));
 
@@ -409,7 +468,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
         );
 
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
     }
 
     function test_RevertIfPermitDeadlineMissed_SetAccountOperatorPermitECDSA(
@@ -417,7 +482,11 @@ contract SetAccountOperatorPermitECDSATest is Test {
         address operator,
         uint40 seed
     ) public {
-        vm.assume(privateKey > 0 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337);
+        vm.assume(
+            privateKey > 0 &&
+                privateKey <
+                115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
         address alice = vm.addr(privateKey);
         vm.assume(!cvc.haveCommonOwner(alice, operator));
         vm.assume(seed > 0);
@@ -432,7 +501,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             privateKey
         );
         vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp - 1), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp - 1),
+            signature
+        );
 
         // succeeds if deadline is not missed
         signature = signer.signPermit(
@@ -442,7 +517,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             uint40(block.timestamp),
             privateKey
         );
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
     }
 
     function test_RevertIfInvalidSignature_SetAccountOperatorPermitECDSA(
@@ -450,7 +531,11 @@ contract SetAccountOperatorPermitECDSATest is Test {
         address operator,
         uint40 seed
     ) public {
-        vm.assume(privateKey > 0 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337);
+        vm.assume(
+            privateKey > 0 &&
+                privateKey <
+                115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
         address alice = vm.addr(privateKey);
         vm.assume(uint160(operator) != type(uint160).max);
         vm.assume(!cvc.haveCommonOwner(alice, operator));
@@ -465,7 +550,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             privateKey
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         signature = signer.signPermit(
             alice,
@@ -475,7 +566,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             privateKey
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         signature = signer.signPermit(
             alice,
@@ -485,7 +582,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             privateKey
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         signature = signer.signPermit(
             alice,
@@ -495,7 +598,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             privateKey
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         // succeeds if signature is valid
         signature = signer.signPermit(
@@ -505,7 +614,13 @@ contract SetAccountOperatorPermitECDSATest is Test {
             uint40(block.timestamp),
             privateKey
         );
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         bytes32 r;
         bytes32 s;
@@ -518,23 +633,59 @@ contract SetAccountOperatorPermitECDSATest is Test {
 
         signature = abi.encodePacked(r, s, v, uint8(1));
         vm.expectRevert(CreditVaultConnector.CVC_InvalidSignature.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         signature = abi.encodePacked(uint(0), s, v);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidSignature.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         signature = abi.encodePacked(r, uint(0), v);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidSignature.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
         signature = abi.encodePacked(r, s, uint8(0));
         vm.expectRevert(CreditVaultConnector.CVC_InvalidSignature.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
 
-        signature = abi.encodePacked(r, uint(0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1), v);
+        signature = abi.encodePacked(
+            r,
+            uint(
+                0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1
+            ),
+            v
+        );
         vm.expectRevert(CreditVaultConnector.CVC_InvalidSignature.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
     }
 
     function test_RevertIfPermitInvalidated_SetAccountOperatorPermitECDSA(
@@ -542,7 +693,11 @@ contract SetAccountOperatorPermitECDSATest is Test {
         address operator,
         uint40 seed
     ) public {
-        vm.assume(privateKey > 0 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337);
+        vm.assume(
+            privateKey > 0 &&
+                privateKey <
+                115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
         address alice = vm.addr(privateKey);
         vm.assume(uint160(operator) != type(uint160).max);
         vm.assume(!cvc.haveCommonOwner(alice, operator));
@@ -563,14 +718,26 @@ contract SetAccountOperatorPermitECDSATest is Test {
             uint40(block.timestamp),
             privateKey
         );
-        
+
         vm.prank(alice);
         cvc.invalidateAllPermits();
 
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature1);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature1
+        );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, address(uint160(operator) + 1), 0, uint40(block.timestamp), signature2);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            address(uint160(operator) + 1),
+            0,
+            uint40(block.timestamp),
+            signature2
+        );
 
         vm.warp(block.timestamp + 1);
         signature1 = signer.signPermit(
@@ -593,8 +760,20 @@ contract SetAccountOperatorPermitECDSATest is Test {
 
         // only one permit is invalid
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature1);
-        cvc.setAccountOperatorPermitECDSA(alice, address(uint160(operator) + 1), 0, uint40(block.timestamp), signature2);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature1
+        );
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            address(uint160(operator) + 1),
+            0,
+            uint40(block.timestamp),
+            signature2
+        );
 
         // succeeds if permit is not invalidated
         vm.warp(block.timestamp + 1);
@@ -605,10 +784,22 @@ contract SetAccountOperatorPermitECDSATest is Test {
             uint40(block.timestamp),
             privateKey
         );
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature1);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature1
+        );
 
         // reverts if replayed
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperatorPermitECDSA(alice, operator, 0, uint40(block.timestamp), signature1);
+        cvc.setAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            0,
+            uint40(block.timestamp),
+            signature1
+        );
     }
 }

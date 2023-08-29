@@ -26,11 +26,11 @@ interface ICVC {
     // @notice Returns the name of the contract.
     // @return name The name of the contract.
     function name() external pure returns (string memory);
-    
+
     // @notice Returns the version of the contract.
     // @return version The version of the contract.
     function version() external pure returns (string memory);
-    
+
     // @notice Returns the EIP-712 typehash for the operator permit.
     // @return OPERATOR_PERMIT_TYPEHASH The EIP-712 typehash for the operator permit.
     function OPERATOR_PERMIT_TYPEHASH() external pure returns (bytes32);
