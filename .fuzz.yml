@@ -16,3 +16,4 @@ fuzz:
   time_limit: 1hour
   targets:
     - "src/test/CreditVaultConnectorScribble.sol"
+    - "src/test/CreditVaultConnectorHarness.sol"
