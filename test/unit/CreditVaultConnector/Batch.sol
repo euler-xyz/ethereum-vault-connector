@@ -129,12 +129,11 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        (uint40 expiryTimestamp, uint40 magicValue) = cvc.getAccountOperator(
+        uint40 expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
             alice,
             bob
         );
         assertEq(expiryTimestamp, block.timestamp);
-        assertEq(magicValue, 0);
         assertEq(address(otherVault).balance, seed);
 
         cvc.reset();

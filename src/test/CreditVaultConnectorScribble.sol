@@ -12,7 +12,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeeds "only the account owner can call this" ownerLookup[uint152(uint160(account) >> 8)].owner == msg.sender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF));
     /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
-    /// #if_succeeds "magic number is not updated" old(operatorLookup[account][operator].magicNumber) == operatorLookup[account][operator].magicNumber;
+    /// #if_succeeds "last signature timestamp is not updated" old(operatorLookup[account][operator].lastSignatureTimestamp) == operatorLookup[account][operator].lastSignatureTimestamp;
     function setAccountOperator(
         address account,
         address operator,
@@ -22,30 +22,33 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
-    /// #if_succeeds "magic number is updated" operatorLookup[account][operator].magicNumber == block.timestamp;
+    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
     function setAccountOperatorPermitECDSA(
         address account,
         address operator,
         uint40 authorizationExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes calldata signature
     ) public payable virtual override {
         super.setAccountOperatorPermitECDSA(
             account,
             operator,
             authorizationExpiryTimestamp,
-            deadline,
+            signatureTimestamp,
+            signatureDeadlineTimestamp,
             signature
         );
     }
 
     /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
-    /// #if_succeeds "magic number is updated" operatorLookup[account][operator].magicNumber == block.timestamp;
+    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
     function setAccountOperatorPermitERC1271(
         address account,
         address operator,
         uint40 authorizationExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes calldata signature,
         address erc1271Signer
     ) public payable virtual override {
@@ -53,19 +56,20 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
             account,
             operator,
             authorizationExpiryTimestamp,
-            deadline,
+            signatureTimestamp,
+            signatureDeadlineTimestamp,
             signature,
             erc1271Signer
         );
     }
 
-    /// #if_succeeds "magic number is updated" ownerLookup[uint152(uint160(msg.sender) >> 8)].magicNumber == block.timestamp;
+    /// #if_succeeds "last signature timestamp is updated" ownerLookup[uint152(uint160(msg.sender) >> 8)].lastSignatureTimestamp == block.timestamp;
     function invalidateAllPermits() public payable virtual override {
         super.invalidateAllPermits();
     }
 
     /// #if_succeeds "only the account owner can call this" ownerLookup[uint152(uint160(account) >> 8)].owner == msg.sender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF));
-    /// #if_succeeds "magic number is updated" operatorLookup[account][operator].magicNumber == block.timestamp;
+    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
     function invalidateAccountOperatorPermits(
         address account,
         address operator

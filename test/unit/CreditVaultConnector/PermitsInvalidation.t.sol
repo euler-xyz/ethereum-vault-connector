@@ -26,28 +26,34 @@ contract PermitsInvalidationTest is Test {
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
 
-            (uint40 magicNumberOwner, uint40 magicNumberAccountOperator) = cvc
-                .getMagicNumbers(account, operator);
-            assertEq(magicNumberOwner, i == 0 ? 0 : block.timestamp);
-            assertEq(magicNumberAccountOperator, 0);
+            (
+                uint40 lastSignatureTimestampOwner,
+                uint40 lastSignatureTimestampAccountOperator
+            ) = cvc.getLastSignatureTimestamps(account, operator);
+            assertEq(lastSignatureTimestampOwner, i == 0 ? 0 : block.timestamp);
+            assertEq(lastSignatureTimestampAccountOperator, 0);
 
             // invalidate permits for operator of the account
             vm.prank(alice);
             cvc.invalidateAccountOperatorPermits(account, operator);
 
-            (magicNumberOwner, magicNumberAccountOperator) = cvc
-                .getMagicNumbers(account, operator);
-            assertEq(magicNumberOwner, i == 0 ? 0 : block.timestamp);
-            assertEq(magicNumberAccountOperator, block.timestamp);
+            (
+                lastSignatureTimestampOwner,
+                lastSignatureTimestampAccountOperator
+            ) = cvc.getLastSignatureTimestamps(account, operator);
+            assertEq(lastSignatureTimestampOwner, i == 0 ? 0 : block.timestamp);
+            assertEq(lastSignatureTimestampAccountOperator, block.timestamp);
 
             // invalidate all permits for the owner
             vm.prank(alice);
             cvc.invalidateAllPermits();
 
-            (magicNumberOwner, magicNumberAccountOperator) = cvc
-                .getMagicNumbers(account, operator);
-            assertEq(magicNumberOwner, block.timestamp);
-            assertEq(magicNumberAccountOperator, block.timestamp);
+            (
+                lastSignatureTimestampOwner,
+                lastSignatureTimestampAccountOperator
+            ) = cvc.getLastSignatureTimestamps(account, operator);
+            assertEq(lastSignatureTimestampOwner, block.timestamp);
+            assertEq(lastSignatureTimestampAccountOperator, block.timestamp);
         }
     }
 

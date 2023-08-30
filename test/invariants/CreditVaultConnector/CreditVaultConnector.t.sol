@@ -61,14 +61,59 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         vm.etch(vault, vaultMock.code);
     }
 
+    function invalidateAllPermits() public payable override {
+        ownerLookup[getPrefixInternal(msg.sender)].owner = msg.sender;
+        super.invalidateAllPermits();
+    }
+
+    /// @inheritdoc ICVC
+    function invalidateAccountOperatorPermits(
+        address account,
+        address operator
+    ) public payable override {
+        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        account = msg.sender;
+        super.invalidateAccountOperatorPermits(account, operator);
+    }
+
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint40 authExpiryTimestamp
     ) public payable override {
-        if ((uint160(msg.sender) | 0xFF) == (uint160(operator) | 0xFF)) return;
+        if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
-        super.setAccountOperator(account, operator, expiryTimestamp);
+        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        super.setAccountOperator(account, operator, authExpiryTimestamp);
+    }
+
+    function setAccountOperatorPermitECDSA(
+        address account,
+        address operator,
+        uint40 authExpiryTimestamp,
+        uint40,
+        uint40,
+        bytes calldata
+    ) public payable override {
+        if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        account = msg.sender;
+        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        super.setAccountOperator(account, operator, authExpiryTimestamp);
+    }
+
+    function setAccountOperatorPermitERC1271(
+        address account,
+        address operator,
+        uint40 authExpiryTimestamp,
+        uint40,
+        uint40,
+        bytes calldata,
+        address
+    ) public payable override {
+        if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        account = msg.sender;
+        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        super.setAccountOperator(account, operator, authExpiryTimestamp);
     }
 
     function enableCollateral(

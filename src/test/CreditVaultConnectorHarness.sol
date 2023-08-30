@@ -76,18 +76,23 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         executionContext.impersonateLock = locked;
     }
 
-    function getMagicNumbers(
+    function getLastSignatureTimestamps(
         address account,
         address operator
     )
         external
         view
-        returns (uint40 magicNumberOwner, uint40 magicNumberAccountOperator)
+        returns (
+            uint40 lastSignatureTimestampOwner,
+            uint40 lastSignatureTimestampAccountOperator
+        )
     {
         uint152 prefix = uint152(uint160(account) >> 8);
-        magicNumberOwner = ownerLookup[prefix].magicNumber;
-        magicNumberAccountOperator = operatorLookup[account][operator]
-            .magicNumber;
+        lastSignatureTimestampOwner = ownerLookup[prefix]
+            .lastSignatureTimestamp;
+        lastSignatureTimestampAccountOperator = operatorLookup[account][
+            operator
+        ].lastSignatureTimestamp;
     }
 
     // function overrides in order to verify the account and vault checks

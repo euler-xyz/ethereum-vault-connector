@@ -38,10 +38,11 @@ contract SetAccountOperatorTest is Test {
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
 
-            (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                .getAccountOperator(account, operator);
+            uint40 expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
+                account,
+                operator
+            );
             assertEq(expiryTimestamp, 0);
-            assertEq(magicNumber, 0);
 
             if (i == 0) {
                 vm.expectRevert(
@@ -53,27 +54,23 @@ contract SetAccountOperatorTest is Test {
             }
 
             // authorize the operator
-            vm.prank(alice);
             if (i == 0) {
                 vm.expectEmit(true, true, false, false, address(cvc));
-                emit AccountsOwnerRegistered(
-                    uint152(uint160(alice) >> 8),
-                    alice
-                );
+                emit AccountsOwnerRegistered(cvc.getPrefix(alice), alice);
             }
             vm.expectEmit(true, true, false, true, address(cvc));
             emit AccountOperatorAuthorized(account, operator, authExpiry);
             vm.recordLogs();
+            vm.prank(alice);
             cvc.setAccountOperator(account, operator, authExpiry);
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-            (expiryTimestamp, magicNumber) = cvc.getAccountOperator(
+            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
                 account,
                 operator
             );
             assertEq(expiryTimestamp, authExpiry);
-            assertEq(magicNumber, 0);
             assertEq(cvc.getAccountOwner(account), alice);
 
             // early return if the operator is already enabled with the same expiry timestamp
@@ -83,12 +80,11 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 0);
-            (expiryTimestamp, magicNumber) = cvc.getAccountOperator(
+            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
                 account,
                 operator
             );
             assertEq(expiryTimestamp, authExpiry);
-            assertEq(magicNumber, 0);
             assertEq(cvc.getAccountOwner(account), alice);
 
             // change the authorization expiry timestamp
@@ -100,12 +96,11 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            (expiryTimestamp, magicNumber) = cvc.getAccountOperator(
+            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
                 account,
                 operator
             );
             assertEq(expiryTimestamp, authExpiry + 1);
-            assertEq(magicNumber, 0);
             assertEq(cvc.getAccountOwner(account), alice);
 
             // deauthorize the operator
@@ -125,12 +120,11 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            (expiryTimestamp, magicNumber) = cvc.getAccountOperator(
+            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
                 account,
                 operator
             );
             assertEq(expiryTimestamp, block.timestamp - 1);
-            assertEq(magicNumber, 0);
             assertEq(cvc.getAccountOwner(account), alice);
 
             // early return if the operator is already deauthorized with the same timestamp
@@ -144,12 +138,11 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 0);
-            (expiryTimestamp, magicNumber) = cvc.getAccountOperator(
+            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
                 account,
                 operator
             );
             assertEq(expiryTimestamp, block.timestamp - 1);
-            assertEq(magicNumber, 0);
             assertEq(cvc.getAccountOwner(account), alice);
 
             // set expiry timestamp to current block if special value is used
@@ -161,12 +154,11 @@ contract SetAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertTrue(logs.length == 1);
-            (expiryTimestamp, magicNumber) = cvc.getAccountOperator(
+            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
                 account,
                 operator
             );
             assertEq(expiryTimestamp, block.timestamp);
-            assertEq(magicNumber, 0);
             assertEq(cvc.getAccountOwner(account), alice);
         }
     }

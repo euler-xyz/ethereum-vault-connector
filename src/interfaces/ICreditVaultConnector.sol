@@ -44,26 +44,31 @@ interface ICVC {
         address otherAccount
     ) external pure returns (bool);
 
+    /// @notice Returns the prefix of the specified account.
+    /// @dev The prefix is the first 19 bytes of the account address.
+    /// @param account The address of the account whose prefix is being retrieved.
+    /// @return A uint152 value that represents the prefix of the account.
+    function getPrefix(address account) external pure returns (uint152);
+
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
     /// @param account The address of the account whose owner is being retrieved.
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the operator details for the specified account.
-    /// @param account The address of the account whose operator detaile are being retrieved.
-    /// @param operator The address of the operator whose details are being retrieved.
+    /// @notice Returns the authentication expiry timestamp for the operator of the specified account.
+    /// @param account The address of the account whose operator's authentication expiry timestamp is being retrieved.
+    /// @param operator The address of the operator whose authentication expiry timestamp is being retrieved.
     /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized.
-    /// @return magicNumber The next magic number. Newly signed operator permit must use this number.
-    function getAccountOperator(
+    function getAccountOperatorAuthExpiryTimestamp(
         address account,
         address operator
-    ) external view returns (uint40 authExpiryTimestamp, uint40 magicNumber);
+    ) external view returns (uint40 authExpiryTimestamp);
 
-    /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have magic number less than the current timestamp.
+    /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have signature timestamp less than the current timestamp.
     function invalidateAllPermits() external payable;
 
-    /// @notice Invalidates permits signed for an operator of an account which have magic number less than the current timestamp.
+    /// @notice Invalidates permits signed for an operator of an account which have signature tiemstamp less than the current timestamp.
     /// @dev Only the owner of the account can call this function.
     /// @param account The address of the account whose operator's permits are being invalidated.
     /// @param operator The address of the operator whose permits are being invalidated.
@@ -88,13 +93,15 @@ interface ICVC {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
-    /// @param deadline The timestamp before which the signature must be submitted.
+    /// @param signatureTimestamp The timestamp at which the signature was created.
+    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to authorize or deauthorize the operator.
     function setAccountOperatorPermitECDSA(
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes calldata signature
     ) external payable;
 
@@ -103,14 +110,16 @@ interface ICVC {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
-    /// @param deadline The timestamp before which the signature must be submitted.
+    /// @param signatureTimestamp The timestamp at which the signature was created.
+    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to authorize or deauthorize the operator.
     /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
     function setAccountOperatorPermitERC1271(
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes calldata signature,
         address ERC1271Signer
     ) external payable;

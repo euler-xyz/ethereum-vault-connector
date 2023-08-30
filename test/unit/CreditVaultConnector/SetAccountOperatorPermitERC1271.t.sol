@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "src/test/CreditVaultConnectorScribble.sol";
+import "src/test/CreditVaultConnectorHarness.sol";
 import "openzeppelin/utils/cryptography/ECDSA.sol";
 import {ShortStrings, ShortString} from "openzeppelin/utils/ShortStrings.sol";
 
@@ -100,18 +100,18 @@ contract Signer is EIP712, IERC1271 {
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes memory signature
     ) external {
-        (, uint40 magicNumber) = cvc.getAccountOperator(account, operator);
         bytes32 structHash = keccak256(
             abi.encode(
                 cvc.OPERATOR_PERMIT_TYPEHASH(),
                 account,
                 operator,
                 authExpiryTimestamp,
-                magicNumber,
-                deadline
+                signatureTimestamp,
+                signatureDeadlineTimestamp
             )
         );
         signatureLookup[_hashTypedDataV4(structHash)] = keccak256(signature);
@@ -128,7 +128,7 @@ contract Signer is EIP712, IERC1271 {
 }
 
 contract SetAccountOperatorPermitERC1271Test is Test {
-    CreditVaultConnector internal cvc;
+    CreditVaultConnectorHarness internal cvc;
 
     event AccountOperatorAuthorized(
         address indexed account,
@@ -141,7 +141,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
     );
 
     function setUp() public {
-        cvc = new CreditVaultConnectorScribble();
+        cvc = new CreditVaultConnectorHarness();
     }
 
     function test_SetAccountOperatorPermitERC1271(
@@ -155,16 +155,19 @@ contract SetAccountOperatorPermitERC1271Test is Test {
         vm.assume(!cvc.haveCommonOwner(signer, operator));
         vm.assume(authExpiry >= seed && authExpiry < type(uint40).max - 1);
         vm.assume(seed > 0 && seed < type(uint40).max - 10);
+        vm.assume(signature.length > 0);
         vm.warp(seed);
 
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(signer) ^ i));
 
             {
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, 0);
-                assertEq(magicNumber, 0);
+                assertEq(lastSignatureTimestamp, 0);
             }
 
             if (i == 0) {
@@ -181,16 +184,14 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 authExpiry,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature
             );
 
             // authorize the operator
             if (i == 0) {
                 vm.expectEmit(true, true, false, false, address(cvc));
-                emit AccountsOwnerRegistered(
-                    uint152(uint160(signer) >> 8),
-                    signer
-                );
+                emit AccountsOwnerRegistered(cvc.getPrefix(signer), signer);
             }
             vm.expectEmit(true, true, false, true, address(cvc));
             emit AccountOperatorAuthorized(account, operator, authExpiry);
@@ -200,6 +201,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 authExpiry,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature,
                 signer
             );
@@ -207,19 +209,22 @@ contract SetAccountOperatorPermitERC1271Test is Test {
 
             {
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
-                assertEq(magicNumber, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), signer);
             }
 
             // it's not possible to carry out a reply attack
-            vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+            vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
             cvc.setAccountOperatorPermitERC1271(
                 account,
                 operator,
                 authExpiry,
+                uint40(block.timestamp),
                 uint40(block.timestamp),
                 signature,
                 signer
@@ -231,7 +236,8 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 account,
                 operator,
                 authExpiry,
-                uint40(block.timestamp + 1),
+                uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature
             );
 
@@ -240,7 +246,8 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 account,
                 operator,
                 authExpiry,
-                uint40(block.timestamp + 1),
+                uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature,
                 signer
             );
@@ -248,10 +255,12 @@ contract SetAccountOperatorPermitERC1271Test is Test {
 
             {
                 assertEq(logs.length, 0);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
-                assertEq(magicNumber, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), signer);
             }
 
@@ -261,6 +270,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 account,
                 operator,
                 authExpiry + 1,
+                uint40(block.timestamp),
                 uint40(block.timestamp),
                 signature
             );
@@ -273,6 +283,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 authExpiry + 1,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature,
                 signer
             );
@@ -280,10 +291,12 @@ contract SetAccountOperatorPermitERC1271Test is Test {
 
             {
                 assertEq(logs.length, 1);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, authExpiry + 1);
-                assertEq(magicNumber, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), signer);
             }
 
@@ -293,6 +306,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 account,
                 operator,
                 1,
+                uint40(block.timestamp),
                 uint40(block.timestamp),
                 signature
             );
@@ -305,6 +319,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 1,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature,
                 signer
             );
@@ -312,10 +327,12 @@ contract SetAccountOperatorPermitERC1271Test is Test {
 
             {
                 assertEq(logs.length, 1);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, 1);
-                assertEq(magicNumber, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), signer);
             }
 
@@ -326,6 +343,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 1,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature
             );
 
@@ -335,6 +353,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 1,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature,
                 signer
             );
@@ -342,10 +361,12 @@ contract SetAccountOperatorPermitERC1271Test is Test {
 
             {
                 assertEq(logs.length, 0);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, 1);
-                assertEq(magicNumber, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), signer);
             }
 
@@ -355,6 +376,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 account,
                 operator,
                 type(uint40).max,
+                uint40(block.timestamp),
                 uint40(block.timestamp),
                 signature
             );
@@ -367,6 +389,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
                 operator,
                 type(uint40).max,
                 uint40(block.timestamp),
+                uint40(block.timestamp),
                 signature,
                 signer
             );
@@ -374,10 +397,12 @@ contract SetAccountOperatorPermitERC1271Test is Test {
 
             {
                 assertTrue(logs.length == 1);
-                (uint40 expiryTimestamp, uint40 magicNumber) = cvc
-                    .getAccountOperator(account, operator);
+                uint40 expiryTimestamp = cvc
+                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
+                (, uint40 lastSignatureTimestamp) = cvc
+                    .getLastSignatureTimestamps(account, operator);
                 assertEq(expiryTimestamp, block.timestamp);
-                assertEq(magicNumber, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(cvc.getAccountOwner(account), signer);
             }
         }
@@ -391,12 +416,14 @@ contract SetAccountOperatorPermitERC1271Test is Test {
         address signer2 = address(new Signer(cvc));
         vm.assume(!cvc.haveCommonOwner(signer, operator));
         vm.assume(!cvc.haveCommonOwner(signer, signer2));
+        vm.assume(signature.length > 0);
 
         address account = address(uint160(uint160(signer) ^ 255));
         Signer(signer).setSignature(
             account,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature
         );
@@ -406,6 +433,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
 
@@ -414,6 +442,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             account,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer2
@@ -426,6 +455,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
 
@@ -434,6 +464,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             account,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -446,6 +477,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
 
@@ -453,6 +485,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             account,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -465,6 +498,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             1,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
 
@@ -473,6 +507,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             account,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -483,6 +518,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             account,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer2
@@ -493,6 +529,8 @@ contract SetAccountOperatorPermitERC1271Test is Test {
         uint8 subAccountId,
         bytes calldata signature
     ) public {
+        vm.assume(signature.length > 0);
+
         address signer = address(new Signer(cvc));
         address operator = address(uint160(uint160(signer) ^ subAccountId));
 
@@ -500,6 +538,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature
         );
@@ -510,19 +549,116 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature,
             signer
         );
     }
 
-    function test_RevertIfPermitDeadlineMissed_SetAccountOperatorPermitERC1271(
+    function test_RevertIfSignatureTimestampInThePast_SetAccountOperatorPermitERC1271(
         address operator,
         uint40 seed,
         bytes calldata signature
     ) public {
         address signer = address(new Signer(cvc));
         vm.assume(!cvc.haveCommonOwner(signer, operator));
-        vm.assume(seed > 0);
+        vm.assume(seed > 0 && seed < type(uint40).max);
+        vm.assume(signature.length > 0);
+
+        vm.warp(seed);
+
+        // succeeds as the first signature is not in the past
+        uint40 lastSignatureTimestamp = uint40(block.timestamp);
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            lastSignatureTimestamp,
+            uint40(block.timestamp),
+            signature
+        );
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            lastSignatureTimestamp,
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+
+        // time elapses
+        vm.warp(block.timestamp + 1);
+
+        // this signature is in the past hence it reverts
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            lastSignatureTimestamp,
+            uint40(block.timestamp),
+            signature
+        );
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            lastSignatureTimestamp,
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+
+        // this signature is even more in the past hence it reverts
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            0,
+            uint40(block.timestamp),
+            signature
+        );
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            0,
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+
+        // succeeds if signature timestamp is not in the past
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature
+        );
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+    }
+
+    function test_RevertIfSignatureTimestampInTheFuture_SetAccountOperatorPermitERC1271(
+        address operator,
+        uint40 seed,
+        bytes calldata signature
+    ) public {
+        address signer = address(new Signer(cvc));
+        vm.assume(!cvc.haveCommonOwner(signer, operator));
+        vm.assume(seed > 0 && seed < type(uint40).max);
+        vm.assume(signature.length > 0);
 
         vm.warp(seed);
 
@@ -530,6 +666,58 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp + 1),
+            uint40(block.timestamp),
+            signature
+        );
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp + 1),
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+
+        // succeeds if signature timestamp is not in the future
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature
+        );
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+    }
+
+    function test_RevertIfSignatureDeadlineMissed_SetAccountOperatorPermitERC1271(
+        address operator,
+        uint40 seed,
+        bytes calldata signature
+    ) public {
+        address signer = address(new Signer(cvc));
+        vm.assume(!cvc.haveCommonOwner(signer, operator));
+        vm.assume(seed > 0);
+        vm.assume(signature.length > 0);
+
+        vm.warp(seed);
+
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
             uint40(block.timestamp - 1),
             signature
         );
@@ -539,6 +727,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp - 1),
             signature,
             signer
@@ -550,12 +739,14 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
         cvc.setAccountOperatorPermitERC1271(
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -572,12 +763,14 @@ contract SetAccountOperatorPermitERC1271Test is Test {
         vm.assume(uint160(operator) != type(uint160).max);
         vm.assume(!cvc.haveCommonOwner(signer, operator));
         vm.assume(seed > 0 && seed < type(uint40).max - 10);
+        vm.assume(signature.length > 0);
         vm.warp(seed);
 
         Signer(signer).setSignature(
             address(uint160(signer) + 1),
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature
         );
@@ -586,6 +779,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -596,6 +790,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             address(uint160(operator) + 1),
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
@@ -603,6 +798,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -613,6 +809,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             1,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
@@ -620,6 +817,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -630,6 +828,26 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp + 1),
+            uint40(block.timestamp),
+            signature
+        );
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setAccountOperatorPermitERC1271(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature,
+            signer
+        );
+
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp + 1),
             signature
         );
 
@@ -638,6 +856,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature,
             signer
@@ -649,6 +868,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature
         );
         cvc.setAccountOperatorPermitERC1271(
@@ -656,15 +876,26 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature,
             signer
         );
 
+        vm.warp(block.timestamp + 1);
+        Signer(signer).setSignature(
+            signer,
+            operator,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature
+        );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
         cvc.setAccountOperatorPermitERC1271(
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             "",
             signer
@@ -681,12 +912,15 @@ contract SetAccountOperatorPermitERC1271Test is Test {
         vm.assume(uint160(operator) != type(uint160).max);
         vm.assume(!cvc.haveCommonOwner(signer, operator));
         vm.assume(seed > 0 && seed < type(uint40).max - 10);
+        vm.assume(signature1.length > 0);
+        vm.assume(signature2.length > 0);
 
         vm.warp(seed);
         Signer(signer).setSignature(
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature1
         );
@@ -696,26 +930,29 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             address(uint160(operator) + 1),
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature2
         );
 
         vm.prank(signer);
         cvc.invalidateAllPermits();
 
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
         cvc.setAccountOperatorPermitERC1271(
             signer,
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature1,
             signer
         );
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
         cvc.setAccountOperatorPermitERC1271(
             signer,
             address(uint160(operator) + 1),
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature2,
             signer
@@ -727,6 +964,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature1
         );
 
@@ -735,6 +973,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             address(uint160(operator) + 1),
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature2
         );
 
@@ -742,11 +981,12 @@ contract SetAccountOperatorPermitERC1271Test is Test {
         cvc.invalidateAccountOperatorPermits(signer, operator);
 
         // only one permit is invalid
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
         cvc.setAccountOperatorPermitERC1271(
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature1,
             signer
@@ -755,6 +995,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             signer,
             address(uint160(operator) + 1),
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature2,
             signer
@@ -767,6 +1008,7 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature1
         );
         cvc.setAccountOperatorPermitERC1271(
@@ -774,16 +1016,18 @@ contract SetAccountOperatorPermitERC1271Test is Test {
             operator,
             0,
             uint40(block.timestamp),
+            uint40(block.timestamp),
             signature1,
             signer
         );
 
         // reverts if replayed
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
         cvc.setAccountOperatorPermitERC1271(
             signer,
             operator,
             0,
+            uint40(block.timestamp),
             uint40(block.timestamp),
             signature1,
             signer

@@ -20,7 +20,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     bytes32 public constant OPERATOR_PERMIT_TYPEHASH =
         keccak256(
-            "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 magicNumber,uint40 deadline)"
+            "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 signatureTimestamp,uint40 signatureDeadlineTimestamp)"
         );
 
     bytes32 public immutable EIP712_DOMAIN_SEPARATOR;
@@ -48,14 +48,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     struct OwnerStorage {
         address owner;
-        uint40 magicNumber;
+        uint40 lastSignatureTimestamp;
     }
 
     mapping(uint152 prefix => OwnerStorage) internal ownerLookup;
 
     struct OperatorStorage {
         uint40 authExpiryTimestamp;
-        uint40 magicNumber;
+        uint40 lastSignatureTimestamp;
     }
 
     mapping(address account => mapping(address operator => OperatorStorage))
@@ -136,12 +136,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @param account The address of the account for which it is checked whether msg.sender is the owner.
     modifier onlyOwner(address account) {
         if (haveCommonOwnerInternal(account, msg.sender)) {
-            uint152 prefix = uint152(uint160(account) >> 8);
-            address owner = ownerLookup[prefix].owner;
+            address owner = getAccountOwnerInternal(account);
 
             if (owner == address(0)) {
-                ownerLookup[prefix].owner = owner = msg.sender;
-                emit AccountsOwnerRegistered(prefix, owner);
+                setAccountOwnerInternal(account, msg.sender);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
             }
@@ -157,12 +155,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
     modifier onlyOwnerOrOperator(address account) {
         if (haveCommonOwnerInternal(account, msg.sender)) {
-            uint152 prefix = uint152(uint160(account) >> 8);
-            address owner = ownerLookup[prefix].owner;
+            address owner = getAccountOwnerInternal(account);
 
             if (owner == address(0)) {
-                ownerLookup[prefix].owner = owner = msg.sender;
-                emit AccountsOwnerRegistered(prefix, owner);
+                setAccountOwnerInternal(account, msg.sender);
             } else if (owner != msg.sender) {
                 revert CVC_NotAuthorized();
             }
@@ -183,7 +179,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             address controller = accountControllers[account].firstElement;
 
             if (numOfControllers != 1) revert CVC_ControllerViolation();
-            else if (controller != msg.sender) revert CVC_NotAuthorized();
+            if (controller != msg.sender) revert CVC_NotAuthorized();
         }
         _;
     }
@@ -253,30 +249,25 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
+    function getPrefix(address account) external pure returns (uint152) {
+        return getPrefixInternal(account);
+    }
+
+    /// @inheritdoc ICVC
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        owner = ownerLookup[prefix].owner;
+        owner = getAccountOwnerInternal(account);
 
         if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
     }
 
     /// @inheritdoc ICVC
-    function getAccountOperator(
+    function getAccountOperatorAuthExpiryTimestamp(
         address account,
         address operator
-    ) external view returns (uint40 authExpiryTimestamp, uint40 magicNumber) {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        uint40 magicNumberOwner = ownerLookup[prefix].magicNumber;
-        uint40 magicNumberAccountOperator = operatorLookup[account][operator]
-            .magicNumber;
-
-        authExpiryTimestamp = operatorLookup[account][operator]
-            .authExpiryTimestamp;
-        magicNumber = magicNumberOwner > magicNumberAccountOperator
-            ? magicNumberOwner
-            : magicNumberAccountOperator;
+    ) external view returns (uint40 authExpiryTimestamp) {
+        return operatorLookup[account][operator].authExpiryTimestamp;
     }
 
     /// @inheritdoc ICVC
@@ -286,8 +277,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         onlyOwner(msg.sender)
     {
-        uint152 prefix = uint152(uint160(msg.sender) >> 8);
-        ownerLookup[prefix].magicNumber = uint40(block.timestamp);
+        uint152 prefix = getPrefixInternal(msg.sender);
+        ownerLookup[prefix].lastSignatureTimestamp = uint40(block.timestamp);
     }
 
     /// @inheritdoc ICVC
@@ -295,7 +286,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator
     ) public payable virtual onlyOwner(account) {
-        operatorLookup[account][operator].magicNumber = uint40(block.timestamp);
+        operatorLookup[account][operator].lastSignatureTimestamp = uint40(
+            block.timestamp
+        );
     }
 
     /// @inheritdoc ICVC
@@ -318,17 +311,18 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes calldata signature
     ) public payable virtual {
         bytes32 permit = getOperatorPermit(
             account,
             operator,
             authExpiryTimestamp,
-            deadline
+            signatureTimestamp,
+            signatureDeadlineTimestamp
         );
-        uint152 prefix = uint152(uint160(account) >> 8);
-        address owner = ownerLookup[prefix].owner;
+        address owner = getAccountOwnerInternal(account);
         address signer = recoverECDSASigner(permit, signature);
 
         if (
@@ -340,12 +334,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
 
         if (owner == address(0)) {
-            ownerLookup[prefix].owner = owner = signer;
-            emit AccountsOwnerRegistered(prefix, owner);
+            setAccountOwnerInternal(account, signer);
         }
 
         setAccountOperatorInternal(
-            owner,
+            signer,
             account,
             operator,
             authExpiryTimestamp,
@@ -358,7 +351,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        uint40 deadline,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
         bytes calldata signature,
         address erc1271Signer
     ) public payable virtual {
@@ -366,10 +360,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             account,
             operator,
             authExpiryTimestamp,
-            deadline
+            signatureTimestamp,
+            signatureDeadlineTimestamp
         );
-        uint152 prefix = uint152(uint160(account) >> 8);
-        address owner = ownerLookup[prefix].owner;
+        address owner = getAccountOwnerInternal(account);
         address signer = owner != address(0) ? owner : erc1271Signer;
 
         if (
@@ -380,12 +374,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
 
         if (owner == address(0)) {
-            ownerLookup[prefix].owner = owner = signer;
-            emit AccountsOwnerRegistered(prefix, owner);
+            setAccountOwnerInternal(account, signer);
         }
 
         setAccountOperatorInternal(
-            owner,
+            signer,
             account,
             operator,
             authExpiryTimestamp,
@@ -847,7 +840,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        bool updateMagicNumber
+        bool updateSignatureTimestamp
     ) internal {
         // the operator cannot be one of the 256 accounts that belong to the owner
         if (haveCommonOwnerInternal(owner, operator)) {
@@ -872,8 +865,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             );
         }
 
-        if (updateMagicNumber) {
-            operatorLookup[account][operator].magicNumber = uint40(
+        if (updateSignatureTimestamp) {
+            operatorLookup[account][operator].lastSignatureTimestamp = uint40(
                 block.timestamp
             );
         }
@@ -1070,17 +1063,27 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         uint40 authExpiryTimestamp,
-        uint40 deadline
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp
     ) internal view returns (bytes32 permit) {
-        if (deadline < block.timestamp) revert CVC_InvalidTimestamp();
+        uint152 prefix = getPrefixInternal(account);
+        uint lastSignatureTimestampOwner = ownerLookup[prefix]
+            .lastSignatureTimestamp;
+        uint lastSignatureTimestampAccountOperator = operatorLookup[account][
+            operator
+        ].lastSignatureTimestamp;
+        uint lastSignatureTimestamp = lastSignatureTimestampOwner >
+            lastSignatureTimestampAccountOperator
+            ? lastSignatureTimestampOwner
+            : lastSignatureTimestampAccountOperator;
 
-        uint152 prefix = uint152(uint160(account) >> 8);
-        uint magicNumberOwner = ownerLookup[prefix].magicNumber;
-        uint magicNumberAccountOperator = operatorLookup[account][operator]
-            .magicNumber;
-        uint nextMagicNumber = magicNumberOwner > magicNumberAccountOperator
-            ? magicNumberOwner
-            : magicNumberAccountOperator;
+        if (
+            signatureTimestamp <= lastSignatureTimestamp ||
+            signatureTimestamp > block.timestamp ||
+            signatureDeadlineTimestamp < block.timestamp
+        ) {
+            revert CVC_InvalidTimestamp();
+        }
 
         bytes32 domainSeparator = EIP712_DOMAIN_SEPARATOR;
         bytes32 structHash = keccak256(
@@ -1089,8 +1092,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 account,
                 operator,
                 authExpiryTimestamp,
-                uint40(nextMagicNumber),
-                deadline
+                signatureTimestamp,
+                signatureDeadlineTimestamp
             )
         );
 
@@ -1173,6 +1176,25 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address otherAccount
     ) internal pure returns (bool) {
         return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
+    }
+
+    function getPrefixInternal(
+        address account
+    ) internal pure returns (uint152) {
+        return uint152(uint160(account) >> 8);
+    }
+
+    function getAccountOwnerInternal(
+        address account
+    ) internal view returns (address) {
+        uint152 prefix = getPrefixInternal(account);
+        return ownerLookup[prefix].owner;
+    }
+
+    function setAccountOwnerInternal(address account, address owner) internal {
+        uint152 prefix = getPrefixInternal(account);
+        ownerLookup[prefix].owner = owner;
+        emit AccountsOwnerRegistered(prefix, owner);
     }
 
     function revertBytes(bytes memory errMsg) internal pure {
