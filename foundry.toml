@@ -25,7 +25,6 @@ runs = 1000
 call_override = false # Override unsafe external calls to perform reentrancy checks
 depth = 20
 runs = 1000
-# fail_on_revert = true
 
 
 [profile.smt.model_checker]
