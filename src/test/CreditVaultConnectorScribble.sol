@@ -6,12 +6,24 @@ import "../CreditVaultConnector.sol";
 
 /// #define ownerOrOperator(address msgSender, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)].owner == msgSender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF));) || operatorLookup[account][msgSender].authorizationExpiryTimestamp >= block.timestamp;
 
+/// #if_succeeds "batch depth is in INIT state" old(executionContext.batchDepth) == 0 && executionContext.batchDepth == 0;
+/// #if_succeeds "checks lock is false" !old(executionContext.checksLock) && !executionContext.checksLock;
+/// #if_succeeds "impersonate lock is false" !old(executionContext.impersonateLock) && !executionContext.impersonateLock;
+/// #if_succeeds "onBehalfOfAccount is zero address" old(executionContext.onBehalfOfAccount) == address(0) && executionContext.onBehalfOfAccount == address(0);
+/// #if_succeeds "account status checks set is empty 1" old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
+/// #if_succeeds "account status checks set is empty 2" old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
+/// #if_succeeds "account status checks set is empty 3" forall(uint i in 0...20) accountStatusChecks.elements[i].element == address(0);
+/// #if_succeeds "vault status checks set is empty 1" old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
+/// #if_succeeds "vault status checks set is empty 2" old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
+/// #if_succeeds "vault status checks set is empty 3" forall(uint i in 0...20) vaultStatusChecks.elements[i].element == address(0);
+/// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
+/// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
 /// #if_succeeds "each account has at most 1 controller" forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 contract CreditVaultConnectorScribble is CreditVaultConnector {
     using Set for SetStorage;
 
     /// #if_succeeds "only the account owner can call this" ownerLookup[uint152(uint160(account) >> 8)].owner == msg.sender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msg.sender) | 0xFF) == (uint160(account) | 0xFF));
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
+    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
     /// #if_succeeds "last signature timestamp is not updated" old(operatorLookup[account][operator].lastSignatureTimestamp) == operatorLookup[account][operator].lastSignatureTimestamp;
     function setAccountOperator(
         address account,
@@ -21,12 +33,12 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.setAccountOperator(account, operator, expiryTimestamp);
     }
 
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
+    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
     /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
     function setAccountOperatorPermitECDSA(
         address account,
         address operator,
-        uint40 authorizationExpiryTimestamp,
+        uint40 authExpiryTimestamp,
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,
         bytes calldata signature
@@ -34,19 +46,19 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.setAccountOperatorPermitECDSA(
             account,
             operator,
-            authorizationExpiryTimestamp,
+            authExpiryTimestamp,
             signatureTimestamp,
             signatureDeadlineTimestamp,
             signature
         );
     }
 
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, operator);
+    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
     /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
     function setAccountOperatorPermitERC1271(
         address account,
         address operator,
-        uint40 authorizationExpiryTimestamp,
+        uint40 authExpiryTimestamp,
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,
         bytes calldata signature,
@@ -55,7 +67,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.setAccountOperatorPermitERC1271(
             account,
             operator,
-            authorizationExpiryTimestamp,
+            authExpiryTimestamp,
             signatureTimestamp,
             signatureDeadlineTimestamp,
             signature,
@@ -153,7 +165,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         return super.impersonate(targetContract, onBehalfOfAccount, data);
     }
 
-    /// #if_succeds "is non-reentant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
+    /// #if_succeds "is non-reentrant" !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
     /// #if_succeds "batch depth doesn't change pre- and post- execution" old(executionContext.batchDepth) == executionContext.batchDepth;
     /// #if_succeds "checks are properly executed 1" executionContext.batchDepth == BATCH_DEPTH__INIT && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
     /// #if_succeds "checks are properly executed 2" executionContext.batchDepth == BATCH_DEPTH__INIT && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
@@ -286,6 +298,15 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeds "vault is never present in the set after calling this" !vaultStatusChecks.contains(msg.sender);
     function forgiveVaultStatusCheck() public payable override {
         super.forgiveVaultStatusCheck();
+    }
+
+    /// #if_succeds "is checks non-reentant" !old(executionContext.checksLock);
+    /// #if_succeds "account is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> accountStatusChecks.contains(account);
+    /// #if_succeds "vault is added to the set only if checks deferred" executionContext.batchDepth != BATCH_DEPTH__INIT ==> vaultStatusChecks.contains(msg.sender);
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) public payable virtual override {
+        super.requireAccountAndVaultStatusCheck(account);
     }
 
     /// #if_succeeds "impersonate reentrancy guard must be locked" executionContext.impersonateLock;

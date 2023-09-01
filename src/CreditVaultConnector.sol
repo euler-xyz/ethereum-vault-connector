@@ -531,27 +531,29 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
-        uint batchDepth = executionContext.batchDepth;
+        uint8 batchDepth = executionContext.batchDepth;
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
         unchecked {
-            ++executionContext.batchDepth;
+            executionContext.batchDepth = batchDepth + 1;
         }
 
         batchInternal(items, false);
-
-        unchecked {
-            --executionContext.batchDepth;
-        }
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
             executionContext.checksLock = false;
+        }
+
+        // moved after the checks to optimize gas consumption.
+        // the checks lock should prevent from reentrancy into any function that modifies the batch depth counter
+        unchecked {
+            executionContext.batchDepth = batchDepth;
         }
     }
 
@@ -569,27 +571,29 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        uint batchDepth = executionContext.batchDepth;
+        uint8 batchDepth = executionContext.batchDepth;
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
         unchecked {
-            ++executionContext.batchDepth;
+            executionContext.batchDepth = batchDepth + 1;
         }
 
         batchItemsResult = batchInternal(items, true);
-
-        unchecked {
-            --executionContext.batchDepth;
-        }
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
             executionContext.checksLock = false;
+        }
+
+        // moved after the checks to optimize gas consumption.
+        // the checks lock should prevent from reentrancy into any function that modifies the batch depth counter
+        unchecked {
+            executionContext.batchDepth = batchDepth;
         }
 
         revert CVC_RevertedBatchResult(
@@ -831,6 +835,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         vaultStatusChecks.remove(msg.sender);
     }
 
+    /// @inheritdoc ICVC
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) public payable virtual nonReentrantChecks {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+            requireAccountStatusCheckInternal(account);
+            requireVaultStatusCheckInternal(msg.sender);
+        } else {
+            accountStatusChecks.insert(account);
+            vaultStatusChecks.insert(msg.sender);
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                  INTERNAL FUNCTIONS                                       //
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -1024,13 +1041,17 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         if (numElements == 0) return result;
 
-        // clear only the number of elements to optimize gas consumption
         setStorage.numElements = 0;
 
         for (uint i; i < numElements; ) {
-            address addressToCheck = i == 0
-                ? firstElement
-                : setStorage.elements[i];
+            address addressToCheck;
+            if (i == 0) {
+                addressToCheck = firstElement;
+                delete setStorage.firstElement;
+            } else {
+                addressToCheck = setStorage.elements[i].element;
+                delete setStorage.elements[i].element;
+            }
 
             if (returnResult) {
                 bytes memory data;

@@ -62,7 +62,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 
     function invalidateAllPermits() public payable override {
-        ownerLookup[getPrefixInternal(msg.sender)].owner = msg.sender;
+        setAccountOwnerInternal(msg.sender, msg.sender);
         super.invalidateAllPermits();
     }
 
@@ -71,8 +71,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address account,
         address operator
     ) public payable override {
-        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
         account = msg.sender;
+        setAccountOwnerInternal(account, msg.sender);
         super.invalidateAccountOperatorPermits(account, operator);
     }
 
@@ -83,7 +83,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     ) public payable override {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
-        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        setAccountOwnerInternal(account, msg.sender);
         super.setAccountOperator(account, operator, authExpiryTimestamp);
     }
 
@@ -97,7 +97,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     ) public payable override {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
-        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        setAccountOwnerInternal(account, msg.sender);
         super.setAccountOperator(account, operator, authExpiryTimestamp);
     }
 
@@ -112,7 +112,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     ) public payable override {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
-        ownerLookup[getPrefixInternal(account)].owner = msg.sender;
+        setAccountOwnerInternal(account, msg.sender);
         super.setAccountOperator(account, operator, authExpiryTimestamp);
     }
 
@@ -201,7 +201,10 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
 
-        SetStorage memory cache = accountControllers[onBehalfOfAccount];
+        uint8 numElementsCache = accountControllers[onBehalfOfAccount]
+            .numElements;
+        address firstElementCache = accountControllers[onBehalfOfAccount]
+            .firstElement;
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
@@ -211,7 +214,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
             data
         );
 
-        accountControllers[onBehalfOfAccount] = cache;
+        accountControllers[onBehalfOfAccount].numElements = numElementsCache;
+        accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
     }
 
     function batch(BatchItem[] calldata items) public payable override {
@@ -264,13 +268,15 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     ) public payable override {
         if (msg.sender == address(0)) return;
 
-        SetStorage memory cache = accountControllers[account];
+        uint8 numElementsCache = accountControllers[account].numElements;
+        address firstElementCache = accountControllers[account].firstElement;
         accountControllers[account].numElements = 1;
         accountControllers[account].firstElement = msg.sender;
 
         super.forgiveAccountStatusCheck(account);
 
-        accountControllers[account] = cache;
+        accountControllers[account].numElements = numElementsCache;
+        accountControllers[account].firstElement = firstElementCache;
     }
 
     function forgiveAccountsStatusCheck(
@@ -279,10 +285,12 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (msg.sender == address(0)) return;
         if (accounts.length > Set.MAX_ELEMENTS) return;
 
-        SetStorage[] memory cache = new SetStorage[](accounts.length);
+        uint8[] memory numElementsCache = new uint8[](accounts.length);
+        address[] memory firstElementCache = new address[](accounts.length);
         for (uint i = 0; i < accounts.length; i++) {
             address account = accounts[i];
-            cache[i] = accountControllers[account];
+            numElementsCache[i] = accountControllers[account].numElements;
+            firstElementCache[i] = accountControllers[account].firstElement;
             accountControllers[account].numElements = 1;
             accountControllers[account].firstElement = msg.sender;
         }
@@ -291,7 +299,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
         for (uint i = accounts.length; i > 0; i--) {
             address account = accounts[i - 1];
-            accountControllers[account] = cache[i - 1];
+            accountControllers[account].numElements = numElementsCache[i - 1];
+            accountControllers[account].firstElement = firstElementCache[i - 1];
         }
     }
 
@@ -305,22 +314,57 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function exposeAccountCollaterals(
         address account
-    ) external view returns (SetStorage memory) {
-        return accountCollaterals[account];
+    ) external view returns (uint8, address[] memory) {
+        address[] memory result = new address[](Set.MAX_ELEMENTS);
+
+        for (uint i = 0; i < Set.MAX_ELEMENTS; i++) {
+            if (i == 0) {
+                result[i] = accountCollaterals[account].firstElement;
+            } else {
+                result[i] = accountCollaterals[account].elements[i].element;
+            }
+        }
+        return (accountCollaterals[account].numElements, result);
     }
 
     function exposeAccountControllers(
         address account
-    ) external view returns (SetStorage memory) {
-        return accountControllers[account];
+    ) external view returns (uint8, address[] memory) {
+        address[] memory result = new address[](Set.MAX_ELEMENTS);
+
+        for (uint i = 0; i < Set.MAX_ELEMENTS; i++) {
+            if (i == 0) {
+                result[i] = accountControllers[account].firstElement;
+            } else {
+                result[i] = accountControllers[account].elements[i].element;
+            }
+        }
+        return (accountControllers[account].numElements, result);
     }
 
-    function exposeTransientStorage()
+    function exposeAccountAndVaultStatusCheck()
         external
         view
-        returns (SetStorage memory, SetStorage memory)
+        returns (uint8, address[] memory, uint8, address[] memory)
     {
-        return (accountStatusChecks, vaultStatusChecks);
+        address[] memory result1 = new address[](Set.MAX_ELEMENTS);
+        address[] memory result2 = new address[](Set.MAX_ELEMENTS);
+
+        for (uint i = 0; i < Set.MAX_ELEMENTS; i++) {
+            if (i == 0) {
+                result1[i] = accountStatusChecks.firstElement;
+                result2[i] = vaultStatusChecks.firstElement;
+            } else {
+                result1[i] = accountStatusChecks.elements[i].element;
+                result2[i] = vaultStatusChecks.elements[i].element;
+            }
+        }
+        return (
+            accountStatusChecks.numElements,
+            result1,
+            vaultStatusChecks.numElements,
+            result2
+        );
     }
 }
 
@@ -344,36 +388,43 @@ contract CreditVaultConnectorInvariants is Test {
         assertFalse(controllerEnabled);
     }
 
-    function invariant_transientStorage() external {
+    function invariant_AccountAndVaultStatusChecks() external {
         (
-            SetStorage memory accountStatusChecks,
-            SetStorage memory vaultStatusChecks
-        ) = cvc.exposeTransientStorage();
+            uint8 accountStatusChecksNumElements,
+            address[] memory accountStatusChecks,
+            uint8 vaultStatusChecksNumElements,
+            address[] memory vaultStatusChecks
+        ) = cvc.exposeAccountAndVaultStatusCheck();
 
-        assertTrue(accountStatusChecks.numElements == 0);
-        assertTrue(vaultStatusChecks.numElements == 0);
+        assertTrue(accountStatusChecksNumElements == 0);
+        for (uint i = 0; i < accountStatusChecks.length; i++) {
+            assertTrue(accountStatusChecks[i] == address(0));
+        }
+
+        assertTrue(vaultStatusChecksNumElements == 0);
+        for (uint i = 0; i < vaultStatusChecks.length; i++) {
+            assertTrue(vaultStatusChecks[i] == address(0));
+        }
     }
 
     function invariant_controllers_collaterals() external {
         address[] memory touchedAccounts = cvc.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
             // controllers
-            SetStorage memory accountControllers = cvc.exposeAccountControllers(
-                touchedAccounts[i]
-            );
-            address[] memory accountControllersArray = cvc.getControllers(
-                touchedAccounts[i]
-            );
+            (
+                uint8 accountControllersNumElements,
+                address[] memory accountControllersArray
+            ) = cvc.exposeAccountControllers(touchedAccounts[i]);
 
             assertTrue(
-                accountControllers.numElements == 0 ||
-                    accountControllers.numElements == 1
+                accountControllersNumElements == 0 ||
+                    accountControllersNumElements == 1
             );
             assertTrue(
-                (accountControllers.numElements == 0 &&
-                    accountControllers.firstElement == address(0)) ||
-                    (accountControllers.numElements == 1 &&
-                        accountControllers.firstElement != address(0))
+                (accountControllersNumElements == 0 &&
+                    accountControllersArray[0] == address(0)) ||
+                    (accountControllersNumElements == 1 &&
+                        accountControllersArray[0] != address(0))
             );
 
             for (uint j = 1; j < accountControllersArray.length; j++) {
@@ -381,27 +432,18 @@ contract CreditVaultConnectorInvariants is Test {
             }
 
             // collaterals
-            SetStorage memory accountCollaterals = cvc.exposeAccountCollaterals(
-                touchedAccounts[i]
-            );
-            address[] memory accountCollateralsArray = cvc.getCollaterals(
-                touchedAccounts[i]
-            );
+            (
+                uint8 accountCollateralsNumCollaterals,
+                address[] memory accountCollateralsArray
+            ) = cvc.exposeAccountCollaterals(touchedAccounts[i]);
 
-            assertTrue(accountCollaterals.numElements <= Set.MAX_ELEMENTS);
-            assertTrue(
-                (accountCollaterals.numElements == 0 &&
-                    accountCollaterals.firstElement == address(0)) ||
-                    (accountCollaterals.numElements == 1 &&
-                        accountCollaterals.firstElement != address(0))
-            );
-
-            for (uint j = 1; j < accountCollaterals.numElements; j++) {
+            assertTrue(accountCollateralsNumCollaterals <= Set.MAX_ELEMENTS);
+            for (uint j = 0; j < accountCollateralsNumCollaterals; j++) {
                 assertTrue(accountCollateralsArray[j] != address(0));
             }
 
             // verify that none entry is duplicated
-            for (uint j = 1; j < accountCollaterals.numElements; j++) {
+            for (uint j = 1; j < accountCollateralsNumCollaterals; j++) {
                 for (uint k = 0; k < j; k++) {
                     assertTrue(
                         accountCollateralsArray[j] != accountCollateralsArray[k]
