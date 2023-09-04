@@ -546,9 +546,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         batchInternal(items, false);
 
-        unchecked {
-            executionContext.batchDepth = batchDepth;
-        }
+        executionContext.batchDepth = batchDepth;
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
@@ -590,9 +588,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         batchItemsResult = batchInternal(items, true);
 
-        unchecked {
-            executionContext.batchDepth = batchDepth;
-        }
+        executionContext.batchDepth = batchDepth;
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
