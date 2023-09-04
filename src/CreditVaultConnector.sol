@@ -533,27 +533,33 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant {
         uint8 batchDepth = executionContext.batchDepth;
 
+        unchecked {
+            executionContext.batchDepth = batchDepth + 1;
+
+            // gas optimization to keep the slot in altered state until the end of the batch
+            executionContext.reserved = DUMMY_RESERVED + 1;
+        }
+
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
-        unchecked {
-            executionContext.batchDepth = batchDepth + 1;
-        }
-
         batchInternal(items, false);
+
+        unchecked {
+            executionContext.batchDepth = batchDepth;
+        }
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
             executionContext.checksLock = false;
-        }
 
-        // moved after the checks to optimize gas consumption.
-        // the checks lock should prevent from reentrancy into any function that modifies the batch depth counter
-        unchecked {
-            executionContext.batchDepth = batchDepth;
+            // bring the slot back to the original state
+            unchecked {
+                executionContext.reserved = DUMMY_RESERVED;
+            }
         }
     }
 
@@ -573,27 +579,33 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     {
         uint8 batchDepth = executionContext.batchDepth;
 
+        unchecked {
+            executionContext.batchDepth = batchDepth + 1;
+
+            // gas optimization to keep the slot in altered state until the end of the batch
+            executionContext.reserved = DUMMY_RESERVED + 1;
+        }
+
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
-        unchecked {
-            executionContext.batchDepth = batchDepth + 1;
-        }
-
         batchItemsResult = batchInternal(items, true);
+
+        unchecked {
+            executionContext.batchDepth = batchDepth;
+        }
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
             executionContext.checksLock = false;
-        }
 
-        // moved after the checks to optimize gas consumption.
-        // the checks lock should prevent from reentrancy into any function that modifies the batch depth counter
-        unchecked {
-            executionContext.batchDepth = batchDepth;
+            // bring the slot back to the original state
+            unchecked {
+                executionContext.reserved = DUMMY_RESERVED;
+            }
         }
 
         revert CVC_RevertedBatchResult(

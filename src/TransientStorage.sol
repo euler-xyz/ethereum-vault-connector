@@ -11,7 +11,7 @@ abstract contract TransientStorage {
         Vault
     }
 
-    uint8 private constant DUMMY_RESERVED = 1;
+    uint8 internal constant DUMMY_RESERVED = 1;
 
     /// #if_updated "batch depth can only increase decrease by one" old(executionContext.batchDepth) != executionContext.batchDepth ==> old(executionContext.batchDepth) + 1 == executionContext.batchDepth || old(executionContext.batchDepth) - 1 == executionContext.batchDepth;
     /// #if_updated "batch depth can only change if reentrancy locks are not acquired" old(executionContext.batchDepth) != executionContext.batchDepth ==> !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
