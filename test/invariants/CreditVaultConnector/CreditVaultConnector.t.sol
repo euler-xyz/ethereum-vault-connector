@@ -321,7 +321,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
             if (i == 0) {
                 result[i] = accountCollaterals[account].firstElement;
             } else {
-                result[i] = accountCollaterals[account].elements[i].element;
+                result[i] = accountCollaterals[account].elements[i].value;
             }
         }
         return (accountCollaterals[account].numElements, result);
@@ -336,7 +336,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
             if (i == 0) {
                 result[i] = accountControllers[account].firstElement;
             } else {
-                result[i] = accountControllers[account].elements[i].element;
+                result[i] = accountControllers[account].elements[i].value;
             }
         }
         return (accountControllers[account].numElements, result);
@@ -355,8 +355,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
                 result1[i] = accountStatusChecks.firstElement;
                 result2[i] = vaultStatusChecks.firstElement;
             } else {
-                result1[i] = accountStatusChecks.elements[i].element;
-                result2[i] = vaultStatusChecks.elements[i].element;
+                result1[i] = accountStatusChecks.elements[i].value;
+                result2[i] = vaultStatusChecks.elements[i].value;
             }
         }
         return (

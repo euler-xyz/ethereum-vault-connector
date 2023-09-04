@@ -537,7 +537,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             executionContext.batchDepth = batchDepth + 1;
 
             // gas optimization to keep the slot in altered state until the end of the batch
-            executionContext.reserved = DUMMY_RESERVED + 1;
+            executionContext.stamp = DUMMY_STAMP + 1;
         }
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
@@ -557,9 +557,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             executionContext.checksLock = false;
 
             // bring the slot back to the original state
-            unchecked {
-                executionContext.reserved = DUMMY_RESERVED;
-            }
+            executionContext.stamp = DUMMY_STAMP;
         }
     }
 
@@ -583,7 +581,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             executionContext.batchDepth = batchDepth + 1;
 
             // gas optimization to keep the slot in altered state until the end of the batch
-            executionContext.reserved = DUMMY_RESERVED + 1;
+            executionContext.stamp = DUMMY_STAMP + 1;
         }
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
@@ -601,11 +599,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
             executionContext.checksLock = false;
-
+            
             // bring the slot back to the original state
-            unchecked {
-                executionContext.reserved = DUMMY_RESERVED;
-            }
+            executionContext.stamp = DUMMY_STAMP;
         }
 
         revert CVC_RevertedBatchResult(
@@ -1061,8 +1057,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 addressToCheck = firstElement;
                 delete setStorage.firstElement;
             } else {
-                addressToCheck = setStorage.elements[i].element;
-                delete setStorage.elements[i].element;
+                addressToCheck = setStorage.elements[i].value;
+                delete setStorage.elements[i].value;
             }
 
             if (returnResult) {

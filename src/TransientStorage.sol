@@ -11,7 +11,7 @@ abstract contract TransientStorage {
         Vault
     }
 
-    uint8 internal constant DUMMY_RESERVED = 1;
+    uint8 internal constant DUMMY_STAMP = 1;
 
     /// #if_updated "batch depth can only increase decrease by one" old(executionContext.batchDepth) != executionContext.batchDepth ==> old(executionContext.batchDepth) + 1 == executionContext.batchDepth || old(executionContext.batchDepth) - 1 == executionContext.batchDepth;
     /// #if_updated "batch depth can only change if reentrancy locks are not acquired" old(executionContext.batchDepth) != executionContext.batchDepth ==> !old(executionContext.checksLock) && !old(executionContext.impersonateLock);
@@ -22,14 +22,18 @@ abstract contract TransientStorage {
     SetStorage internal vaultStatusChecks;
 
     constructor() {
-        // populate the storage slots to optimize gas consumption
-        executionContext.reserved = DUMMY_RESERVED;
-        accountStatusChecks.reserved = DUMMY_RESERVED;
-        vaultStatusChecks.reserved = DUMMY_RESERVED;
+        // prepopulate the execution context storage slot to optimize gas consumption
+        // (it should never be clear again thanks to the stamp)
+        executionContext.stamp = DUMMY_STAMP;
+
+        // prepopulate the status checks storage slots to optimize gas consumption
+        // (it should be cheaper to insert the accounts and vaults addresses to be checked)
+        accountStatusChecks.stamp = DUMMY_STAMP;
+        vaultStatusChecks.stamp = DUMMY_STAMP;
 
         for (uint i = 1; i < Set.MAX_ELEMENTS; ) {
-            accountStatusChecks.elements[i].reserved = DUMMY_RESERVED;
-            vaultStatusChecks.elements[i].reserved = DUMMY_RESERVED;
+            accountStatusChecks.elements[i].stamp = DUMMY_STAMP;
+            vaultStatusChecks.elements[i].stamp = DUMMY_STAMP;
 
             unchecked {
                 ++i;
