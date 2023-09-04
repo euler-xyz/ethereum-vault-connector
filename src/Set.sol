@@ -88,14 +88,16 @@ library Set {
         }
 
         if (searchIndex != lastMarketIndex) {
-            if (searchIndex == 0)
+            if (searchIndex == 0) {
                 setStorage.firstElement = setStorage
                     .elements[lastMarketIndex]
                     .element;
-            else
+            }
+            else {
                 setStorage.elements[searchIndex].element = setStorage
                     .elements[lastMarketIndex]
                     .element;
+            }
         }
 
         setStorage.numElements = uint8(lastMarketIndex);
@@ -123,6 +125,7 @@ library Set {
 
         for (uint i = 1; i < numElements; ) {
             output[i] = setStorage.elements[i].element;
+            
             unchecked {
                 ++i;
             }
@@ -147,6 +150,7 @@ library Set {
 
         for (uint i = 1; i < numElements; ) {
             if (setStorage.elements[i].element == element) return true;
+            
             unchecked {
                 ++i;
             }
