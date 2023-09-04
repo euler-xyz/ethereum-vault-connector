@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "src/Set.sol";
+import "../../../src/Set.sol";
 
 contract SetTest is Test {
     using Set for SetStorage;

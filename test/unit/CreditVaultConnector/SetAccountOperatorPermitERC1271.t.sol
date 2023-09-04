@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "src/test/CreditVaultConnectorHarness.sol";
+import "../../../src/test/CreditVaultConnectorHarness.sol";
 import "openzeppelin/utils/cryptography/ECDSA.sol";
 import {ShortStrings, ShortString} from "openzeppelin/utils/ShortStrings.sol";
 
