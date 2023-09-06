@@ -8,7 +8,7 @@ interface ICVC {
         bool checksLock;
         bool impersonateLock;
         address onBehalfOfAccount;
-        uint8 stamp;
+        uint72 stamp;
     }
 
     struct BatchItem {

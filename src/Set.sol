@@ -3,14 +3,14 @@
 pragma solidity ^0.8.20;
 
 struct ElementStorage {
-    uint8 stamp;
     address value;
+    uint96 stamp;
 }
 
 struct SetStorage {
-    uint8 stamp;
     uint8 numElements;
     address firstElement;
+    uint88 stamp;
     ElementStorage[2 ** 8] elements;
 }
 

@@ -595,7 +595,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
             executionContext.checksLock = false;
-            
+
             // bring the slot back to the original state
             executionContext.stamp = DUMMY_STAMP;
         }
@@ -872,21 +872,24 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             authExpiryTimestamp = uint40(block.timestamp);
         }
 
-        if (
-            operatorLookup[account][operator].authExpiryTimestamp !=
-            authExpiryTimestamp
-        ) {
-            operatorLookup[account][operator]
-                .authExpiryTimestamp = authExpiryTimestamp;
+        OperatorStorage memory operatorCache = operatorLookup[account][
+            operator
+        ];
+
+        if (operatorCache.authExpiryTimestamp != authExpiryTimestamp) {
+            operatorLookup[account][operator] = OperatorStorage({
+                authExpiryTimestamp: authExpiryTimestamp,
+                lastSignatureTimestamp: updateSignatureTimestamp
+                    ? uint40(block.timestamp)
+                    : operatorCache.lastSignatureTimestamp
+            });
 
             emit AccountOperatorAuthorized(
                 account,
                 operator,
                 authExpiryTimestamp
             );
-        }
-
-        if (updateSignatureTimestamp) {
+        } else if (updateSignatureTimestamp) {
             operatorLookup[account][operator].lastSignatureTimestamp = uint40(
                 block.timestamp
             );
