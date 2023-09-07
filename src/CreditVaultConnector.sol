@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 
 import "./Set.sol";
 import "./TransientStorage.sol";
-import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 import "./interfaces/IERC1271.sol";
 
@@ -23,7 +22,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 signatureTimestamp,uint40 signatureDeadlineTimestamp)"
         );
 
-    bytes32 public immutable EIP712_DOMAIN_SEPARATOR;
+    bytes32 internal constant TYPE_HASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
+    bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
+    bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
     uint8 internal constant BATCH_DEPTH__INIT = 0;
     uint8 internal constant BATCH_DEPTH__MAX = 9;
@@ -104,28 +108,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         BatchItemResult[] vaultsStatusResult
     );
     error CVC_BatchPanic();
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //                                      CONSTRUCTOR                                          //
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    constructor() {
-        bytes32 TYPE_HASH = keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-        bytes32 hashedName = keccak256(bytes(name));
-        bytes32 hashedVersion = keccak256(bytes(version));
-
-        EIP712_DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                TYPE_HASH,
-                hashedName,
-                hashedVersion,
-                block.chainid,
-                address(this)
-            )
-        );
-    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
@@ -1113,7 +1095,16 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidTimestamp();
         }
 
-        bytes32 domainSeparator = EIP712_DOMAIN_SEPARATOR;
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                TYPE_HASH,
+                HASHED_NAME,
+                HASHED_VERSION,
+                block.chainid,
+                address(this)
+            )
+        );
+        
         bytes32 structHash = keccak256(
             abi.encode(
                 OPERATOR_PERMIT_TYPEHASH,
@@ -1233,4 +1224,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
         revert("CVC-empty-error");
     }
+
+    receive() external payable {}
 }
