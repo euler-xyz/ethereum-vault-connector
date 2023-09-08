@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import "./Set.sol";
 import "./TransientStorage.sol";
+import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 import "./interfaces/IERC1271.sol";
 
@@ -22,9 +23,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 signatureTimestamp,uint40 signatureDeadlineTimestamp)"
         );
 
-    bytes32 internal constant TYPE_HASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-    );
+    bytes32 internal constant TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
     bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
@@ -169,33 +171,65 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @notice A modifier that verifies whether account or vault status checks are reentered as well as checks for impersonate reentrancy.
     modifier nonReentrant() {
         {
-            bool checksLock = executionContext.checksLock;
-            bool impersonateLock = executionContext.impersonateLock;
+            uint context = executionContext;
 
-            if (checksLock) revert CVC_ChecksReentrancy();
-            if (impersonateLock) revert CVC_ImpersonateReentrancy();
+            if (context & CHECKS_LOCK_MASK != 0) {
+                revert CVC_ChecksReentrancy();
+            }
+
+            if (context & IMPERSONATE_LOCK_MASK != 0) {
+                revert CVC_ImpersonateReentrancy();
+            }
         }
         _;
     }
 
     /// @notice A modifier that verifies whether account or vault status checks are reentered and sets the lock.
     modifier nonReentrantChecks() {
-        if (executionContext.checksLock) revert CVC_ChecksReentrancy();
+        uint context = executionContext;
+        if (context & CHECKS_LOCK_MASK != 0) {
+            revert CVC_ChecksReentrancy();
+        }
 
-        executionContext.checksLock = true;
+        executionContext = context | CHECKS_LOCK_MASK;
+
+        // TODO leave only _;
+        uint contextCache = executionContext;
         _;
-        executionContext.checksLock = false;
+        assert(contextCache == executionContext);
+
+        executionContext = context & ~CHECKS_LOCK_MASK;
     }
 
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) {
-        // must be cached in case of CVC reentrancy
-        address onBehalfOfAccountCache = executionContext.onBehalfOfAccount;
+        // on behalf account must be cached in case of allowed CVC reentrancy
+        uint context = executionContext;
+        uint onBehalfOfAccountCache = context & ON_BEHALF_OF_ACCOUNT_MASK;
+        uint accountShifted = uint(uint160(account)) <<
+            ON_BEHALF_OF_ACCOUNT_OFFSET;
 
-        executionContext.onBehalfOfAccount = account;
+        // update the context only if the account is different from the cached one
+        if (onBehalfOfAccountCache != accountShifted) {
+            executionContext =
+                (context & ~ON_BEHALF_OF_ACCOUNT_MASK) |
+                accountShifted;
+        }
+
+        // TODO leave only _;
+        uint contextCache = executionContext;
         _;
-        executionContext.onBehalfOfAccount = onBehalfOfAccountCache;
+        assert(contextCache == executionContext);
+
+        // restore the cached account only if the checks are not deferred so that we may keep
+        // the account in the context for the next batch item.
+        // if the checks are deferred, the account will be cleared after all batch items are executed
+        if (context & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT) {
+            executionContext =
+                (context & ~ON_BEHALF_OF_ACCOUNT_MASK) |
+                onBehalfOfAccountCache;
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,11 +242,29 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function getExecutionContext(
         address controllerToCheck
     )
-        external
+        public
         view
+        virtual
         returns (ExecutionContext memory context, bool controllerEnabled)
     {
-        context = executionContext;
+        // execution context must be checks reentrancy protected because on behalf of account
+        // might be inconsistent while checks are in progress
+        if (executionContext & CHECKS_LOCK_MASK != 0) {
+            revert CVC_ChecksReentrancy();   
+        }
+
+        context = ExecutionContext({
+            batchDepth: uint8(executionContext & BATCH_DEPTH_MASK),
+            checksLock: executionContext & CHECKS_LOCK_MASK != 0,
+            impersonateLock: executionContext & IMPERSONATE_LOCK_MASK != 0,
+            onBehalfOfAccount: address(
+                uint160(
+                    (executionContext & ON_BEHALF_OF_ACCOUNT_MASK) >>
+                        ON_BEHALF_OF_ACCOUNT_OFFSET
+                )
+            )
+        });
+
         controllerEnabled = controllerToCheck == address(0)
             ? false
             : accountControllers[context.onBehalfOfAccount].contains(
@@ -457,7 +509,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
-        uint value = executionContext.batchDepth == BATCH_DEPTH__INIT
+        uint value = executionContext & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT
             ? msg.value
             : 0;
 
@@ -487,7 +539,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
-        uint value = executionContext.batchDepth == BATCH_DEPTH__INIT
+        uint context = executionContext;
+        
+        uint value = context & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT
             ? msg.value
             : 0;
 
@@ -495,16 +549,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             ? msg.sender
             : onBehalfOfAccount;
 
-        executionContext.impersonateLock = true;
+        executionContext = context | IMPERSONATE_LOCK_MASK;
 
+        // TODO leave only impersonateInternal call
+        uint contextCache = executionContext;
         (success, result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
             value,
             data
         );
+        assert(contextCache & ~ON_BEHALF_OF_ACCOUNT_MASK == executionContext & ~ON_BEHALF_OF_ACCOUNT_MASK); // on behalf of account may differ as it may be left for the next batch item
 
-        executionContext.impersonateLock = false;
+        executionContext = context & ~IMPERSONATE_LOCK_MASK;
     }
 
     // Batching
@@ -513,32 +570,55 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
-        uint8 batchDepth = executionContext.batchDepth;
+        uint context = executionContext;
+        uint batchDepth = context & BATCH_DEPTH_MASK;
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
         unchecked {
-            executionContext.batchDepth = batchDepth + 1;
-
-            // gas optimization to keep the slot in altered state until the end of the batch
-            executionContext.stamp = DUMMY_STAMP + 1;
+            // increases batch depth
+            ++context;
         }
 
-        batchInternal(items, false);
+        // gas optimization to keep the slot in altered state until the end of the batch
+        if (batchDepth == BATCH_DEPTH__INIT) {
+            context |= STAMP_MASK;
+        }
 
-        executionContext.batchDepth = batchDepth;
+        executionContext = context;
+
+        // TODO leave only batchInternal call
+        uint contextCache = executionContext;
+        batchInternal(items, false);
+        assert(contextCache & ~ON_BEHALF_OF_ACCOUNT_MASK == executionContext & ~ON_BEHALF_OF_ACCOUNT_MASK); // on behalf of account may differ as it may be left for the next batch item
+
+        unchecked {
+            // decreases batch depth
+            --context;
+        }
 
         if (batchDepth == BATCH_DEPTH__INIT) {
-            executionContext.checksLock = true;
+            // clear on behalf of account after all batch items are executed
+            context &= ~ON_BEHALF_OF_ACCOUNT_MASK;
+
+            context |= CHECKS_LOCK_MASK;
+            executionContext = context;
+
+            // TODO leave only checkStatusAll calls
+            contextCache = executionContext;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
-            executionContext.checksLock = false;
+            assert(contextCache == executionContext);
+
+            context &= ~CHECKS_LOCK_MASK;
 
             // bring the slot back to the original state
-            executionContext.stamp = DUMMY_STAMP;
+            context = (context & ~STAMP_MASK) | (DUMMY_STAMP << STAMP_OFFSET);
         }
+
+        executionContext = context;
     }
 
     /// @inheritdoc ICVC
@@ -555,32 +635,55 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        uint8 batchDepth = executionContext.batchDepth;
+        uint context = executionContext;
+        uint batchDepth = context & BATCH_DEPTH_MASK;
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
         unchecked {
-            executionContext.batchDepth = batchDepth + 1;
-
-            // gas optimization to keep the slot in altered state until the end of the batch
-            executionContext.stamp = DUMMY_STAMP + 1;
+            // increases batch depth
+            ++context;
         }
 
-        batchItemsResult = batchInternal(items, true);
+        // gas optimization to keep the slot in altered state until the end of the batch
+        if (batchDepth == BATCH_DEPTH__INIT) {
+            context |= STAMP_MASK;
+        }
 
-        executionContext.batchDepth = batchDepth;
+        executionContext = context;
+
+        // TODO leave only batchInternal call
+        uint contextCache = executionContext;
+        batchItemsResult = batchInternal(items, true);
+        assert(contextCache & ~ON_BEHALF_OF_ACCOUNT_MASK == executionContext & ~ON_BEHALF_OF_ACCOUNT_MASK); // on behalf of account may differ as it may be left for the next batch item
+
+        unchecked {
+            // decreases batch depth
+            --context;
+        }
 
         if (batchDepth == BATCH_DEPTH__INIT) {
-            executionContext.checksLock = true;
+            // clear on behalf of account after all batch items are executed
+            context &= ~ON_BEHALF_OF_ACCOUNT_MASK;
+
+            context |= CHECKS_LOCK_MASK;
+            executionContext = context;
+
+            // TODO leave only checkStatusAll calls
+            contextCache = executionContext;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
-            executionContext.checksLock = false;
+            assert(contextCache == executionContext);
+
+            context &= ~CHECKS_LOCK_MASK;
 
             // bring the slot back to the original state
-            executionContext.stamp = DUMMY_STAMP;
+            context = (context & ~STAMP_MASK) | (DUMMY_STAMP << STAMP_OFFSET);
         }
+
+        executionContext = context;
 
         revert CVC_RevertedBatchResult(
             batchItemsResult,
@@ -664,7 +767,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function requireAccountStatusCheck(
         address account
     ) public payable virtual nonReentrantChecks {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+        if (executionContext & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
         } else {
             accountStatusChecks.insert(account);
@@ -675,7 +778,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function requireAccountsStatusCheck(
         address[] calldata accounts
     ) public payable virtual nonReentrantChecks {
-        uint batchDepth = executionContext.batchDepth;
+        uint batchDepth = executionContext & BATCH_DEPTH_MASK;
         uint length = accounts.length;
         for (uint i; i < length; ) {
             if (batchDepth == BATCH_DEPTH__INIT) {
@@ -768,7 +871,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         nonReentrantChecks
     {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+        if (executionContext & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT) {
             requireVaultStatusCheckInternal(msg.sender);
         } else {
             vaultStatusChecks.insert(msg.sender);
@@ -825,7 +928,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function requireAccountAndVaultStatusCheck(
         address account
     ) public payable virtual nonReentrantChecks {
-        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+        if (executionContext & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT) {
             requireAccountStatusCheckInternal(account);
             requireVaultStatusCheckInternal(msg.sender);
         } else {
@@ -1104,7 +1207,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 address(this)
             )
         );
-        
+
         bytes32 structHash = keccak256(
             abi.encode(
                 OPERATOR_PERMIT_TYPEHASH,

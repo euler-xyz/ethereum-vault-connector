@@ -14,7 +14,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.enableController(account, vault);
 
-        if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
+        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
 
         expectedAccountsChecked.push(
             account == address(0) ? msg.sender : account
@@ -29,7 +29,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.disableController(account);
 
-        if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
+        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
 
         expectedAccountsChecked.push(
             account == address(0) ? msg.sender : account

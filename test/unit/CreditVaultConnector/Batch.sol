@@ -11,7 +11,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     function handlerBatch(BatchItem[] calldata items) public payable {
         super.batch(items);
 
-        if (executionContext.batchDepth != BATCH_DEPTH__INIT) return;
+        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
 
         verifyStorage();
         verifyVaultStatusChecks();

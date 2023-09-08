@@ -58,22 +58,28 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext.batchDepth = depth;
+        executionContext = (executionContext & ~BATCH_DEPTH_MASK) | uint(depth);
     }
 
     function setChecksLock(bool locked) external {
         if (isFuzzSender()) return;
-        executionContext.checksLock = locked;
-    }
-
-    function setOnBehalfOfAccount(address account) external {
-        if (isFuzzSender()) return;
-        executionContext.onBehalfOfAccount = account;
+        executionContext =
+            (executionContext & ~CHECKS_LOCK_MASK) |
+            (uint(locked ? 1 : 0) << 8);
     }
 
     function setImpersonateLock(bool locked) external {
         if (isFuzzSender()) return;
-        executionContext.impersonateLock = locked;
+        executionContext =
+            (executionContext & ~IMPERSONATE_LOCK_MASK) |
+            (uint(locked ? 1 : 0) << 16);
+    }
+
+    function setOnBehalfOfAccount(address account) external {
+        if (isFuzzSender()) return;
+        executionContext =
+            (executionContext & ~ON_BEHALF_OF_ACCOUNT_MASK) |
+            (uint(uint160(account)) << ON_BEHALF_OF_ACCOUNT_OFFSET);
     }
 
     function getLastSignatureTimestamps(
@@ -193,19 +199,23 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function verifyStorage() public view {
         require(
-            executionContext.batchDepth == BATCH_DEPTH__INIT,
+            executionContext & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT,
             "verifyStorage/checks-deferred"
         );
         require(
-            executionContext.checksLock == false,
+            executionContext & CHECKS_LOCK_MASK == 0,
             "verifyStorage/checks-in-progress-lock"
         );
         require(
-            executionContext.impersonateLock == false,
+            executionContext & IMPERSONATE_LOCK_MASK == 0,
             "verifyStorage/impersonate-lock"
         );
         require(
-            executionContext.onBehalfOfAccount == address(0),
+            executionContext & ON_BEHALF_OF_ACCOUNT_MASK == 0,
+            "verifyStorage/on-behalf-of-account"
+        );
+        require(
+            executionContext & STAMP_MASK == DUMMY_STAMP << STAMP_OFFSET,
             "verifyStorage/on-behalf-of-account"
         );
 
