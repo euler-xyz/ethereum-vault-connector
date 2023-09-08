@@ -26,3 +26,7 @@ out/
 # System Files
 .DS_Store
 Thumbs.db
+
+# Certora Files
+.certora_internal
+gambit_out
