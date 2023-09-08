@@ -17,10 +17,6 @@ certora-cli 4.10.1
 * `certora/specs`: Specification files with rules
 
 ## Running Certora
-### Run all
-```
-❯ sh certora/scripts/verify_all.sh
-```
 ### Run specific contract
 ```
 ❯ sh certora/scripts/verify_set.sh
@@ -29,4 +25,3 @@ certora-cli 4.10.1
 ```
 ❯ sh certora/scripts/verify_set.sh noOOBWrite
 ```
-### 
