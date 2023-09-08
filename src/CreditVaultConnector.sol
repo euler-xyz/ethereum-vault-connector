@@ -515,15 +515,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant {
         uint8 batchDepth = executionContext.batchDepth;
 
+        if (batchDepth >= BATCH_DEPTH__MAX) {
+            revert CVC_BatchDepthViolation();
+        }
+
         unchecked {
             executionContext.batchDepth = batchDepth + 1;
 
             // gas optimization to keep the slot in altered state until the end of the batch
             executionContext.stamp = DUMMY_STAMP + 1;
-        }
-
-        if (batchDepth >= BATCH_DEPTH__MAX) {
-            revert CVC_BatchDepthViolation();
         }
 
         batchInternal(items, false);
@@ -557,15 +557,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     {
         uint8 batchDepth = executionContext.batchDepth;
 
+        if (batchDepth >= BATCH_DEPTH__MAX) {
+            revert CVC_BatchDepthViolation();
+        }
+
         unchecked {
             executionContext.batchDepth = batchDepth + 1;
 
             // gas optimization to keep the slot in altered state until the end of the batch
             executionContext.stamp = DUMMY_STAMP + 1;
-        }
-
-        if (batchDepth >= BATCH_DEPTH__MAX) {
-            revert CVC_BatchDepthViolation();
         }
 
         batchItemsResult = batchInternal(items, true);
