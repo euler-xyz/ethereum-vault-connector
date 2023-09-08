@@ -3,8 +3,6 @@
 pragma solidity ^0.8.0;
 
 import "../../src/CreditVaultConnector.sol";
-import "../../src/interfaces/ICreditVaultConnector.sol";
-import "../../src/Set.sol";
 
 contract CreditVaultConnectorHarness is CreditVaultConnector {
     function numAccountCollaterals(address account) external view returns (uint8) {
@@ -21,10 +19,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
 
     function getOwnerLookup(uint152 prefix) external view returns (address owner) {
         return ownerLookup[prefix];
-    }
-
-    function getExecutionContext() external view returns (ICVC.ExecutionContext memory) {
-        return executionContext;
     }
 
     function getExecutionContextChecksLock() external view returns (bool) {
@@ -47,16 +41,8 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return executionContext.reserved;
     }
 
-    function getAccountStatusChecks() external view returns (SetStorage memory) {
-        return accountStatusChecks;
-    }
-
     function getAccountStatusChecksSize() external view returns (uint8) {
         return accountStatusChecks.numElements;
-    }
-
-    function getVaultStatusChecks() external view returns (SetStorage memory) {
-        return vaultStatusChecks;
     }
 
     function getVaultStatusChecksSize() external view returns (uint8) {

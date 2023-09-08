@@ -48,8 +48,6 @@ methods {
 
     function getOwnerLookup(uint152 prefix) external returns (address) envfree;
 
-    function getExecutionContext() external returns (ICVC.ExecutionContext) envfree;
-
     function getExecutionContextChecksLock() external returns (bool) envfree;
 
     function getExecutionContextImpersonateLock() external returns (bool) envfree;
@@ -58,29 +56,25 @@ methods {
 
     function getExecutionContextOnBehalfOfAccount() external returns (address) envfree;
 
-    function getAccountStatusChecks() external returns (CreditVaultConnectorHarness.SetStorage) envfree;
-
     function getAccountStatusChecksSize() external returns (uint8) envfree;
-
-    function getVaultStatusChecks() external returns (CreditVaultConnectorHarness.SetStorage) envfree;
 
     function getVaultStatusChecksSize() external returns (uint8) envfree;
 
     function isAccountOperator(address account, address operator) external returns (bool) envfree;
 }
 
+function requireClearExecutionContext() {
+  require getExecutionContextChecksLock() == false
+    && getExecutionContextImpersonateLock() == false
+    && getExecutionContextBatchDepth() == 0 
+    && getExecutionContextOnBehalfOfAccount() == 0 
+    && getAccountStatusChecksSize() == 0 
+    && getVaultStatusChecksSize() == 0;
+}
 
-// struct ExecutionContext {
-//     uint8 batchDepth;
-//     bool checksLock;
-//     bool impersonateLock;
-//     address onBehalfOfAccount;
-//     uint8 reserved;
-// }
-// definition ExecutionContext_batchDepth(uint256 s) returns uint256 =
-//     s & 0xffffffffffffffffffffffffffffffff;
 
-invariant executionContextIsCleaned() 
+// After every call execution context is zeroed out
+invariant executionContextIsCleared() 
     getExecutionContextChecksLock() == false
     && getExecutionContextImpersonateLock() == false
     && getExecutionContextBatchDepth() == 0 
@@ -88,45 +82,29 @@ invariant executionContextIsCleaned()
     && getAccountStatusChecksSize() == 0 
     && getVaultStatusChecksSize() == 0;
 
-invariant controllersAreZeroOrOne(address account)
-    numAccountControllers(account) <= 1;
-
+// 5. An account can only have one controller
 rule controllersAreZeroOrOne(env e, method f, calldataarg args, address account) {
-    require(getExecutionContextBatchDepth() == 0);
-    require(numAccountControllers(account) <= 1);
+    requireClearExecutionContext();
+
     f(e, args);
-    require(numAccountControllers(account) <= 1);
+
+    assert numAccountControllers(account) <= 1;
 }
 
-/*
-    @Rule
-
-    @Description:
-        If account owner is set once, it cannot be changed anymore.
-
-    @Note:
-        This is property 1 of the CVC Specification.
-    @Link:
-*/
+/// 1. If account owner is set once, it cannot be changed anymore.
 rule groupOwnerIsOneWay(env e, method f, calldataarg args, address account) {
+    requireClearExecutionContext();
     address originalOwner = getAccountOwner(account);
-    
     require(originalOwner != 0);
+
     f(e, args);
+
     assert getAccountOwner(account) == originalOwner;
 }
 
-/*
-    @Rule
-
-    @Description:
-        Only an Account Owner can grant permission to an Account Operator to operate on behalf of the Account.
-
-    @Note:
-        This is property 2 of the CVC Specification.
-    @Link:
-*/
+/// 2. Only an Account Owner can grant permission to an Account Operator to operate on behalf of the Account.
 rule onlyOwnerCanGrantOperatorship(env e, method f, calldataarg args, address account, address operator) {
+    requireClearExecutionContext();
     require(e.msg.sender != account);
 
     bool isOperatorBefore = isAccountOperator(account, operator);
@@ -136,8 +114,59 @@ rule onlyOwnerCanGrantOperatorship(env e, method f, calldataarg args, address ac
     assert isOperatorAfter == isOperatorBefore;
 }
 
+/// 3. An Account can have multiple Account Operators.
+rule accountCanHaveMultipleOperators(env e, method f, calldataarg args, address account, address operator1, address operator2) {
+    requireClearExecutionContext();
+    require(isAccountOperator(account, operator1));
+
+    bool isNewOperatorBefore = isAccountOperator(account, operator2);
+    f(e, args);
+    bool isNewOperatorAfter = isAccountOperator(account, operator2);
+
+    satisfy isNewOperatorAfter && !isNewOperatorBefore;
+}
+
+/// 4.1 Each Account can have at most 20 Collateral Vaults enabled at a time
+/// Base case
+rule accountCanHaveAtMost20Collaterals_baseCase(env e, method f, calldataarg args, address account) {
+    requireClearExecutionContext();
+
+    uint256 collateralsBefore = numAccountCollaterals(account);
+    require(numAccountCollaterals(account) == 0);
+
+    f(e, args);
+
+    satisfy numAccountCollaterals(account) == 1;
+}
+
+/// 4.2 Each Account can have at most 20 Collateral Vaults enabled at a time
+/// Inductive case
+rule accountCanIncreaseCollaterals_inductiveCase(env e, method f, calldataarg args, address account) {
+    requireClearExecutionContext();
+
+    mathint collateralsBefore = numAccountCollaterals(account);
+    require(collateralsBefore > 0);
+
+    f(e, args);
+
+    mathint collateralsAfter = numAccountCollaterals(account);
+    satisfy collateralsAfter == collateralsBefore + 1;
+}
+
+/// 4.3 Each Account can have at most 20 Collateral Vaults enabled at a time
+/// Boundary
+rule accountCanHaveAtMost20Collaterals(env e, method f, calldataarg args, address account) {
+    requireClearExecutionContext();
+    require(numAccountCollaterals(account) == 20);
+
+    f(e, args);
+
+    assert numAccountCollaterals(account) == 20;
+}
+
 /// 6. (part) Only an Account Owner can grant permission to an Account Operator to operate on behalf of the Account.
 rule onlyOwnerOrOperatorCanMutateCollateralVaultSet(env e, method f, calldataarg args, address account) {
+    requireClearExecutionContext();
     // msg.sender is not owner
     require(!haveCommonOwner(account, e.msg.sender));
     
@@ -153,6 +182,7 @@ rule onlyOwnerOrOperatorCanMutateCollateralVaultSet(env e, method f, calldataarg
 
 /// 7. Only an Account Owner or the Account Operator can enable a Controller Vault for the Account.
 rule onlyOwnerOrOperatorCanEnableCollateralVault(env e, method f, calldataarg args, address account, address vault) {
+    requireClearExecutionContext();
     // msg.sender is not owner
     require(!haveCommonOwner(account, e.msg.sender));
     
@@ -170,29 +200,13 @@ rule onlyOwnerOrOperatorCanEnableCollateralVault(env e, method f, calldataarg ar
 
 /// 8. Only a Controller Vault can disable itself for the Account.
 rule onlyControllerVaultCanDisableItself(env e, method f, calldataarg args, address account, address vault) {
+    requireClearExecutionContext();
     // msg.sender is not controller for account
     require(!isControllerEnabled(account, e.msg.sender));
     // vault is controller for account
     require(isControllerEnabled(account, vault));
 
     f(e, args);
-
-    // vault is still controller for account
-    assert isControllerEnabled(account, vault);
-}
-
-hook Sstore s_1.(offset 16) uint64 second (uint64 old_second) STORAGE {
-  // hook body
-}
-
-/// 10. If there's only one enabled Controller Vault for an Account, only that Controller can impersonate the Account's call into any of its enabled Collateral Vaults
-rule onlySoleControllerCanImpersonate(env e, method f, calldataarg args, address account) {
-    // msg.sender is controller for account
-    require(isControllerEnabled(account, e.msg.sender));
-
-    // ch
-    uint8 numControllers = numAccountControllers();
-    impersonate(e, args);
 
     // vault is still controller for account
     assert isControllerEnabled(account, vault);
