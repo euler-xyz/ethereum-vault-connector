@@ -22,9 +22,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 signatureTimestamp,uint40 signatureDeadlineTimestamp)"
         );
 
-    bytes32 internal constant TYPE_HASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-    );
+    bytes32 internal constant TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
     bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
@@ -163,6 +164,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (numOfControllers != 1) revert CVC_ControllerViolation();
             if (controller != msg.sender) revert CVC_NotAuthorized();
         }
+
         _;
     }
 
@@ -175,6 +177,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (checksLock) revert CVC_ChecksReentrancy();
             if (impersonateLock) revert CVC_ImpersonateReentrancy();
         }
+        
         _;
     }
 
@@ -1104,7 +1107,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 address(this)
             )
         );
-        
+
         bytes32 structHash = keccak256(
             abi.encode(
                 OPERATOR_PERMIT_TYPEHASH,
