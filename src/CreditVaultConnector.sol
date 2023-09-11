@@ -194,9 +194,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         executionContext = context | EC__CHECKS_LOCK_MASK;
 
         // TODO leave only _;
-        uint contextCache = executionContext;
+        // uint contextCache = executionContext;
         _;
-        assert(contextCache == executionContext);
+        // assert(contextCache == executionContext);
 
         executionContext = context & ~EC__CHECKS_LOCK_MASK;
     }
