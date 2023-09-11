@@ -67,6 +67,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return ownerLookup[prefix].owner;
     }
 
+    function getExecutionContextIgnoringStamp() external view returns (uint256) {
+        return executionContext & ~EC__STAMP_MASK;
+    }
+
     function getExecutionContextChecksLock() external view returns (bool) {
         return executionContext & EC__CHECKS_LOCK_MASK != 0;
     }
@@ -77,6 +81,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
 
     function getExecutionContextBatchDepth() external view returns (uint8) {
         return uint8(executionContext & EC__BATCH_DEPTH_MASK);
+    }
+
+    function getExecutionContextBatchDepthIsInit() external view returns (bool) {
+        return executionContext & EC__BATCH_DEPTH_MASK == EC__BATCH_DEPTH__INIT;
     }
 
     function getExecutionContextOnBehalfOfAccount() external view returns (address) {
