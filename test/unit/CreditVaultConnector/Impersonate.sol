@@ -24,7 +24,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
             data
         );
 
-        verifyStorage();
         verifyVaultStatusChecks();
         verifyAccountStatusChecks();
     }

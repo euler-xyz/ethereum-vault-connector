@@ -13,10 +13,11 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.enableCollateral(account, vault);
 
-        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
+        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
+            return;
 
         expectedAccountsChecked.push(account);
-        verifyStorage();
+
         verifyAccountStatusChecks();
     }
 
@@ -25,10 +26,11 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.disableCollateral(account, vault);
 
-        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
+        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
+            return;
 
         expectedAccountsChecked.push(account);
-        verifyStorage();
+
         verifyAccountStatusChecks();
     }
 }

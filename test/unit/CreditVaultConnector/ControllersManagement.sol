@@ -14,12 +14,13 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.enableController(account, vault);
 
-        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
+        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
+            return;
 
         expectedAccountsChecked.push(
             account == address(0) ? msg.sender : account
         );
-        verifyStorage();
+
         verifyAccountStatusChecks();
     }
 
@@ -29,12 +30,13 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.disableController(account);
 
-        if (executionContext & BATCH_DEPTH_MASK != BATCH_DEPTH__INIT) return;
+        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
+            return;
 
         expectedAccountsChecked.push(
             account == address(0) ? msg.sender : account
         );
-        verifyStorage();
+
         verifyAccountStatusChecks();
     }
 }

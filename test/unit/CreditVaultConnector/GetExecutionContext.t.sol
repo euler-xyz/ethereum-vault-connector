@@ -17,14 +17,13 @@ contract GetExecutionContextTest is Test {
 
         address controller = address(new Vault(cvc));
 
-        (ICVC.ExecutionContext memory context, bool controllerEnabled) = cvc
+        (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getExecutionContext(controller);
+        uint context = cvc.getRawExecutionContext();
 
-        assertEq(context.batchDepth, 0);
-        assertFalse(context.checksLock);
-        assertFalse(context.impersonateLock);
-        assertEq(context.onBehalfOfAccount, address(0));
+        assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
+        assertEq(context, 1 << 184);
 
         if (seed % 2 == 0) {
             vm.prank(account);
@@ -36,13 +35,21 @@ contract GetExecutionContextTest is Test {
         cvc.setImpersonateLock(seed % 4 == 0 ? true : false);
         cvc.setOnBehalfOfAccount(account);
 
-        (context, controllerEnabled) = cvc.getExecutionContext(controller);
+        (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
+            controller
+        );
+        context = cvc.getRawExecutionContext();
 
-        assertEq(context.batchDepth, seed % 3 == 0 ? 1 : 0);
-        assertEq(context.checksLock, false);
-        assertEq(context.impersonateLock, seed % 4 == 0 ? true : false);
-        assertEq(context.onBehalfOfAccount, account);
+        assertEq(onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
+        assertEq(context & 0x0000FF, seed % 3 == 0 ? 1 : 0);
+        assertEq(context & 0x00FF00 != 0, false);
+        assertEq(context & 0xFF0000 != 0, seed % 4 == 0 ? true : false);
+        assertEq(
+            context &
+                0x000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000000,
+            uint(uint160(account)) << 24
+        );
     }
 
     function test_RevertIfChecksReentrancy_GetExecutionContext(
@@ -53,29 +60,39 @@ contract GetExecutionContextTest is Test {
 
         address controller = address(new Vault(cvc));
 
-        (ICVC.ExecutionContext memory context, bool controllerEnabled) = cvc
+        (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getExecutionContext(controller);
+        uint context = cvc.getRawExecutionContext();
 
-        assertEq(context.batchDepth, 0);
-        assertFalse(context.impersonateLock);
-        assertEq(context.onBehalfOfAccount, address(0));
+        assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
+        assertEq(context, 1 << 184);
 
         if (seed % 2 == 0) {
             vm.prank(account);
             cvc.enableController(account, controller);
         }
 
-        cvc.setBatchDepth(seed % 3 == 0 ? 1 : 0);
-        cvc.setImpersonateLock(seed % 4 == 0 ? true : false);
-        cvc.setOnBehalfOfAccount(account);
         cvc.setChecksLock(true);
+        cvc.setOnBehalfOfAccount(account);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 CreditVaultConnector.CVC_ChecksReentrancy.selector
             )
         );
-        (context, controllerEnabled) = cvc.getExecutionContext(controller);
+        (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
+            controller
+        );
+
+        context = cvc.getRawExecutionContext();
+        assertEq(context & 0x0000FF, 0);
+        assertEq(context & 0x00FF00 != 0, true);
+        assertEq(context & 0xFF0000 != 0, false);
+        assertEq(
+            context &
+                0x000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000000,
+            uint(uint160(account)) << 24
+        );
     }
 }

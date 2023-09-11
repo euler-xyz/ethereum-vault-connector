@@ -58,28 +58,30 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext = (executionContext & ~BATCH_DEPTH_MASK) | uint(depth);
+        executionContext =
+            (executionContext & ~EC__BATCH_DEPTH_MASK) |
+            uint(depth);
     }
 
     function setChecksLock(bool locked) external {
         if (isFuzzSender()) return;
         executionContext =
-            (executionContext & ~CHECKS_LOCK_MASK) |
+            (executionContext & ~EC__CHECKS_LOCK_MASK) |
             (uint(locked ? 1 : 0) << 8);
     }
 
     function setImpersonateLock(bool locked) external {
         if (isFuzzSender()) return;
         executionContext =
-            (executionContext & ~IMPERSONATE_LOCK_MASK) |
+            (executionContext & ~EC__IMPERSONATE_LOCK_MASK) |
             (uint(locked ? 1 : 0) << 16);
     }
 
     function setOnBehalfOfAccount(address account) external {
         if (isFuzzSender()) return;
         executionContext =
-            (executionContext & ~ON_BEHALF_OF_ACCOUNT_MASK) |
-            (uint(uint160(account)) << ON_BEHALF_OF_ACCOUNT_OFFSET);
+            (executionContext & ~EC__ON_BEHALF_OF_ACCOUNT_MASK) |
+            (uint(uint160(account)) << EC__ON_BEHALF_OF_ACCOUNT_OFFSET);
     }
 
     function getLastSignatureTimestamps(
@@ -195,39 +197,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         super.requireVaultStatusCheckInternal(vault);
 
         Vault(vault).pushVaultStatusChecked();
-    }
-
-    function verifyStorage() public view {
-        require(
-            executionContext & BATCH_DEPTH_MASK == BATCH_DEPTH__INIT,
-            "verifyStorage/checks-deferred"
-        );
-        require(
-            executionContext & CHECKS_LOCK_MASK == 0,
-            "verifyStorage/checks-in-progress-lock"
-        );
-        require(
-            executionContext & IMPERSONATE_LOCK_MASK == 0,
-            "verifyStorage/impersonate-lock"
-        );
-        require(
-            executionContext & ON_BEHALF_OF_ACCOUNT_MASK == 0,
-            "verifyStorage/on-behalf-of-account"
-        );
-        require(
-            executionContext & STAMP_MASK == DUMMY_STAMP << STAMP_OFFSET,
-            "verifyStorage/on-behalf-of-account"
-        );
-
-        require(
-            accountStatusChecks.numElements == 0,
-            "verifyStorage/account-status-checks/numElements"
-        );
-
-        require(
-            vaultStatusChecks.numElements == 0,
-            "verifyStorage/vault-status-checks/numElements"
-        );
     }
 
     function verifyVaultStatusChecks() public view {

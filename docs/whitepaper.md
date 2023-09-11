@@ -228,12 +228,7 @@ In order to support sub-accounts, operators, and impersonating (ie, liquidations
 
 When a vault detects that `msg.sender` is the CVC, it should call back into the CVC to retrieve the current execution context using `getExecutionContext`. This will tell the vault two things:
 
-* The `context` which is a copy of the current `executionContext` which consists of five fields:
-** The `batchDepth` which indicates current depth of nested batches. If the `batchDepth` is greater than `0`, the account/vault status checks are considered to be deferred.
-** The `checksLock` which indicates state of the account/vault status checks reentrancy lock. If `checksLock` is `true`, the account/vault status checks are in progress.
-** The `impersonateLock` which indicates state of the impersonation reentrancy lock. If `impersonateLock` is `true`, the it means `impersonate()` function is currently being executed.
-** The `onBehalfOfAccount` which indicates the account that has been authenticated by the CVC. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
-** `reserved` which is reserved for gas optimization purposes.
+* The `onBehalfOfAccount` which indicates the account that has been authenticated by the CVC. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
 * The `controllerEnabled` which indicates whether or not the `controllerToCheck` vault address, with which the function has been invoked, is currently enabled as a controller for the current `onBehalfOfAccount` account. This information is only considered valid when `getExecutionContext` is invoked with `controllerToCheck` set to non-zero address. When `controllerToCheck` is set to zero address (which optimizes gas consumption), the value returned is always `false`. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account.
 
 ### CVC Contract Privileges

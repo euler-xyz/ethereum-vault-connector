@@ -13,18 +13,68 @@ contract Target {
         bool checksDeferred,
         address onBehalfOfAccount
     ) external payable returns (uint) {
-        (ICVC.ExecutionContext memory context, ) = ICVC(cvc)
-            .getExecutionContext(address(0));
+        (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
+            address(0)
+        );
+        uint context = ICVC(cvc).getRawExecutionContext();
 
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
         require(
-            context.batchDepth != 0 == checksDeferred,
+            (context & 0xff != 0) == checksDeferred,
             "ct/invalid-checks-deferred"
         );
         require(
-            context.onBehalfOfAccount == onBehalfOfAccount,
+            _onBehalfOfAccount == onBehalfOfAccount,
             "ct/invalid-on-behalf-of-account"
+        );
+
+        return msg.value;
+    }
+
+    function nestedCallTest(
+        address cvc,
+        address msgSender,
+        uint value,
+        bool checksDeferred,
+        address onBehalfOfAccount
+    ) external payable returns (uint) {
+        (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
+            address(0)
+        );
+        uint context = ICVC(cvc).getRawExecutionContext();
+
+        require(msg.sender == msgSender, "nct/invalid-sender");
+        require(msg.value == value, "nct/invalid-msg-value");
+        require(
+            (context & 0xff != 0) == checksDeferred,
+            "nct/invalid-checks-deferred"
+        );
+        require(
+            _onBehalfOfAccount == onBehalfOfAccount,
+            "nct/invalid-on-behalf-of-account"
+        );
+
+        (bool success, bytes memory result) = ICVC(cvc).call(
+            address(this),
+            address(this),
+            abi.encodeWithSelector(
+                this.callTest.selector,
+                cvc,
+                cvc,
+                0,
+                checksDeferred,
+                address(this)
+            )
+        );
+
+        require(success, "nct/success");
+        require(abi.decode(result, (uint)) == 0, "nct/result");
+
+        (_onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(address(0));
+        require(
+            _onBehalfOfAccount == onBehalfOfAccount,
+            "nct/invalid-on-behalf-of-account-2"
         );
 
         return msg.value;
@@ -37,20 +87,22 @@ contract Target {
         bool checksDeferred,
         address onBehalfOfAccount
     ) external payable returns (uint) {
-        (ICVC.ExecutionContext memory context, ) = ICVC(cvc)
-            .getExecutionContext(address(0));
+        (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
+            address(0)
+        );
+        uint context = ICVC(cvc).getRawExecutionContext();
 
         require(msg.sender == msgSender, "it/invalid-sender");
         require(msg.value == value, "it/invalid-msg-value");
         require(
-            context.batchDepth != 0 == checksDeferred,
+            (context & 0xff != 0) == checksDeferred,
             "it/invalid-checks-deferred"
         );
         require(
-            context.onBehalfOfAccount == onBehalfOfAccount,
+            _onBehalfOfAccount == onBehalfOfAccount,
             "it/invalid-on-behalf-of-account"
         );
-        require(context.impersonateLock == true, "it/impersonate-lock");
+        require(context & 0xff0000 != 0, "it/impersonate-lock");
 
         // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
         // therefore it's not necessary to fully verify it here
