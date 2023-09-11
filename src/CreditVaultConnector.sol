@@ -218,9 +218,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
 
         // TODO leave only _;
-        uint contextCache = executionContext;
+        // uint contextCache = executionContext;
         _;
-        assert(contextCache == executionContext);
+        // assert(contextCache == executionContext);
 
         // restore cached account only if the checks are not deferred or when the account
         // has been updated from non-zero address. thanks to that, we may keep the account in
