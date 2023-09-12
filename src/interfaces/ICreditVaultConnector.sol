@@ -72,10 +72,10 @@ interface ICVC {
     ) external payable;
 
     /// @notice Sets or unsets an operator for an account.
-    /// @dev Only the owner of the account can call this function. An operator is an address that can perform operations for an account on behalf of the owner.
+    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only deauthorize ifself.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block.
     function setAccountOperator(
         address account,
         address operator,
@@ -86,7 +86,7 @@ interface ICVC {
     /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to authorize or deauthorize the operator.
@@ -103,7 +103,7 @@ interface ICVC {
     /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to authorize or deauthorize the operator.
