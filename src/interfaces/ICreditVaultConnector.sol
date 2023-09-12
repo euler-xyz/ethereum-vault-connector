@@ -8,7 +8,7 @@ interface ICVC {
         bool checksLock;
         bool impersonateLock;
         address onBehalfOfAccount;
-        uint8 reserved;
+        uint72 stamp;
     }
 
     struct BatchItem {
@@ -343,4 +343,11 @@ interface ICVC {
     /// @notice Forgives previously deferred vault status check.
     /// @dev Vault address is removed from the set of addresses for which status checks are deferred. This function can only be called by the vault itself.
     function forgiveVaultStatusCheck() external payable;
+
+    /// @notice Checks the status of an account and a vault and reverts if it is not valid.
+    /// @dev If in a batch, the account and the vault are added to the respective sets of accounts and vaults to be checked at the end of the transaction (status checks are considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. This function can only be called by the vault itself.
+    /// @param account The address of the account to be checked.
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) external payable;
 }

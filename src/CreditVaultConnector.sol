@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 
 import "./Set.sol";
 import "./TransientStorage.sol";
-import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 import "./interfaces/IERC1271.sol";
 
@@ -23,7 +22,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             "OperatorPermit(address account,address operator,uint40 authExpiryTimestamp,uint40 signatureTimestamp,uint40 signatureDeadlineTimestamp)"
         );
 
-    bytes32 public immutable EIP712_DOMAIN_SEPARATOR;
+    bytes32 internal constant TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
+    bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
+    bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
     uint8 internal constant BATCH_DEPTH__INIT = 0;
     uint8 internal constant BATCH_DEPTH__MAX = 9;
@@ -106,28 +111,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     error CVC_BatchPanic();
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
-    //                                      CONSTRUCTOR                                          //
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    constructor() {
-        bytes32 TYPE_HASH = keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-        bytes32 hashedName = keccak256(bytes(name));
-        bytes32 hashedVersion = keccak256(bytes(version));
-
-        EIP712_DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                TYPE_HASH,
-                hashedName,
-                hashedVersion,
-                block.chainid,
-                address(this)
-            )
-        );
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -181,6 +164,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (numOfControllers != 1) revert CVC_ControllerViolation();
             if (controller != msg.sender) revert CVC_NotAuthorized();
         }
+
         _;
     }
 
@@ -193,6 +177,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (checksLock) revert CVC_ChecksReentrancy();
             if (impersonateLock) revert CVC_ImpersonateReentrancy();
         }
+        
         _;
     }
 
@@ -531,27 +516,31 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
-        uint batchDepth = executionContext.batchDepth;
+        uint8 batchDepth = executionContext.batchDepth;
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
         unchecked {
-            ++executionContext.batchDepth;
+            executionContext.batchDepth = batchDepth + 1;
+
+            // gas optimization to keep the slot in altered state until the end of the batch
+            executionContext.stamp = DUMMY_STAMP + 1;
         }
 
         batchInternal(items, false);
 
-        unchecked {
-            --executionContext.batchDepth;
-        }
+        executionContext.batchDepth = batchDepth;
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
             executionContext.checksLock = false;
+
+            // bring the slot back to the original state
+            executionContext.stamp = DUMMY_STAMP;
         }
     }
 
@@ -569,27 +558,31 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        uint batchDepth = executionContext.batchDepth;
+        uint8 batchDepth = executionContext.batchDepth;
 
         if (batchDepth >= BATCH_DEPTH__MAX) {
             revert CVC_BatchDepthViolation();
         }
 
         unchecked {
-            ++executionContext.batchDepth;
+            executionContext.batchDepth = batchDepth + 1;
+
+            // gas optimization to keep the slot in altered state until the end of the batch
+            executionContext.stamp = DUMMY_STAMP + 1;
         }
 
         batchItemsResult = batchInternal(items, true);
 
-        unchecked {
-            --executionContext.batchDepth;
-        }
+        executionContext.batchDepth = batchDepth;
 
         if (batchDepth == BATCH_DEPTH__INIT) {
             executionContext.checksLock = true;
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
             executionContext.checksLock = false;
+
+            // bring the slot back to the original state
+            executionContext.stamp = DUMMY_STAMP;
         }
 
         revert CVC_RevertedBatchResult(
@@ -831,6 +824,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         vaultStatusChecks.remove(msg.sender);
     }
 
+    /// @inheritdoc ICVC
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) public payable virtual nonReentrantChecks {
+        if (executionContext.batchDepth == BATCH_DEPTH__INIT) {
+            requireAccountStatusCheckInternal(account);
+            requireVaultStatusCheckInternal(msg.sender);
+        } else {
+            accountStatusChecks.insert(account);
+            vaultStatusChecks.insert(msg.sender);
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                  INTERNAL FUNCTIONS                                       //
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -851,21 +857,24 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             authExpiryTimestamp = uint40(block.timestamp);
         }
 
-        if (
-            operatorLookup[account][operator].authExpiryTimestamp !=
-            authExpiryTimestamp
-        ) {
-            operatorLookup[account][operator]
-                .authExpiryTimestamp = authExpiryTimestamp;
+        OperatorStorage memory operatorCache = operatorLookup[account][
+            operator
+        ];
+
+        if (operatorCache.authExpiryTimestamp != authExpiryTimestamp) {
+            operatorLookup[account][operator] = OperatorStorage({
+                authExpiryTimestamp: authExpiryTimestamp,
+                lastSignatureTimestamp: updateSignatureTimestamp
+                    ? uint40(block.timestamp)
+                    : operatorCache.lastSignatureTimestamp
+            });
 
             emit AccountOperatorAuthorized(
                 account,
                 operator,
                 authExpiryTimestamp
             );
-        }
-
-        if (updateSignatureTimestamp) {
+        } else if (updateSignatureTimestamp) {
             operatorLookup[account][operator].lastSignatureTimestamp = uint40(
                 block.timestamp
             );
@@ -1024,13 +1033,17 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         if (numElements == 0) return result;
 
-        // clear only the number of elements to optimize gas consumption
         setStorage.numElements = 0;
 
         for (uint i; i < numElements; ) {
-            address addressToCheck = i == 0
-                ? firstElement
-                : setStorage.elements[i];
+            address addressToCheck;
+            if (i == 0) {
+                addressToCheck = firstElement;
+                delete setStorage.firstElement;
+            } else {
+                addressToCheck = setStorage.elements[i].value;
+                delete setStorage.elements[i].value;
+            }
 
             if (returnResult) {
                 bytes memory data;
@@ -1085,7 +1098,16 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidTimestamp();
         }
 
-        bytes32 domainSeparator = EIP712_DOMAIN_SEPARATOR;
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                TYPE_HASH,
+                HASHED_NAME,
+                HASHED_VERSION,
+                block.chainid,
+                address(this)
+            )
+        );
+
         bytes32 structHash = keccak256(
             abi.encode(
                 OPERATOR_PERMIT_TYPEHASH,
@@ -1205,4 +1227,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
         revert("CVC-empty-error");
     }
+
+    receive() external payable {}
 }

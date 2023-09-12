@@ -2,10 +2,16 @@
 
 pragma solidity ^0.8.20;
 
+struct ElementStorage {
+    address value;
+    uint96 stamp;
+}
+
 struct SetStorage {
     uint8 numElements;
     address firstElement;
-    address[2 ** 8] elements;
+    uint88 stamp;
+    ElementStorage[2 ** 8] elements;
 }
 
 library Set {
@@ -26,8 +32,10 @@ library Set {
 
         if (numElements != 0) {
             if (firstElement == element) return false;
+
             for (uint i = 1; i < numElements; ) {
-                if (setStorage.elements[i] == element) return false;
+                if (setStorage.elements[i].value == element) return false;
+
                 unchecked {
                     ++i;
                 }
@@ -36,8 +44,16 @@ library Set {
 
         if (numElements >= MAX_ELEMENTS) revert TooManyElements();
 
-        if (numElements == 0) setStorage.firstElement = element;
-        else setStorage.elements[numElements] = element;
+        if (numElements == 0) {
+            setStorage.firstElement = element;
+
+            // gas optimization:
+            // on the first element insertion, set the stamp to non-zero value
+            // to keep the storage slot dirty when the element is removed
+            setStorage.stamp = 1;
+        } else {
+            setStorage.elements[numElements].value = element;
+        }
 
         unchecked {
             setStorage.numElements = uint8(numElements + 1);
@@ -64,7 +80,7 @@ library Set {
             searchIndex = 0;
         } else {
             for (uint i = 1; i < numElements; ) {
-                if (setStorage.elements[i] == element) {
+                if (setStorage.elements[i].value == element) {
                     searchIndex = i;
                     break;
                 }
@@ -82,18 +98,24 @@ library Set {
         }
 
         if (searchIndex != lastMarketIndex) {
-            if (searchIndex == 0)
-                setStorage.firstElement = setStorage.elements[lastMarketIndex];
-            else
-                setStorage.elements[searchIndex] = setStorage.elements[
-                    lastMarketIndex
-                ];
+            if (searchIndex == 0) {
+                setStorage.firstElement = setStorage
+                    .elements[lastMarketIndex]
+                    .value;
+            } else {
+                setStorage.elements[searchIndex].value = setStorage
+                    .elements[lastMarketIndex]
+                    .value;
+            }
         }
 
         setStorage.numElements = uint8(lastMarketIndex);
 
-        if (lastMarketIndex == 0) delete setStorage.firstElement;
-        else delete setStorage.elements[lastMarketIndex];
+        if (lastMarketIndex == 0) {
+            delete setStorage.firstElement;
+        } else {
+            delete setStorage.elements[lastMarketIndex].value;
+        }
 
         return true;
     }
@@ -114,7 +136,8 @@ library Set {
         output[0] = firstElement;
 
         for (uint i = 1; i < numElements; ) {
-            output[i] = setStorage.elements[i];
+            output[i] = setStorage.elements[i].value;
+
             unchecked {
                 ++i;
             }
@@ -138,7 +161,8 @@ library Set {
         if (firstElement == element) return true;
 
         for (uint i = 1; i < numElements; ) {
-            if (setStorage.elements[i] == element) return true;
+            if (setStorage.elements[i].value == element) return true;
+
             unchecked {
                 ++i;
             }
