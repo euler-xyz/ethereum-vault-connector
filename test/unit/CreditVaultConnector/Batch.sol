@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "src/test/CreditVaultConnectorHarness.sol";
+import "../../../src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -75,7 +75,7 @@ contract BatchTest is Test {
             cvc.setAccountOperator.selector,
             alice,
             bob,
-            true
+            type(uint40).max
         );
 
         items[2].onBehalfOfAccount = alicesSubAccount;
@@ -129,7 +129,11 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        assertTrue(cvc.accountOperators(alice, bob));
+        uint40 expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
+            alice,
+            bob
+        );
+        assertEq(expiryTimestamp, block.timestamp);
         assertEq(address(otherVault).balance, seed);
 
         cvc.reset();

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./Target.sol";
-import "src/interfaces/ICreditVault.sol";
+import "../../../src/interfaces/ICreditVault.sol";
 
 // mock vault contract that implements required interface and helps with status checks verification
 contract Vault is ICreditVault, Target {

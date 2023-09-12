@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-import "src/interfaces/ICreditVaultConnector.sol";
+import "../../../src/interfaces/ICreditVaultConnector.sol";
 
 // mock target contract that allows to test call() and impersonate() functions of the CVC
 contract Target {

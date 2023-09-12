@@ -6,7 +6,7 @@
 - Credit Vault (CV): A smart contract that accepts deposits of a single asset and issues shares in return, may support borrowing functionality. It implements the logic and interface necessary for interaction with other Credit Vaults via CVC. It may be ERC-4626 compliant.
 - Account: Every Ethereum address has 256 accounts in the CVC (one private key to rule them all). Each account has an account ID from 0-255. In order to compute the account addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address. Effectively, a group of 256 accounts belonging to the same owner share the first 19 bytes of their address and differ only in the last byte.
 - Account Owner: An EOA or smart contract Ethereum address, one of 256 accounts (account ID 0), that has ownership over the group of 256 accounts.
-- Account Operator: An EOA or smart contract Ethereum address that has been granted permission to operate on behalf of an Account. The permission can only be granted by the Account Owner.
+- Account Operator: An EOA or smart contract Ethereum address that has been granted permission to operate on behalf of an Account. The permission can only be granted by the Account Owner directly or via EIP-712 style permit.
 - Collateral Vault: A Credit Vault which deposits are used as collateral for borrowing in other Credit Vaults. An Account can enable up to 20 collaterals. Enabled collateral can be seized in case of liquidation.
 - Controller Vault: A Credit Vault enabled by a user in order to be able to borrow from it. Enabling Controller submits the Account to the rules encoded in the Controller Vault's code. All the funds in all the enabled Collateral Vaults are indirectly under control of the Controller Vault. Whenever a user wants to perform an action such as removing collateral, the Controller Vault is consulted in order to determine whether the action is allowed, or whether it should be blocked since it would make the Account insolvent. An Account can have only one Controller Vault enabled at a time unless it's a transient state during batch execution.
 - Batch: A list of operations that are executed atomically one by one. A batch defers Account and Vault Status Checks until the end of the transaction.
@@ -18,6 +18,7 @@
 
 1. An Owner of the group of 256 accounts is recorded only once upon the first interaction of any of the accounts with the CVC.
 1. Only an Account Owner can grant permission to an Account Operator to operate on behalf of the Account.
+1. An account Owner can decide to grant permission to an Account Operator directly or using an EIP-712 style permit.
 1. An Account can have multiple Account Operators.
 1. Each Account can have at most 20 Collateral Vaults enabled at a time.
 1. Each Account can have at most one Controller Vault enabled at a time unless it's a transient state during a batch execution. This is how single-liability-per-account is enforced.

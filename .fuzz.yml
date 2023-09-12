@@ -1,7 +1,8 @@
 analyze:
   remappings:
     - "forge-std/=lib/forge-std/src/"
-  solc-version: "0.8.19"
+    - "openzeppelin/=lib/openzeppelin-contracts/contracts"
+  solc-version: "0.8.20"
 fuzz:
   ide: foundry
   enable_cheat_codes: true
@@ -15,3 +16,4 @@ fuzz:
   time_limit: 1hour
   targets:
     - "src/test/CreditVaultConnectorScribble.sol"
+    - "src/test/CreditVaultConnectorHarness.sol"

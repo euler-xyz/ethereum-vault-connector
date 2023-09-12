@@ -9,9 +9,8 @@ gas_reports = [
     "CreditVaultConnector"
 ]
 remappings = [
-    "src=src/",
-    "test=test/",
     "forge-std/=lib/forge-std/src/",
+    "openzeppelin/=lib/openzeppelin-contracts/contracts"
 ]
 
 

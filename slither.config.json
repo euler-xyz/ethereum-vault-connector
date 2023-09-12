@@ -1,7 +1,7 @@
 {
     "filter_paths": "lib",
     "solc_remaps": [
-        "src=src/",
-        "forge-std/=lib/forge-std/src/"
+        "forge-std/=lib/forge-std/src/",
+        "openzeppelin/=lib/openzeppelin-contracts/contracts"
     ]
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "src/test/CreditVaultConnectorHarness.sol";
+import "../../../src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -68,7 +68,11 @@ contract CollateralsManagementTest is Test {
         ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            cvc.setAccountOperator(account, msgSender, true);
+            cvc.setAccountOperator(
+                account,
+                msgSender,
+                uint40(block.timestamp + 100)
+            );
             assertEq(cvc.getAccountOwner(account), alice);
         }
 
@@ -150,7 +154,7 @@ contract CollateralsManagementTest is Test {
         cvc.disableCollateral(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, true);
+        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
 
         vm.prank(alice);
         cvc.enableCollateral(bob, vault);
