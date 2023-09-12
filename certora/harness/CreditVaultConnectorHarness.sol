@@ -24,26 +24,16 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
             bytes memory result;
 
             if (targetContract == address(this)) {
-                // No fallback / receive function
-                require(item.data.length >= 4);
-
-                bytes4 selector = item.data[:4];
-
-                if (selector == this.setAccountOperator.selector) {
-                    (success, result) = setAccountOperator{value: msg.value}(item.data[5:]);
-                } else if (selector == this.enableCollateral.selector) {
-                    (success, result) = enableCollateral{value: msg.value}(item.data[5:]);
-                } else {
-                    // TODO
-                    // No fallback function
-                    revert("");
-                }
+                // Changed
+                // (success, result) = harness_delegatecall(item.data);
+                success = harness_delegatecall();
             } else {
                 address onBehalfOfAccount = item.onBehalfOfAccount == address(0)
                     ? msg.sender
                     : item.onBehalfOfAccount;
 
-                (success, result) = callInternal(
+                // Changed
+                (success, result) = harness_callInternal(
                     targetContract,
                     onBehalfOfAccount,
                     item.value,
@@ -64,6 +54,19 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         }
     }
 
+    /// @dev Summarized in CVL
+    function harness_delegatecall() public returns (bool success) {}
+
+    /// @dev Summarized in CVL
+    function harness_callInternal(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) public returns (bool success, bytes memory result) {
+        return callInternal(targetContract, onBehalfOfAccount, value, data);
+    }
+
     function numAccountCollaterals(address account) external view returns (uint8) {
         return accountCollaterals[account].numElements;
     }
@@ -73,11 +76,11 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
     }
 
     function isAccountOperator(address account, address operator) external view returns (bool) {
-        return accountOperators[account][operator];
+        return operatorLookup[account][operator].authExpiryTimestamp < block.timestamp;
     }
 
     function getOwnerLookup(uint152 prefix) external view returns (address owner) {
-        return ownerLookup[prefix];
+        return ownerLookup[prefix].owner;
     }
 
     function getExecutionContextChecksLock() external view returns (bool) {
@@ -96,8 +99,8 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
         return executionContext.onBehalfOfAccount;
     }
 
-    function getExecutionContextReserved() external view returns (uint8) {
-        return executionContext.reserved;
+    function getExecutionContextStamp() external view returns (uint72) {
+        return executionContext.stamp;
     }
 
     function getAccountStatusChecksSize() external view returns (uint8) {
