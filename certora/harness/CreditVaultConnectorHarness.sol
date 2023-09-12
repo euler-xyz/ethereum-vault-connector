@@ -3,8 +3,11 @@
 pragma solidity ^0.8.0;
 
 import "../../src/CreditVaultConnector.sol";
+import "../../src/ExecutionContext.sol";
 
 contract CreditVaultConnectorHarness is CreditVaultConnector {
+    using ExecutionContext for EC;
+
     /// @dev Certora prover erroneously thinks `address(this).delegatecall(item.data)` can arbitrarily mutate storage.
     function batchInternal(
         BatchItem[] calldata items,
@@ -68,32 +71,27 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
     }
 
     function getExecutionContextIgnoringStamp() external view returns (uint256) {
-        return executionContext & ~EC__STAMP_MASK;
+        return EC.unwrap(executionContext) & ~ExecutionContext.STAMP_MASK;
     }
 
     function getExecutionContextChecksLock() external view returns (bool) {
-        return executionContext & EC__CHECKS_LOCK_MASK != 0;
+        return executionContext.areChecksInProgress();
     }
 
     function getExecutionContextImpersonateLock() external view returns (bool) {
-        return executionContext & EC__IMPERSONATE_LOCK_MASK != 0;
+        return executionContext.isImpersonationInProgress();
     }
 
     function getExecutionContextBatchDepth() external view returns (uint8) {
-        return uint8(executionContext & EC__BATCH_DEPTH_MASK);
+        return uint8(EC.unwrap(executionContext) & ExecutionContext.BATCH_DEPTH_MASK);
     }
 
     function getExecutionContextBatchDepthIsInit() external view returns (bool) {
-        return executionContext & EC__BATCH_DEPTH_MASK == EC__BATCH_DEPTH__INIT;
+        return !executionContext.isInBatch();
     }
 
     function getExecutionContextOnBehalfOfAccount() external view returns (address) {
-        return address(
-            uint160(
-                (executionContext & EC__ON_BEHALF_OF_ACCOUNT_MASK) >>
-                    EC__ON_BEHALF_OF_ACCOUNT_OFFSET
-            )
-        );
+        return executionContext.getOnBehalfOfAccount();
     }
 
     function getAccountStatusChecksSize() external view returns (uint8) {

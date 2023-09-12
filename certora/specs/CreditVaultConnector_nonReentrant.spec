@@ -32,10 +32,6 @@ methods {
         address vault
     ) external returns(bool) envfree;
 
-    function getControllers(
-        address account
-    ) external returns(address[] memory) envfree;
-
     function isControllerEnabled(
         address account,
         address vault
