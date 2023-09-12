@@ -8,6 +8,7 @@ import "../../test/utils/mocks/Vault.sol";
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks
 contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
+    using ExecutionContext for EC;
     using Set for SetStorage;
 
     address[] internal expectedAccountsChecked;
@@ -58,30 +59,34 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext =
-            (executionContext & ~EC__BATCH_DEPTH_MASK) |
-            uint(depth);
+        executionContext = EC.wrap(
+            (EC.unwrap(executionContext) & ~uint(0xff)) | uint(depth)
+        );
     }
 
     function setChecksLock(bool locked) external {
         if (isFuzzSender()) return;
-        executionContext =
-            (executionContext & ~EC__CHECKS_LOCK_MASK) |
-            (uint(locked ? 1 : 0) << 8);
+
+        if (locked) {
+            executionContext = executionContext.setChecksInProgress();
+        } else {
+            executionContext = executionContext.clearChecksInProgress();
+        }
     }
 
     function setImpersonateLock(bool locked) external {
         if (isFuzzSender()) return;
-        executionContext =
-            (executionContext & ~EC__IMPERSONATE_LOCK_MASK) |
-            (uint(locked ? 1 : 0) << 16);
+
+        if (locked) {
+            executionContext = executionContext.setImpersonationInProgress();
+        } else {
+            executionContext = executionContext.clearImpersonationInProgress();
+        }
     }
 
     function setOnBehalfOfAccount(address account) external {
         if (isFuzzSender()) return;
-        executionContext =
-            (executionContext & ~EC__ON_BEHALF_OF_ACCOUNT_MASK) |
-            (uint(uint160(account)) << EC__ON_BEHALF_OF_ACCOUNT_OFFSET);
+        executionContext = executionContext.setOnBehalfOfAccount(account);
     }
 
     function getLastSignatureTimestamps(

@@ -42,13 +42,27 @@ contract GetExecutionContextTest is Test {
 
         assertEq(onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
-        assertEq(context & 0x0000FF, seed % 3 == 0 ? 1 : 0);
-        assertEq(context & 0x00FF00 != 0, false);
-        assertEq(context & 0xFF0000 != 0, seed % 4 == 0 ? true : false);
         assertEq(
             context &
-                0x000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000000,
-            uint(uint160(account)) << 24
+                0x00000000000000000000000000000000000000000000000000000000000000FF,
+            seed % 3 == 0 ? 1 : 0
+        );
+        assertEq(
+            context &
+                0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00,
+            uint(uint160(account)) << 8
+        );
+        assertEq(
+            context &
+                0x00000000000000000000FF000000000000000000000000000000000000000000 !=
+                0,
+            false
+        );
+        assertEq(
+            context &
+                0x000000000000000000FF00000000000000000000000000000000000000000000 !=
+                0,
+            seed % 4 == 0 ? true : false
         );
     }
 
@@ -86,13 +100,27 @@ contract GetExecutionContextTest is Test {
         );
 
         context = cvc.getRawExecutionContext();
-        assertEq(context & 0x0000FF, 0);
-        assertEq(context & 0x00FF00 != 0, true);
-        assertEq(context & 0xFF0000 != 0, false);
         assertEq(
             context &
-                0x000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000000,
-            uint(uint160(account)) << 24
+                0x00000000000000000000000000000000000000000000000000000000000000FF,
+            0
+        );
+        assertEq(
+            context &
+                0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00,
+            uint(uint160(account)) << 8
+        );
+        assertEq(
+            context &
+                0x00000000000000000000FF000000000000000000000000000000000000000000 !=
+                0,
+            true
+        );
+        assertEq(
+            context &
+                0x000000000000000000FF00000000000000000000000000000000000000000000 !=
+                0,
+            false
         );
     }
 }

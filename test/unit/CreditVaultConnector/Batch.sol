@@ -6,13 +6,13 @@ import "forge-std/Test.sol";
 import "../../../src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
+    using ExecutionContext for EC;
     using Set for SetStorage;
 
     function handlerBatch(BatchItem[] calldata items) public payable {
         super.batch(items);
 
-        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
-            return;
+        if (executionContext.isInBatch()) return;
 
         verifyVaultStatusChecks();
         verifyAccountStatusChecks();

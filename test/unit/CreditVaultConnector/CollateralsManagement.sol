@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import "../../../src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
+    using ExecutionContext for EC;
     using Set for SetStorage;
 
     function handlerEnableCollateral(address account, address vault) external {
@@ -13,8 +14,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.enableCollateral(account, vault);
 
-        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
-            return;
+        if (executionContext.isInBatch()) return;
 
         expectedAccountsChecked.push(account);
 
@@ -26,8 +26,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.disableCollateral(account, vault);
 
-        if (executionContext & EC__BATCH_DEPTH_MASK != EC__BATCH_DEPTH__INIT)
-            return;
+        if (executionContext.isInBatch()) return;
 
         expectedAccountsChecked.push(account);
 
