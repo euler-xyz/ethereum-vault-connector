@@ -177,7 +177,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (checksLock) revert CVC_ChecksReentrancy();
             if (impersonateLock) revert CVC_ImpersonateReentrancy();
         }
-        
+
         _;
     }
 
@@ -281,13 +281,24 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address operator,
         uint40 authExpiryTimestamp
-    ) public payable virtual onlyOwner(account) {
+    ) public payable virtual onlyOwnerOrOperator(account) {
+        address owner = haveCommonOwnerInternal(account, msg.sender)
+            ? msg.sender
+            : getAccountOwnerInternal(account);
+
+        // if it's an operator calling, it can only deauthorize itself
+        if (
+            owner != msg.sender &&
+            (operator != msg.sender || authExpiryTimestamp > block.timestamp)
+        ) {
+            revert CVC_NotAuthorized();
+        }
+
         setAccountOperatorInternal(
-            msg.sender,
+            owner,
             account,
             operator,
-            authExpiryTimestamp,
-            false
+            authExpiryTimestamp
         );
     }
 
@@ -326,8 +337,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             signer,
             account,
             operator,
-            authExpiryTimestamp,
-            true
+            authExpiryTimestamp
         );
     }
 
@@ -366,8 +376,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             signer,
             account,
             operator,
-            authExpiryTimestamp,
-            true
+            authExpiryTimestamp
         );
     }
 
@@ -845,8 +854,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address owner,
         address account,
         address operator,
-        uint40 authExpiryTimestamp,
-        bool updateSignatureTimestamp
+        uint40 authExpiryTimestamp
     ) internal {
         // the operator cannot be one of the 256 accounts that belong to the owner
         if (haveCommonOwnerInternal(owner, operator)) {
@@ -861,22 +869,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             operator
         ];
 
-        if (operatorCache.authExpiryTimestamp != authExpiryTimestamp) {
+        if (operatorCache.authExpiryTimestamp == authExpiryTimestamp) {
+            operatorLookup[account][operator].lastSignatureTimestamp = uint40(
+                block.timestamp
+            );
+        } else {
             operatorLookup[account][operator] = OperatorStorage({
                 authExpiryTimestamp: authExpiryTimestamp,
-                lastSignatureTimestamp: updateSignatureTimestamp
-                    ? uint40(block.timestamp)
-                    : operatorCache.lastSignatureTimestamp
+                lastSignatureTimestamp: uint40(block.timestamp)
             });
 
             emit AccountOperatorAuthorized(
                 account,
                 operator,
                 authExpiryTimestamp
-            );
-        } else if (updateSignatureTimestamp) {
-            operatorLookup[account][operator].lastSignatureTimestamp = uint40(
-                block.timestamp
             );
         }
     }
