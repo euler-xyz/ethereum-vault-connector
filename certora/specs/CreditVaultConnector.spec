@@ -1,15 +1,8 @@
 methods {
-    // CVC harnessed delegatecall
-    function harness_delegatecall() 
-        internal 
-        returns(bool) 
-        with(env e) 
-        => simulateSelfDelegatecall(e);
-
     // CVC envfree methods
     function name() external returns (string memory) envfree;
     function version() external returns (string memory) envfree;
-    function OPERATOR_PERMIT_TYPEHASH() external returns (bytes32) envfree;
+    function OPERATOR_PERMIT_TYPEHASH() external returns (bytes32) envfree => CONSTANT;
     function getExecutionContext(
         address controllerToCheck
     )
@@ -58,72 +51,17 @@ methods {
     function getVaultStatusChecksSize() external returns (uint8) envfree;
 }
 
-definition isHelperMethod(method f) returns bool = f.isView || f.isPure;
-    // f.selector == sig:numAccountCollaterals(address).selector
-    // || f.selector == sig:numAccountControllers(address).selector
-    // || f.selector == sig:getOwnerLookup(uint152).selector
-    // || f.selector == sig:getExecutionContextChecksLock().selector
-    // || f.selector == sig:getExecutionContextImpersonateLock().selector
-    // || f.selector == sig:getExecutionContextBatchDepth().selector
-    // || f.selector == sig:getExecutionContextOnBehalfOfAccount().selector
-    // || f.selector == sig:getExecutionContextStamp().selector
-    // || f.selector == sig:getAccountStatusChecksSize().selector
-    // || f.selector == sig:getVaultStatusChecksSize().selector
-    // || f.selector == sig:isAccountOperator(address, address).selector;
+definition isExcludedMethod(method f) returns bool = 
+    f.isView || f.isPure || f.selector == 0xc16ae7a4; // Exclude batch method
 
+definition isAccountCheckInsertingMethod(method f) returns bool = 
+    f.selector == sig:requireAccountStatusCheck(address).selector    
+    || f.selector == sig:requireAccountsStatusCheck(address[] calldata).selector    
+    || f.selector == sig:requireAccountAndVaultStatusCheck(address).selector;
 
-function simulateSelfDelegatecall(env e) returns bool {
-    // Replicate delegatecall semantics
-    env e2;
-    require(
-        e2.block.number == e.block.number
-        && e2.block.timestamp == e.block.timestamp
-        && e2.tx.origin == e.tx.origin
-        && e2.msg.value == e.msg.value
-        && e2.msg.sender == currentContract
-    );
-
-    calldataarg args;
-
-    // CVL does not support parametric methods in CVL functions, so we must implement a call table
-    mathint rand;
-    mathint idx = rand % 29;
-
-    // Not implemented with else-if blocks for easier analysis on the prover UI
-    // Otherwise we need to manually expand the section for every else-if
-    if (idx == 0) { invalidateAllPermits@withrevert(e2, args); } 
-    if (idx == 1) { invalidateAccountOperatorPermits@withrevert(e2, args); } 
-    if (idx == 2) { setAccountOperator@withrevert(e2, args); } 
-    if (idx == 3) { setAccountOperator@withrevert(e2, args); } 
-    if (idx == 4) { setAccountOperatorPermitECDSA@withrevert(e2, args); } 
-    if (idx == 5) { setAccountOperatorPermitERC1271@withrevert(e2, args); } 
-    if (idx == 6) { enableCollateral@withrevert(e2, args); } 
-    if (idx == 7) { disableCollateral@withrevert(e2, args); } 
-    if (idx == 8) { enableController@withrevert(e2, args); } 
-    if (idx == 9) { disableController@withrevert(e2, args); } 
-    if (idx == 10) { call@withrevert(e2, args); } 
-    if (idx == 11) { impersonate@withrevert(e2, args); } 
-    if (idx == 12) { batch@withrevert(e2, args); } 
-    if (idx == 13) { batchRevert@withrevert(e2, args); } 
-    if (idx == 14) { batchSimulation@withrevert(e2, args); } 
-    if (idx == 15) { checkAccountStatus@withrevert(e2, args); } 
-    if (idx == 16) { checkAccountsStatus@withrevert(e2, args); } 
-    if (idx == 17) { requireAccountStatusCheck@withrevert(e2, args); } 
-    if (idx == 18) { requireAccountsStatusCheck@withrevert(e2, args); } 
-    if (idx == 19) { requireAccountStatusCheckNow@withrevert(e2, args); } 
-    if (idx == 20) { requireAccountsStatusCheckNow@withrevert(e2, args); } 
-    if (idx == 21) { requireAllAccountsStatusCheckNow@withrevert(e2, args); } 
-    if (idx == 22) { forgiveAccountStatusCheck@withrevert(e2, args); } 
-    if (idx == 23) { requireVaultStatusCheck@withrevert(e2, args); } 
-    if (idx == 24) { requireVaultStatusCheckNow@withrevert(e2, args); } 
-    if (idx == 25) { requireVaultsStatusCheckNow@withrevert(e2, args); } 
-    if (idx == 26) { requireAllVaultsStatusCheckNow@withrevert(e2, args);  } 
-    if (idx == 27) { forgiveVaultStatusCheck@withrevert(e2, args); } 
-    if (idx == 28) { requireAccountAndVaultStatusCheck@withrevert(e2, args);}
-    // whew!
-
-    return !lastReverted;
-}
+definition isVaultCheckInsertingMethod(method f) returns bool = 
+    f.selector == sig:requireVaultStatusCheck().selector    
+    || f.selector == sig:requireAccountAndVaultStatusCheck(address).selector;
 
 /// Used to eliminate false positives due to starting from an unreachable state
 function requireClearExecutionContext() {
@@ -145,18 +83,6 @@ invariant executionContextIsCleared()
     && getAccountStatusChecksSize() == 0 
     && getVaultStatusChecksSize() == 0;
 
-rule sanityCheckCVLDelegateCall(env e, calldataarg args, address account, address vault) {
-    requireClearExecutionContext();
-
-    require(!isControllerEnabled(account, vault));
-
-    batch(e, args);
-    // simulateSelfDelegatecall(e);
-    // harness_delegatecall(e);
-
-    satisfy isControllerEnabled(account, vault);
-}
-
 /// A batchRevert call always reverts
 rule batchRevertAlwaysReverts(env e, calldataarg args) {
     batchRevert@withrevert(e, args);
@@ -167,7 +93,7 @@ rule batchRevertAlwaysReverts(env e, calldataarg args) {
 /// 1. If account owner is set once, it cannot be changed anymore.
 rule groupOwnerCanBeSetOnce(env e, method f, calldataarg args, address account) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
     address originalOwner = getAccountOwner(account);
@@ -181,18 +107,17 @@ filtered {
 /// 2. Only an Account Owner can grant permission to an Account Operator to operate on behalf of the Account.
 rule onlyOwnerCanGrantOperatorship(env e, method f, calldataarg args, address account, address operator) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
     // msg.sender is not owner
     require(e.msg.sender != account);
     require(!haveCommonOwner(e, account, e.msg.sender));
+    require(!isAccountOperator(e, account, operator));
 
-    bool isOperatorBefore = isAccountOperator(e, account, operator);
     f(e, args);
-    bool isOperatorAfter = isAccountOperator(e, account, operator);
 
-    assert isOperatorAfter == isOperatorBefore;
+    assert !isAccountOperator(e, account, operator);
 }
 
 /// 3. An Account can have multiple Account Operators.
@@ -223,7 +148,7 @@ rule accountCanHaveMultipleOperators_inductiveCase(env e, method f, calldataarg 
 /// Base case: An account can enable a collateral vault
 rule accountCanHaveAtMost20Collaterals_baseCase(env e, method f, calldataarg args, address account) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
 
@@ -239,7 +164,7 @@ filtered {
 /// Inductive case: An account can enable more than one collateral vault
 rule accountCanHaveAtMost20Collaterals_inductiveCase(env e, method f, calldataarg args, address account) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
 
@@ -256,7 +181,7 @@ filtered {
 /// Boundary: An account cannot enable more than 20 collateral vaults
 rule accountCanHaveAtMost20Collaterals(env e, method f, calldataarg args, address account) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
     require(numAccountCollaterals(account) == 20);
@@ -269,7 +194,7 @@ filtered {
 // 5. An account can only have one controller
 rule controllersAreZeroOrOne(env e, method f, calldataarg args, address account) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
 
@@ -283,7 +208,7 @@ filtered {
 /// 6. (part) Only an Account Owner can grant permission to an Account Operator to operate on behalf of the Account.
 rule onlyOwnerOrOperatorCanMutateCollateralVaultSet(env e, method f, calldataarg args, address account) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
     // msg.sender is not owner
@@ -308,7 +233,7 @@ rule onlyOwnerOrOperatorCanEnableCollateralVault(
     address account, 
     address vault
 ) filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
     // msg.sender is not owner
@@ -330,7 +255,7 @@ rule onlyOwnerOrOperatorCanEnableCollateralVault(
 /// 8. Only a Controller Vault can disable itself for the Account.
 rule onlyControllerVaultCanDisableItself(env e, method f, calldataarg args, address account, address vault) 
 filtered {
-  f -> !isHelperMethod(f)  
+  f -> !isExcludedMethod(f)  
 } {
     requireClearExecutionContext();
     // msg.sender is not controller for account
@@ -345,104 +270,170 @@ filtered {
 }
 
 /// 10. Only an Owner or the Operator of the specified Account can call other contract through the CVC.
-// rule onlyOwnerOrOperatorCanCallExternalContract(env e, method f, calldataarg args, address account, address vault) 
-// filtered {
-//   f -> !isHelperMethod(f)  
-// } {
-//     requireClearExecutionContext();
-//     // Called flag is false
-//     require(!isCallableContractCalled);
-//     // msg.sender is not controller for account
-//     require(!isControllerEnabled(account, e.msg.sender));
-//     // vault is controller for account
-//     require(isControllerEnabled(account, vault));
-
-//     f(e, args);
-
-//     // vault is still controller for account
-//     assert isControllerEnabled(account, vault);
-// }
-
-// 11. If there's only one enabled Controller Vault for an Account, only that Controller can impersonate the Account's call into any of its enabled Collateral Vaults.
-// rule onlySoleControllerCanImpersonateAccount(env e, method f, calldataarg args, address account, address vault) 
-// filtered {
-//   f -> !isHelperMethod(f)  
-// } {
-//     requireClearExecutionContext();
-// }
-
-/// 13. Batches can be nested up to 10 levels deep.
-ghost uint8 batchDepthReached;
-
-hook Sstore currentContract.executionContext.batchDepth uint8 batchDepth STORAGE {
-    if (batchDepth > batchDepthReached) {
-        batchDepthReached = batchDepth;
-    }
-}
-
-rule batchesCanBeNestedUpTo10Levels(env e, calldataarg args) {
+rule onlyOwnerOrOperatorCanCallExternalContract(env e, address targetContract, address account, bytes data) {
     requireClearExecutionContext();
-    batch(e, args);
+    require(account != 0);
 
-    assert batchDepthReached < 10;
+    bool isOwnerOrOperator = e.msg.sender == account || haveCommonOwner(e, account, e.msg.sender) || isAccountOperator(e, account, e.msg.sender);
+
+    call@withrevert(e, targetContract, account, data);
+
+    // If call was successful then caller must have been owner or operator
+    assert !lastReverted => isOwnerOrOperator;
 }
 
-ghost uint8 numDeferredAccountChecks;
+/// 11. If there's only one enabled Controller Vault for an Account, only that Controller can impersonate the Account's call into any of its enabled Collateral Vaults.
+rule onlyOwnerOrSoleControllerCanImpersonateAccount(env e, address targetContract, address account, bytes data) {
+    requireClearExecutionContext();
+    require(account != 0);
+    bool isOwnerOrSoleController = e.msg.sender == account || haveCommonOwner(e, account, e.msg.sender) || numAccountControllers(account) == 1 && isControllerEnabled(account, e.msg.sender);
 
-hook Sstore currentContract.accountStatusChecks.numElements uint8 numElements STORAGE {
-    if (numElements > numDeferredAccountChecks) {
-        numDeferredAccountChecks = numElements;
-    }
+    impersonate@withrevert(e, targetContract, account, data);
+
+    // If impersonate was successful then caller must have been a sole controller
+    assert !lastReverted => isOwnerOrSoleController;
 }
 
-ghost uint8 numDeferredVaultChecks;
+/// 13.2 Batches can be nested up to 10 levels deep.
+/// Inductive case: Batch depth can be more than 1;
+rule batchesCanBeNested(env e, calldataarg args) {
+    require(getExecutionContextBatchDepth() == 1);
 
-hook Sstore currentContract.vaultStatusChecks.numElements uint8 numElements STORAGE {
-    if (numElements > numDeferredVaultChecks) {
-        numDeferredVaultChecks = numElements;
-    }
+    batch(e, args); 
+
+    assert getExecutionContextBatchDepth() == 1;
+}
+
+
+/// 13.2 Batches can be nested up to 10 levels deep.
+/// Inductive case: Batch depth can be more than 1;
+rule batchesCanBeNestedMoreThanOneLevel(env e, calldataarg args) {
+    require(getExecutionContextBatchDepth() == 8);
+
+    batch(e, args); 
+
+    satisfy getExecutionContextBatchDepth() == 8;
+}
+
+/// 13.3 Batches can be nested up to 10 levels deep.
+/// Boundary case: Batch depth cannot exceed 10 levels;
+rule batchesCanBeNestedUpTo10Levels(env e, calldataarg args) {
+    require(getExecutionContextBatchDepth() == 9);
+
+    batch@withrevert(e, args); 
+
+    assert lastReverted;
 }
 
 /// 15. CVC defers Account Status Checks and Vault Status Checks until the end of the transaction only if the operation requiring them is part of a batch. Otherwise they must be executed immediately.
 rule onlyBatchCanDeferChecks(env e, method f, calldataarg args) 
 filtered {
-    f -> f.selector != 0xc16ae7a4  
+    f -> !isExcludedMethod(f)
 } {
     requireClearExecutionContext();
     f(e, args);
 
-    assert numDeferredAccountChecks == 0 && numDeferredVaultChecks == 0;
+    assert getAccountStatusChecksSize() == 0 && getVaultStatusChecksSize() == 0;
 }
 
+/// 16.1 Account Status Checks can be deferred for at most 20 Accounts at a time.
+/// Base case: Batch can defer 1 Account Status Check
+rule batchCanDeferOneAccountCheck(env e, method f, calldataarg args) 
+filtered {
+    f -> isAccountCheckInsertingMethod(f)
+} {
+    require(getExecutionContextBatchDepth() > 0);
+    require(getAccountStatusChecksSize() == 0);
+    f(e, args);
 
-/// 16. Account Status Checks can be deferred for at most 20 Accounts at a time.
-rule batchCanDefer20AccountChecks(env e, calldataarg args) {
-    requireClearExecutionContext();
-    batch(e, args);
-
-    satisfy numDeferredAccountChecks == 20;
+    satisfy getAccountStatusChecksSize() == 1;
 }
 
-rule batchCannotDeferMoreThan20AccountChecks(env e, calldataarg args) {
-    requireClearExecutionContext();
-    batch(e, args);
+/// 16.2 Account Status Checks can be deferred for at most 20 Accounts at a time.
+/// Inductive case: Batch can defer more than 1 Account Status Check
+rule batchCanDefer20AccountChecks(env e, method f, calldataarg args) 
+filtered {
+    f -> isAccountCheckInsertingMethod(f)
+} {
+    require(getExecutionContextBatchDepth() > 0);
+    require(getAccountStatusChecksSize() == 1);
+    f(e, args);
 
-    assert numDeferredAccountChecks <= 20;
+    satisfy getAccountStatusChecksSize() == 2;
 }
 
-/// 17. Vault Status Checks can be deferred for at most 20 Accounts at a time.
-rule batchCanDefer20VaultChecks(env e, calldataarg args) {
-    requireClearExecutionContext();
-    batch(e, args);
+/// 16.3 Account Status Checks can be deferred for at most 20 Accounts at a time.
+/// Boundary case: Batch cannot defer more than 20 Account Status Checks
+rule batchCannotDeferMoreThan20AccountChecks(env e, method f, calldataarg args) 
+filtered {
+    f -> isAccountCheckInsertingMethod(f)
+} {
+    require(getExecutionContextBatchDepth() == 20);
+    require(getAccountStatusChecksSize() == 20);
+    f(e, args);
 
-    satisfy numDeferredVaultChecks == 20;
+    assert getAccountStatusChecksSize() <= 20;
 }
 
-rule batchCannotDeferMoreThan20VaultChecks(env e, calldataarg args) {
-    requireClearExecutionContext();
-    batch(e, args);
+/// 17.1 Vault Status Checks can be deferred for at most 20 Accounts at a time.
+/// Base case: Batch can defer 1 Vault Status Check
+rule batchCanDeferOneVaultCheck(env e, method f, calldataarg args) 
+filtered {
+    f -> isVaultCheckInsertingMethod(f)
+} {
+    require(getExecutionContextBatchDepth() > 0);
+    require(getVaultStatusChecksSize() == 0);
+    f(e, args);
 
-    assert numDeferredVaultChecks <= 20;
+    satisfy getVaultStatusChecksSize() == 1;
+}
+
+/// 17.2 Vault Status Checks can be deferred for at most 20 Accounts at a time.
+/// Inductive case: Batch can defer more than 1 Vault Account Status Check
+rule batchCanDefer20VaultChecks(env e, method f, calldataarg args) 
+filtered {
+    f -> isVaultCheckInsertingMethod(f)
+} {
+    require(getExecutionContextBatchDepth() > 0);
+    require(getVaultStatusChecksSize() == 1);
+    f(e, args);
+
+    satisfy getVaultStatusChecksSize() == 2;
+}
+
+/// 17.3 Vault Status Checks can be deferred for at most 20 Accounts at a time.
+/// Boundary case: Batch can defer Vault Account Status Check
+rule batchCannotDeferMoreThan20VaultChecks(env e, method f, calldataarg args) 
+filtered {
+    f -> isVaultCheckInsertingMethod(f)
+} {
+    require(getVaultStatusChecksSize() <= 20);
+    f(e, args);
+
+    assert getVaultStatusChecksSize() <= 20;
+}
+
+/// 19. If there's only one enabled Controller Vault for an Account, CVC allows currently enabled Controller to forgive the Account Status Check if it's deferred.
+rule onlySoleControllerCanForgiveAccountCheck(env e, calldataarg args, address account, address checked) {
+    // Caller is sole controller
+    require(numAccountControllers(account) == 1);
+    require(isControllerEnabled(account, e.msg.sender));
+    require(isAccountStatusCheckDeferred(checked));
+
+    forgiveAccountsStatusCheck(e, args);
+
+    satisfy !isAccountStatusCheckDeferred(checked);
+}
+
+/// 20. CVC allows a Vault to forgive the Vault Status Check for itself if it's deferred.
+rule vaultCanForgiveStatusCheckForItself(env e, calldataarg args, address account) {
+    // Caller is controller
+    require(isControllerEnabled(account, e.msg.sender));
+    require(isVaultStatusCheckDeferred(e.msg.sender));
+
+    forgiveVaultStatusCheck(e, args);
+
+    satisfy !isVaultStatusCheckDeferred(e.msg.sender);
 }
 
 // 21. Simulation functions must not modify the state.

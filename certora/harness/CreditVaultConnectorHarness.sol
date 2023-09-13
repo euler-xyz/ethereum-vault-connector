@@ -6,7 +6,6 @@ import "../../src/CreditVaultConnector.sol";
 
 contract CreditVaultConnectorHarness is CreditVaultConnector {
     /// @dev Certora prover erroneously thinks `address(this).delegatecall(item.data)` can arbitrarily mutate storage.
-    /// We replace the delegatecall with a call table
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
@@ -25,7 +24,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
 
             if (targetContract == address(this)) {
                 // Changed
-                // (success, result) = harness_delegatecall(item.data);
                 success = harness_delegatecall();
             } else {
                 address onBehalfOfAccount = item.onBehalfOfAccount == address(0)
@@ -76,7 +74,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnector {
     }
 
     function isAccountOperator(address account, address operator) external view returns (bool) {
-        return operatorLookup[account][operator].authExpiryTimestamp < block.timestamp;
+        return operatorLookup[account][operator].authExpiryTimestamp >= block.timestamp;
     }
 
     function getOwnerLookup(uint152 prefix) external view returns (address owner) {
