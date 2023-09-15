@@ -314,12 +314,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
         value = value == type(uint).max ? address(this).balance : value;
 
-        (success, result) = callTargetContractInternal(
-            targetContract,
-            onBehalfOfAccount,
-            value,
-            data
-        );
+        (success, result) = targetContract.call{value: value}(data);
     }
 
     function impersonateInternal(
@@ -339,11 +334,6 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_NotAuthorized();
         }
 
-        (success, result) = callTargetContractInternal(
-            targetContract,
-            onBehalfOfAccount,
-            value,
-            data
-        );
+        (success, result) = targetContract.call{value: value}(data);
     }
 }

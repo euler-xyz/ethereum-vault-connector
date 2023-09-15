@@ -380,20 +380,4 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     ) internal override returns (BatchItemResult[] memory result) {
         return super.checkStatusAll(setType, returnResult);
     }
-
-    /// #if_succeeds "on behalf of account must be properly set" old(executionContext.getOnBehalfOfAccount()) == onBehalfOfAccount && executionContext.getOnBehalfOfAccount() == onBehalfOfAccount;
-    function callTargetContractInternal(
-        address targetContract,
-        address onBehalfOfAccount,
-        uint value,
-        bytes calldata data
-    ) internal virtual override returns (bool success, bytes memory result) {
-        return
-            super.callTargetContractInternal(
-                targetContract,
-                onBehalfOfAccount,
-                value,
-                data
-            );
-    }
 }

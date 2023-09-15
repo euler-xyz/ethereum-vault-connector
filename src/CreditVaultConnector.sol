@@ -919,12 +919,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         value = value == type(uint).max ? address(this).balance : value;
 
-        (success, result) = callTargetContractInternal(
-            targetContract,
-            onBehalfOfAccount,
-            value,
-            data
-        );
+        (success, result) = targetContract.call{value: value}(data);
     }
 
     function impersonateInternal(
@@ -943,12 +938,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_NotAuthorized();
         }
 
-        (success, result) = callTargetContractInternal(
-            targetContract,
-            onBehalfOfAccount,
-            value,
-            data
-        );
+        (success, result) = targetContract.call{value: value}(data);
     }
 
     function batchInternal(
@@ -1249,15 +1239,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         uint152 prefix = getPrefixInternal(account);
         ownerLookup[prefix].owner = owner;
         emit AccountsOwnerRegistered(prefix, owner);
-    }
-
-    function callTargetContractInternal(
-        address targetContract,
-        address,
-        uint value,
-        bytes calldata data
-    ) internal virtual returns (bool success, bytes memory result) {
-        (success, result) = targetContract.call{value: value}(data);
     }
 
     function revertBytes(bytes memory errMsg) internal pure {
