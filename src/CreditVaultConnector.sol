@@ -196,6 +196,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         _;
 
+        // checks in progress not have to be explicitly cleared here as we're using cached context
         executionContext = context;
     }
 
@@ -208,6 +209,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         _;
 
+        // the on behalf of account address not have to be explicitly set here as we're using cached context
         executionContext = context;
     }
 
@@ -537,6 +539,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             data
         );
 
+        // impersonate in progress not have to be explicitly cleared here as we're using cached context
         executionContext = context;
     }
 
@@ -552,15 +555,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBathDepth();
+        executionContext = context.increaseBatchDepth();
 
         batchInternal(items, false);
+
+        // batch depth does not have to be explicitly decreased here as we're using cached context
 
         if (!context.isInBatch()) {
             executionContext = context.setChecksInProgress();
 
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
+
+            // checks in progress not have to be explicitly cleared here as we're using cached context
         }
 
         executionContext = context;
@@ -586,15 +593,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBathDepth();
+        executionContext = context.increaseBatchDepth();
 
         batchItemsResult = batchInternal(items, true);
+
+        // batch depth does not have to be explicitly decreased here as we're using cached context
 
         if (!context.isInBatch()) {
             executionContext = context.setChecksInProgress();
 
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
+
+            // checks in progress not have to be explicitly cleared here as we're using cached context
         }
 
         executionContext = context;

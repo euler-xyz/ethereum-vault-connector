@@ -88,14 +88,14 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBathDepth();
+        executionContext = context.increaseBatchDepth();
 
         batchInternal(items, false);
 
         // verify if cached context value can be reused
         assert(
             EC.unwrap(executionContext) ==
-                EC.unwrap(context.increaseBathDepth())
+                EC.unwrap(context.increaseBatchDepth())
         );
 
         if (!context.isInBatch()) {

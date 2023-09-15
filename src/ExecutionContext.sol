@@ -32,14 +32,14 @@ library ExecutionContext {
     }
 
     /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function increaseBathDepth(EC context) internal pure returns (EC result) {
+    function increaseBatchDepth(EC context) internal pure returns (EC result) {
         unchecked {
             result = EC.wrap(EC.unwrap(context) + 1);
         }
     }
 
     /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function decreaseBathDepth(EC context) internal pure returns (EC result) {
+    function decreaseBatchDepth(EC context) internal pure returns (EC result) {
         unchecked {
             result = EC.wrap(EC.unwrap(context) - 1);
         }
