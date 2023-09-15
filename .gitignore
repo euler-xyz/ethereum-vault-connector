@@ -29,3 +29,7 @@ Thumbs.db
 
 # Certora Files
 .certora_internal
+
+# Echidna Files
+crytic-export/
+corpus-echidna/

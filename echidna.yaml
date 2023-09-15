@@ -1,0 +1,9 @@
+testMode: "assertion"
+#corpusDir: "corpus-echidna"
+#testLimit: 1000
+solcArgs: "optimize-runs=10000"
+deployContracts: [
+  ["0xdead", "CreditVaultConnectorEchidna"],
+  ["0xbeef", "VaultEchidna"],
+  ["0xbeefbeef", "TargetEchidna"]
+]

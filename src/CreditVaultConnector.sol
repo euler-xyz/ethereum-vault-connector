@@ -196,36 +196,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         _;
 
-        executionContext = context.clearChecksInProgress();
+        executionContext = context;
     }
 
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) {
-        // on behalf account must be cached in case of allowed CVC reentrancy
         EC context = executionContext;
-        address onBehalfOfAccountCache = context.getOnBehalfOfAccount();
 
-        // update the context only if the account differs
-        if (onBehalfOfAccountCache != account) {
-            executionContext = context.setOnBehalfOfAccount(account);
-        }
+        executionContext = context.setOnBehalfOfAccount(account);
 
         _;
 
-        // restore cached account only if the checks are not deferred or when the account
-        // has been updated from non-zero address. thanks to that, we may keep the account in
-        // the context for the next batch item.
-        // if the checks are deferred, the account will be cleared after all batch items are executed
-        if (
-            !context.isInBatch() ||
-            (onBehalfOfAccountCache != address(0) &&
-                onBehalfOfAccountCache != account)
-        ) {
-            executionContext = context.setOnBehalfOfAccount(
-                onBehalfOfAccountCache
-            );
-        }
+        executionContext = context;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -554,7 +537,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             data
         );
 
-        executionContext = executionContext.clearImpersonationInProgress();
+        executionContext = context;
     }
 
     // Batching
@@ -573,10 +556,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         batchInternal(items, false);
 
-        context = executionContext.decreaseBathDepth();
-
         if (!context.isInBatch()) {
-            context = context.clearOnBehalfOfAccount();
             executionContext = context.setChecksInProgress();
 
             checkStatusAll(SetType.Account, false);
@@ -610,10 +590,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         batchItemsResult = batchInternal(items, true);
 
-        context = executionContext.decreaseBathDepth();
-
         if (!context.isInBatch()) {
-            context = context.clearOnBehalfOfAccount();
             executionContext = context.setChecksInProgress();
 
             accountsStatusResult = checkStatusAll(SetType.Account, true);

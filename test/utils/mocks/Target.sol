@@ -102,7 +102,10 @@ contract Target {
             _onBehalfOfAccount == onBehalfOfAccount,
             "it/invalid-on-behalf-of-account"
         );
-        require(context & 0xff00000000000000000000000000000000000000000000 != 0, "it/impersonate-lock");
+        require(
+            context & 0xff00000000000000000000000000000000000000000000 != 0,
+            "it/impersonate-lock"
+        );
 
         // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
         // therefore it's not necessary to fully verify it here

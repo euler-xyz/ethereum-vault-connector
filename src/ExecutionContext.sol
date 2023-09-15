@@ -31,14 +31,14 @@ library ExecutionContext {
         result = EC.unwrap(context) & BATCH_DEPTH_MASK >= BATCH_DEPTH_MAX;
     }
 
-    /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !old(areChecksInProgress(context)) && !old(isImpersonationInProgress(context)) && !areChecksInProgress(context) && !isImpersonationInProgress(context);
+    /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
     function increaseBathDepth(EC context) internal pure returns (EC result) {
         unchecked {
             result = EC.wrap(EC.unwrap(context) + 1);
         }
     }
 
-    /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !old(areChecksInProgress(context)) && !old(isImpersonationInProgress(context)) && !areChecksInProgress(context) && !isImpersonationInProgress(context);
+    /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
     function decreaseBathDepth(EC context) internal pure returns (EC result) {
         unchecked {
             result = EC.wrap(EC.unwrap(context) - 1);
@@ -56,7 +56,6 @@ library ExecutionContext {
         );
     }
 
-    /// #if_succeeds "on behalf of account can only change if reentrancy locks are not acquired" !old(areChecksInProgress(context)) && !old(isImpersonationInProgress(context)) && !areChecksInProgress(context) && !isImpersonationInProgress(context);
     function setOnBehalfOfAccount(
         EC context,
         address account
@@ -67,25 +66,18 @@ library ExecutionContext {
         );
     }
 
-    /// #if_succeeds "on behalf of account can only change if reentrancy locks are not acquired" !old(areChecksInProgress(context)) && !old(isImpersonationInProgress(context)) && !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function clearOnBehalfOfAccount(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~ON_BEHALF_OF_ACCOUNT_MASK);
-    }
-
     function areChecksInProgress(
         EC context
     ) internal pure returns (bool result) {
         result = EC.unwrap(context) & CHECKS_LOCK_MASK != 0;
     }
 
-    /// #if_succeeds "check lock can only change if impersonate lock is not acquired" !old(isImpersonationInProgress(context)) && !isImpersonationInProgress(context);
+    /// #if_succeeds "check lock can only change if impersonate lock is not acquired" !isImpersonationInProgress(context);
     function setChecksInProgress(EC context) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | CHECKS_LOCK_MASK);
     }
 
-    /// #if_succeeds "check lock can only change if impersonate lock is not acquired" !old(isImpersonationInProgress(context)) && !isImpersonationInProgress(context);
+    /// #if_succeeds "check lock can only change if impersonate lock is not acquired" !isImpersonationInProgress(context);
     function clearChecksInProgress(
         EC context
     ) internal pure returns (EC result) {

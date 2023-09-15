@@ -38,7 +38,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeds "only the account owner or operator can call this" ownerOrOperator(msg.sender, account);
     /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
-    /// #if_succeeds "last signature timestamp is not updated" old(operatorLookup[account][operator].lastSignatureTimestamp) == operatorLookup[account][operator].lastSignatureTimestamp;
+    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
     function setAccountOperator(
         address account,
         address operator,
@@ -326,7 +326,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeds "vault is never present in the set after calling this" !vaultStatusChecks.contains(msg.sender);
-    function forgiveVaultStatusCheck() public payable override {
+    function forgiveVaultStatusCheck() public payable virtual override {
         super.forgiveVaultStatusCheck();
     }
 
@@ -345,7 +345,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
-    ) internal override returns (bool success, bytes memory result) {
+    ) internal virtual override returns (bool success, bytes memory result) {
         return
             super.impersonateInternal(
                 targetContract,
