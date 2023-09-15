@@ -32,6 +32,8 @@ contract IsVaultStatusCheckDeferredTest is Test {
             vm.prank(vault);
             cvc.requireVaultStatusCheck();
             assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+
+            cvc.reset();
         }
     }
 }

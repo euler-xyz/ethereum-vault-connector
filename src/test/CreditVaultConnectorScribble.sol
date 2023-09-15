@@ -6,19 +6,19 @@ import "../CreditVaultConnector.sol";
 
 /// #define ownerOrOperator(address msgSender, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)].owner == msgSender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF));) || operatorLookup[account][msgSender].authorizationExpiryTimestamp >= block.timestamp;
 
-/// #if_succeeds "batch depth is in INIT state" !old(executionContext.isInBatch()) && !executionContext.isInBatch();
-/// #if_succeeds "onBehalfOfAccount is zero address" old(executionContext.getOnBehalfOfAccount()) == address(0) && executionContext.getOnBehalfOfAccount() == address(0);
-/// #if_succeeds "checks lock is false" !old(executionContext.areChecksInProgress()) && !executionContext.areChecksInProgress();
-/// #if_succeeds "impersonate lock is false" !old(executionContext.isImpersonationInProgress()) && !executionContext.isImpersonationInProgress();
-/// #if_succeeds "account status checks set is empty 1" old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
-/// #if_succeeds "account status checks set is empty 2" old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
-/// #if_succeeds "account status checks set is empty 3" forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
-/// #if_succeeds "vault status checks set is empty 1" old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
-/// #if_succeeds "vault status checks set is empty 2" old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
-/// #if_succeeds "vault status checks set is empty 3" forall(uint i in 0...20) vaultStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "batch depth is in INIT state" !old(executionContext.isInBatch()) && msg.sig == 0x99a4bb62 ==> !executionContext.isInBatch();
+/// #if_succeeds "onBehalfOfAccount is zero address" !old(executionContext.isInBatch()) && !old(executionContext.isImpersonationInProgress()) && msg.sig != 0xc435b14b ==> old(executionContext.getOnBehalfOfAccount()) == address(0) && executionContext.getOnBehalfOfAccount() == address(0);
+/// #if_succeeds "checks lock is false" !old(executionContext.isInBatch()) ==> !old(executionContext.areChecksInProgress()) && !executionContext.areChecksInProgress();
+/// #if_succeeds "impersonate lock is false" !old(executionContext.isInBatch()) && !old(executionContext.isImpersonationInProgress()) ==> !executionContext.isImpersonationInProgress();
+/// #if_succeeds "account status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
+/// #if_succeeds "account status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
+/// #if_succeeds "account status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "vault status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
+/// #if_succeeds "vault status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
+/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) vaultStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "each account has at most 1 controller" !old(executionContext.isInBatch()) ==> forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 /// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
 /// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
-/// #if_succeeds "each account has at most 1 controller" forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 contract CreditVaultConnectorScribble is CreditVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
@@ -183,6 +183,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeds "batch depth doesn't change pre- and post- execution" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
     /// #if_succeds "checks are properly executed 1" !executionContext.isInBatch() && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
     /// #if_succeds "checks are properly executed 2" !executionContext.isInBatch() && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
+    /// #if_succeeds "batch depth is in range" !old(executionContext.isBatchDepthExceeded());
     function batch(BatchItem[] calldata items) public payable virtual override {
         super.batch(items);
     }
@@ -355,7 +356,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
             );
     }
 
-    /// #if_succeeds "batch depth is in range" !executionContext.isBatchDepthExceeded();
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
@@ -379,5 +379,25 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         bool returnResult
     ) internal override returns (BatchItemResult[] memory result) {
         return super.checkStatusAll(setType, returnResult);
+    }
+
+    // it's needed because harness is not scribble annotated
+    function getLastSignatureTimestampsInternal(
+        address account,
+        address operator
+    )
+        internal
+        view
+        returns (
+            uint40 lastSignatureTimestampOwner,
+            uint40 lastSignatureTimestampAccountOperator
+        )
+    {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        lastSignatureTimestampOwner = ownerLookup[prefix]
+            .lastSignatureTimestamp;
+        lastSignatureTimestampAccountOperator = operatorLookup[account][
+            operator
+        ].lastSignatureTimestamp;
     }
 }

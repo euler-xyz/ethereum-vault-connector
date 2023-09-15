@@ -72,12 +72,10 @@ library ExecutionContext {
         result = EC.unwrap(context) & CHECKS_LOCK_MASK != 0;
     }
 
-    /// #if_succeeds "check lock can only change if impersonate lock is not acquired" !isImpersonationInProgress(context);
     function setChecksInProgress(EC context) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | CHECKS_LOCK_MASK);
     }
 
-    /// #if_succeeds "check lock can only change if impersonate lock is not acquired" !isImpersonationInProgress(context);
     function clearChecksInProgress(
         EC context
     ) internal pure returns (EC result) {

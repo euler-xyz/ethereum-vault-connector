@@ -425,6 +425,8 @@ contract AccountStatusTest is Test {
                 assertTrue(cvc.isAccountStatusCheckDeferred(account));
             }
             cvc.verifyAccountStatusChecks();
+
+            cvc.reset();
         }
 
         // schedule the checks to be performed later to prove that after being peformed on the fly

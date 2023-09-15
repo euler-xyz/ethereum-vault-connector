@@ -35,6 +35,8 @@ contract IsAccountStatusCheckDeferredTest is Test {
 
             cvc.requireAccountStatusCheck(account);
             assertTrue(cvc.isAccountStatusCheckDeferred(account));
+
+            cvc.reset();
         }
     }
 }

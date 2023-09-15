@@ -100,12 +100,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
             uint40 lastSignatureTimestampAccountOperator
         )
     {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        lastSignatureTimestampOwner = ownerLookup[prefix]
-            .lastSignatureTimestamp;
-        lastSignatureTimestampAccountOperator = operatorLookup[account][
-            operator
-        ].lastSignatureTimestamp;
+        return getLastSignatureTimestampsInternal(account, operator);
     }
 
     // function overrides in order to verify the account and vault checks
