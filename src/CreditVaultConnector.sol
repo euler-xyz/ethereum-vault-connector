@@ -185,7 +185,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @notice A modifier that verifies whether account or vault status checks are reentered and sets the lock.
-    modifier nonReentrantChecks() {
+    modifier nonReentrantChecks() virtual {
         EC context = executionContext;
 
         if (context.areChecksInProgress()) {
@@ -202,7 +202,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
-    modifier onBehalfOfAccountContext(address account) {
+    modifier onBehalfOfAccountContext(address account) virtual {
         EC context = executionContext;
 
         executionContext = context.setOnBehalfOfAccount(account);
