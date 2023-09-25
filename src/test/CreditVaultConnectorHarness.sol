@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-import "src/test/CreditVaultConnectorScribble.sol";
-import "test/utils/mocks/Vault.sol";
+import "./CreditVaultConnectorScribble.sol";
+import "../../test/utils/mocks/Vault.sol";
 
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks
@@ -74,6 +74,25 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     function setImpersonateLock(bool locked) external {
         if (isFuzzSender()) return;
         executionContext.impersonateLock = locked;
+    }
+
+    function getLastSignatureTimestamps(
+        address account,
+        address operator
+    )
+        external
+        view
+        returns (
+            uint40 lastSignatureTimestampOwner,
+            uint40 lastSignatureTimestampAccountOperator
+        )
+    {
+        uint152 prefix = uint152(uint160(account) >> 8);
+        lastSignatureTimestampOwner = ownerLookup[prefix]
+            .lastSignatureTimestamp;
+        lastSignatureTimestampAccountOperator = operatorLookup[account][
+            operator
+        ].lastSignatureTimestamp;
     }
 
     // function overrides in order to verify the account and vault checks

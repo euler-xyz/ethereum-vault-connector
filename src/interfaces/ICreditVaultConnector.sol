@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 interface ICVC {
     struct ExecutionContext {
@@ -8,7 +8,7 @@ interface ICVC {
         bool checksLock;
         bool impersonateLock;
         address onBehalfOfAccount;
-        uint8 reserved;
+        uint72 stamp;
     }
 
     struct BatchItem {
@@ -23,33 +23,6 @@ interface ICVC {
         bytes result;
     }
 
-    /// @notice Checks whether the specified account and the other account have the same owner.
-    /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other. Accounts are considered to have a common owner if they share the first 19 bytes of their address.
-    /// @param account The address of the account that is being checked.
-    /// @param otherAccount The address of the other account that is being checked.
-    /// @return A boolean flag that indicates whether the accounts have the same owner.
-    function haveCommonOwner(
-        address account,
-        address otherAccount
-    ) external pure returns (bool);
-
-    /// @notice Returns the owner for the specified account.
-    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
-    /// @param account The address of the account whose owner is being retrieved.
-    /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
-    function getAccountOwner(address account) external view returns (address);
-
-    /// @notice Sets or unsets an operator for an account.
-    /// @dev Only the owner of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param isAuthorized A boolean flag that indicates whether the operator is authorized or not.
-    function setAccountOperator(
-        address account,
-        address operator,
-        bool isAuthorized
-    ) external payable;
-
     /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the action is being executed at the moment.
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the action is being executed at the moment.
     /// @return context Current execution context.
@@ -61,21 +34,95 @@ interface ICVC {
         view
         returns (ExecutionContext memory context, bool controllerEnabled);
 
-    /// @notice Checks whether the status check is deferred for a given account.
-    /// @dev The account status check can only be deferred if a batch of items is being executed.
-    /// @param account The address of the account for which it is checked whether the status check is deferred.
-    /// @return A boolean flag that indicates whether the status check is deferred or not.
-    function isAccountStatusCheckDeferred(
-        address account
-    ) external view returns (bool);
+    /// @notice Checks whether the specified account and the other account have the same owner.
+    /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other. Accounts are considered to have a common owner if they share the first 19 bytes of their address.
+    /// @param account The address of the account that is being checked.
+    /// @param otherAccount The address of the other account that is being checked.
+    /// @return A boolean flag that indicates whether the accounts have the same owner.
+    function haveCommonOwner(
+        address account,
+        address otherAccount
+    ) external pure returns (bool);
 
-    /// @notice Checks whether the status check is deferred for a given vault.
-    /// @dev The vault status check can only be deferred if a batch of items is being executed.
-    /// @param vault The address of the vault for which it is checked whether the status check is deferred.
-    /// @return A boolean flag that indicates whether the status check is deferred or not.
-    function isVaultStatusCheckDeferred(
-        address vault
-    ) external view returns (bool);
+    /// @notice Returns the prefix of the specified account.
+    /// @dev The prefix is the first 19 bytes of the account address.
+    /// @param account The address of the account whose prefix is being retrieved.
+    /// @return A uint152 value that represents the prefix of the account.
+    function getPrefix(address account) external pure returns (uint152);
+
+    /// @notice Returns the owner for the specified account.
+    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
+    /// @param account The address of the account whose owner is being retrieved.
+    /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
+    function getAccountOwner(address account) external view returns (address);
+
+    /// @notice Returns the authentication expiry timestamp for the operator of the specified account.
+    /// @param account The address of the account whose operator's authentication expiry timestamp is being retrieved.
+    /// @param operator The address of the operator whose authentication expiry timestamp is being retrieved.
+    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized.
+    function getAccountOperatorAuthExpiryTimestamp(
+        address account,
+        address operator
+    ) external view returns (uint40 authExpiryTimestamp);
+
+    /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have signature timestamp less than the current timestamp.
+    function invalidateAllPermits() external payable;
+
+    /// @notice Invalidates permits signed for an operator of an account which have signature tiemstamp less than the current timestamp.
+    /// @dev Only the owner of the account can call this function.
+    /// @param account The address of the account whose operator's permits are being invalidated.
+    /// @param operator The address of the operator whose permits are being invalidated.
+    function invalidateAccountOperatorPermits(
+        address account,
+        address operator
+    ) external payable;
+
+    /// @notice Sets or unsets an operator for an account.
+    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only deauthorize ifself.
+    /// @param account The address of the account whose operator is being set or unset.
+    /// @param operator The address of the operator that is being authorized or deauthorized.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block.
+    function setAccountOperator(
+        address account,
+        address operator,
+        uint40 authExpiryTimestamp
+    ) external payable;
+
+    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ECDSA signature.
+    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
+    /// @param account The address of the account whose operator is being set or unset.
+    /// @param operator The address of the operator that is being authorized or deauthorized.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @param signatureTimestamp The timestamp at which the signature was created.
+    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
+    /// @param signature The signature that is used to authorize or deauthorize the operator.
+    function setAccountOperatorPermitECDSA(
+        address account,
+        address operator,
+        uint40 authExpiryTimestamp,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
+        bytes calldata signature
+    ) external payable;
+
+    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ERC-1271 signature.
+    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
+    /// @param account The address of the account whose operator is being set or unset.
+    /// @param operator The address of the operator that is being authorized or deauthorized.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @param signatureTimestamp The timestamp at which the signature was created.
+    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
+    /// @param signature The signature that is used to authorize or deauthorize the operator.
+    /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
+    function setAccountOperatorPermitERC1271(
+        address account,
+        address operator,
+        uint40 authExpiryTimestamp,
+        uint40 signatureTimestamp,
+        uint40 signatureDeadlineTimestamp,
+        bytes calldata signature,
+        address ERC1271Signer
+    ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
     /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen controller vault.
@@ -201,6 +248,14 @@ interface ICVC {
             BatchItemResult[] memory vaultsStatusResult
         );
 
+    /// @notice Checks whether the status check is deferred for a given account.
+    /// @dev The account status check can only be deferred if a batch of items is being executed.
+    /// @param account The address of the account for which it is checked whether the status check is deferred.
+    /// @return A boolean flag that indicates whether the status check is deferred or not.
+    function isAccountStatusCheckDeferred(
+        address account
+    ) external view returns (bool);
+
     /// @notice Checks the status of an account and returns whether it is valid or not.
     /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
     /// @param account The address of the account to be checked.
@@ -257,6 +312,14 @@ interface ICVC {
         address[] calldata accounts
     ) external payable;
 
+    /// @notice Checks whether the status check is deferred for a given vault.
+    /// @dev The vault status check can only be deferred if a batch of items is being executed.
+    /// @param vault The address of the vault for which it is checked whether the status check is deferred.
+    /// @return A boolean flag that indicates whether the status check is deferred or not.
+    function isVaultStatusCheckDeferred(
+        address vault
+    ) external view returns (bool);
+
     /// @notice Checks the status of a vault and reverts if it is not valid.
     /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the transaction (vault status check is considered deferred). This function can only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
@@ -280,4 +343,11 @@ interface ICVC {
     /// @notice Forgives previously deferred vault status check.
     /// @dev Vault address is removed from the set of addresses for which status checks are deferred. This function can only be called by the vault itself.
     function forgiveVaultStatusCheck() external payable;
+
+    /// @notice Checks the status of an account and a vault and reverts if it is not valid.
+    /// @dev If in a batch, the account and the vault are added to the respective sets of accounts and vaults to be checked at the end of the transaction (status checks are considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. This function can only be called by the vault itself.
+    /// @param account The address of the account to be checked.
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) external payable;
 }
