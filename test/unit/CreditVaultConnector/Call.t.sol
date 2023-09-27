@@ -5,25 +5,11 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../../../src/test/CreditVaultConnectorHarness.sol";
 
-contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
-    using Set for SetStorage;
-
-    function handlerCall(
-        address targetContract,
-        address onBehalfOfAccount,
-        bytes calldata data
-    ) public payable returns (bool success, bytes memory result) {
-        (success, result) = super.call(targetContract, onBehalfOfAccount, data);
-
-        verifyStorage();
-    }
-}
-
 contract CallTest is Test {
-    CreditVaultConnectorHandler internal cvc;
+    CreditVaultConnectorHarness internal cvc;
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHandler();
+        cvc = new CreditVaultConnectorHarness();
     }
 
     function test_Call(address alice, uint96 seed) public {
@@ -57,7 +43,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        (bool success, bytes memory result) = cvc.handlerCall{value: seed}(
+        (bool success, bytes memory result) = cvc.call{value: seed}(
             targetContract,
             account,
             data
@@ -90,7 +76,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        cvc.batch(items);
+        cvc.batch{value: seed}(items);
 
         // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
         data = abi.encodeWithSelector(
@@ -104,7 +90,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        (success, result) = cvc.handlerCall{value: seed}(
+        (success, result) = cvc.call{value: seed}(
             targetContract,
             address(0),
             data
@@ -112,6 +98,44 @@ contract CallTest is Test {
 
         assertTrue(success);
         assertEq(abi.decode(result, (uint)), seed);
+
+        // on behalf of account should be correct in a nested call when checks are not deferred
+        data = abi.encodeWithSelector(
+            Target(targetContract).nestedCallTest.selector,
+            address(cvc),
+            address(cvc),
+            seed,
+            false,
+            account
+        );
+
+        vm.deal(alice, seed);
+        vm.prank(alice);
+        (success, result) = cvc.call{value: seed}(
+            targetContract,
+            account,
+            data
+        );
+
+        assertTrue(success);
+        assertEq(abi.decode(result, (uint)), seed);
+
+        // on behalf of account should also be correct in a nested call when checks are deferred
+        items[0].onBehalfOfAccount = account;
+        items[0].targetContract = targetContract;
+        items[0].value = seed;
+        items[0].data = abi.encodeWithSelector(
+            Target(targetContract).nestedCallTest.selector,
+            address(cvc),
+            address(cvc),
+            seed,
+            true,
+            account
+        );
+
+        vm.deal(alice, seed);
+        vm.prank(alice);
+        cvc.batch{value: seed}(items);
     }
 
     function test_RevertIfNotOwnerOrOperator_Call(
@@ -138,11 +162,7 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        (bool success, ) = cvc.handlerCall{value: seed}(
-            targetContract,
-            bob,
-            data
-        );
+        (bool success, ) = cvc.call{value: seed}(targetContract, bob, data);
 
         assertFalse(success);
     }
@@ -168,11 +188,7 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
-        (bool success, ) = cvc.handlerCall{value: seed}(
-            targetContract,
-            alice,
-            data
-        );
+        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
 
         assertFalse(success);
     }
@@ -200,11 +216,7 @@ contract CallTest is Test {
         vm.expectRevert(
             CreditVaultConnector.CVC_ImpersonateReentrancy.selector
         );
-        (bool success, ) = cvc.handlerCall{value: seed}(
-            targetContract,
-            alice,
-            data
-        );
+        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
 
         assertFalse(success);
     }
@@ -234,11 +246,7 @@ contract CallTest is Test {
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
 
-        (bool success, ) = cvc.handlerCall{value: seed}(
-            targetContract,
-            alice,
-            data
-        );
+        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
 
         assertFalse(success);
 
@@ -261,7 +269,7 @@ contract CallTest is Test {
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
 
-        (success, ) = cvc.handlerCall{value: seed}(targetContract, alice, data);
+        (success, ) = cvc.call{value: seed}(targetContract, alice, data);
 
         assertFalse(success);
     }

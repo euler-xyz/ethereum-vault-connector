@@ -8,6 +8,7 @@ import "../../test/utils/mocks/Vault.sol";
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks
 contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
+    using ExecutionContext for EC;
     using Set for SetStorage;
 
     address[] internal expectedAccountsChecked;
@@ -58,22 +59,34 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext.batchDepth = depth;
+        executionContext = EC.wrap(
+            (EC.unwrap(executionContext) & ~uint(0xff)) | uint(depth)
+        );
     }
 
     function setChecksLock(bool locked) external {
         if (isFuzzSender()) return;
-        executionContext.checksLock = locked;
-    }
 
-    function setOnBehalfOfAccount(address account) external {
-        if (isFuzzSender()) return;
-        executionContext.onBehalfOfAccount = account;
+        if (locked) {
+            executionContext = executionContext.setChecksInProgress();
+        } else {
+            executionContext = executionContext.clearChecksInProgress();
+        }
     }
 
     function setImpersonateLock(bool locked) external {
         if (isFuzzSender()) return;
-        executionContext.impersonateLock = locked;
+
+        if (locked) {
+            executionContext = executionContext.setImpersonationInProgress();
+        } else {
+            executionContext = executionContext.clearImpersonationInProgress();
+        }
+    }
+
+    function setOnBehalfOfAccount(address account) external {
+        if (isFuzzSender()) return;
+        executionContext = executionContext.setOnBehalfOfAccount(account);
     }
 
     function getLastSignatureTimestamps(
@@ -87,12 +100,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
             uint40 lastSignatureTimestampAccountOperator
         )
     {
-        uint152 prefix = uint152(uint160(account) >> 8);
-        lastSignatureTimestampOwner = ownerLookup[prefix]
-            .lastSignatureTimestamp;
-        lastSignatureTimestampAccountOperator = operatorLookup[account][
-            operator
-        ].lastSignatureTimestamp;
+        return getLastSignatureTimestampsInternal(account, operator);
     }
 
     // function overrides in order to verify the account and vault checks
@@ -189,35 +197,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         super.requireVaultStatusCheckInternal(vault);
 
         Vault(vault).pushVaultStatusChecked();
-    }
-
-    function verifyStorage() public view {
-        require(
-            executionContext.batchDepth == BATCH_DEPTH__INIT,
-            "verifyStorage/checks-deferred"
-        );
-        require(
-            executionContext.checksLock == false,
-            "verifyStorage/checks-in-progress-lock"
-        );
-        require(
-            executionContext.impersonateLock == false,
-            "verifyStorage/impersonate-lock"
-        );
-        require(
-            executionContext.onBehalfOfAccount == address(0),
-            "verifyStorage/on-behalf-of-account"
-        );
-
-        require(
-            accountStatusChecks.numElements == 0,
-            "verifyStorage/account-status-checks/numElements"
-        );
-
-        require(
-            vaultStatusChecks.numElements == 0,
-            "verifyStorage/vault-status-checks/numElements"
-        );
     }
 
     function verifyVaultStatusChecks() public view {

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../../src/test/CreditVaultConnectorScribble.sol";
+import "../../src/test/CreditVaultConnectorScribble.sol";
 
 contract VaultMock is ICreditVault {
     ICVC public immutable cvc;
@@ -378,14 +378,13 @@ contract CreditVaultConnectorInvariants is Test {
     }
 
     function invariant_executionContext() external {
-        (ICVC.ExecutionContext memory context, bool controllerEnabled) = cvc
+        (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getExecutionContext(address(this));
+        uint context = cvc.getRawExecutionContext();
 
-        assertEq(context.batchDepth, 0);
-        assertFalse(context.checksLock);
-        assertFalse(context.impersonateLock);
-        assertEq(context.onBehalfOfAccount, address(0));
+        assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
+        assertEq(context, 1 << 184);
     }
 
     function invariant_AccountAndVaultStatusChecks() external {

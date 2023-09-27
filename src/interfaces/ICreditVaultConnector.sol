@@ -3,14 +3,6 @@
 pragma solidity ^0.8.20;
 
 interface ICVC {
-    struct ExecutionContext {
-        uint8 batchDepth;
-        bool checksLock;
-        bool impersonateLock;
-        address onBehalfOfAccount;
-        uint72 stamp;
-    }
-
     struct BatchItem {
         address targetContract;
         address onBehalfOfAccount;
@@ -23,16 +15,18 @@ interface ICVC {
         bytes result;
     }
 
-    /// @notice Returns current execution context and whether the controllerToCheck is an enabled controller for the account on behalf of which the action is being executed at the moment.
-    /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the action is being executed at the moment.
-    /// @return context Current execution context.
-    /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the execution flow is being executed at the moment. Always false if controllerToCheck is address(0).
+    /// @notice Returns current raw execution context.
+    /// @dev Check for checks reentrancy in order to consume on behalf of account.
+    /// @return context Current raw execution context.
+    function getRawExecutionContext() external view returns (uint context);
+
+    /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
+    /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the operation is being executed at the moment.
+    /// @return onBehalfOfAccount An account that has been authenticated and on behalf of which the operation is being executed at the moment.
+    /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck is address(0).
     function getExecutionContext(
         address controllerToCheck
-    )
-        external
-        view
-        returns (ExecutionContext memory context, bool controllerEnabled);
+    ) external view returns (address onBehalfOfAccount, bool controllerEnabled);
 
     /// @notice Checks whether the specified account and the other account have the same owner.
     /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other. Accounts are considered to have a common owner if they share the first 19 bytes of their address.
@@ -89,7 +83,7 @@ interface ICVC {
     ) external payable;
 
     /// @notice Sets or unsets an operator for an account using EIP-712 standard and ECDSA signature.
-    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
+    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
@@ -106,7 +100,7 @@ interface ICVC {
     ) external payable;
 
     /// @notice Sets or unsets an operator for an account using EIP-712 standard and ERC-1271 signature.
-    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform actions for an account on behalf of the owner.
+    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being authorized or deauthorized.
     /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
@@ -155,7 +149,7 @@ interface ICVC {
     function disableCollateral(address account, address vault) external payable;
 
     /// @notice Returns an array of enabled controllers for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the enabled collaterals vaults. A user can have multiple controllers during a batch execution, but at most one can be selected when the account status check is performed at the end of the transaction.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances in the enabled collaterals vaults. A user can have multiple controllers during a batch execution, but at most one can be selected when the account status check is performed at the end of the top-level batch.
     /// @param account The address of the account whose controllers are being queried.
     /// @return An array of addresses that are the enabled controllers for the account.
     function getControllers(
@@ -209,12 +203,12 @@ interface ICVC {
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 
-    /// @notice Defers the account and vault status checks until the end of the execution flow and executes a batch of batch items.
+    /// @notice Defers the account and vault status checks until the end of the top-level batch and executes a batch of batch items.
     /// @dev Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.
     /// @param items An array of batch items to be executed.
     function batch(BatchItem[] calldata items) external payable;
 
-    /// @notice Defers the account and vault status checks until the end of the execution flow and executes a batch of batch items.
+    /// @notice Defers the account and vault status checks until the end of the top-level batch and executes a batch of batch items.
     /// @dev This function always reverts as it's only used for simulation purposes. Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed.
     /// @param items An array of batch items to be executed.
     /// @return batchItemsResult An array of batch item results for each item.
@@ -231,7 +225,7 @@ interface ICVC {
             BatchItemResult[] memory vaultsStatusResult
         );
 
-    /// @notice Defers the account and vault status checks until the end of the execution flow and executes a batch of batch items.
+    /// @notice Defers the account and vault status checks until the end of the top-level batch and executes a batch of batch items.
     /// @dev This function does not modify state and should only be used for simulation purposes. Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed.
     /// @param items An array of batch items to be executed.
     /// @return batchItemsResult An array of batch item results for each item.
@@ -273,12 +267,12 @@ interface ICVC {
     ) external payable returns (bool[] memory isValid);
 
     /// @notice Checks the status of an account and reverts if it is not valid.
-    /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the transaction (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
+    /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the top-level batch (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) external payable;
 
     /// @notice Checks the status of multiple accounts and reverts if any of them is not valid.
-    /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the transaction (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
+    /// @dev If in a batch, the accounts are added to the set of accounts to be checked at the end of the top-level batch (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
     /// @param accounts An array of addresses of the accounts to be checked.
     function requireAccountsStatusCheck(
         address[] calldata accounts
@@ -321,7 +315,7 @@ interface ICVC {
     ) external view returns (bool);
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
-    /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the transaction (vault status check is considered deferred). This function can only be called by the vault itself.
+    /// @dev If in a batch, the vault is added to the set of vaults to be checked at the end of the top-level batch (vault status check is considered deferred). This function can only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
 
     /// @notice Immediately checks the status of a vault if the check had been deferred by it prior to this call. It reverts if status is not valid.
@@ -345,7 +339,7 @@ interface ICVC {
     function forgiveVaultStatusCheck() external payable;
 
     /// @notice Checks the status of an account and a vault and reverts if it is not valid.
-    /// @dev If in a batch, the account and the vault are added to the respective sets of accounts and vaults to be checked at the end of the transaction (status checks are considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. This function can only be called by the vault itself.
+    /// @dev If in a batch, the account and the vault are added to the respective sets of accounts and vaults to be checked at the end of the top-level batch (status checks are considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid. This function can only be called by the vault itself.
     /// @param account The address of the account to be checked.
     function requireAccountAndVaultStatusCheck(
         address account
