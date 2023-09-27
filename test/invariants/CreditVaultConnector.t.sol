@@ -39,14 +39,20 @@ contract VaultMock is ICreditVault {
     receive() external payable {}
 }
 
+contract OperatorMock {
+    fallback() external payable {}
+}
+
 contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     using Set for SetStorage;
 
     address internal vaultMock;
+    address internal operatorMock;
     address[] public touchedAccounts;
 
     constructor() {
         vaultMock = address(new VaultMock(ICVC(address(this))));
+        operatorMock = address(new OperatorMock());
     }
 
     function getTouchedAccounts() external view returns (address[] memory) {
@@ -76,20 +82,28 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         super.invalidateAccountOperatorPermits(account, operator);
     }
 
-    function setAccountOperator(
+    function installAccountOperator(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp
     ) public payable override {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        super.setAccountOperator(account, operator, authExpiryTimestamp);
+        vm.etch(operator, operatorMock.code);
+        super.installAccountOperator(
+            account,
+            operator,
+            operatorData,
+            authExpiryTimestamp
+        );
     }
 
-    function setAccountOperatorPermitECDSA(
+    function installAccountOperatorPermitECDSA(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp,
         uint40,
         uint40,
@@ -98,12 +112,19 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        super.setAccountOperator(account, operator, authExpiryTimestamp);
+        vm.etch(operator, operatorMock.code);
+        super.installAccountOperator(
+            account,
+            operator,
+            operatorData,
+            authExpiryTimestamp
+        );
     }
 
-    function setAccountOperatorPermitERC1271(
+    function installAccountOperatorPermitERC1271(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp,
         uint40,
         uint40,
@@ -113,7 +134,13 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        super.setAccountOperator(account, operator, authExpiryTimestamp);
+        vm.etch(operator, operatorMock.code);
+        super.installAccountOperator(
+            account,
+            operator,
+            operatorData,
+            authExpiryTimestamp
+        );
     }
 
     function enableCollateral(
@@ -380,11 +407,10 @@ contract CreditVaultConnectorInvariants is Test {
     function invariant_executionContext() external {
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getExecutionContext(address(this));
-        uint context = cvc.getRawExecutionContext();
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertEq(context, 1 << 184);
+        assertEq(cvc.getRawExecutionContext(), 1 << 192);
     }
 
     function invariant_AccountAndVaultStatusChecks() external {

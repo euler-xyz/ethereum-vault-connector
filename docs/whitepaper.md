@@ -119,7 +119,7 @@ Inside each batch item, an `onBehalfOfAccount` can be specified. The `batch` fun
 
 * If they share the first 19 bytes, then `onBehalfOfAccount` is considered to be a *sub-account* of `msg.sender` and therefore `msg.sender` is authorised.
 * If `onBehalfOfAccount` is `address(0)` then it is considered to be `msg.sender` and is therefore authorised (this is a calldata gas optimisation)
-* If the `onBehalfOfAccount` has previously had `setAccountOperator` called to install `msg.sender` as an *operator* for this account, it is authorised.
+* If the `onBehalfOfAccount` has previously had `installAccountOperator` called to install `msg.sender` as an *operator* for this account, it is authorised.
 * In all other cases, the the batch item is invalid, and the entire batch transaction will fail unless the batch item allows for failure.
 
 #### Sub-Accounts

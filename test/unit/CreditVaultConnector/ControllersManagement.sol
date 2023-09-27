@@ -74,9 +74,10 @@ contract ControllersManagementTest is Test {
         ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            cvc.setAccountOperator(
+            cvc.installAccountOperator(
                 account,
                 msgSender,
+                bytes(""),
                 uint40(block.timestamp + 100)
             );
         }
@@ -160,7 +161,12 @@ contract ControllersManagementTest is Test {
         cvc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
+        cvc.installAccountOperator(
+            bob,
+            alice,
+            bytes(""),
+            uint40(block.timestamp + 100)
+        );
 
         vm.prank(alice);
         cvc.handlerEnableController(bob, vault);

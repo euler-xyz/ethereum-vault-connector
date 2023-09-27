@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import "../../utils/mocks/Operator.sol";
 import "../../../src/test/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
@@ -47,9 +48,10 @@ contract BatchTest is Test {
         cvc = new CreditVaultConnectorHandler();
     }
 
-    function test_Batch(address alice, address bob, uint seed) external {
+    function test_Batch(address alice, uint seed) external {
+        address payable bob = payable(new Operator());
         vm.assume(!cvc.haveCommonOwner(alice, bob));
-        vm.assume(seed >= 3);
+        vm.assume(seed >= 4);
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](6);
         address controller = address(new Vault(cvc));
@@ -57,6 +59,10 @@ contract BatchTest is Test {
         address alicesSubAccount = address(uint160(alice) ^ 0x10);
 
         vm.assume(bob != controller);
+
+        Operator(bob).clearFallbackCalled();
+        Operator(bob).setExpectedHash(bytes("some arbitrary data"));
+        Operator(bob).setExpectedValue(0);
 
         // -------------- FIRST BATCH -------------------------
         items[0].onBehalfOfAccount = address(0);
@@ -70,12 +76,13 @@ contract BatchTest is Test {
 
         items[1].onBehalfOfAccount = alice;
         items[1].targetContract = address(cvc);
-        items[1].value = 0;
+        items[1].value = 1; // despite this set to 1, the operator will not get the value because the it is set in the batch
         items[1].data = abi.encodeWithSelector(
-            cvc.setAccountOperator.selector,
+            cvc.installAccountOperator.selector,
             alice,
             bob,
-            type(uint40).max
+            bytes("some arbitrary data"),
+            block.timestamp
         );
 
         items[2].onBehalfOfAccount = alicesSubAccount;
@@ -135,6 +142,7 @@ contract BatchTest is Test {
         );
         assertEq(expiryTimestamp, block.timestamp);
         assertEq(address(otherVault).balance, seed);
+        assertEq(Operator(bob).fallbackCalled(), true);
 
         cvc.reset();
         Vault(controller).reset();

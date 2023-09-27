@@ -18,9 +18,10 @@ contract CallTest is Test {
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(uint160(alice) ^ 256));
             vm.prank(account);
-            cvc.setAccountOperator(
+            cvc.installAccountOperator(
                 account,
                 alice,
+                bytes(""),
                 uint40(block.timestamp + 100)
             );
         } else {

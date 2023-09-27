@@ -62,7 +62,7 @@ interface ICVC {
     /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have signature timestamp less than the current timestamp.
     function invalidateAllPermits() external payable;
 
-    /// @notice Invalidates permits signed for an operator of an account which have signature tiemstamp less than the current timestamp.
+    /// @notice Invalidates permits signed for an operator of an account which have signature timestamp less than the current timestamp.
     /// @dev Only the owner of the account can call this function.
     /// @param account The address of the account whose operator's permits are being invalidated.
     /// @param operator The address of the operator whose permits are being invalidated.
@@ -71,46 +71,52 @@ interface ICVC {
         address operator
     ) external payable;
 
-    /// @notice Sets or unsets an operator for an account.
-    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only deauthorize ifself.
+    /// @notice Installs or uninstalls an operator for an account.
+    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only uninstall ifself.
     /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block.
-    function setAccountOperator(
+    /// @param operator The address of the operator that is being installed or uninstalled.
+    /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0 or less than current block.timestamp, the operator is considered deauthorized (uninstalled). If type(uint40).max, the authorization is only valid for the duration of the operatorData call on the operator address.
+    function installAccountOperator(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp
     ) external payable;
 
-    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ECDSA signature.
+    /// @notice Installs or uninstalls an operator for an account using EIP-712 standard and ECDSA signature.
     /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @param account The address of the account whose operator is being installed or uninstalled.
+    /// @param operator The address of the operator that is being installed or uninstalled.
+    /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0 or less than current block.timestamp, the operator is considered deauthorized (uninstalled). If type(uint40).max, the authorization is only valid for the duration of the operatorData call on the operator address.
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
-    /// @param signature The signature that is used to authorize or deauthorize the operator.
-    function setAccountOperatorPermitECDSA(
+    /// @param signature The signature that is used to install or uninstall the operator.
+    function installAccountOperatorPermitECDSA(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp,
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,
         bytes calldata signature
     ) external payable;
 
-    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ERC-1271 signature.
-    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
+    /// @notice Installs or uninstalls an operator for an account using EIP-712 standard and ERC-1271 signature.
+    /// @dev Only the owner of the account can sign the data used in this function in ERC-1271 fashion. An operator is an address that can perform operations for an account on behalf of the owner.
+    /// @param account The address of the account whose operator is being installed or uninstalled.
+    /// @param operator The address of the operator that is being installed or uninstalled.
+    /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0 or less than current block.timestamp, the operator is considered deauthorized (uninstalled). If type(uint40).max, the authorization is only valid for the duration of the operatorData call on the operator address.
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
-    /// @param signature The signature that is used to authorize or deauthorize the operator.
+    /// @param signature The signature that is used to install or uninstall the operator.
     /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
-    function setAccountOperatorPermitERC1271(
+    function installAccountOperatorPermitERC1271(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp,
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,

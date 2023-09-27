@@ -84,6 +84,16 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
+    function setOperatorCallLock(bool locked) external {
+        if (isFuzzSender()) return;
+
+        if (locked) {
+            executionContext = executionContext.setOperatorCallInProgress();
+        } else {
+            executionContext = executionContext.clearOperatorCallInProgress();
+        }
+    }
+
     function setOnBehalfOfAccount(address account) external {
         if (isFuzzSender()) return;
         executionContext = executionContext.setOnBehalfOfAccount(account);

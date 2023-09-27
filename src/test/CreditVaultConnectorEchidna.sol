@@ -48,7 +48,13 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable nonReentrant override returns (bool success, bytes memory result) {
+    )
+        public
+        payable
+        override
+        nonReentrant
+        returns (bool success, bytes memory result)
+    {
         // copied function body with inserted assertion
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
@@ -80,7 +86,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
     function batch(
         BatchItem[] calldata items
-    ) public payable nonReentrant override {
+    ) public payable override nonReentrant {
         // copied function body with inserted assertion
         EC context = executionContext;
 

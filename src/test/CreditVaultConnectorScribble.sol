@@ -8,8 +8,9 @@ import "../CreditVaultConnector.sol";
 
 /// #if_succeeds "batch depth is in INIT state" !old(executionContext.isInBatch()) && msg.sig == 0x99a4bb62 ==> !executionContext.isInBatch();
 /// #if_succeeds "onBehalfOfAccount is zero address" !old(executionContext.isInBatch()) && !old(executionContext.isImpersonationInProgress()) && msg.sig != 0xc435b14b ==> old(executionContext.getOnBehalfOfAccount()) == address(0) && executionContext.getOnBehalfOfAccount() == address(0);
-/// #if_succeeds "checks lock is false" !old(executionContext.isInBatch()) ==> !old(executionContext.areChecksInProgress()) && !executionContext.areChecksInProgress();
-/// #if_succeeds "impersonate lock is false" !old(executionContext.isInBatch()) && !old(executionContext.isImpersonationInProgress()) ==> !executionContext.isImpersonationInProgress();
+/// #if_succeeds "checks lock is false" !old(executionContext.areChecksInProgress()) && !executionContext.areChecksInProgress();
+/// #if_succeeds "impersonate lock is false" !old(executionContext.isImpersonationInProgress()) ==> !executionContext.isImpersonationInProgress();
+/// #if_succeeds "operator call lock is false" !old(executionContext.isOperatorCallInProgress()) ==> !executionContext.isOperatorCallInProgress();
 /// #if_succeeds "account status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
 /// #if_succeeds "account status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
 /// #if_succeeds "account status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
@@ -37,29 +38,35 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeds "only the account owner or operator can call this" ownerOrOperator(msg.sender, account);
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
-    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
-    function setAccountOperator(
+    /// #if_succeds "is operator call non-reentant" !old(executionContext.isOperatorCallInProgress());
+    function installAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        bytes calldata operatorData,
+        uint40 authExpiryTimestamp
     ) public payable virtual override {
-        super.setAccountOperator(account, operator, expiryTimestamp);
+        super.installAccountOperator(
+            account,
+            operator,
+            operatorData,
+            authExpiryTimestamp
+        );
     }
 
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
-    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
-    function setAccountOperatorPermitECDSA(
+    /// #if_succeds "is operator call non-reentant" !old(executionContext.isOperatorCallInProgress());
+    function installAccountOperatorPermitECDSA(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp,
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,
         bytes calldata signature
     ) public payable virtual override {
-        super.setAccountOperatorPermitECDSA(
+        super.installAccountOperatorPermitECDSA(
             account,
             operator,
+            operatorData,
             authExpiryTimestamp,
             signatureTimestamp,
             signatureDeadlineTimestamp,
@@ -67,20 +74,21 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         );
     }
 
-    /// #if_succeeds "operator is not a sub-account of the owner" !haveCommonOwner(operator, ownerLookup[getPrefixInternal(account)].owner);
-    /// #if_succeeds "last signature timestamp is updated" operatorLookup[account][operator].lastSignatureTimestamp == block.timestamp;
-    function setAccountOperatorPermitERC1271(
+    /// #if_succeds "is operator call non-reentant" !old(executionContext.isOperatorCallInProgress());
+    function installAccountOperatorPermitERC1271(
         address account,
         address operator,
+        bytes calldata operatorData,
         uint40 authExpiryTimestamp,
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,
         bytes calldata signature,
         address erc1271Signer
     ) public payable virtual override {
-        super.setAccountOperatorPermitERC1271(
+        super.installAccountOperatorPermitERC1271(
             account,
             operator,
+            operatorData,
             authExpiryTimestamp,
             signatureTimestamp,
             signatureDeadlineTimestamp,
