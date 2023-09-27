@@ -188,47 +188,44 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     /// @notice A modifier that verifies whether account or vault status checks are reentered and sets the lock.
     modifier nonReentrantChecks() virtual {
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        if (context.areChecksInProgress()) {
+        if (contextCache.areChecksInProgress()) {
             revert CVC_ChecksReentrancy();
         }
 
-        executionContext = context.setChecksInProgress();
+        executionContext = contextCache.setChecksInProgress();
 
         _;
 
-        // checks in progress not have to be explicitly cleared here as we're using cached context
-        executionContext = context;
+        executionContext = contextCache;
     }
 
     /// @notice A modifier that verifies whether the operator call is in progress and sets the lock.
     modifier nonReentrantOperatorCall() virtual {
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        if (context.isOperatorCallInProgress()) {
+        if (contextCache.isOperatorCallInProgress()) {
             revert CVC_OperatorCallReentrancy();
         }
 
-        executionContext = context.setOperatorCallInProgress();
+        executionContext = contextCache.setOperatorCallInProgress();
 
         _;
 
-        // operator call in progress does not have to be explicitly cleared here as we're using cached context
-        executionContext = context;
+        executionContext = contextCache;
     }
 
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
     /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
     modifier onBehalfOfAccountContext(address account) virtual {
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        executionContext = context.setOnBehalfOfAccount(account);
+        executionContext = contextCache.setOnBehalfOfAccount(account);
 
         _;
 
-        // the on behalf of account address not have to be explicitly set here as we're using cached context
-        executionContext = context;
+        executionContext = contextCache;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -554,15 +551,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        uint value = executionContext.isInBatch() ? 0 : msg.value;
+        uint value = contextCache.isInBatch() ? 0 : msg.value;
 
         onBehalfOfAccount = onBehalfOfAccount == address(0)
             ? msg.sender
             : onBehalfOfAccount;
 
-        executionContext = context.setImpersonationInProgress();
+        executionContext = contextCache.setImpersonationInProgress();
 
         (success, result) = impersonateInternal(
             targetContract,
@@ -571,8 +568,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             data
         );
 
-        // impersonate in progress not have to be explicitly cleared here as we're using cached context
-        executionContext = context;
+        executionContext = contextCache;
     }
 
     // Batching
@@ -581,28 +577,24 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        if (context.isBatchDepthExceeded()) {
+        if (contextCache.isBatchDepthExceeded()) {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBatchDepth();
+        executionContext = contextCache.increaseBatchDepth();
 
         batchInternal(items, false);
 
-        // batch depth does not have to be explicitly decreased here as we're using cached context
-
-        if (!context.isInBatch()) {
-            executionContext = context.setChecksInProgress();
+        if (!contextCache.isInBatch()) {
+            executionContext = contextCache.setChecksInProgress();
 
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
-
-            // checks in progress not have to be explicitly cleared here as we're using cached context
         }
 
-        executionContext = context;
+        executionContext = contextCache;
     }
 
     /// @inheritdoc ICVC
@@ -619,28 +611,26 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        if (context.isBatchDepthExceeded()) {
+        if (contextCache.isBatchDepthExceeded()) {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBatchDepth();
+        executionContext = contextCache.increaseBatchDepth();
 
         batchItemsResult = batchInternal(items, true);
 
         // batch depth does not have to be explicitly decreased here as we're using cached context
 
-        if (!context.isInBatch()) {
-            executionContext = context.setChecksInProgress();
+        if (!contextCache.isInBatch()) {
+            executionContext = contextCache.setChecksInProgress();
 
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
-
-            // checks in progress not have to be explicitly cleared here as we're using cached context
         }
 
-        executionContext = context;
+        executionContext = contextCache;
 
         revert CVC_RevertedBatchResult(
             batchItemsResult,
