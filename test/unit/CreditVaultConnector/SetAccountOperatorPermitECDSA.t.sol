@@ -427,7 +427,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertEq(cvc.getAccountOwner(account), alice);
             }
 
-            // don't change the expiry timestamp if the special value is used
+            // approve the operator only for the timebeing of the operator callback if the special value is used
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(
                 bytes(abi.encode(operatorData, "5"))
@@ -439,30 +439,32 @@ contract installAccountOperatorPermitECDSATest is Test {
                 account,
                 operator,
                 bytes(abi.encode(operatorData, "5")),
-                type(uint40).max,
+                0,
                 uint40(block.timestamp),
                 uint40(block.timestamp)
             );
 
+            vm.expectEmit(true, true, false, true, address(cvc));
+            emit AccountOperatorAuthorized(account, operator, 0);
             vm.recordLogs();
             cvc.installAccountOperatorPermitECDSA{value: value + 5}(
                 account,
                 operator,
                 bytes(abi.encode(operatorData, "5")),
-                type(uint40).max,
+                0,
                 uint40(block.timestamp),
                 uint40(block.timestamp),
                 signature
             );
-            logs = vm.getRecordedLogs();
 
             {
-                assertTrue(logs.length == 0);
+                logs = vm.getRecordedLogs();
+                assertTrue(logs.length == 1);
                 uint40 expiryTimestamp = cvc
                     .getAccountOperatorAuthExpiryTimestamp(account, operator);
                 (, uint40 lastSignatureTimestamp) = cvc
                     .getLastSignatureTimestamps(account, operator);
-                assertEq(expiryTimestamp, 1);
+                assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -508,7 +510,7 @@ contract installAccountOperatorPermitECDSATest is Test {
             alice,
             operator,
             operatorData,
-            type(uint40).max,
+            0,
             uint40(block.timestamp),
             uint40(block.timestamp)
         );
@@ -517,14 +519,14 @@ contract installAccountOperatorPermitECDSATest is Test {
             alice,
             operator,
             operatorData,
-            type(uint40).max,
+            0,
             uint40(block.timestamp),
             uint40(block.timestamp),
             signature
         );
 
         assertEq(cvc.isCollateralEnabled(alice, collateral), true);
-        assertEq(cvc.getAccountOperatorAuthExpiryTimestamp(alice, operator), 0); // special value used thus authExpiryTimestamp doesn't change
+        assertEq(cvc.getAccountOperatorAuthExpiryTimestamp(alice, operator), 0);
     }
 
     function test_RevertIfOperatorCallReentrancy_installAccountOperatorPermitECDSA(

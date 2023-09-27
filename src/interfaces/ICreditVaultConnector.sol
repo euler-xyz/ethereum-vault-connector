@@ -76,7 +76,7 @@ interface ICVC {
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being installed or uninstalled.
     /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0 or less than current block.timestamp, the operator is considered deauthorized (uninstalled). If type(uint40).max, the authorization is only valid for the duration of the operatorData call on the operator address.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized (uninstalled). If 0 (special value), the authorization is valid for the duration of the operatorData call on the operator address.
     function installAccountOperator(
         address account,
         address operator,
@@ -89,7 +89,7 @@ interface ICVC {
     /// @param account The address of the account whose operator is being installed or uninstalled.
     /// @param operator The address of the operator that is being installed or uninstalled.
     /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0 or less than current block.timestamp, the operator is considered deauthorized (uninstalled). If type(uint40).max, the authorization is only valid for the duration of the operatorData call on the operator address.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized (uninstalled). If 0 (special value), the authorization is valid for the duration of the operatorData call on the operator address.
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to install or uninstall the operator.
@@ -108,7 +108,7 @@ interface ICVC {
     /// @param account The address of the account whose operator is being installed or uninstalled.
     /// @param operator The address of the operator that is being installed or uninstalled.
     /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If 0 or less than current block.timestamp, the operator is considered deauthorized (uninstalled). If type(uint40).max, the authorization is only valid for the duration of the operatorData call on the operator address.
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized (uninstalled). If 0 (special value), the authorization is valid for the duration of the operatorData call on the operator address.
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to install or uninstall the operator.

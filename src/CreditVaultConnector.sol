@@ -900,14 +900,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidAddress();
         }
 
-        OperatorStorage memory operatorCache = operatorLookup[account][
-            operator
-        ];
+        uint authExpiryTimestampCache = operatorLookup[account][operator]
+            .authExpiryTimestamp;
 
         // set new authentication expiry timestamp,
         // invalidate all the permits which have signature timestamp less than the current timestamp
         operatorLookup[account][operator] = OperatorStorage({
-            authExpiryTimestamp: authExpiryTimestamp,
+            authExpiryTimestamp: authExpiryTimestamp == 0
+                ? uint40(block.timestamp)
+                : authExpiryTimestamp,
             lastSignatureTimestamp: uint40(block.timestamp)
         });
 
@@ -919,13 +920,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (!success) revert CVC_OperatorCallFailure();
         }
 
-        if (authExpiryTimestamp == type(uint40).max) {
-            operatorLookup[account][operator]
-                .authExpiryTimestamp = authExpiryTimestamp = operatorCache
-                .authExpiryTimestamp;
+        if (authExpiryTimestamp == 0) {
+            operatorLookup[account][operator].authExpiryTimestamp = 0;
         }
 
-        if (authExpiryTimestamp != operatorCache.authExpiryTimestamp) {
+        if (authExpiryTimestamp != authExpiryTimestampCache) {
             emit AccountOperatorAuthorized(
                 account,
                 operator,

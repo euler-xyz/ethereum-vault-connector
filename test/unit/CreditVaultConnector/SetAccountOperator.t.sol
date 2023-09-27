@@ -236,7 +236,7 @@ contract installAccountOperatorTest is Test {
                 assertEq(cvc.getAccountOwner(account), alice);
             }
 
-            // don't change the expiry timestamp if the special value is used
+            // approve the operator only for the timebeing of the operator callback if the special value is used
             operatorData = bytes(abi.encode(str, "5"));
             value++;
 
@@ -246,22 +246,24 @@ contract installAccountOperatorTest is Test {
 
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
+            vm.expectEmit(true, true, false, true, address(cvc));
+            emit AccountOperatorAuthorized(account, operator, 0);
             vm.recordLogs();
             cvc.installAccountOperator{value: value}(
                 account,
                 operator,
                 operatorData,
-                type(uint40).max
+                0
             );
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
-                assertTrue(logs.length == 0);
+                assertTrue(logs.length == 1);
                 uint40 expiryTimestamp = cvc
                     .getAccountOperatorAuthExpiryTimestamp(account, operator);
                 (, uint40 lastSignatureTimestamp) = cvc
                     .getLastSignatureTimestamps(account, operator);
-                assertEq(expiryTimestamp, block.timestamp - 3);
+                assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -416,11 +418,11 @@ contract installAccountOperatorTest is Test {
                 address(cvc),
                 items
             ),
-            type(uint40).max
+            0
         );
 
         assertEq(cvc.isCollateralEnabled(alice, collateral), true);
-        assertEq(cvc.getAccountOperatorAuthExpiryTimestamp(alice, operator), 0); // special value used thus authExpiryTimestamp doesn't change
+        assertEq(cvc.getAccountOperatorAuthExpiryTimestamp(alice, operator), 0);
     }
 
     function test_RevertIfOperatorCallReentrancy_installAccountOperator(
