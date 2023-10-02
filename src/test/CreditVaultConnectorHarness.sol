@@ -84,13 +84,17 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
-    function setOperatorCallLock(bool locked) external {
+    function setOperatorCallLock(
+        address account,
+        address operator,
+        bool locked
+    ) external {
         if (isFuzzSender()) return;
 
         if (locked) {
-            executionContext = executionContext.setOperatorCallInProgress();
+            operatorLookup[account][operator].operatorCallLock = true;
         } else {
-            executionContext = executionContext.clearOperatorCallInProgress();
+            operatorLookup[account][operator].operatorCallLock = false;
         }
     }
 

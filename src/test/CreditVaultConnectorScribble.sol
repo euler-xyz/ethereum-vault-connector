@@ -6,11 +6,10 @@ import "../CreditVaultConnector.sol";
 
 /// #define ownerOrOperator(address msgSender, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)].owner == msgSender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF));) || operatorLookup[account][msgSender].authorizationExpiryTimestamp >= block.timestamp;
 
-/// #if_succeeds "batch depth is in INIT state" !old(executionContext.isInBatch()) && msg.sig == 0x99a4bb62 ==> !executionContext.isInBatch();
-/// #if_succeeds "onBehalfOfAccount is zero address" !old(executionContext.isInBatch()) && !old(executionContext.isImpersonationInProgress()) && msg.sig != 0xc435b14b ==> old(executionContext.getOnBehalfOfAccount()) == address(0) && executionContext.getOnBehalfOfAccount() == address(0);
+/// #if_succeeds "batch depth is in INIT state" !old(executionContext.isInBatch()) && msg.sig == ICVC.batch.selector ==> !executionContext.isInBatch();
+/// #if_succeeds "onBehalfOfAccount is zero address" !old(executionContext.isInBatch()) && !old(executionContext.isImpersonationInProgress()) && msg.sig != ICVC.call.selector && !operatorLookup[executionContext.getOnBehalfOfAccount()][msg.sender].operatorCallLock ==> old(executionContext.getOnBehalfOfAccount()) == address(0) && executionContext.getOnBehalfOfAccount() == address(0);
 /// #if_succeeds "checks lock is false" !old(executionContext.areChecksInProgress()) && !executionContext.areChecksInProgress();
 /// #if_succeeds "impersonate lock is false" !old(executionContext.isImpersonationInProgress()) ==> !executionContext.isImpersonationInProgress();
-/// #if_succeeds "operator call lock is false" !old(executionContext.isOperatorCallInProgress()) ==> !executionContext.isOperatorCallInProgress();
 /// #if_succeeds "account status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
 /// #if_succeeds "account status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
 /// #if_succeeds "account status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);

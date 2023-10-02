@@ -30,8 +30,11 @@ contract PermitsInvalidationTest is Test {
                 uint40 lastSignatureTimestampOwner,
                 uint40 lastSignatureTimestampAccountOperator
             ) = cvc.getLastSignatureTimestamps(account, operator);
+            (,uint40 lastSignatureTimestamp,,) = cvc
+                .getAccountOperatorContext(account, operator);
             assertEq(lastSignatureTimestampOwner, i == 0 ? 0 : block.timestamp);
             assertEq(lastSignatureTimestampAccountOperator, 0);
+            assertEq(lastSignatureTimestamp, 0);
 
             // invalidate permits for operator of the account
             vm.prank(alice);
@@ -41,8 +44,13 @@ contract PermitsInvalidationTest is Test {
                 lastSignatureTimestampOwner,
                 lastSignatureTimestampAccountOperator
             ) = cvc.getLastSignatureTimestamps(account, operator);
+            (,lastSignatureTimestamp,,) = cvc.getAccountOperatorContext(
+                account,
+                operator
+            );
             assertEq(lastSignatureTimestampOwner, i == 0 ? 0 : block.timestamp);
             assertEq(lastSignatureTimestampAccountOperator, block.timestamp);
+            assertEq(lastSignatureTimestamp, block.timestamp);
 
             // invalidate all permits for the owner
             vm.prank(alice);
@@ -52,8 +60,13 @@ contract PermitsInvalidationTest is Test {
                 lastSignatureTimestampOwner,
                 lastSignatureTimestampAccountOperator
             ) = cvc.getLastSignatureTimestamps(account, operator);
+            (,lastSignatureTimestamp,,) = cvc.getAccountOperatorContext(
+                account,
+                operator
+            );
             assertEq(lastSignatureTimestampOwner, block.timestamp);
             assertEq(lastSignatureTimestampAccountOperator, block.timestamp);
+            assertEq(lastSignatureTimestamp, block.timestamp);
         }
     }
 

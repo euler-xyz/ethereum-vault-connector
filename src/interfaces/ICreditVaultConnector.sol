@@ -50,14 +50,25 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the authentication expiry timestamp for the operator of the specified account.
-    /// @param account The address of the account whose operator's authentication expiry timestamp is being retrieved.
-    /// @param operator The address of the operator whose authentication expiry timestamp is being retrieved.
-    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized.
-    function getAccountOperatorAuthExpiryTimestamp(
+    /// @notice Returns the context of the operator for a specified account.
+    /// @param account The address of the account whose operator's context is being retrieved.
+    /// @param operator The address of the operator whose context is being retrieved.
+    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized. If singleOperatorCallAuth is true, the authorization is valid for a single call to the operator and the operator will be deauthorized right after.
+    /// @return lastSignatureTimestamp The timestamp of the last used permit signature.
+    /// @return operatorCallLock A boolean flag that indicates whether the operator is currently being called from CVC in the context of the account.
+    /// @return singleOperatorCallAuth A boolean flag that indicates whether the operator is authorized to perform only a single call to the operator in the context of the account.
+    function getAccountOperatorContext(
         address account,
         address operator
-    ) external view returns (uint40 authExpiryTimestamp);
+    )
+        external
+        view
+        returns (
+            uint40 authExpiryTimestamp,
+            uint40 lastSignatureTimestamp,
+            bool operatorCallLock,
+            bool singleOperatorCallAuth
+        );
 
     /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have signature timestamp less than the current timestamp.
     function invalidateAllPermits() external payable;
@@ -112,7 +123,7 @@ interface ICVC {
     /// @param signatureTimestamp The timestamp at which the signature was created.
     /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
     /// @param signature The signature that is used to install or uninstall the operator.
-    /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
+    /// @param signer The address of the ERC-1271 contract that is used to verify the signature.
     function installAccountOperatorPermitERC1271(
         address account,
         address operator,
@@ -121,7 +132,7 @@ interface ICVC {
         uint40 signatureTimestamp,
         uint40 signatureDeadlineTimestamp,
         bytes calldata signature,
-        address ERC1271Signer
+        address signer
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.

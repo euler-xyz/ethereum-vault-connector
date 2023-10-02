@@ -169,7 +169,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 bytes4(operatorData) != 0x1234458c
         );
         vm.assume(authExpiry >= seed && authExpiry < type(uint40).max - 1);
-        vm.assume(seed > 0 && seed < type(uint40).max - 10);
+        vm.assume(seed > 10 && seed < type(uint40).max - 10);
         vm.assume(value < type(uint16).max - 10);
 
         vm.deal(msg.sender, type(uint128).max);
@@ -182,10 +182,10 @@ contract installAccountOperatorPermitECDSATest is Test {
             address account = address(uint160(uint160(alice) ^ i));
 
             {
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, 0);
             }
@@ -202,6 +202,7 @@ contract installAccountOperatorPermitECDSATest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             // sign permit
             bytes memory signature = signer.signPermit(
@@ -209,7 +210,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 operatorData,
                 authExpiry,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 5),
                 uint40(block.timestamp)
             );
 
@@ -226,7 +227,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 operatorData,
                 authExpiry,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 5),
                 uint40(block.timestamp),
                 signature
             );
@@ -234,12 +235,12 @@ contract installAccountOperatorPermitECDSATest is Test {
 
             {
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 5);
                 assertEq(
                     Operator(operator).fallbackCalled(),
                     operatorData.length > 0 ? true : false
@@ -254,7 +255,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 operatorData,
                 authExpiry,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 5),
                 uint40(block.timestamp),
                 signature
             );
@@ -265,6 +266,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 bytes(abi.encode(operatorData, "1"))
             );
             Operator(operator).setExpectedValue(value + 1);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             signature = signer.signPermit(
@@ -272,7 +274,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 bytes(abi.encode(operatorData, "1")),
                 authExpiry,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 3),
                 uint40(block.timestamp)
             );
 
@@ -282,7 +284,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 bytes(abi.encode(operatorData, "1")),
                 authExpiry,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 3),
                 uint40(block.timestamp),
                 signature
             );
@@ -290,12 +292,12 @@ contract installAccountOperatorPermitECDSATest is Test {
 
             {
                 assertEq(logs.length, 0);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 3);
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -306,6 +308,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 bytes(abi.encode(operatorData, "2"))
             );
             Operator(operator).setExpectedValue(value + 2);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             signature = signer.signPermit(
@@ -313,7 +316,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 bytes(abi.encode(operatorData, "2")),
                 authExpiry + 1,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 2),
                 uint40(block.timestamp)
             );
 
@@ -325,7 +328,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 operator,
                 bytes(abi.encode(operatorData, "2")),
                 authExpiry + 1,
-                uint40(block.timestamp),
+                uint40(block.timestamp - 2),
                 uint40(block.timestamp),
                 signature
             );
@@ -333,12 +336,12 @@ contract installAccountOperatorPermitECDSATest is Test {
 
             {
                 assertEq(logs.length, 1);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry + 1);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 2);
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -349,6 +352,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 bytes(abi.encode(operatorData, "3"))
             );
             Operator(operator).setExpectedValue(value + 3);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             signature = signer.signPermit(
@@ -376,10 +380,10 @@ contract installAccountOperatorPermitECDSATest is Test {
 
             {
                 assertEq(logs.length, 1);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 1);
                 assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(Operator(operator).fallbackCalled(), true);
@@ -392,6 +396,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 bytes(abi.encode(operatorData, "4"))
             );
             Operator(operator).setExpectedValue(value + 4);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             signature = signer.signPermit(
@@ -417,10 +422,10 @@ contract installAccountOperatorPermitECDSATest is Test {
 
             {
                 assertEq(logs.length, 0);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 1);
                 assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(Operator(operator).fallbackCalled(), true);
@@ -433,6 +438,7 @@ contract installAccountOperatorPermitECDSATest is Test {
                 bytes(abi.encode(operatorData, "5"))
             );
             Operator(operator).setExpectedValue(value + 5);
+            Operator(operator).setExpectedSingleOperatorCallAuth(true);
 
             vm.warp(block.timestamp + 1);
             signature = signer.signPermit(
@@ -460,10 +466,10 @@ contract installAccountOperatorPermitECDSATest is Test {
             {
                 logs = vm.getRecordedLogs();
                 assertTrue(logs.length == 1);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, block.timestamp);
                 assertEq(Operator(operator).fallbackCalled(), true);
@@ -486,7 +492,7 @@ contract installAccountOperatorPermitECDSATest is Test {
         address alice = vm.addr(privateKey);
         address operator = address(new OperatorBatchCallback());
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 0 && seed < type(uint40).max - 10);
+        vm.assume(seed > 10 && seed < type(uint40).max - 10);
 
         vm.warp(seed);
 
@@ -511,7 +517,7 @@ contract installAccountOperatorPermitECDSATest is Test {
             operator,
             operatorData,
             0,
-            uint40(block.timestamp),
+            uint40(block.timestamp - 1),
             uint40(block.timestamp)
         );
 
@@ -520,18 +526,20 @@ contract installAccountOperatorPermitECDSATest is Test {
             operator,
             operatorData,
             0,
-            uint40(block.timestamp),
+            uint40(block.timestamp - 1),
             uint40(block.timestamp),
             signature
         );
 
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+            .getAccountOperatorContext(alice, operator);
         assertEq(cvc.isCollateralEnabled(alice, collateral), true);
-        assertEq(cvc.getAccountOperatorAuthExpiryTimestamp(alice, operator), 0);
+        assertEq(expiryTimestamp, 0);
+        assertEq(lastSignatureTimestamp, block.timestamp - 1);
     }
 
     function test_RevertIfOperatorCallReentrancy_installAccountOperatorPermitECDSA(
         uint privateKey,
-        bytes calldata operatorData,
         uint40 seed
     ) public {
         vm.assume(
@@ -542,17 +550,14 @@ contract installAccountOperatorPermitECDSATest is Test {
         address alice = vm.addr(privateKey);
         address payable operator = payable(new OperatorMaliciousECDSA());
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(
-            bytes4(operatorData) != 0xc41e79ed &&
-                bytes4(operatorData) != 0xb79bb2d7 &&
-                bytes4(operatorData) != 0x1234458c
-        );
         vm.assume(seed > 0 && seed < type(uint40).max - 10);
-        vm.assume(operatorData.length > 0);
         vm.warp(seed);
 
         signer.setPrivateKey(privateKey);
 
+        // CVC_OperatorCallFailure is expected due to OperatorMaliciousECDSA reverting.
+        // look at OperatorMaliciousECDSA implementation for details.
+        bytes memory operatorData = abi.encode(alice, operator);
         bytes memory signature = signer.signPermit(
             alice,
             operator,
@@ -561,11 +566,7 @@ contract installAccountOperatorPermitECDSATest is Test {
             uint40(block.timestamp),
             uint40(block.timestamp)
         );
-
-        // CVC_OperatorCallFailure is expected due to OperatorMaliciousECDSA reverting.
-        // look at OperatorMaliciousECDSA implementation for details.
         vm.expectRevert(CreditVaultConnector.CVC_OperatorCallFailure.selector);
-
         cvc.installAccountOperatorPermitECDSA(
             alice,
             operator,
@@ -576,11 +577,13 @@ contract installAccountOperatorPermitECDSATest is Test {
             signature
         );
 
-        // succeeds if operator is not called due to empty operatorData
+        // succeeds if OperatorMaliciousECDSA tries to install operator for different account.
+        // look at OperatorMaliciousECDSA implementation for details.
+        operatorData = abi.encode(address(uint160(alice) ^ 1), operator);
         signature = signer.signPermit(
             alice,
             operator,
-            bytes(""),
+            operatorData,
             0,
             uint40(block.timestamp),
             uint40(block.timestamp)
@@ -588,7 +591,33 @@ contract installAccountOperatorPermitECDSATest is Test {
         cvc.installAccountOperatorPermitECDSA(
             alice,
             operator,
-            bytes(""),
+            operatorData,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp),
+            signature
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        // succeeds if OperatorMaliciousECDSA tries to install different operator for the account
+        // look at OperatorMaliciousECDSA implementation for details.
+        operatorData = abi.encode(
+            alice,
+            address(uint160(address(operator)) ^ 1)
+        );
+        signature = signer.signPermit(
+            alice,
+            operator,
+            operatorData,
+            0,
+            uint40(block.timestamp),
+            uint40(block.timestamp)
+        );
+        cvc.installAccountOperatorPermitECDSA(
+            alice,
+            operator,
+            operatorData,
             0,
             uint40(block.timestamp),
             uint40(block.timestamp),
@@ -949,6 +978,7 @@ contract installAccountOperatorPermitECDSATest is Test {
         vm.warp(seed);
 
         Operator(operator).setExpectedHash(operatorData);
+        Operator(operator).setExpectedSingleOperatorCallAuth(true);
 
         signer.setPrivateKey(privateKey);
 

@@ -51,10 +51,10 @@ contract installAccountOperatorTest is Test {
             address account = address(uint160(uint160(alice) ^ i));
 
             {
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, 0);
             }
@@ -62,6 +62,7 @@ contract installAccountOperatorTest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             if (i == 0) {
                 vm.expectRevert(
@@ -91,17 +92,30 @@ contract installAccountOperatorTest is Test {
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
                 assertEq(
                     Operator(operator).fallbackCalled(),
                     operatorData.length > 0 ? true : false
                 );
                 assertEq(cvc.getAccountOwner(account), alice);
+            }
+
+            // invalidate all signed permits for the operator of the account to modify the lastSignatureTimestamp
+            vm.prank(alice);
+            cvc.invalidateAccountOperatorPermits(account, operator);
+
+            {
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
+                assertEq(expiryTimestamp, authExpiry);
+                assertEq(lastSignatureTimestamp, block.timestamp);
             }
 
             // don't emit the event if the operator is already enabled with the same expiry timestamp
@@ -111,6 +125,7 @@ contract installAccountOperatorTest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
@@ -125,12 +140,12 @@ contract installAccountOperatorTest is Test {
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 0);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 1); // does not get modified if non-permit function used
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -142,6 +157,7 @@ contract installAccountOperatorTest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
@@ -158,12 +174,12 @@ contract installAccountOperatorTest is Test {
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 1);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry + 1);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 2); // does not get modified if non-permit function used
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -175,6 +191,7 @@ contract installAccountOperatorTest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
@@ -195,12 +212,12 @@ contract installAccountOperatorTest is Test {
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 1);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, block.timestamp - 1);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 3); // does not get modified if non-permit function used
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -212,6 +229,7 @@ contract installAccountOperatorTest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
@@ -226,12 +244,12 @@ contract installAccountOperatorTest is Test {
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 0);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, block.timestamp - 2);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 4); // does not get modified if non-permit function used
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -243,6 +261,7 @@ contract installAccountOperatorTest is Test {
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(true);
 
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
@@ -259,12 +278,12 @@ contract installAccountOperatorTest is Test {
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertTrue(logs.length == 1);
-                uint40 expiryTimestamp = cvc
-                    .getAccountOperatorAuthExpiryTimestamp(account, operator);
-                (, uint40 lastSignatureTimestamp) = cvc
-                    .getLastSignatureTimestamps(account, operator);
+                (
+                    uint40 expiryTimestamp,
+                    uint40 lastSignatureTimestamp,,
+                ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
-                assertEq(lastSignatureTimestamp, block.timestamp);
+                assertEq(lastSignatureTimestamp, block.timestamp - 5); // does not get modified if non-permit function used
                 assertEq(Operator(operator).fallbackCalled(), true);
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -295,20 +314,15 @@ contract installAccountOperatorTest is Test {
             uint value = val;
             address account = address(uint160(uint160(alice) ^ i));
 
-            uint40 expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-                account,
-                operator
-            );
-            (, uint40 lastSignatureTimestamp) = cvc.getLastSignatureTimestamps(
-                account,
-                operator
-            );
+            (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+                .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, 0);
             assertEq(lastSignatureTimestamp, 0);
 
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
             if (i == 0) {
                 vm.expectRevert(
@@ -337,31 +351,46 @@ contract installAccountOperatorTest is Test {
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-                account,
-                operator
-            );
-            (, lastSignatureTimestamp) = cvc.getLastSignatureTimestamps(
-                account,
-                operator
-            );
+            (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+                .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, authExpiry);
-            assertEq(lastSignatureTimestamp, block.timestamp);
+            assertEq(lastSignatureTimestamp, 0);
             assertEq(
                 Operator(operator).fallbackCalled(),
                 operatorData.length > 0 ? true : false
             );
             assertEq(cvc.getAccountOwner(account), alice);
 
-            // an operator can only deauthorize itself
+            // invalidate all signed permits for the operator of the account to modify the lastSignatureTimestamp
+            vm.prank(alice);
+            cvc.invalidateAccountOperatorPermits(account, operator);
+
+            (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+                .getAccountOperatorContext(account, operator);
+            assertEq(expiryTimestamp, authExpiry);
+            assertEq(lastSignatureTimestamp, block.timestamp);
+
+            // an operator can only deauthorize itself.
+            // reverts because operatorData is non-empty
             operatorData = bytes(abi.encode(str, "1"));
             value++;
 
+            vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+            cvc.installAccountOperator{value: value}(
+                account,
+                operator,
+                operatorData,
+                uint40(block.timestamp)
+            );
+
+            // an operator can only deauthorize itself.
+            // succeeds if operatorData is empty
+            operatorData = bytes("");
             Operator(operator).clearFallbackCalled();
             Operator(operator).setExpectedHash(operatorData);
             Operator(operator).setExpectedValue(value);
+            Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
-            vm.warp(block.timestamp + 1);
             vm.expectEmit(true, true, false, true, address(cvc));
             emit AccountOperatorAuthorized(account, operator, block.timestamp);
             vm.recordLogs();
@@ -375,17 +404,11 @@ contract installAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-                account,
-                operator
-            );
-            (, lastSignatureTimestamp) = cvc.getLastSignatureTimestamps(
-                account,
-                operator
-            );
+            (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+                .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, block.timestamp);
-            assertEq(lastSignatureTimestamp, block.timestamp);
-            assertEq(Operator(operator).fallbackCalled(), true);
+            assertEq(lastSignatureTimestamp, block.timestamp); // does not get modified if non-permit function used
+            assertEq(Operator(operator).fallbackCalled(), false);
             assertEq(cvc.getAccountOwner(account), alice);
         }
     }
@@ -421,25 +444,22 @@ contract installAccountOperatorTest is Test {
             0
         );
 
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+            .getAccountOperatorContext(alice, operator);
         assertEq(cvc.isCollateralEnabled(alice, collateral), true);
-        assertEq(cvc.getAccountOperatorAuthExpiryTimestamp(alice, operator), 0);
+        assertEq(expiryTimestamp, 0);
+        assertEq(lastSignatureTimestamp, 0);
     }
 
     function test_RevertIfOperatorCallReentrancy_installAccountOperator(
-        address alice,
-        bytes calldata operatorData
+        address alice
     ) public {
-        vm.assume(
-            bytes4(operatorData) != 0xc41e79ed &&
-                bytes4(operatorData) != 0xb79bb2d7 &&
-                bytes4(operatorData) != 0x1234458c
-        );
-
         address payable operator = payable(new OperatorMalicious());
 
         vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(operatorData.length > 0);
+
+        bytes memory operatorData = abi.encode(alice, operator);
 
         vm.prank(alice);
         // CVC_OperatorCallFailure is expected due to OperatorMalicious reverting.
@@ -447,9 +467,20 @@ contract installAccountOperatorTest is Test {
         vm.expectRevert(CreditVaultConnector.CVC_OperatorCallFailure.selector);
         cvc.installAccountOperator(alice, operator, operatorData, 0);
 
-        // succeeds if operator is not called due to empty operatorData
+        // succeeds if OperatorMalicious tries to install operator for different account.
+        // look at OperatorMalicious implementation for details.
+        operatorData = abi.encode(address(uint160(alice) ^ 1), operator);
         vm.prank(alice);
-        cvc.installAccountOperator(alice, operator, bytes(""), 0);
+        cvc.installAccountOperator(alice, operator, operatorData, 0);
+
+        // succeeds if OperatorMalicious tries to install different operator for the account
+        // look at OperatorMalicious implementation for details.
+        operatorData = abi.encode(
+            alice,
+            address(uint160(address(operator)) ^ 1)
+        );
+        vm.prank(alice);
+        cvc.installAccountOperator(alice, operator, operatorData, 0);
     }
 
     function test_RevertIfSenderNotOwnerAndNotOperator_installAccountOperator(
@@ -483,46 +514,28 @@ contract installAccountOperatorTest is Test {
 
     function test_RevertWhenOperatorNotAuthorizedToPerformTheOperation_installAccountOperator(
         address alice,
-        bytes calldata operatorData,
         uint40 authExpiry,
         uint40 seed
     ) public {
         address payable operator = payable(new Operator());
         vm.assume(alice != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(
-            bytes4(operatorData) != 0xc41e79ed &&
-                bytes4(operatorData) != 0xb79bb2d7 &&
-                bytes4(operatorData) != 0x1234458c
-        );
         vm.assume(seed > 10 && seed < type(uint40).max - 1000);
         vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
 
         vm.warp(seed);
-        uint40 expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-            alice,
-            operator
-        );
-        (, uint40 lastSignatureTimestamp) = cvc.getLastSignatureTimestamps(
-            alice,
-            operator
-        );
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+            .getAccountOperatorContext(alice, operator);
         assertEq(expiryTimestamp, 0);
         assertEq(lastSignatureTimestamp, 0);
 
         vm.prank(alice);
         cvc.installAccountOperator(alice, operator, bytes(""), authExpiry);
 
-        expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-            alice,
-            operator
-        );
-        (, lastSignatureTimestamp) = cvc.getLastSignatureTimestamps(
-            alice,
-            operator
-        );
+        (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+            .getAccountOperatorContext(alice, operator);
         assertEq(expiryTimestamp, authExpiry);
-        assertEq(lastSignatureTimestamp, block.timestamp);
+        assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
 
         // operator cannot authorize itself (set authorization expiry timestamp in the future)
         vm.prank(operator);
@@ -553,32 +566,24 @@ contract installAccountOperatorTest is Test {
             uint40(block.timestamp)
         );
 
-        // but operator can deauthorize itself and callback itself using operatorData
+        // but operator can deauthorize itself
         Operator(operator).clearFallbackCalled();
-        Operator(operator).setExpectedHash(operatorData);
+        Operator(operator).setExpectedHash(bytes(""));
+        Operator(operator).setExpectedSingleOperatorCallAuth(false);
 
         vm.prank(operator);
         cvc.installAccountOperator(
             alice,
             operator,
-            operatorData,
+            bytes(""),
             uint40(block.timestamp)
         );
 
-        expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-            alice,
-            operator
-        );
-        (, lastSignatureTimestamp) = cvc.getLastSignatureTimestamps(
-            alice,
-            operator
-        );
+        (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+            .getAccountOperatorContext(alice, operator);
         assertEq(expiryTimestamp, block.timestamp);
-        assertEq(lastSignatureTimestamp, block.timestamp);
-        assertEq(
-            Operator(operator).fallbackCalled(),
-            operatorData.length > 0 ? true : false
-        );
+        assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
+        assertEq(Operator(operator).fallbackCalled(), false);
     }
 
     function test_RevertIfOperatorIsSendersAccount_installAccountOperator(

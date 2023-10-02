@@ -9,6 +9,7 @@ contract Operator {
     bool public fallbackCalled;
     bytes32 internal expectedHash;
     uint internal expectedValue;
+    bool internal expectedSingleOperatorCallAuth;
 
     function clearFallbackCalled() external {
         fallbackCalled = false;
@@ -22,9 +23,37 @@ contract Operator {
         expectedValue = value;
     }
 
+    function setExpectedSingleOperatorCallAuth(bool single) external {
+        expectedSingleOperatorCallAuth = single;
+    }
+
     fallback(bytes calldata data) external payable returns (bytes memory) {
         fallbackCalled = true;
 
+        (address onBahalfOfAccount, ) = ICVC(msg.sender).getExecutionContext(
+            address(0)
+        );
+        (
+            uint40 authExpiryTimestamp,
+            ,
+            bool operatorCallLock,
+            bool singleOperatorCallAuth
+        ) = ICVC(msg.sender).getAccountOperatorContext(
+                onBahalfOfAccount,
+                address(this)
+            );
+
+        require(operatorCallLock, "o/invalid-lock");
+        require(
+            singleOperatorCallAuth == expectedSingleOperatorCallAuth,
+            "o/invalid-single"
+        );
+        require(
+            (singleOperatorCallAuth &&
+                authExpiryTimestamp == block.timestamp) ||
+                !singleOperatorCallAuth,
+            "o/invalid-timestamp"
+        );
         require(data.length > 0, "o/invalid-data");
         require(keccak256(data) == expectedHash, "o/invalid-hash");
         require(msg.value == expectedValue, "o/invalid-value");
@@ -38,12 +67,17 @@ contract Operator {
 }
 
 contract OperatorMalicious {
-    fallback() external payable {
+    fallback(bytes calldata data) external payable returns (bytes memory) {
+        (address account, address operator) = abi.decode(
+            data,
+            (address, address)
+        );
+
         // try to reenter the CVC contract
         try
             ICVC(msg.sender).installAccountOperator(
-                address(0),
-                address(0),
+                account,
+                operator,
                 bytes(""),
                 0
             )
@@ -53,38 +87,54 @@ contract OperatorMalicious {
                 CreditVaultConnector.CVC_OperatorCallReentrancy.selector
             ) revert();
         }
+
+        return data;
     }
 }
 
 contract OperatorMaliciousECDSA {
-    fallback() external payable {
+    fallback(bytes calldata data) external payable returns (bytes memory) {
+        (address account, address operator) = abi.decode(
+            data,
+            (address, address)
+        );
+
         // try to reenter the CVC contract
         try
             ICVC(msg.sender).installAccountOperatorPermitECDSA(
-                address(0),
-                address(0),
+                account,
+                operator,
                 bytes(""),
                 0,
                 0,
                 0,
                 bytes("")
             )
-        {} catch (bytes memory reason) {
+        {
+            revert();
+        } catch (bytes memory reason) {
             if (
                 bytes4(reason) ==
                 CreditVaultConnector.CVC_OperatorCallReentrancy.selector
             ) revert();
         }
+
+        return data;
     }
 }
 
 contract OperatorMaliciousERC1271 {
-    fallback() external payable {
+    fallback(bytes calldata data) external payable returns (bytes memory) {
+        (address account, address operator) = abi.decode(
+            data,
+            (address, address)
+        );
+
         // try to reenter the CVC contract
         try
             ICVC(msg.sender).installAccountOperatorPermitERC1271(
-                address(0),
-                address(0),
+                account,
+                operator,
                 bytes(""),
                 0,
                 0,
@@ -92,12 +142,16 @@ contract OperatorMaliciousERC1271 {
                 bytes(""),
                 address(0)
             )
-        {} catch (bytes memory reason) {
+        {
+            revert();
+        } catch (bytes memory reason) {
             if (
                 bytes4(reason) ==
                 CreditVaultConnector.CVC_OperatorCallReentrancy.selector
             ) revert();
         }
+
+        return data;
     }
 }
 

@@ -63,6 +63,7 @@ contract BatchTest is Test {
         Operator(bob).clearFallbackCalled();
         Operator(bob).setExpectedHash(bytes("some arbitrary data"));
         Operator(bob).setExpectedValue(0);
+        Operator(bob).setExpectedSingleOperatorCallAuth(false);
 
         // -------------- FIRST BATCH -------------------------
         items[0].onBehalfOfAccount = address(0);
@@ -136,11 +137,10 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        uint40 expiryTimestamp = cvc.getAccountOperatorAuthExpiryTimestamp(
-            alice,
-            bob
-        );
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+            .getAccountOperatorContext(alice, bob);
         assertEq(expiryTimestamp, block.timestamp);
+        assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
         assertEq(address(otherVault).balance, seed);
         assertEq(Operator(bob).fallbackCalled(), true);
 
