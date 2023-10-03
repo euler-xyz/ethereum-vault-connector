@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import "../../src/test/CreditVaultConnectorScribble.sol";
+import "./CreditVaultConnectorScribble.sol";
 
 contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     using ExecutionContext for EC;

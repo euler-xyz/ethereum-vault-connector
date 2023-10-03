@@ -15,4 +15,4 @@ fuzz:
   number_of_cores: 32
   time_limit: 1hour
   targets:
-    - "src/test/CreditVaultConnectorScribble.sol"
+    - "test/cvc/CreditVaultConnectorScribble.sol"
