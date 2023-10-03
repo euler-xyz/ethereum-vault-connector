@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import "../CreditVaultConnector.sol";
+import "../../src/CreditVaultConnector.sol";
 
 /// #define ownerOrOperator(address msgSender, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)].owner == msgSender || (ownerLookup[uint152(uint160(account) >> 8)].owner == address(0) && (uint160(msgSender) | 0xFF) == (uint160(account) | 0xFF));) || operatorLookup[account][msgSender].authorizationExpiryTimestamp >= block.timestamp;
 

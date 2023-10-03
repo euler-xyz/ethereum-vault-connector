@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "./CreditVaultConnectorScribble.sol";
-import "../../test/utils/mocks/Vault.sol";
+import "../utils/mocks/Vault.sol";
 
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import "../../src/interfaces/ICreditVault.sol";
 import "../../src/interfaces/ICreditVaultConnector.sol";
-import "../../src/test/CreditVaultConnectorEchidna.sol";
+import "../cvc/CreditVaultConnectorEchidna.sol";
 
 interface IHevm {
     function prank(address) external;
