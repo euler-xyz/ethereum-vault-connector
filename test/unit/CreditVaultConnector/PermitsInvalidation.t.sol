@@ -30,7 +30,7 @@ contract PermitsInvalidationTest is Test {
                 uint40 lastSignatureTimestampOwner,
                 uint40 lastSignatureTimestampAccountOperator
             ) = cvc.getLastSignatureTimestamps(account, operator);
-            (,uint40 lastSignatureTimestamp,,) = cvc
+            (, uint40 lastSignatureTimestamp, , ) = cvc
                 .getAccountOperatorContext(account, operator);
             assertEq(lastSignatureTimestampOwner, i == 0 ? 0 : block.timestamp);
             assertEq(lastSignatureTimestampAccountOperator, 0);
@@ -44,7 +44,7 @@ contract PermitsInvalidationTest is Test {
                 lastSignatureTimestampOwner,
                 lastSignatureTimestampAccountOperator
             ) = cvc.getLastSignatureTimestamps(account, operator);
-            (,lastSignatureTimestamp,,) = cvc.getAccountOperatorContext(
+            (, lastSignatureTimestamp, , ) = cvc.getAccountOperatorContext(
                 account,
                 operator
             );
@@ -60,7 +60,7 @@ contract PermitsInvalidationTest is Test {
                 lastSignatureTimestampOwner,
                 lastSignatureTimestampAccountOperator
             ) = cvc.getLastSignatureTimestamps(account, operator);
-            (,lastSignatureTimestamp,,) = cvc.getAccountOperatorContext(
+            (, lastSignatureTimestamp, , ) = cvc.getAccountOperatorContext(
                 account,
                 operator
             );

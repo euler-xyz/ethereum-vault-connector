@@ -184,7 +184,9 @@ contract installAccountOperatorPermitECDSATest is Test {
             {
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, 0);
@@ -237,7 +239,9 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(lastSignatureTimestamp, block.timestamp - 5);
@@ -294,7 +298,9 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertEq(logs.length, 0);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(lastSignatureTimestamp, block.timestamp - 3);
@@ -338,7 +344,9 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertEq(logs.length, 1);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry + 1);
                 assertEq(lastSignatureTimestamp, block.timestamp - 2);
@@ -382,7 +390,9 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertEq(logs.length, 1);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 1);
                 assertEq(lastSignatureTimestamp, block.timestamp);
@@ -424,7 +434,9 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertEq(logs.length, 0);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 1);
                 assertEq(lastSignatureTimestamp, block.timestamp);
@@ -468,7 +480,9 @@ contract installAccountOperatorPermitECDSATest is Test {
                 assertTrue(logs.length == 1);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, block.timestamp);
@@ -531,7 +545,7 @@ contract installAccountOperatorPermitECDSATest is Test {
             signature
         );
 
-        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp, , ) = cvc
             .getAccountOperatorContext(alice, operator);
         assertEq(cvc.isCollateralEnabled(alice, collateral), true);
         assertEq(expiryTimestamp, 0);

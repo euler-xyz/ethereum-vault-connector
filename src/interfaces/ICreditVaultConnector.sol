@@ -50,89 +50,45 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the context of the operator for a specified account.
-    /// @param account The address of the account whose operator's context is being retrieved.
-    /// @param operator The address of the operator whose context is being retrieved.
-    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized. If singleOperatorCallAuth is true, the authorization is valid for a single call to the operator and the operator will be deauthorized right after.
-    /// @return lastSignatureTimestamp The timestamp of the last used permit signature.
-    /// @return operatorCallLock A boolean flag that indicates whether the operator is currently being called from CVC in the context of the account.
-    /// @return singleOperatorCallAuth A boolean flag that indicates whether the operator is authorized to perform only a single call to the operator in the context of the account.
-    function getAccountOperatorContext(
+    /// @notice Returns the nonce for a given account and nonce index.
+    /// @dev Each nonce index provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce index before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
+    /// @param account The address of the account for which the nonce is being retrieved.
+    /// @param nonceIndex The nonce index for which the nonce is being retrieved.
+    /// @return nonce The current nonce for the given account and nonce index.
+    function getNonce(
+        address account,
+        uint nonceIndex
+    ) external view returns (uint nonce);
+
+    /// @notice Returns information whether given operator has been authorized for the account.
+    /// @param account The address of the account whose operator is being checked.
+    /// @param operator The address of the operator that is being checked.
+    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized.
+    function getAccountOperator(
         address account,
         address operator
-    )
-        external
-        view
-        returns (
-            uint40 authExpiryTimestamp,
-            uint40 lastSignatureTimestamp,
-            bool operatorCallLock,
-            bool singleOperatorCallAuth
-        );
+    ) external view returns (uint authExpiryTimestamp);
 
-    /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have signature timestamp less than the current timestamp.
-    function invalidateAllPermits() external payable;
-
-    /// @notice Invalidates permits signed for an operator of an account which have signature timestamp less than the current timestamp.
-    /// @dev Only the owner of the account can call this function.
-    /// @param account The address of the account whose operator's permits are being invalidated.
-    /// @param operator The address of the operator whose permits are being invalidated.
-    function invalidateAccountOperatorPermits(
+    /// @notice Sets the nonce for a given account and nonce index.
+    /// @dev This function can only be called by the owner of the account. Each nonce index provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce index before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce index accordingly. To invalidate all the permit messages for a given nonce index, set the nonce to type(uint).max.
+    /// @param account The address of the account for which the nonce is being set.
+    /// @param nonceIndex The nonce index for which the nonce is being set.
+    /// @param nonce The new nonce for the given account and nonce index.
+    function setNonce(
         address account,
-        address operator
+        uint nonceIndex,
+        uint nonce
     ) external payable;
 
-    /// @notice Installs or uninstalls an operator for an account.
+    /// @notice Authorizes or deauthorizes an operator for the account.
     /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only uninstall ifself.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being installed or uninstalled.
-    /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized (uninstalled). If 0 (special value), the authorization is valid for the duration of the operatorData call on the operator address.
-    function installAccountOperator(
+    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized.
+    function setAccountOperator(
         address account,
         address operator,
-        bytes calldata operatorData,
         uint40 authExpiryTimestamp
-    ) external payable;
-
-    /// @notice Installs or uninstalls an operator for an account using EIP-712 standard and ECDSA signature.
-    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being installed or uninstalled.
-    /// @param operator The address of the operator that is being installed or uninstalled.
-    /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized (uninstalled). If 0 (special value), the authorization is valid for the duration of the operatorData call on the operator address.
-    /// @param signatureTimestamp The timestamp at which the signature was created.
-    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
-    /// @param signature The signature that is used to install or uninstall the operator.
-    function installAccountOperatorPermitECDSA(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp,
-        bytes calldata signature
-    ) external payable;
-
-    /// @notice Installs or uninstalls an operator for an account using EIP-712 standard and ERC-1271 signature.
-    /// @dev Only the owner of the account can sign the data used in this function in ERC-1271 fashion. An operator is an address that can perform operations for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being installed or uninstalled.
-    /// @param operator The address of the operator that is being installed or uninstalled.
-    /// @param operatorData The data that is called on the operator address when it is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized (uninstalled). If 0 (special value), the authorization is valid for the duration of the operatorData call on the operator address.
-    /// @param signatureTimestamp The timestamp at which the signature was created.
-    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
-    /// @param signature The signature that is used to install or uninstall the operator.
-    /// @param signer The address of the ERC-1271 contract that is used to verify the signature.
-    function installAccountOperatorPermitERC1271(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp,
-        bytes calldata signature,
-        address signer
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
@@ -219,6 +175,21 @@ interface ICVC {
         address onBehalfOfAccount,
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
+
+    /// @notice Executes signed arbitrary data by calling into the CVC.
+    /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.
+    /// @param owner The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271).
+    /// @param nonce The nonce of the owner who signed the permit message.
+    /// @param deadline The timestamp after which the permit is considered expired.
+    /// @param data The encoded data which is called on the CVC contract.
+    /// @param signature The signature of the data signed by the owner.
+    function permit(
+        address owner,
+        uint nonce,
+        uint deadline,
+        bytes calldata data,
+        bytes calldata signature
+    ) external payable;
 
     /// @notice Defers the account and vault status checks until the end of the top-level batch and executes a batch of batch items.
     /// @dev Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.

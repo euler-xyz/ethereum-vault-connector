@@ -16,12 +16,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     //                                       CONSTANTS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    string public constant name = "Credit Vault Connector (CVC)";
+    string public constant name = "Credit Vault Connector";
     string public constant version = "1";
 
-    bytes32 public constant OPERATOR_PERMIT_TYPEHASH =
+    bytes32 public constant PERMIT_TYPEHASH =
         keccak256(
-            "OperatorPermit(address account,address operator,bytes operatorData,uint40 authExpiryTimestamp,uint40 signatureTimestamp,uint40 signatureDeadlineTimestamp)"
+            "Permit(address owner,uint nonceIndex,uint nonce,uint deadline,bytes data)"
         );
 
     bytes32 internal constant TYPE_HASH =
@@ -50,21 +50,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     // account/152 -> prefix/152
     // To get prefix for the account, it's enough to take the account address and right shift it by 8 bits.
 
-    struct OwnerStorage {
-        address owner;
-        uint40 lastSignatureTimestamp;
-    }
+    mapping(uint152 prefix => address owner) internal ownerLookup;
 
-    mapping(uint152 prefix => OwnerStorage) internal ownerLookup;
+    mapping(uint152 prefix => mapping(uint nonceIndex => uint nonce))
+        internal nonceLookup;
 
-    struct OperatorStorage {
-        uint40 authExpiryTimestamp;
-        uint40 lastSignatureTimestamp;
-        bool operatorCallLock;
-        bool singleOperatorCallAuth;
-    }
-
-    mapping(address account => mapping(address operator => OperatorStorage))
+    mapping(address account => mapping(address operator => uint authExpiryTimestamp))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,13 +86,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
+    error CVC_InvalidNonce();
     error CVC_InvalidAddress();
     error CVC_InvalidTimestamp();
-    error CVC_InvalidSignature();
+    error CVC_InvalidData();
     error CVC_ChecksReentrancy();
     error CVC_ImpersonateReentrancy();
-    error CVC_OperatorCallReentrancy();
-    error CVC_OperatorCallFailure();
     error CVC_BatchDepthViolation();
     error CVC_ControllerViolation();
     error CVC_AccountStatusViolation(address account, bytes data);
@@ -118,41 +108,54 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @notice A modifier that allows only the owner of the account to call the function.
-    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup.
-    /// @param account The address of the account for which it is checked whether msg.sender is the owner.
+    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. In case of permit() function execution, the CVC address becomes msg.sender hence the caller address (that is permit message signer) is taken from the execution context.
+    /// @param account The address of the account for which it is checked whether the caller is the owner.
     modifier onlyOwner(address account) {
-        if (haveCommonOwnerInternal(account, msg.sender)) {
-            address owner = getAccountOwnerInternal(account);
+        {
+            // CVC can only be msg.sender during the permit() function call. in that case,
+            // the caller address (that is permit message signer) is taken from the execution context
+            address caller = address(this) == msg.sender
+                ? executionContext.getOnBehalfOfAccount()
+                : msg.sender;
 
-            if (owner == address(0)) {
-                setAccountOwnerInternal(account, msg.sender);
-            } else if (owner != msg.sender) {
+            if (haveCommonOwnerInternal(account, caller)) {
+                address owner = getAccountOwnerInternal(account);
+
+                if (owner == address(0)) {
+                    setAccountOwnerInternal(account, caller);
+                } else if (owner != caller) {
+                    revert CVC_NotAuthorized();
+                }
+            } else {
                 revert CVC_NotAuthorized();
             }
-        } else {
-            revert CVC_NotAuthorized();
         }
 
         _;
     }
 
     /// @notice A modifier that allows only the owner or an operator of the account to call the function.
-    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner.
-    /// @param account The address of the account for which it is checked whether msg.sender is the owner or an operator.
+    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner. In case of permit() function execution, the CVC address becomes msg.sender hence the caller address (that is permit message signer) is taken from the execution context.
+    /// @param account The address of the account for which it is checked whether the caller is the owner or an operator.
     modifier onlyOwnerOrOperator(address account) {
-        if (haveCommonOwnerInternal(account, msg.sender)) {
-            address owner = getAccountOwnerInternal(account);
+        {
+            // CVC can only be msg.sender during the permit() function call. in that case,
+            // the caller address (that is permit message signer) is taken from the execution context
+            address caller = address(this) == msg.sender
+                ? executionContext.getOnBehalfOfAccount()
+                : msg.sender;
 
-            if (owner == address(0)) {
-                setAccountOwnerInternal(account, msg.sender);
-            } else if (owner != msg.sender) {
+            if (haveCommonOwnerInternal(account, caller)) {
+                address owner = getAccountOwnerInternal(account);
+
+                if (owner == address(0)) {
+                    setAccountOwnerInternal(account, caller);
+                } else if (owner != caller) {
+                    revert CVC_NotAuthorized();
+                }
+            } else if (operatorLookup[account][caller] < block.timestamp) {
                 revert CVC_NotAuthorized();
             }
-        } else if (
-            operatorLookup[account][msg.sender].authExpiryTimestamp <
-            block.timestamp
-        ) {
-            revert CVC_NotAuthorized();
         }
 
         _;
@@ -201,20 +204,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         _;
 
         executionContext = contextCache;
-    }
-
-    /// @notice A modifier that verifies whether the operator call for a given account-operator pair is reentered and sets the lock.
-    modifier nonReentrantOperatorCall(address account, address operator)
-        virtual {
-        if (operatorLookup[account][operator].operatorCallLock) {
-            revert CVC_OperatorCallReentrancy();
-        }
-
-        operatorLookup[account][operator].operatorCallLock = true;
-
-        _;
-
-        operatorLookup[account][operator].operatorCallLock = false;
     }
 
     /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
@@ -289,172 +278,79 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function getAccountOperatorContext(
+    function getNonce(
         address account,
-        address operator
-    )
-        external
-        view
-        returns (
-            uint40 authExpiryTimestamp,
-            uint40 lastSignatureTimestamp,
-            bool operatorCallLock,
-            bool singleOperatorCallAuth
-        )
-    {
-        OperatorStorage memory operatorStorageCache = operatorLookup[account][
-            operator
-        ];
-
-        authExpiryTimestamp = operatorStorageCache.authExpiryTimestamp;
-        lastSignatureTimestamp = operatorStorageCache.lastSignatureTimestamp;
-        operatorCallLock = operatorStorageCache.operatorCallLock;
-        singleOperatorCallAuth = operatorStorageCache.singleOperatorCallAuth;
+        uint nonceIndex
+    ) external view returns (uint nonce) {
+        uint152 prefix = getPrefixInternal(account);
+        nonce = nonceLookup[prefix][nonceIndex];
     }
 
     /// @inheritdoc ICVC
-    function invalidateAllPermits()
-        public
-        payable
-        virtual
-        onlyOwner(msg.sender)
-    {
-        uint152 prefix = getPrefixInternal(msg.sender);
-        ownerLookup[prefix].lastSignatureTimestamp = uint40(block.timestamp);
+    function getAccountOperator(
+        address account,
+        address operator
+    ) external view returns (uint authExpiryTimestamp) {
+        authExpiryTimestamp = operatorLookup[account][operator];
     }
 
     /// @inheritdoc ICVC
-    function invalidateAccountOperatorPermits(
+    function setNonce(
         address account,
-        address operator
+        uint nonceIndex,
+        uint nonce
     ) public payable virtual onlyOwner(account) {
-        operatorLookup[account][operator].lastSignatureTimestamp = uint40(
-            block.timestamp
-        );
+        uint152 prefix = getPrefixInternal(account);
+
+        if (nonceLookup[prefix][nonceIndex] >= nonce) {
+            revert CVC_InvalidNonce();
+        }
+
+        nonceLookup[prefix][nonceIndex] = nonce;
     }
 
     /// @inheritdoc ICVC
-    function installAccountOperator(
+    function setAccountOperator(
         address account,
         address operator,
-        bytes calldata operatorData,
         uint40 authExpiryTimestamp
-    )
-        public
-        payable
-        virtual
-        nonReentrantOperatorCall(account, operator)
-        onlyOwnerOrOperator(account)
-    {
+    ) public payable virtual onlyOwnerOrOperator(account) {
+        if (operator == address(0) || operator == address(this)) {
+            revert CVC_InvalidAddress();
+        }
+
+        // if CVC is msg.sender (during the permit() function call), it won't have common owner with the account
+        // as it would mean that the CVC itself signed the ERC-1271 message which is not possible.
+        // hence in that case the owner address will always be taken from the storage
         address owner = haveCommonOwnerInternal(account, msg.sender)
             ? msg.sender
             : getAccountOwnerInternal(account);
 
+        // the operator can never belong to one of 256 accounts of the owner
+        if (haveCommonOwnerInternal(owner, operator)) {
+            revert CVC_InvalidAddress();
+        }
+
+        // if CVC is msg.sender (during the permit() function call), it acts as if it was an owner,
+        // meaning it can authorize and deauthorize operators as per signed data.
         // if it's an operator calling, it can only deauthorize itself
-        if (owner != msg.sender) {
+        if (!(owner == msg.sender || address(this) == msg.sender)) {
             if (
-                operator != msg.sender ||
-                operatorData.length != 0 ||
-                authExpiryTimestamp > block.timestamp
+                operator != msg.sender || authExpiryTimestamp > block.timestamp
             ) {
                 revert CVC_NotAuthorized();
             }
         }
 
-        installAccountOperatorInternal(
-            owner,
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp,
-            0
-        );
-    }
+        if (operatorLookup[account][operator] != authExpiryTimestamp) {
+            operatorLookup[account][operator] = authExpiryTimestamp;
 
-    /// @inheritdoc ICVC
-    function installAccountOperatorPermitECDSA(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp,
-        bytes calldata signature
-    ) public payable virtual nonReentrantOperatorCall(account, operator) {
-        bytes32 permit = getOperatorPermit(
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp,
-            signatureTimestamp,
-            signatureDeadlineTimestamp
-        );
-        address owner = getAccountOwnerInternal(account);
-        address signer = recoverECDSASigner(permit, signature);
-
-        if (
-            !(owner == signer ||
-                (owner == address(0) &&
-                    haveCommonOwnerInternal(signer, account)))
-        ) {
-            revert CVC_NotAuthorized();
+            emit AccountOperatorAuthorized(
+                account,
+                operator,
+                authExpiryTimestamp
+            );
         }
-
-        if (owner == address(0)) {
-            setAccountOwnerInternal(account, signer);
-        }
-
-        installAccountOperatorInternal(
-            signer,
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp,
-            signatureTimestamp
-        );
-    }
-
-    /// @inheritdoc ICVC
-    function installAccountOperatorPermitERC1271(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp,
-        bytes calldata signature,
-        address signer
-    ) public payable virtual nonReentrantOperatorCall(account, operator) {
-        bytes32 permit = getOperatorPermit(
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp,
-            signatureTimestamp,
-            signatureDeadlineTimestamp
-        );
-        address owner = getAccountOwnerInternal(account);
-        signer = owner == address(0) ? signer : owner;
-
-        if (
-            !(haveCommonOwnerInternal(signer, account) &&
-                isValidERC1271Signature(signer, permit, signature))
-        ) {
-            revert CVC_NotAuthorized();
-        }
-
-        if (owner == address(0)) {
-            setAccountOwnerInternal(account, signer);
-        }
-
-        installAccountOperatorInternal(
-            signer,
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp,
-            signatureTimestamp
-        );
     }
 
     // Collaterals management
@@ -514,6 +410,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address vault
     ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
+        if (vault == address(this)) revert CVC_InvalidAddress();
+
         if (accountControllers[account].insert(vault)) {
             emit ControllerEnabled(account, vault);
         }
@@ -548,10 +446,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
-        onBehalfOfAccount = onBehalfOfAccount == address(0)
-            ? msg.sender
-            : onBehalfOfAccount;
-
         (success, result) = callInternal(
             targetContract,
             onBehalfOfAccount,
@@ -578,10 +472,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         uint value = contextCache.isInBatch() ? 0 : msg.value;
 
-        onBehalfOfAccount = onBehalfOfAccount == address(0)
-            ? msg.sender
-            : onBehalfOfAccount;
-
         executionContext = contextCache.setImpersonationInProgress();
 
         (success, result) = impersonateInternal(
@@ -592,6 +482,55 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         );
 
         executionContext = contextCache;
+    }
+
+    /// @inheritdoc ICVC
+    function permit(
+        address owner,
+        uint nonceIndex,
+        uint deadline,
+        bytes calldata data,
+        bytes calldata signature
+    ) public payable virtual nonReentrant {
+        if (owner == address(0)) {
+            revert CVC_InvalidAddress();
+        }
+
+        if (deadline < block.timestamp) {
+            revert CVC_InvalidTimestamp();
+        }
+
+        if (data.length == 0) {
+            revert CVC_InvalidData();
+        }
+
+        uint152 prefix = getPrefixInternal(owner);
+        uint nextNonce = nonceLookup[prefix][nonceIndex] + 1;
+        bytes32 permitHash = getPermitHash(owner, nonceIndex, nextNonce, deadline, data);
+        address signer = recoverECDSASigner(permitHash, signature);
+
+        nonceLookup[prefix][nonceIndex] = nextNonce;
+
+        if (
+            owner != signer &&
+            !isValidERC1271Signature(signer, permitHash, signature)
+        ) {
+            revert CVC_NotAuthorized();
+        }
+
+        uint value = executionContext.isInBatch() ? 0 : msg.value;
+
+        // CVC address becomes msg.sender for the duration this call
+        (bool success, bytes memory result) = callPermitDataInternal(
+            address(this),
+            signer,
+            value,
+            data
+        );
+
+        if (!success) {
+            revertBytes(result);
+        }
     }
 
     // Batching
@@ -911,56 +850,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     //                                  INTERNAL FUNCTIONS                                       //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    function installAccountOperatorInternal(
-        address owner,
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40 lastSignatureTimestamp
-    ) internal onBehalfOfAccountContext(account) {
-        // the operator cannot be one of the 256 accounts that belong to the owner
-        if (haveCommonOwnerInternal(owner, operator)) {
-            revert CVC_InvalidAddress();
-        }
-
-        OperatorStorage memory operatorStorageCache = operatorLookup[account][
-            operator
-        ];
-
-        operatorLookup[account][operator] = OperatorStorage({
-            authExpiryTimestamp: authExpiryTimestamp == 0
-                ? uint40(block.timestamp)
-                : authExpiryTimestamp,
-            lastSignatureTimestamp: lastSignatureTimestamp == 0
-                ? operatorStorageCache.lastSignatureTimestamp
-                : lastSignatureTimestamp,
-            operatorCallLock: operatorStorageCache.operatorCallLock,
-            singleOperatorCallAuth: authExpiryTimestamp == 0 ? true : false
-        });
-
-        // call the operator using arbitrary data if necessary
-        if (operatorData.length != 0) {
-            uint value = executionContext.isInBatch() ? 0 : msg.value;
-            (bool success, ) = operator.call{value: value}(operatorData);
-
-            if (!success) revert CVC_OperatorCallFailure();
-        }
-
-        if (authExpiryTimestamp == 0) {
-            operatorLookup[account][operator].authExpiryTimestamp = 0;
-            operatorLookup[account][operator].singleOperatorCallAuth = false;
-        }
-
-        if (authExpiryTimestamp != operatorStorageCache.authExpiryTimestamp) {
-            emit AccountOperatorAuthorized(
-                account,
-                operator,
-                authExpiryTimestamp
-            );
-        }
-    }
-
     function callInternal(
         address targetContract,
         address onBehalfOfAccount,
@@ -999,6 +888,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         (success, result) = targetContract.call{value: value}(data);
     }
 
+    function callPermitDataInternal(
+        address targetContract,
+        address signer,
+        uint value,
+        bytes calldata data
+    )
+        internal
+        virtual
+        onBehalfOfAccountContext(signer)
+        returns (bool success, bytes memory result)
+    {
+        (success, result) = targetContract.call{value: value}(data);
+    }
+
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
@@ -1018,13 +921,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             if (targetContract == address(this)) {
                 (success, result) = address(this).delegatecall(item.data);
             } else {
-                address onBehalfOfAccount = item.onBehalfOfAccount == address(0)
-                    ? msg.sender
-                    : item.onBehalfOfAccount;
-
                 (success, result) = callInternal(
                     targetContract,
-                    onBehalfOfAccount,
+                    item.onBehalfOfAccount,
                     item.value,
                     item.data
                 );
@@ -1152,33 +1051,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     // Permit-related functions
 
-    function getOperatorPermit(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp
-    ) internal view returns (bytes32 permit) {
-        uint152 prefix = getPrefixInternal(account);
-        uint lastSignatureTimestampOwner = ownerLookup[prefix]
-            .lastSignatureTimestamp;
-        uint lastSignatureTimestampAccountOperator = operatorLookup[account][
-            operator
-        ].lastSignatureTimestamp;
-        uint lastSignatureTimestamp = lastSignatureTimestampOwner >
-            lastSignatureTimestampAccountOperator
-            ? lastSignatureTimestampOwner
-            : lastSignatureTimestampAccountOperator;
-
-        if (
-            signatureTimestamp <= lastSignatureTimestamp ||
-            signatureTimestamp > block.timestamp ||
-            signatureDeadlineTimestamp < block.timestamp
-        ) {
-            revert CVC_InvalidTimestamp();
-        }
-
+    function getPermitHash(
+        address owner,
+        uint nonceIndex,
+        uint nonce,
+        uint deadline,
+        bytes calldata data
+    ) internal view returns (bytes32 permitHash) {
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 TYPE_HASH,
@@ -1191,13 +1070,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         bytes32 structHash = keccak256(
             abi.encode(
-                OPERATOR_PERMIT_TYPEHASH,
-                account,
-                operator,
-                keccak256(operatorData),
-                authExpiryTimestamp,
-                signatureTimestamp,
-                signatureDeadlineTimestamp
+                PERMIT_TYPEHASH,
+                owner,
+                nonceIndex,
+                nonce,
+                deadline,
+                keccak256(data)
             )
         );
 
@@ -1208,7 +1086,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             mstore(ptr, "\x19\x01")
             mstore(add(ptr, 0x02), domainSeparator)
             mstore(add(ptr, 0x22), structHash)
-            permit := keccak256(ptr, 0x42)
+            permitHash := keccak256(ptr, 0x42)
         }
     }
 
@@ -1218,7 +1096,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bytes32 hash,
         bytes memory signature
     ) internal pure returns (address signer) {
-        if (signature.length != 65) revert CVC_InvalidSignature();
+        if (signature.length != 65) return address(0);
 
         bytes32 r;
         bytes32 s;
@@ -1246,13 +1124,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             uint256(s) >
             0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
         ) {
-            revert CVC_InvalidSignature();
+            return address(0);
         }
 
         // If the signature is valid (and not malleable), return the signer address
         signer = ecrecover(hash, v, r, s);
-
-        if (signer == address(0)) revert CVC_InvalidSignature();
     }
 
     // Based on:
@@ -1292,12 +1168,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account
     ) internal view returns (address) {
         uint152 prefix = getPrefixInternal(account);
-        return ownerLookup[prefix].owner;
+        return ownerLookup[prefix];
     }
 
     function setAccountOwnerInternal(address account, address owner) internal {
         uint152 prefix = getPrefixInternal(account);
-        ownerLookup[prefix].owner = owner;
+        ownerLookup[prefix] = owner;
         emit AccountsOwnerRegistered(prefix, owner);
     }
 

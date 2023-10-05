@@ -53,7 +53,9 @@ contract installAccountOperatorTest is Test {
             {
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, 0);
@@ -94,7 +96,9 @@ contract installAccountOperatorTest is Test {
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
@@ -112,7 +116,9 @@ contract installAccountOperatorTest is Test {
             {
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(lastSignatureTimestamp, block.timestamp);
@@ -142,7 +148,9 @@ contract installAccountOperatorTest is Test {
                 assertEq(logs.length, 0);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry);
                 assertEq(lastSignatureTimestamp, block.timestamp - 1); // does not get modified if non-permit function used
@@ -176,7 +184,9 @@ contract installAccountOperatorTest is Test {
                 assertEq(logs.length, 1);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, authExpiry + 1);
                 assertEq(lastSignatureTimestamp, block.timestamp - 2); // does not get modified if non-permit function used
@@ -214,7 +224,9 @@ contract installAccountOperatorTest is Test {
                 assertEq(logs.length, 1);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, block.timestamp - 1);
                 assertEq(lastSignatureTimestamp, block.timestamp - 3); // does not get modified if non-permit function used
@@ -246,7 +258,9 @@ contract installAccountOperatorTest is Test {
                 assertEq(logs.length, 0);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, block.timestamp - 2);
                 assertEq(lastSignatureTimestamp, block.timestamp - 4); // does not get modified if non-permit function used
@@ -280,7 +294,9 @@ contract installAccountOperatorTest is Test {
                 assertTrue(logs.length == 1);
                 (
                     uint40 expiryTimestamp,
-                    uint40 lastSignatureTimestamp,,
+                    uint40 lastSignatureTimestamp,
+                    ,
+
                 ) = cvc.getAccountOperatorContext(account, operator);
                 assertEq(expiryTimestamp, 0);
                 assertEq(lastSignatureTimestamp, block.timestamp - 5); // does not get modified if non-permit function used
@@ -314,7 +330,7 @@ contract installAccountOperatorTest is Test {
             uint value = val;
             address account = address(uint160(uint160(alice) ^ i));
 
-            (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+            (uint40 expiryTimestamp, uint40 lastSignatureTimestamp, , ) = cvc
                 .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, 0);
             assertEq(lastSignatureTimestamp, 0);
@@ -351,7 +367,7 @@ contract installAccountOperatorTest is Test {
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // AccountsOwnerRegistered event is emitted only once
-            (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+            (expiryTimestamp, lastSignatureTimestamp, , ) = cvc
                 .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, authExpiry);
             assertEq(lastSignatureTimestamp, 0);
@@ -365,7 +381,7 @@ contract installAccountOperatorTest is Test {
             vm.prank(alice);
             cvc.invalidateAccountOperatorPermits(account, operator);
 
-            (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+            (expiryTimestamp, lastSignatureTimestamp, , ) = cvc
                 .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, authExpiry);
             assertEq(lastSignatureTimestamp, block.timestamp);
@@ -404,7 +420,7 @@ contract installAccountOperatorTest is Test {
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+            (expiryTimestamp, lastSignatureTimestamp, , ) = cvc
                 .getAccountOperatorContext(account, operator);
             assertEq(expiryTimestamp, block.timestamp);
             assertEq(lastSignatureTimestamp, block.timestamp); // does not get modified if non-permit function used
@@ -444,7 +460,7 @@ contract installAccountOperatorTest is Test {
             0
         );
 
-        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp, , ) = cvc
             .getAccountOperatorContext(alice, operator);
         assertEq(cvc.isCollateralEnabled(alice, collateral), true);
         assertEq(expiryTimestamp, 0);
@@ -524,7 +540,7 @@ contract installAccountOperatorTest is Test {
         vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
 
         vm.warp(seed);
-        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp,,) = cvc
+        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp, , ) = cvc
             .getAccountOperatorContext(alice, operator);
         assertEq(expiryTimestamp, 0);
         assertEq(lastSignatureTimestamp, 0);
@@ -532,7 +548,7 @@ contract installAccountOperatorTest is Test {
         vm.prank(alice);
         cvc.installAccountOperator(alice, operator, bytes(""), authExpiry);
 
-        (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+        (expiryTimestamp, lastSignatureTimestamp, , ) = cvc
             .getAccountOperatorContext(alice, operator);
         assertEq(expiryTimestamp, authExpiry);
         assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
@@ -579,7 +595,7 @@ contract installAccountOperatorTest is Test {
             uint40(block.timestamp)
         );
 
-        (expiryTimestamp, lastSignatureTimestamp,,) = cvc
+        (expiryTimestamp, lastSignatureTimestamp, , ) = cvc
             .getAccountOperatorContext(alice, operator);
         assertEq(expiryTimestamp, block.timestamp);
         assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
