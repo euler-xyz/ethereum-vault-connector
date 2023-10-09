@@ -236,7 +236,7 @@ contract installAccountOperatorTest is Test {
         uint40 seed
     ) public {
         vm.assume(alice != address(0));
-        vm.assume(operator != address(0));
+        vm.assume(operator != address(0) && address(uint160(operator) ^ 1) != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
         vm.assume(seed > 10 && seed < type(uint40).max - 1000);
         vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
@@ -257,7 +257,7 @@ contract installAccountOperatorTest is Test {
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(
-            address(uint160(uint160(alice) ^ 1)),
+            address(uint160(alice) ^ 1),
             operator,
             uint40(block.timestamp)
         );
@@ -266,7 +266,7 @@ contract installAccountOperatorTest is Test {
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(
             alice,
-            address(uint160(address(operator)) ^ 1),
+            address(uint160(operator) ^ 1),
             uint40(block.timestamp)
         );
 

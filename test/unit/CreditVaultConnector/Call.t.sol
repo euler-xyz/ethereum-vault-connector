@@ -15,6 +15,8 @@ contract CallTest is Test {
     function test_Call(address alice, uint96 seed) public {
         address account;
         if (seed % 2 == 0) {
+            vm.assume(alice != address(0));
+            
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(uint160(alice) ^ 256));
             vm.prank(account);

@@ -48,7 +48,7 @@ contract BatchTest is Test {
     }
 
     function test_Batch(address alice, address bob, uint seed) external {
-        vm.assume(!cvc.haveCommonOwner(alice, bob));
+        vm.assume(bob != address(0) && !cvc.haveCommonOwner(alice, bob));
         vm.assume(seed >= 4);
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](6);

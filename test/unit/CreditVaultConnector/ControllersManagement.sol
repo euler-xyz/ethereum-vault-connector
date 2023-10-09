@@ -68,7 +68,7 @@ contract ControllersManagementTest is Test {
             seed % 2 == 0 &&
             !cvc.haveCommonOwner(account, address(uint160(seed)))
         ) {
-            msgSender = address(uint160(seed));
+            msgSender = address(uint160(uint(keccak256(abi.encode(seed)))));
             vm.prank(alice);
             cvc.setAccountOperator(
                 account,
