@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import "../../src/interfaces/IERC1271.sol";
 import "../cvc/CreditVaultConnectorScribble.sol";
 
 contract VaultMock is ICreditVault {
@@ -39,20 +40,25 @@ contract VaultMock is ICreditVault {
     receive() external payable {}
 }
 
-contract OperatorMock {
-    fallback() external payable {}
+contract SignerMock {
+    function isValidSignature(
+        bytes32,
+        bytes memory
+    ) external pure returns (bytes4 magicValue) {
+        return IERC1271.isValidSignature.selector;
+    }
 }
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     using Set for SetStorage;
 
     address internal vaultMock;
-    address internal operatorMock;
+    address internal signerMock;
     address[] public touchedAccounts;
 
     constructor() {
         vaultMock = address(new VaultMock(ICVC(address(this))));
-        operatorMock = address(new OperatorMock());
+        signerMock = address(new SignerMock());
     }
 
     function getTouchedAccounts() external view returns (address[] memory) {
@@ -61,86 +67,33 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        operatorLookup[account][msg.sender].authExpiryTimestamp = uint40(
-            block.timestamp + 10
-        );
+        operatorLookup[account][msg.sender] = uint40(block.timestamp);
         vm.etch(vault, vaultMock.code);
     }
 
-    function invalidateAllPermits() public payable override {
-        setAccountOwnerInternal(msg.sender, msg.sender);
-        super.invalidateAllPermits();
-    }
-
-    /// @inheritdoc ICVC
-    function invalidateAccountOperatorPermits(
+    function setNonce(
         address account,
-        address operator
+        uint nonceNamespace,
+        uint nonce
     ) public payable override {
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        super.invalidateAccountOperatorPermits(account, operator);
+        nonce =
+            nonceLookup[getAddressPrefixInternal(account)][nonceNamespace] +
+            1;
+        super.setNonce(account, nonceNamespace, nonce);
     }
 
-    function installAccountOperator(
+    function setAccountOperator(
         address account,
         address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp
+        uint40 expiryTimestamp
     ) public payable override {
+        if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        vm.etch(operator, operatorMock.code);
-        super.installAccountOperator(
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp
-        );
-    }
-
-    function installAccountOperatorPermitECDSA(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40,
-        uint40,
-        bytes calldata
-    ) public payable override {
-        if (haveCommonOwnerInternal(msg.sender, operator)) return;
-        account = msg.sender;
-        setAccountOwnerInternal(account, msg.sender);
-        vm.etch(operator, operatorMock.code);
-        super.installAccountOperator(
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp
-        );
-    }
-
-    function installAccountOperatorPermitERC1271(
-        address account,
-        address operator,
-        bytes calldata operatorData,
-        uint40 authExpiryTimestamp,
-        uint40,
-        uint40,
-        bytes calldata,
-        address
-    ) public payable override {
-        if (haveCommonOwnerInternal(msg.sender, operator)) return;
-        account = msg.sender;
-        setAccountOwnerInternal(account, msg.sender);
-        vm.etch(operator, operatorMock.code);
-        super.installAccountOperator(
-            account,
-            operator,
-            operatorData,
-            authExpiryTimestamp
-        );
+        super.setAccountOperator(account, operator, expiryTimestamp);
     }
 
     function enableCollateral(
@@ -184,6 +137,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable override returns (bool success, bytes memory result) {
+        if (onBehalfOfAccount == address(0)) return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
         setup(onBehalfOfAccount, targetContract);
@@ -216,16 +170,11 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         bytes calldata data
     ) public payable override returns (bool success, bytes memory result) {
         if (uint160(msg.sender) <= 10) return (true, "");
+        if (onBehalfOfAccount == address(0)) return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == address(this)) return (true, "");
 
-        if (onBehalfOfAccount == address(0)) {
-            onBehalfOfAccount = msg.sender;
-        }
-
         setup(onBehalfOfAccount, msg.sender);
-        setup(onBehalfOfAccount, targetContract);
-
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
 
         uint8 numElementsCache = accountControllers[onBehalfOfAccount]
@@ -243,6 +192,20 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
+    }
+
+    function permit(
+        address owner,
+        uint nonceNamespace,
+        uint deadline,
+        bytes calldata data,
+        bytes calldata signature
+    ) public payable override {
+        if (uint160(owner) <= 10) return;
+        if (data.length == 0) return;
+        vm.etch(owner, signerMock.code);
+        deadline = block.timestamp;
+        super.permit(owner, nonceNamespace, deadline, data, signature);
     }
 
     function batch(BatchItem[] calldata items) public payable override {
@@ -338,6 +301,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function requireVaultStatusCheckInternal(address) internal pure override {
         return;
     }
+
+    fallback() external payable {}
 
     function exposeAccountCollaterals(
         address account

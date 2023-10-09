@@ -38,11 +38,11 @@ interface ICVC {
         address otherAccount
     ) external pure returns (bool);
 
-    /// @notice Returns the prefix of the specified account.
-    /// @dev The prefix is the first 19 bytes of the account address.
-    /// @param account The address of the account whose prefix is being retrieved.
-    /// @return A uint152 value that represents the prefix of the account.
-    function getPrefix(address account) external pure returns (uint152);
+    /// @notice Returns the address prefix of the specified account.
+    /// @dev The address prefix is the first 19 bytes of the account address.
+    /// @param account The address of the account whose address prefix is being retrieved.
+    /// @return A uint152 value that represents the address prefix of the account.
+    function getAddressPrefix(address account) external pure returns (uint152);
 
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
@@ -50,33 +50,33 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the nonce for a given account and nonce index.
-    /// @dev Each nonce index provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce index before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
+    /// @notice Returns the nonce for a given account and nonce namespace.
+    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
     /// @param account The address of the account for which the nonce is being retrieved.
-    /// @param nonceIndex The nonce index for which the nonce is being retrieved.
-    /// @return nonce The current nonce for the given account and nonce index.
+    /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
+    /// @return nonce The current nonce for the given account and nonce namespace.
     function getNonce(
         address account,
-        uint nonceIndex
+        uint nonceNamespace
     ) external view returns (uint nonce);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
     /// @param operator The address of the operator that is being checked.
-    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized.
+    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized.
     function getAccountOperator(
         address account,
         address operator
-    ) external view returns (uint authExpiryTimestamp);
+    ) external view returns (uint expiryTimestamp);
 
-    /// @notice Sets the nonce for a given account and nonce index.
-    /// @dev This function can only be called by the owner of the account. Each nonce index provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce index before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce index accordingly. To invalidate all the permit messages for a given nonce index, set the nonce to type(uint).max.
+    /// @notice Sets the nonce for a given account and nonce namespace.
+    /// @dev This function can only be called by the owner of the account. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
     /// @param account The address of the account for which the nonce is being set.
-    /// @param nonceIndex The nonce index for which the nonce is being set.
-    /// @param nonce The new nonce for the given account and nonce index.
+    /// @param nonceNamespace The nonce namespace for which the nonce is being set.
+    /// @param nonce The new nonce for the given account and nonce namespace.
     function setNonce(
         address account,
-        uint nonceIndex,
+        uint nonceNamespace,
         uint nonce
     ) external payable;
 
@@ -84,11 +84,11 @@ interface ICVC {
     /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only uninstall ifself.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being installed or uninstalled.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized.
+    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized.
     function setAccountOperator(
         address account,
         address operator,
-        uint40 authExpiryTimestamp
+        uint40 expiryTimestamp
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
@@ -176,16 +176,16 @@ interface ICVC {
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
 
-    /// @notice Executes signed arbitrary data by calling into the CVC.
+    /// @notice Executes signed arbitrary data by self-calling into the CVC.
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.
-    /// @param owner The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271).
-    /// @param nonce The nonce of the owner who signed the permit message.
+    /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271). It's also an owner of all the accounts for which authentication will be needed during the execution of the arbitrary data call.
+    /// @param nonceNamespace The nonce namespace for which the nonce is being used.
     /// @param deadline The timestamp after which the permit is considered expired.
-    /// @param data The encoded data which is called on the CVC contract.
-    /// @param signature The signature of the data signed by the owner.
+    /// @param data The encoded data which is self-called on the CVC contract.
+    /// @param signature The signature of the data signed by the signer.
     function permit(
-        address owner,
-        uint nonce,
+        address signer,
+        uint nonceNamespace,
         uint deadline,
         bytes calldata data,
         bytes calldata signature

@@ -83,7 +83,7 @@ contract ImpersonateTest is Test {
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].onBehalfOfAccount = address(0);
+        items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
@@ -117,14 +117,14 @@ contract ImpersonateTest is Test {
             address(cvc),
             seed,
             false,
-            controller
+            alice
         );
 
         vm.deal(controller, seed);
         vm.prank(controller);
         (success, result) = cvc.handlerImpersonate{value: seed}(
             collateral,
-            address(0),
+            alice,
             data
         );
 

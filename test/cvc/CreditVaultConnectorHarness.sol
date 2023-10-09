@@ -84,37 +84,9 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
-    function setOperatorCallLock(
-        address account,
-        address operator,
-        bool locked
-    ) external {
-        if (isFuzzSender()) return;
-
-        if (locked) {
-            operatorLookup[account][operator].operatorCallLock = true;
-        } else {
-            operatorLookup[account][operator].operatorCallLock = false;
-        }
-    }
-
     function setOnBehalfOfAccount(address account) external {
         if (isFuzzSender()) return;
         executionContext = executionContext.setOnBehalfOfAccount(account);
-    }
-
-    function getLastSignatureTimestamps(
-        address account,
-        address operator
-    )
-        external
-        view
-        returns (
-            uint40 lastSignatureTimestampOwner,
-            uint40 lastSignatureTimestampAccountOperator
-        )
-    {
-        return getLastSignatureTimestampsInternal(account, operator);
     }
 
     // function overrides in order to verify the account and vault checks
@@ -195,6 +167,15 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         for (uint i = 0; i < vaults.length; ++i) {
             expectedVaultsChecked.push(vaults[i]);
         }
+    }
+
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) public payable override {
+        super.requireAccountAndVaultStatusCheck(account);
+
+        expectedAccountsChecked.push(account);
+        expectedVaultsChecked.push(msg.sender);
     }
 
     function requireAccountStatusCheckInternal(

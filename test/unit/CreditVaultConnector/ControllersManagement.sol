@@ -17,9 +17,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         if (executionContext.isInBatch()) return;
 
-        expectedAccountsChecked.push(
-            account == address(0) ? msg.sender : account
-        );
+        expectedAccountsChecked.push(account);
 
         verifyAccountStatusChecks();
     }
@@ -32,9 +30,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         if (executionContext.isInBatch()) return;
 
-        expectedAccountsChecked.push(
-            account == address(0) ? msg.sender : account
-        );
+        expectedAccountsChecked.push(account);
 
         verifyAccountStatusChecks();
     }
@@ -74,10 +70,9 @@ contract ControllersManagementTest is Test {
         ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            cvc.installAccountOperator(
+            cvc.setAccountOperator(
                 account,
                 msgSender,
-                bytes(""),
                 uint40(block.timestamp + 100)
             );
         }
@@ -161,12 +156,7 @@ contract ControllersManagementTest is Test {
         cvc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        cvc.installAccountOperator(
-            bob,
-            alice,
-            bytes(""),
-            uint40(block.timestamp + 100)
-        );
+        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
 
         vm.prank(alice);
         cvc.handlerEnableController(bob, vault);
@@ -230,6 +220,14 @@ contract ControllersManagementTest is Test {
 
         vm.prank(vault);
         cvc.disableController(alice);
+    }
+
+    function test_RevertIfInvalidVault_ControllersManagement(
+        address alice
+    ) public {
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        cvc.enableController(alice, address(cvc));
     }
 
     function test_RevertIfAccountStatusViolated_ControllersManagement(

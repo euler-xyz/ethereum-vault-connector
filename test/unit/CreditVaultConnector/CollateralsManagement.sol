@@ -69,10 +69,9 @@ contract CollateralsManagementTest is Test {
         ) {
             msgSender = address(uint160(seed));
             vm.prank(alice);
-            cvc.installAccountOperator(
+            cvc.setAccountOperator(
                 account,
                 msgSender,
-                bytes(""),
                 uint40(block.timestamp + 100)
             );
             assertEq(cvc.getAccountOwner(account), alice);
@@ -156,12 +155,7 @@ contract CollateralsManagementTest is Test {
         cvc.disableCollateral(bob, vault);
 
         vm.prank(bob);
-        cvc.installAccountOperator(
-            bob,
-            alice,
-            bytes(""),
-            uint40(block.timestamp + 100)
-        );
+        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
 
         vm.prank(alice);
         cvc.enableCollateral(bob, vault);
@@ -228,6 +222,14 @@ contract CollateralsManagementTest is Test {
 
         vm.prank(alice);
         cvc.disableCollateral(alice, vault);
+    }
+
+    function test_RevertIfInvalidVault_CollateralsManagement(
+        address alice
+    ) public {
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        cvc.enableCollateral(alice, address(cvc));
     }
 
     function test_RevertIfAccountStatusViolated_CollateralsManagement(

@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../utils/mocks/Operator.sol";
 import "../../cvc/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
@@ -48,8 +47,7 @@ contract BatchTest is Test {
         cvc = new CreditVaultConnectorHandler();
     }
 
-    function test_Batch(address alice, uint seed) external {
-        address payable bob = payable(new Operator());
+    function test_Batch(address alice, address bob, uint seed) external {
         vm.assume(!cvc.haveCommonOwner(alice, bob));
         vm.assume(seed >= 4);
 
@@ -60,13 +58,8 @@ contract BatchTest is Test {
 
         vm.assume(bob != controller);
 
-        Operator(bob).clearFallbackCalled();
-        Operator(bob).setExpectedHash(bytes("some arbitrary data"));
-        Operator(bob).setExpectedValue(0);
-        Operator(bob).setExpectedSingleOperatorCallAuth(false);
-
         // -------------- FIRST BATCH -------------------------
-        items[0].onBehalfOfAccount = address(0);
+        items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvc);
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
@@ -77,12 +70,11 @@ contract BatchTest is Test {
 
         items[1].onBehalfOfAccount = alice;
         items[1].targetContract = address(cvc);
-        items[1].value = 1; // despite this set to 1, the operator will not get the value because the it is set in the batch
+        items[1].value = 0;
         items[1].data = abi.encodeWithSelector(
-            cvc.installAccountOperator.selector,
+            cvc.setAccountOperator.selector,
             alice,
             bob,
-            bytes("some arbitrary data"),
             block.timestamp
         );
 
@@ -94,7 +86,7 @@ contract BatchTest is Test {
             alicesSubAccount
         );
 
-        items[3].onBehalfOfAccount = address(0);
+        items[3].onBehalfOfAccount = alice;
         items[3].targetContract = controller;
         items[3].value = seed / 3;
         items[3].data = abi.encodeWithSelector(
@@ -137,12 +129,9 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        (uint40 expiryTimestamp, uint40 lastSignatureTimestamp, , ) = cvc
-            .getAccountOperatorContext(alice, bob);
+        uint expiryTimestamp = cvc.getAccountOperator(alice, bob);
         assertEq(expiryTimestamp, block.timestamp);
-        assertEq(lastSignatureTimestamp, 0); // does not get modified if non-permit function used
         assertEq(address(otherVault).balance, seed);
-        assertEq(Operator(bob).fallbackCalled(), true);
 
         cvc.reset();
         Vault(controller).reset();
@@ -176,7 +165,7 @@ contract BatchTest is Test {
             alice
         );
 
-        items[1].onBehalfOfAccount = address(0);
+        items[1].onBehalfOfAccount = bob;
         items[1].targetContract = controller;
         items[1].value = 0;
         items[1].data = abi.encodeWithSelector(
@@ -226,7 +215,7 @@ contract BatchTest is Test {
             if (j == items.length - 1) {
                 ICVC.BatchItem[] memory nestedItems = new ICVC.BatchItem[](2);
 
-                nestedItems[0].onBehalfOfAccount = address(0);
+                nestedItems[0].onBehalfOfAccount = alice;
                 nestedItems[0].targetContract = vault;
                 nestedItems[0].value = 0;
                 nestedItems[0].data = abi.encodeWithSelector(
@@ -234,7 +223,7 @@ contract BatchTest is Test {
                     alice
                 );
 
-                nestedItems[1].onBehalfOfAccount = address(0);
+                nestedItems[1].onBehalfOfAccount = alice;
                 nestedItems[1].targetContract = address(cvc);
                 nestedItems[1].value = 0;
                 nestedItems[1].data = abi.encodeWithSelector(
@@ -313,7 +302,7 @@ contract BatchTest is Test {
         address vault = address(new VaultMalicious(cvc));
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-        items[0].onBehalfOfAccount = address(0);
+        items[0].onBehalfOfAccount = alice;
         items[0].targetContract = vault;
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
@@ -360,7 +349,7 @@ contract BatchTest is Test {
         address vault = address(new VaultMalicious(cvc));
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
-        items[0].onBehalfOfAccount = address(0);
+        items[0].onBehalfOfAccount = alice;
         items[0].targetContract = vault;
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(

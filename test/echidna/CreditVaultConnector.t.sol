@@ -4,10 +4,20 @@ pragma solidity ^0.8.20;
 
 import "../../src/interfaces/ICreditVault.sol";
 import "../../src/interfaces/ICreditVaultConnector.sol";
+import "../../src/interfaces/IERC1271.sol";
 import "../cvc/CreditVaultConnectorEchidna.sol";
 
 interface IHevm {
     function prank(address) external;
+}
+
+contract SignerEchidna {
+    function isValidSignature(
+        bytes32,
+        bytes memory
+    ) external pure returns (bytes4 magicValue) {
+        return IERC1271.isValidSignature.selector;
+    }
 }
 
 contract TargetEchidna {
@@ -31,6 +41,13 @@ contract VaultEchidna is ICreditVault {
         address[] calldata
     ) public returns (bool isValid, bytes memory data) {
         // try to reenter the CVC
+
+        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        hevm.prank(account);
+        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -86,8 +103,14 @@ contract VaultEchidna is ICreditVault {
         returns (bool isValid, bytes memory data)
     {
         // try to reenter the CVC
-
         address account = address(1);
+
+        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        hevm.prank(account);
+        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -144,6 +167,13 @@ contract VaultEchidna is ICreditVault {
 
         // try to reenter the CVC
         address account = address(2);
+
+        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        hevm.prank(account);
+        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -205,23 +235,29 @@ contract EchidnaTest {
         CreditVaultConnectorEchidna(payable(address(0xdead)));
     VaultEchidna internal immutable vaultEchidna =
         VaultEchidna(payable(address(0xbeef)));
+    SignerEchidna internal immutable signerEchidna =
+        SignerEchidna(address(0xbeefbeefbeef));
 
     function enableCollateral(address account, address vault) public payable {
+        if (account == address(cvc)) return;
         hevm.prank(account);
         cvc.enableCollateral(account, vault);
     }
 
     function disableCollateral(address account, address vault) public payable {
+        if (account == address(cvc)) return;
         hevm.prank(account);
         cvc.disableCollateral(account, vault);
     }
 
     function enableController(address account, address) public payable {
+        if (account == address(cvc)) return;
         hevm.prank(account);
         cvc.enableController(account, address(vaultEchidna));
     }
 
     function disableController(address account) public payable {
+        if (account == address(cvc)) return;
         if (cvc.getControllers(account).length > 0) {
             hevm.prank(cvc.getControllers(account)[0]);
         }
@@ -232,6 +268,7 @@ contract EchidnaTest {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
+        if (onBehalfOfAccount == address(cvc)) return;
         hevm.prank(onBehalfOfAccount);
         cvc.call(address(vaultEchidna), onBehalfOfAccount, data);
     }
@@ -240,6 +277,7 @@ contract EchidnaTest {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
+        if (onBehalfOfAccount == address(cvc)) return;
         hevm.prank(onBehalfOfAccount);
         cvc.enableCollateral(onBehalfOfAccount, address(vaultEchidna));
 
@@ -250,9 +288,28 @@ contract EchidnaTest {
         cvc.impersonate(address(vaultEchidna), onBehalfOfAccount, data);
     }
 
+    function permit(
+        uint nonceNamespace,
+        uint deadline,
+        bytes calldata data,
+        bytes calldata signature
+    ) public payable {
+        deadline = block.timestamp;
+        cvc.permit(
+            address(signerEchidna),
+            nonceNamespace,
+            deadline,
+            data,
+            signature
+        );
+    }
+
     function batch(ICVC.BatchItem[] calldata items) public payable {
         if (items.length > 0) {
             ICVC.BatchItem[] memory _items = new ICVC.BatchItem[](1);
+
+            if (items[0].onBehalfOfAccount == address(cvc)) return;
+
             _items[0].targetContract = address(vaultEchidna);
             _items[0].onBehalfOfAccount = items[0].onBehalfOfAccount;
             _items[0].value = 0;

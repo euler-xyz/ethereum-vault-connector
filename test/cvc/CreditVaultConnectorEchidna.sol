@@ -8,6 +8,64 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
+    bool private inPermit;
+
+    modifier onlyOwner(address account) override {
+        assert(address(this) == msg.sender ? inPermit : true);
+
+        {
+            // CVC can only be msg.sender during the permit() function call. in that case,
+            // the caller address (that is permit message signer) is taken from the execution context
+            address caller = address(this) == msg.sender
+                ? executionContext.getOnBehalfOfAccount()
+                : msg.sender;
+
+            assert(caller != address(0));
+
+            if (haveCommonOwnerInternal(account, caller)) {
+                address owner = getAccountOwnerInternal(account);
+
+                if (owner == address(0)) {
+                    setAccountOwnerInternal(account, caller);
+                } else if (owner != caller) {
+                    revert CVC_NotAuthorized();
+                }
+            } else {
+                revert CVC_NotAuthorized();
+            }
+        }
+
+        _;
+    }
+
+    modifier onlyOwnerOrOperator(address account) override {
+        assert(address(this) == msg.sender ? inPermit : true);
+
+        {
+            // CVC can only be msg.sender during the permit() function call. in that case,
+            // the caller address (that is permit message signer) is taken from the execution context
+            address caller = address(this) == msg.sender
+                ? executionContext.getOnBehalfOfAccount()
+                : msg.sender;
+
+            assert(caller != address(0));
+
+            if (haveCommonOwnerInternal(account, caller)) {
+                address owner = getAccountOwnerInternal(account);
+
+                if (owner == address(0)) {
+                    setAccountOwnerInternal(account, caller);
+                } else if (owner != caller) {
+                    revert CVC_NotAuthorized();
+                }
+            } else if (operatorLookup[account][caller] < block.timestamp) {
+                revert CVC_NotAuthorized();
+            }
+        }
+
+        _;
+    }
+
     modifier nonReentrantChecks() override {
         EC context = executionContext;
 
@@ -82,6 +140,65 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         );
 
         executionContext = context;
+    }
+
+    function permit(
+        address owner,
+        uint nonceNamespace,
+        uint deadline,
+        bytes calldata data,
+        bytes calldata signature
+    ) public payable override nonReentrant {
+        // copied function body with setting inPermit flag
+        inPermit = true;
+
+        if (owner == address(0)) {
+            revert CVC_InvalidAddress();
+        }
+
+        if (deadline < block.timestamp) {
+            revert CVC_InvalidTimestamp();
+        }
+
+        if (data.length == 0) {
+            revert CVC_InvalidData();
+        }
+
+        uint152 addressPrefix = getAddressPrefixInternal(owner);
+        uint nextNonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
+        bytes32 permitHash = getPermitHash(
+            owner,
+            nonceNamespace,
+            nextNonce,
+            deadline,
+            data
+        );
+        address signer = recoverECDSASigner(permitHash, signature);
+
+        nonceLookup[addressPrefix][nonceNamespace] = nextNonce;
+
+        if (
+            owner != signer &&
+            !isValidERC1271Signature(signer, permitHash, signature)
+        ) {
+            revert CVC_NotAuthorized();
+        }
+
+        uint value = executionContext.isInBatch() ? 0 : msg.value;
+
+        // CVC address becomes msg.sender for the duration this call
+        (bool success, bytes memory result) = callPermitDataInternal(
+            address(this),
+            signer,
+            value,
+            data
+        );
+
+        if (!success) {
+            revertBytes(result);
+        }
+
+        inPermit = false;
     }
 
     function batch(
