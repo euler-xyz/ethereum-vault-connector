@@ -20,7 +20,7 @@ contract SetNonceTest is Test {
         uint nonce,
         uint8 iterations
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(iterations > 0 && iterations < 5);
         vm.assume(nonce > 0 && nonce <= type(uint).max - 256 * iterations);
 
@@ -47,7 +47,7 @@ contract SetNonceTest is Test {
         uint nonceNamespace,
         uint nonce
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(alice != address(uint160(uint160(alice) ^ 1)));
         vm.assume(nonce > 0 && nonce < type(uint).max);
 
@@ -74,7 +74,7 @@ contract SetNonceTest is Test {
         uint nonceNamespace,
         uint nonce
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 0);
 
         // fails if invalid nonce

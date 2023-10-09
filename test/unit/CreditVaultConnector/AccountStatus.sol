@@ -19,6 +19,8 @@ contract AccountStatusTest is Test {
         for (uint i = 0; i < accounts.length; i++) {
             address account = accounts[i];
 
+            vm.assume(account != address(cvc));
+
             // avoid duplicate entries in the accounts array not to enable multiple
             // controllers for the same account
             bool seen = false;

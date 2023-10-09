@@ -47,7 +47,7 @@ contract CollateralsManagementTest is Test {
         uint8 numberOfVaults,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
         vm.assume(seed > 1000);
 
@@ -141,7 +141,7 @@ contract CollateralsManagementTest is Test {
         address alice,
         address bob
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc) && bob != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -167,6 +167,7 @@ contract CollateralsManagementTest is Test {
     function test_RevertIfChecksReentrancy_CollateralsManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
         address vault = address(new Vault(cvc));
 
         cvc.setChecksLock(true);
@@ -195,6 +196,7 @@ contract CollateralsManagementTest is Test {
     function test_RevertIfImpersonateReentrancy_CollateralsManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
         address vault = address(new Vault(cvc));
 
         cvc.setImpersonateLock(true);
@@ -235,6 +237,8 @@ contract CollateralsManagementTest is Test {
     function test_RevertIfAccountStatusViolated_CollateralsManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
+        
         address vault = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
 

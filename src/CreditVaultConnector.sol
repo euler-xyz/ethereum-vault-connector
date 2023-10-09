@@ -70,13 +70,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address indexed operator,
         uint expiryTimestamp
     );
-    event ControllerEnabled(
+    event ControllerStatus(
         address indexed account,
-        address indexed controller
-    );
-    event ControllerDisabled(
-        address indexed account,
-        address indexed controller
+        address indexed controller,
+        bool indexed enabled
     );
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,7 +403,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (vault == address(this)) revert CVC_InvalidAddress();
 
         if (accountControllers[account].insert(vault)) {
-            emit ControllerEnabled(account, vault);
+            emit ControllerStatus(account, vault, true);
         }
         requireAccountStatusCheck(account);
     }
@@ -416,7 +413,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account
     ) public payable virtual nonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
-            emit ControllerDisabled(account, msg.sender);
+            emit ControllerStatus(account, msg.sender, false);
         }
         requireAccountStatusCheck(account);
     }

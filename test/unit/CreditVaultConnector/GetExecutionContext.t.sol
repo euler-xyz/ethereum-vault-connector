@@ -13,7 +13,7 @@ contract GetExecutionContextTest is Test {
     }
 
     function test_GetExecutionContext(address account, uint seed) external {
-        vm.assume(account != address(0));
+        vm.assume(account != address(0) && account != address(cvc));
 
         address controller = address(new Vault(cvc));
 
@@ -70,7 +70,7 @@ contract GetExecutionContextTest is Test {
         address account,
         uint seed
     ) external {
-        vm.assume(account != address(0));
+        vm.assume(account != address(0) && account != address(cvc));
 
         address controller = address(new Vault(cvc));
 

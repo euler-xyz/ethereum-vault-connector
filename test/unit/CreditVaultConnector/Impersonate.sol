@@ -37,7 +37,7 @@ contract ImpersonateTest is Test {
     }
 
     function test_Impersonate(address alice, uint96 seed) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -136,7 +136,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -175,7 +175,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -216,7 +216,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address controller = address(new Vault(cvc));
 
@@ -249,7 +249,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -284,7 +284,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller_1 = address(new Vault(cvc));
@@ -330,8 +330,8 @@ contract ImpersonateTest is Test {
         address randomAddress,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(uint160(randomAddress) > 10);
+        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(uint160(randomAddress) > 10 && randomAddress != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -375,7 +375,7 @@ contract ImpersonateTest is Test {
         address targetContract,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(targetContract != address(cvc));
 
         address collateral = address(new Vault(cvc));

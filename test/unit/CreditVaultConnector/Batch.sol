@@ -48,6 +48,7 @@ contract BatchTest is Test {
     }
 
     function test_Batch(address alice, address bob, uint seed) external {
+        vm.assume(alice != address(cvc) && bob != address(cvc));
         vm.assume(bob != address(0) && !cvc.haveCommonOwner(alice, bob));
         vm.assume(seed >= 4);
 
@@ -202,6 +203,7 @@ contract BatchTest is Test {
         address alice,
         uint seed
     ) external {
+        vm.assume(alice != address(cvc));
         address vault = address(new Vault(cvc));
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](9);
@@ -273,6 +275,8 @@ contract BatchTest is Test {
     function test_RevertIfDeferralDepthExceeded_BatchSimulation(
         address alice
     ) external {
+        vm.assume(alice != address(cvc));
+
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
         items[0].onBehalfOfAccount = alice;
@@ -290,6 +294,7 @@ contract BatchTest is Test {
     function test_RevertIfChecksReentrancy_AcquireChecksLock_Batch(
         address alice
     ) external {
+        vm.assume(alice != address(cvc));
         cvc.setChecksLock(true);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -330,6 +335,8 @@ contract BatchTest is Test {
     function test_RevertIfChecksReentrancy_AcquireChecksLock_BatchRevert_BatchSimulation(
         address alice
     ) external {
+        vm.assume(alice != address(cvc));
+
         cvc.setChecksLock(true);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -441,7 +448,7 @@ contract BatchTest is Test {
     function test_RevertIfImpersonateReentrancy_AcquireImpersonateLock_Batch(
         address alice
     ) external {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         cvc.setImpersonateLock(true);
         vm.expectRevert(
@@ -483,7 +490,7 @@ contract BatchTest is Test {
     function test_RevertIfImpersonateReentrancy_AcquireImpersonateLock_BatchRevert_BatchSimulation(
         address alice
     ) external {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         cvc.setImpersonateLock(true);
         vm.expectRevert(
@@ -531,6 +538,8 @@ contract BatchTest is Test {
     }
 
     function test_BatchRevert_BatchSimulation(address alice) external {
+        vm.assume(alice != address(cvc));
+
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
         ICVC.BatchItemResult[]
             memory expectedBatchItemsResult = new ICVC.BatchItemResult[](1);
@@ -823,6 +832,8 @@ contract BatchTest is Test {
     function test_RevertIfBatchRevertDoesntRevert_BatchSimulation(
         address alice
     ) external {
+        vm.assume(alice != address(cvc));
+
         ICVC cvc_noRevert = new CreditVaultConnectorNoRevert();
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_BatchPanic.selector);

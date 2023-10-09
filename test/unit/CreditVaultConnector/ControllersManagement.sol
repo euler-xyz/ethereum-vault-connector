@@ -39,13 +39,10 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 contract ControllersManagementTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
-    event ControllerEnabled(
+    event ControllerStatus(
         address indexed account,
-        address indexed controller
-    );
-    event ControllerDisabled(
-        address indexed account,
-        address indexed controller
+        address indexed controller,
+        bool indexed enabled
     );
 
     function setUp() public {
@@ -57,7 +54,7 @@ contract ControllersManagementTest is Test {
         uint8 subAccountId,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(seed > 1000);
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
@@ -84,8 +81,8 @@ contract ControllersManagementTest is Test {
         address[] memory controllersPre = cvc.getControllers(account);
 
         vm.prank(msgSender);
-        vm.expectEmit(true, true, false, false, address(cvc));
-        emit ControllerEnabled(account, vault);
+        vm.expectEmit(true, true, true, false, address(cvc));
+        emit ControllerStatus(account, vault, true);
         vm.recordLogs();
         cvc.handlerEnableController(account, vault);
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -125,8 +122,8 @@ contract ControllersManagementTest is Test {
         controllersPre = cvc.getControllers(account);
 
         vm.prank(msgSender);
-        vm.expectEmit(true, true, false, false, address(cvc));
-        emit ControllerDisabled(account, vault);
+        vm.expectEmit(true, true, true, false, address(cvc));
+        emit ControllerStatus(account, vault, false);
         Vault(vault).call(
             address(cvc),
             abi.encodeWithSelector(
@@ -146,7 +143,7 @@ contract ControllersManagementTest is Test {
         address alice,
         address bob
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc) && bob != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -165,6 +162,8 @@ contract ControllersManagementTest is Test {
     function test_RevertIfProgressReentrancy_ControllersManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
+
         address vault = address(new Vault(cvc));
 
         cvc.setChecksLock(true);
@@ -193,6 +192,8 @@ contract ControllersManagementTest is Test {
     function test_RevertIfImpersonateReentrancy_ControllersManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
+
         address vault = address(new Vault(cvc));
 
         cvc.setImpersonateLock(true);
@@ -233,6 +234,8 @@ contract ControllersManagementTest is Test {
     function test_RevertIfAccountStatusViolated_ControllersManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
+
         address vault = address(new Vault(cvc));
 
         Vault(vault).setAccountStatusState(1); // account status is violated

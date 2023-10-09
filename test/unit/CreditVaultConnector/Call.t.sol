@@ -13,10 +13,10 @@ contract CallTest is Test {
     }
 
     function test_Call(address alice, uint96 seed) public {
+        vm.assume(alice != address(0) && alice != address(cvc));
+
         address account;
         if (seed % 2 == 0) {
-            vm.assume(alice != address(0));
-            
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(uint160(alice) ^ 256));
             vm.prank(account);
@@ -124,7 +124,7 @@ contract CallTest is Test {
         address bob,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
         vm.assume(bob != address(0));
 
@@ -152,6 +152,8 @@ contract CallTest is Test {
         address alice,
         uint seed
     ) public {
+        vm.assume(alice != address(cvc));
+
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvc));
 
@@ -178,6 +180,8 @@ contract CallTest is Test {
         address alice,
         uint seed
     ) public {
+        vm.assume(alice != address(cvc));
+
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvc));
 
@@ -207,6 +211,7 @@ contract CallTest is Test {
         uint seed
     ) public {
         vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();

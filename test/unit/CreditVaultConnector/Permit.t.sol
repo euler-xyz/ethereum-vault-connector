@@ -248,7 +248,7 @@ contract permitTest is Test {
         address alice = vm.addr(privateKey);
         data = abi.encode(keccak256(data));
 
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.assume(value > 0);
 
@@ -385,7 +385,7 @@ contract permitTest is Test {
         bytes calldata signature
     ) public {
         data = abi.encode(keccak256(data));
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 1 && nonce < type(uint).max);
         vm.assume(deadline < type(uint).max);
         vm.warp(deadline + 1);
@@ -405,7 +405,7 @@ contract permitTest is Test {
         uint deadline,
         bytes calldata signature
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 1 && nonce < type(uint).max);
         vm.warp(deadline);
 
@@ -433,7 +433,7 @@ contract permitTest is Test {
         data = abi.encode(keccak256(data));
         signerECDSA.setPrivateKey(privateKey);
 
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 1 && nonce < type(uint).max);
         vm.warp(deadline);
 

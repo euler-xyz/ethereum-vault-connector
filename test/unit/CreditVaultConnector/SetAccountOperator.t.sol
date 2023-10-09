@@ -25,7 +25,7 @@ contract installAccountOperatorTest is Test {
         uint40 authExpiry,
         uint40 seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(operator != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
         vm.assume(seed > 10 && seed < type(uint40).max - 1000);
@@ -145,8 +145,8 @@ contract installAccountOperatorTest is Test {
         uint40 authExpiry,
         uint40 seed
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(operator != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(operator != address(0) && operator != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
         vm.assume(seed > 10 && seed < type(uint40).max - 1000);
         vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
@@ -203,7 +203,7 @@ contract installAccountOperatorTest is Test {
         address alice,
         address operator
     ) public {
-        vm.assume(alice != address(0) && alice != address(0xfe));
+        vm.assume(alice != address(0) && alice != address(0xfe) && alice != address(cvc));
         vm.assume(operator != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
 
@@ -235,8 +235,8 @@ contract installAccountOperatorTest is Test {
         uint40 authExpiry,
         uint40 seed
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(operator != address(0) && address(uint160(operator) ^ 1) != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(operator != address(0) && address(uint160(operator) ^ 1) != address(0) && operator != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
         vm.assume(seed > 10 && seed < type(uint40).max - 1000);
         vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
@@ -281,6 +281,8 @@ contract installAccountOperatorTest is Test {
         address alice,
         uint8 subAccountId
     ) public {
+        vm.assume(alice != address(cvc));
+
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.setAccountOperator(alice, address(0), 0);
