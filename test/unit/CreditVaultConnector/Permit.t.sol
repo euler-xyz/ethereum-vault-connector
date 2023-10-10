@@ -1055,30 +1055,30 @@ contract permitTest is Test {
         // if the operator tries authorize themselves directly, it's not possible
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(alice, operator, type(uint40).max);
+        cvc.setAccountOperator(alice, operator, type(uint).max);
 
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(bob, operator, type(uint40).max);
+        cvc.setAccountOperator(bob, operator, type(uint).max);
 
         // but it succeeds if it's done using the signed data
         data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
             alice,
             operator,
-            type(uint40).max
+            type(uint).max
         );
 
         signature = signerECDSA.signPermit(alice, 0, 2, block.timestamp, data);
         vm.prank(operator);
         cvc.permit(alice, 0, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(alice, operator), type(uint40).max);
+        assertEq(cvc.getAccountOperator(alice, operator), type(uint).max);
 
         data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
             bob,
             operator,
-            type(uint40).max
+            type(uint).max
         );
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
@@ -1086,7 +1086,7 @@ contract permitTest is Test {
 
         vm.prank(operator);
         cvc.permit(bob, 0, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(bob, operator), type(uint40).max);
+        assertEq(cvc.getAccountOperator(bob, operator), type(uint).max);
 
         // when operator is authorized, it can sign permit messages on behalf of the authorized account
         signerECDSA.setPrivateKey(privateKey + 1);
@@ -1098,19 +1098,31 @@ contract permitTest is Test {
             address(0)
         );
 
-        signature = signerECDSA.signPermit(operator, 0, 1, block.timestamp, data);
+        signature = signerECDSA.signPermit(
+            operator,
+            0,
+            1,
+            block.timestamp,
+            data
+        );
         cvc.permit(operator, 0, block.timestamp, data, signature);
         assertEq(cvc.isCollateralEnabled(alice, address(0)), true);
 
         // but it cannot sign permit messages on behalf of other accounts for which it's not authorized
         // or authorization has expired
-         data = abi.encodeWithSelector(
+        data = abi.encodeWithSelector(
             ICVC.enableCollateral.selector,
             address(uint160(alice) ^ subAccountId),
             address(0)
         );
 
-        signature = signerECDSA.signPermit(operator, 0, 2, block.timestamp, data);
+        signature = signerECDSA.signPermit(
+            operator,
+            0,
+            2,
+            block.timestamp,
+            data
+        );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
         cvc.permit(operator, 0, block.timestamp, data, signature);
     }

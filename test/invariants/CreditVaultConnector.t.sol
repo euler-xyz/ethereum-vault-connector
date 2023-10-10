@@ -67,7 +67,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        operatorLookup[account][msg.sender] = uint40(block.timestamp);
+        operatorLookup[account][msg.sender] = block.timestamp;
         vm.etch(vault, vaultMock.code);
     }
 
@@ -87,7 +87,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint expiryTimestamp
     ) public payable override {
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
