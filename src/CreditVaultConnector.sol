@@ -969,7 +969,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     function checkVaultStatusInternal(
         address vault
-    ) internal returns (bool isValid, bytes memory data) {
+    ) internal virtual returns (bool isValid, bytes memory data) {
         bool success;
         (success, data) = vault.call(
             abi.encodeCall(ICreditVault.checkVaultStatus, ())
@@ -1136,7 +1136,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) internal view returns (bool isValid) {
+    ) internal virtual view returns (bool isValid) {
         (bool success, bytes memory result) = signer.staticcall(
             abi.encodeCall(IERC1271.isValidSignature, (hash, signature))
         );
