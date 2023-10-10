@@ -310,7 +310,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint expiryTimestamp
     ) public payable virtual onlyOwnerOrOperator(account) {
         // if CVC is msg.sender (during the self-call in the permit() function), it won't have the common owner
         // with the account as it would mean that the CVC itself signed the ERC-1271 message which is not
@@ -321,7 +321,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             : getAccountOwnerInternal(account);
 
         // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
-        if (operator == address(0) || haveCommonOwnerInternal(owner, operator)) {
+        if (
+            operator == address(0) || haveCommonOwnerInternal(owner, operator)
+        ) {
             revert CVC_InvalidAddress();
         }
 

@@ -88,7 +88,7 @@ interface ICVC {
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint expiryTimestamp
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.

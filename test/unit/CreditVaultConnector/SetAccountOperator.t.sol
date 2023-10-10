@@ -22,14 +22,14 @@ contract installAccountOperatorTest is Test {
     function test_WhenOwnerCalling_setAccountOperator(
         address alice,
         address operator,
-        uint40 authExpiry,
-        uint40 seed
+        uint authExpiry,
+        uint seed
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(operator != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 10 && seed < type(uint40).max - 1000);
-        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
+        vm.assume(seed > 10 && seed < type(uint).max - 1000);
+        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint).max - 1);
 
         for (uint i = 0; i < 256; ++i) {
             vm.warp(seed);
@@ -101,11 +101,7 @@ contract installAccountOperatorTest is Test {
             vm.expectEmit(true, true, false, true, address(cvc));
             emit OperatorAuthorized(account, operator, block.timestamp - 1);
             vm.recordLogs();
-            cvc.setAccountOperator(
-                account,
-                operator,
-                uint40(block.timestamp - 1)
-            );
+            cvc.setAccountOperator(account, operator, block.timestamp - 1);
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -121,11 +117,7 @@ contract installAccountOperatorTest is Test {
             vm.warp(block.timestamp + 1);
             vm.prank(alice);
             vm.recordLogs();
-            cvc.setAccountOperator(
-                account,
-                operator,
-                uint40(block.timestamp - 2)
-            );
+            cvc.setAccountOperator(account, operator, block.timestamp - 2);
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -142,14 +134,14 @@ contract installAccountOperatorTest is Test {
     function test_WhenOperatorCalling_setAccountOperator(
         address alice,
         address operator,
-        uint40 authExpiry,
-        uint40 seed
+        uint authExpiry,
+        uint seed
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(operator != address(0) && operator != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 10 && seed < type(uint40).max - 1000);
-        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
+        vm.assume(seed > 10 && seed < type(uint).max - 1000);
+        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint).max - 1);
 
         for (uint i = 0; i < 256; ++i) {
             vm.warp(seed);
@@ -187,7 +179,7 @@ contract installAccountOperatorTest is Test {
             emit OperatorAuthorized(account, operator, block.timestamp);
             vm.recordLogs();
             vm.prank(operator);
-            cvc.setAccountOperator(account, operator, uint40(block.timestamp));
+            cvc.setAccountOperator(account, operator, block.timestamp);
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
@@ -203,7 +195,11 @@ contract installAccountOperatorTest is Test {
         address alice,
         address operator
     ) public {
-        vm.assume(alice != address(0) && alice != address(0xfe) && alice != address(cvc));
+        vm.assume(
+            alice != address(0) &&
+                alice != address(0xfe) &&
+                alice != address(cvc)
+        );
         vm.assume(operator != address(0));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
 
@@ -232,14 +228,18 @@ contract installAccountOperatorTest is Test {
     function test_RevertWhenOperatorNotAuthorizedToPerformTheOperation_setAccountOperator(
         address alice,
         address operator,
-        uint40 authExpiry,
-        uint40 seed
+        uint authExpiry,
+        uint seed
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(operator != address(0) && address(uint160(operator) ^ 1) != address(0) && operator != address(cvc));
+        vm.assume(
+            operator != address(0) &&
+                address(uint160(operator) ^ 1) != address(0) &&
+                operator != address(cvc)
+        );
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 10 && seed < type(uint40).max - 1000);
-        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint40).max - 1);
+        vm.assume(seed > 10 && seed < type(uint).max - 1000);
+        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint).max - 1);
 
         vm.warp(seed);
         assertEq(cvc.getAccountOperator(alice, operator), 0);
@@ -251,7 +251,7 @@ contract installAccountOperatorTest is Test {
         // operator cannot authorize itself (set authorization expiry timestamp in the future)
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(alice, operator, uint40(block.timestamp + 1));
+        cvc.setAccountOperator(alice, operator, block.timestamp + 1);
 
         // operator cannot change authorization status for any other operator nor account
         vm.prank(operator);
@@ -259,7 +259,7 @@ contract installAccountOperatorTest is Test {
         cvc.setAccountOperator(
             address(uint160(alice) ^ 1),
             operator,
-            uint40(block.timestamp)
+            block.timestamp
         );
 
         vm.prank(operator);
@@ -267,12 +267,12 @@ contract installAccountOperatorTest is Test {
         cvc.setAccountOperator(
             alice,
             address(uint160(operator) ^ 1),
-            uint40(block.timestamp)
+            block.timestamp
         );
 
         // but operator can deauthorize itself
         vm.prank(operator);
-        cvc.setAccountOperator(alice, operator, uint40(block.timestamp));
+        cvc.setAccountOperator(alice, operator, block.timestamp);
 
         assertEq(cvc.getAccountOperator(alice, operator), block.timestamp);
     }
