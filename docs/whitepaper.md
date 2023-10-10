@@ -169,6 +169,43 @@ Operators have many use cases. For instance, a user might want to install a modi
 
 An operator is similar to a controller, in that an account gives considerable permissions to a smart contract (that presumably has been well audited). However, the important difference is that an account owner can always revoke an operator's privileges at any time, however they can not do so with a controller. Instead, the controller must release its own privileges. Another difference is that controllers can not change the account's collateral or controller sets, whereas an operator can.
 
+#### Permit
+
+Instead of invoking the CVC directly, signed messages called `permit`s can also be provided to the CVC. Permits can be invoked by anyone, but they will execute on behalf of the signer of the permit message. They are useful for implementing "gasless" transactions.
+
+Permits are EIP-712 typed data messages with the following fields:
+
+* `signer`: The address to execute the operation on behalf of.
+* `nonceNamespace` and `nonce`: Values used to prevent replaying permit messages, and for sequencing (see below)
+* `deadline`: A timestamp after which the permit becomes invalid.
+* `data`: Arbitrary calldata that will be used to invoke the CVC. Typically this contains an invocation of the `batch` method.
+
+There are two types of signature methods supported by permits: ECDSA, which is used by EOAs, and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) which is used by smart contract wallets. In both cases, the `permit` method is invoked. If the signature is exactly 65 bytes long, `ecrecover` is invoked. If the recovered address does not match `signer`, or for signature lengths other than 65, then an ERC-1271 verification is attempted, by staticcalling `isValidSignature` on `signer`.
+
+After verifying `deadline`, `signature`, and `nonce`, the `data` will be used to invoke the CVC. Although other methods can be invoked, the most general purpose method to call is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, and a given batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch`. If the `signer` is an operator of another account, then this other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
+
+Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the CVC itself, indicating to the CVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the CVC can be re-invoked via a batch, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
+
+##### Nonce Namespaces
+
+Nonces in Ethereum transactions enforce that transactions cannot be included multiple times, and that they are included in the same sequence they were created (with no gaps).
+
+`permit` messages contain two fields that can be used to enforce the same restrictions: `nonceNamespace` and `nonce`. Each account owner has a mapping that maps from `nonceNamespace` to `nonce`, where `nonce` is a `uint256`. In order for a permit message to be valid, the `nonce` value inside the specified `nonceNamespace` must be one less than the `nonce` field in the permit message.
+
+The separation of `nonceNamespace` and `nonce` allows users to optionally relax the sequencing restrictions. There are several ways that an owner may choose to use the namespaces:
+
+* Always set `nonceNamespace` to `0`, and sign sequentially increasing `nonce`s. These permit messages will function like Ethereum transactions, and must be mined in order, with no gaps.
+* Derive the `nonceNamespace` deterministically from the message, perhaps by taking the message hash, and always set the `nonce` to `1`. These permit messages can be mined in any order, and some may never be mined.
+* Some combination of the two approaches. For example, a user could have "regular" and "high priority" namespaces. Normal orders would be included in sequence, while high priority permits are allowed to bypass this queue.
+
+Note that any time sequencing restrictions are relaxed, users must take into account that different orderings of their transactions can have different MEV potential, and they should prepare for their transactions executing in the least favourable order (for them).
+
+Permit messages can be cancelled in two ways:
+
+* Creating a new message with the same nonce and having it included before the unwanted message (as with Ethereum transactions).
+* Invoking the `setNonce` method. This allows users to increase their nonce up to a specified value, potentially cancelling many outstanding permit messages in the process. Note that there is no danger of rendering an account non-functional: Even if a nonce is set to the max `uint256`, there are an effectively unlimited number of other namespaces available.
+
+
 
 ### call
 
