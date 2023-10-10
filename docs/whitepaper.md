@@ -36,7 +36,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 
 ## Introduction
 
-The Credit Vault Connector (CVC) Protocol is an attempt to distill the core functionality required for a lending market into a foundational layer that can be used as a foundation for many diverse protocols. The CVC is primarily a mediator between Credit Vaults, which are contracts that implement the ERC-4626 interface and contain a small amount of additional logic for interfacing with other vaults.
+The Credit Vault Connector (CVC) Protocol is an attempt to distill the core functionality required for a lending market into a foundational layer that can be used as a base building block for many diverse protocols. The CVC is primarily a mediator between Credit Vaults, which are contracts that implement the ERC-4626 interface and contain a small amount of additional logic for interfacing with other vaults.
 
 In order to borrow from a vault, users must attach their accounts and various collateral vaults to this borrowed-from vault via the CVC. From then on, whenever a user wants to perform an action such as removing collateral, the liability vault (called the "controller") will be consulted in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent.
 
@@ -74,7 +74,7 @@ Account status checks are implemented by vaults to enforce account solvency. Vau
 
 ### Collateral Validity
 
-Within the `checkAccountStatus` callback, vaults should inspect the provided list of collaterals and determine whether or not they are acceptable. Vaults can limit themselves to a small set of collateral, or can be more general-purpose and allow borrowing using any assets they can get prices for. Alternately, a vault could always fail, if it is only intended to be a collateral vault.
+Within the `checkAccountStatus` callback, vaults should inspect the provided list of collaterals and determine whether or not they are acceptable. Vaults can limit themselves to a small set of collaterals, or can be more general-purpose and allow borrowing using any assets they can get prices for. Alternately, a vault could always fail, if it is only intended to be a collateral vault.
 
 To encourage borrowing, it may be tempting to allow a large set of collateral assets. However, vault creators must be careful about which assets they accept. A malicious vault could lie about the amount of assets it holds, or reject liquidations when a user is in violation. For this reason, vaults should restrict allowed collaterals to a known-good set of audited addresses, or lookup the addresses in a registry or factory contract to ensure they were created by known-good, audited contracts.
 
@@ -130,8 +130,8 @@ Upon receiving a `requireVaultStatusCheck` call, the CVC will determine whether 
 In order to evaluate the vault status, `checkVaultStatus` may need access to a snapshot of the initial vault state. If so, the recommended pattern as implemented in the reference vaults is as follows:
 
 * Before performing any actions, each operation that requires a vault status check should first make an appropriate snapshot and store the data in transient storage (if a snapshot has not already been made)
-* The vault should then call `requireVaultStatusCheck`
 * The operations should be performed
+* The vault should then call `requireVaultStatusCheck`
 * When the `checkVaultStatus` callback is invoked, it should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return `false` (or revert) if there is a violation.
 
 As with the account status check, there is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the CVC), then when it calls `requireVaultStatusCheck` on the CVC, the CVC may immediately call back into the vault's `checkVaultStatus` function. A normal reentrancy guard would fail upon re-entering at this point. Because of this, the vault reference implementation relaxes the reentrancy modifier to allow `checkVaultStatus` call while invoking `requireVaultStatusCheck`.
@@ -151,11 +151,11 @@ At the time of this writing, public/private keypair Ethereum accounts (EOAs) can
 
 Inside each batch item, an `onBehalfOfAccount` can be specified. The `batch` function will determine whether or not `msg.sender` is authorised to perform operations on this account:
 
-* If they share the first 19 bytes, then `onBehalfOfAccount` is considered to be a *sub-account* of `msg.sender` and therefore `msg.sender` is authorised.
-* If `onBehalfOfAccount` is `address(0)` then it is taken to be `msg.sender` itself and is therefore authorised (this is a calldata gas optimisation)
-* If the `onBehalfOfAccount` has previously called `setAccountOperator` to install `msg.sender` as an [operator](#operators) for this account, it is authorised.
+* If `msg.sender` has never before interacted with the CVC, if it shares the first 19 bytes with the `onBehalfOfAccount`, then `onBehalfOfAccount` is considered to be a *sub-account* of `msg.sender` and therefore `msg.sender` is authorised. Upon that first interaction with the CVC, `msg.sender` address is stored in CVC's storage as an owner of the group of 256 accounts having the same first 19 bytes.
+* If `msg.sender` has interacted with the CVC before and it shares the first 19 bytes with the `onBehalfOfAccount`, its address is supposed to match the one stored in the CVC's storage. If it does, then it is authorised.
+* If `setAccountOperator` has previously been called for the `onBehalfOfAccount` to install `msg.sender` as an [operator](#operators) for this account, it is authorised.
 * If the `msg.sender` is the CVC itself, then this must be from a permit and the effective sender is taken from the execution context
-* In all other cases, the batch item is invalid, and the entire batch transaction will fail unless the batch item allows for failure.
+* In all other cases, the batch item is invalid, and the entire batch transaction will fail.
 
 #### Sub-Accounts
 
@@ -186,7 +186,7 @@ Permits are EIP-712 typed data messages with the following fields:
 
 There are two types of signature methods supported by permits: ECDSA, which is used by EOAs, and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) which is used by smart contract wallets. In both cases, the `permit` method can be invoked by any unprivileged address, such as a keeper. If the signature is exactly 65 bytes long, an `ecrecover` is attempted. If the recovered address does not match `signer`, or for signature lengths other than 65, then an ERC-1271 verification is attempted, by staticcalling `isValidSignature` on `signer`.
 
-After verifying `deadline`, `signature`, and `nonce`, the `data` will be used to invoke the CVC. Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
+After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the CVC. Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
 
 Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the CVC itself, indicating to the CVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the CVC can be self-invoked via a batch, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
 
@@ -250,7 +250,7 @@ Additionally, the execution context contains some locks that protect critical re
 
 If a vault or other contract is invoked via the CVC, and that contract in turn re-invokes the CVC to call another vault/contract, then the execution context is considered nested. The execution context is however *not* treated as a stack. The sets of deferred account and vault status checks are added to, and only after unwinding the final execution context will they be validated.
 
-Internally, the execution context stores a `batchDepth` value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
+Internally, the execution context stores a batch depth value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
 
 The previous value of `onBehalfOfAccount` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAccount` at all times when `msg.sender` is the CVC (see [Authentication by Vaults](#authentication-by-vaults)). However, when `msg.sender` is not the CVC, vaults cannot rely on `onBehalfOfAccount` because it could have been changed by a nested context.
 
