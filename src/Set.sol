@@ -92,29 +92,29 @@ library Set {
             if (searchIndex == type(uint).max) return false;
         }
 
-        uint lastMarketIndex;
+        uint lastElementIndex;
         unchecked {
-            lastMarketIndex = numElements - 1;
+            lastElementIndex = numElements - 1;
         }
 
-        if (searchIndex != lastMarketIndex) {
+        if (searchIndex != lastElementIndex) {
             if (searchIndex == 0) {
                 setStorage.firstElement = setStorage
-                    .elements[lastMarketIndex]
+                    .elements[lastElementIndex]
                     .value;
             } else {
                 setStorage.elements[searchIndex].value = setStorage
-                    .elements[lastMarketIndex]
+                    .elements[lastElementIndex]
                     .value;
             }
         }
 
-        setStorage.numElements = uint8(lastMarketIndex);
+        setStorage.numElements = uint8(lastElementIndex);
 
-        if (lastMarketIndex == 0) {
+        if (lastElementIndex == 0) {
             delete setStorage.firstElement;
         } else {
-            delete setStorage.elements[lastMarketIndex].value;
+            delete setStorage.elements[lastElementIndex].value;
         }
 
         return true;
