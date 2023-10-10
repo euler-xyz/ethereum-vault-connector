@@ -480,12 +480,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function permit(
         address signer,
         uint nonceNamespace,
+        uint nonce,
         uint deadline,
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual nonReentrant {
+        uint152 addressPrefix = getAddressPrefixInternal(signer);
+
         if (signer == address(0)) {
             revert CVC_InvalidAddress();
+        }
+
+        if (++nonceLookup[addressPrefix][nonceNamespace] != nonce) {
+            revert CVC_InvalidNonce();
         }
 
         if (deadline < block.timestamp) {
@@ -496,16 +503,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidData();
         }
 
-        uint152 addressPrefix = getAddressPrefixInternal(signer);
-        uint nextNonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
-
-        nonceLookup[addressPrefix][nonceNamespace] = nextNonce;
-        emit NonceUsed(addressPrefix, nextNonce);
-
         bytes32 permitHash = getPermitHash(
             signer,
             nonceNamespace,
-            nextNonce,
+            nonce,
             deadline,
             data
         );
@@ -516,6 +517,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         ) {
             revert CVC_NotAuthorized();
         }
+
+        emit NonceUsed(addressPrefix, nonce);
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 

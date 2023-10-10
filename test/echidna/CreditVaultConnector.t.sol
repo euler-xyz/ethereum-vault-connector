@@ -289,16 +289,14 @@ contract EchidnaTest {
     }
 
     function permit(
-        uint nonceNamespace,
-        uint deadline,
         bytes calldata data,
         bytes calldata signature
     ) public payable {
-        deadline = block.timestamp;
         cvc.permit(
             address(signerEchidna),
-            nonceNamespace,
-            deadline,
+            0,
+            cvc.getNonce(address(cvc), 0) + 1,
+            block.timestamp,
             data,
             signature
         );

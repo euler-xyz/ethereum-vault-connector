@@ -143,8 +143,9 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     }
 
     function permit(
-        address owner,
+        address signer,
         uint nonceNamespace,
+        uint nonce,
         uint deadline,
         bytes calldata data,
         bytes calldata signature
@@ -152,8 +153,14 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         // copied function body with setting inPermit flag
         inPermit = true;
 
-        if (owner == address(0)) {
+        uint152 addressPrefix = getAddressPrefixInternal(signer);
+
+        if (signer == address(0)) {
             revert CVC_InvalidAddress();
+        }
+
+        if (++nonceLookup[addressPrefix][nonceNamespace] == nonce) {
+            revert CVC_InvalidNonce();
         }
 
         if (deadline < block.timestamp) {
@@ -164,29 +171,26 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_InvalidData();
         }
 
-        uint152 addressPrefix = getAddressPrefixInternal(owner);
-        uint nextNonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
         bytes32 permitHash = getPermitHash(
-            owner,
+            signer,
             nonceNamespace,
-            nextNonce,
+            nonce,
             deadline,
             data
         );
-        address signer = recoverECDSASigner(permitHash, signature);
-
-        nonceLookup[addressPrefix][nonceNamespace] = nextNonce;
 
         if (
-            owner != signer &&
+            signer != recoverECDSASigner(permitHash, signature) &&
             !isValidERC1271Signature(signer, permitHash, signature)
         ) {
             revert CVC_NotAuthorized();
         }
 
+        emit NonceUsed(addressPrefix, nonce);
+
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
-        // CVC address becomes msg.sender for the duration this call
+        // CVC address becomes msg.sender for the duration this self-call
         (bool success, bytes memory result) = callPermitDataInternal(
             address(this),
             signer,
