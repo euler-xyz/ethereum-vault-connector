@@ -109,17 +109,17 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     modifier onlyOwner(address account) virtual {
         {
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
-            // the "true" caller address (that is the permit message signer) is taken from the execution context
-            address caller = address(this) == msg.sender
+            // the "true" sender address (that is the permit message signer) is taken from the execution context
+            address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
                 : msg.sender;
 
-            if (haveCommonOwnerInternal(account, caller)) {
+            if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
 
                 if (owner == address(0)) {
-                    setAccountOwnerInternal(account, caller);
-                } else if (owner != caller) {
+                    setAccountOwnerInternal(account, msgSender);
+                } else if (owner != msgSender) {
                     revert CVC_NotAuthorized();
                 }
             } else {
@@ -136,20 +136,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     modifier onlyOwnerOrOperator(address account) virtual {
         {
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
-            // the "true" caller address (that is the permit message signer) is taken from the execution context
-            address caller = address(this) == msg.sender
+            // the "true" sender address (that is the permit message signer) is taken from the execution context
+            address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
                 : msg.sender;
 
-            if (haveCommonOwnerInternal(account, caller)) {
+            if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
 
                 if (owner == address(0)) {
-                    setAccountOwnerInternal(account, caller);
-                } else if (owner != caller) {
+                    setAccountOwnerInternal(account, msgSender);
+                } else if (owner != msgSender) {
                     revert CVC_NotAuthorized();
                 }
-            } else if (operatorLookup[account][caller] < block.timestamp) {
+            } else if (operatorLookup[account][msgSender] < block.timestamp) {
                 revert CVC_NotAuthorized();
             }
         }
