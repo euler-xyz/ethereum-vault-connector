@@ -48,7 +48,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint expiryTimestamp
     ) public payable virtual override {
         super.setAccountOperator(account, operator, expiryTimestamp);
     }
