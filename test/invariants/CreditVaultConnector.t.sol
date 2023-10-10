@@ -195,17 +195,19 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 
     function permit(
-        address owner,
+        address signer,
         uint nonceNamespace,
+        uint nonce,
         uint deadline,
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
-        if (uint160(owner) <= 10) return;
+        if (uint160(signer) <= 10) return;
         if (data.length == 0) return;
-        vm.etch(owner, signerMock.code);
+        vm.etch(signer, signerMock.code);
+        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] + 1;
         deadline = block.timestamp;
-        super.permit(owner, nonceNamespace, deadline, data, signature);
+        super.permit(signer, nonceNamespace, nonce, deadline, data, signature);
     }
 
     function batch(BatchItem[] calldata items) public payable override {

@@ -180,12 +180,14 @@ interface ICVC {
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.
     /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271). It's also an owner of all the accounts for which authentication will be needed during the execution of the arbitrary data call.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
+    /// @param nonce The nonce for the given account and nonce namespace.
     /// @param deadline The timestamp after which the permit is considered expired.
     /// @param data The encoded data which is self-called on the CVC contract.
     /// @param signature The signature of the data signed by the signer.
     function permit(
         address signer,
         uint nonceNamespace,
+        uint nonce,
         uint deadline,
         bytes calldata data,
         bytes calldata signature
