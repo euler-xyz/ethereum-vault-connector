@@ -100,7 +100,7 @@ At this point in time Credit Vault Connector **has not yet been audited** and mu
 
 ## Known limitations
 
-Please refer to the [WHITEPAPER](docs/docs/whitepaper.md#security-considerations) guide for a list of known limitations and security considerations.
+Please refer to the [WHITEPAPER](docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
 
 ## Contributing
 
