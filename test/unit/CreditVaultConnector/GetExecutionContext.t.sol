@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../../src/test/CreditVaultConnectorHarness.sol";
+import "../../cvc/CreditVaultConnectorHarness.sol";
 
 contract GetExecutionContextTest is Test {
     CreditVaultConnectorHarness internal cvc;
@@ -13,7 +13,7 @@ contract GetExecutionContextTest is Test {
     }
 
     function test_GetExecutionContext(address account, uint seed) external {
-        vm.assume(account != address(0));
+        vm.assume(account != address(0) && account != address(cvc));
 
         address controller = address(new Vault(cvc));
 
@@ -31,9 +31,9 @@ contract GetExecutionContextTest is Test {
         }
 
         cvc.setBatchDepth(seed % 3 == 0 ? 1 : 0);
+        cvc.setOnBehalfOfAccount(account);
         cvc.setChecksLock(false);
         cvc.setImpersonateLock(seed % 4 == 0 ? true : false);
-        cvc.setOnBehalfOfAccount(account);
 
         (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
             controller
@@ -70,7 +70,7 @@ contract GetExecutionContextTest is Test {
         address account,
         uint seed
     ) external {
-        vm.assume(account != address(0));
+        vm.assume(account != address(0) && account != address(cvc));
 
         address controller = address(new Vault(cvc));
 

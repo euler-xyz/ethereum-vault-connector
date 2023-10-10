@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../../src/test/CreditVaultConnectorHarness.sol";
+import "../../cvc/CreditVaultConnectorHarness.sol";
 
 contract AccountStatusTest is Test {
     CreditVaultConnectorHarness internal cvc;
@@ -18,6 +18,8 @@ contract AccountStatusTest is Test {
     ) external {
         for (uint i = 0; i < accounts.length; i++) {
             address account = accounts[i];
+
+            vm.assume(account != address(cvc));
 
             // avoid duplicate entries in the accounts array not to enable multiple
             // controllers for the same account

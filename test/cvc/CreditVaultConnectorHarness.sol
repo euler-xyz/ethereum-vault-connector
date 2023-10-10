@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "./CreditVaultConnectorScribble.sol";
-import "../../test/utils/mocks/Vault.sol";
+import "../utils/mocks/Vault.sol";
 
 // helper contract that allows to set CVC's internal state and overrides original
 // CVC functions in order to verify the account and vault checks
@@ -89,20 +89,6 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         executionContext = executionContext.setOnBehalfOfAccount(account);
     }
 
-    function getLastSignatureTimestamps(
-        address account,
-        address operator
-    )
-        external
-        view
-        returns (
-            uint40 lastSignatureTimestampOwner,
-            uint40 lastSignatureTimestampAccountOperator
-        )
-    {
-        return getLastSignatureTimestampsInternal(account, operator);
-    }
-
     // function overrides in order to verify the account and vault checks
     function requireAccountStatusCheck(
         address account
@@ -181,6 +167,15 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         for (uint i = 0; i < vaults.length; ++i) {
             expectedVaultsChecked.push(vaults[i]);
         }
+    }
+
+    function requireAccountAndVaultStatusCheck(
+        address account
+    ) public payable override {
+        super.requireAccountAndVaultStatusCheck(account);
+
+        expectedAccountsChecked.push(account);
+        expectedVaultsChecked.push(msg.sender);
     }
 
     function requireAccountStatusCheckInternal(

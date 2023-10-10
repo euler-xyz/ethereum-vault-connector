@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../../src/test/CreditVaultConnectorHarness.sol";
+import "../../cvc/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using ExecutionContext for EC;
@@ -47,7 +47,7 @@ contract CollateralsManagementTest is Test {
         uint8 numberOfVaults,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
         vm.assume(seed > 1000);
 
@@ -67,7 +67,7 @@ contract CollateralsManagementTest is Test {
             seed % 2 == 0 &&
             !cvc.haveCommonOwner(account, address(uint160(seed)))
         ) {
-            msgSender = address(uint160(seed));
+            msgSender = address(uint160(uint(keccak256(abi.encodePacked(seed)))));
             vm.prank(alice);
             cvc.setAccountOperator(
                 account,
@@ -141,7 +141,7 @@ contract CollateralsManagementTest is Test {
         address alice,
         address bob
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc) && bob != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -167,6 +167,7 @@ contract CollateralsManagementTest is Test {
     function test_RevertIfChecksReentrancy_CollateralsManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
         address vault = address(new Vault(cvc));
 
         cvc.setChecksLock(true);
@@ -195,6 +196,7 @@ contract CollateralsManagementTest is Test {
     function test_RevertIfImpersonateReentrancy_CollateralsManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
         address vault = address(new Vault(cvc));
 
         cvc.setImpersonateLock(true);
@@ -224,9 +226,19 @@ contract CollateralsManagementTest is Test {
         cvc.disableCollateral(alice, vault);
     }
 
+    function test_RevertIfInvalidVault_CollateralsManagement(
+        address alice
+    ) public {
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        cvc.enableCollateral(alice, address(cvc));
+    }
+
     function test_RevertIfAccountStatusViolated_CollateralsManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
+        
         address vault = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
 

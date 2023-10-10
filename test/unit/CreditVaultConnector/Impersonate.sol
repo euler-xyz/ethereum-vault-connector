@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../../src/test/CreditVaultConnectorHarness.sol";
+import "../../cvc/CreditVaultConnectorHarness.sol";
 
 contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     using Set for SetStorage;
@@ -37,7 +37,7 @@ contract ImpersonateTest is Test {
     }
 
     function test_Impersonate(address alice, uint96 seed) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -83,7 +83,7 @@ contract ImpersonateTest is Test {
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].onBehalfOfAccount = address(0);
+        items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
@@ -117,14 +117,14 @@ contract ImpersonateTest is Test {
             address(cvc),
             seed,
             false,
-            controller
+            alice
         );
 
         vm.deal(controller, seed);
         vm.prank(controller);
         (success, result) = cvc.handlerImpersonate{value: seed}(
             collateral,
-            address(0),
+            alice,
             data
         );
 
@@ -136,7 +136,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -175,7 +175,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -216,7 +216,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address controller = address(new Vault(cvc));
 
@@ -249,7 +249,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -284,7 +284,7 @@ contract ImpersonateTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller_1 = address(new Vault(cvc));
@@ -330,8 +330,8 @@ contract ImpersonateTest is Test {
         address randomAddress,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(uint160(randomAddress) > 10);
+        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(uint160(randomAddress) > 10 && randomAddress != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
@@ -375,7 +375,7 @@ contract ImpersonateTest is Test {
         address targetContract,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(targetContract != address(cvc));
 
         address collateral = address(new Vault(cvc));

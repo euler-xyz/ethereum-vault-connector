@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../../src/test/CreditVaultConnectorHarness.sol";
+import "../../cvc/CreditVaultConnectorHarness.sol";
 
 contract CallTest is Test {
     CreditVaultConnectorHarness internal cvc;
@@ -13,6 +13,8 @@ contract CallTest is Test {
     }
 
     function test_Call(address alice, uint96 seed) public {
+        vm.assume(alice != address(0) && alice != address(cvc));
+
         address account;
         if (seed % 2 == 0) {
             // in this case the account is not alice's sub-account thus alice must be an operator
@@ -64,7 +66,7 @@ contract CallTest is Test {
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
 
-        items[0].onBehalfOfAccount = address(0);
+        items[0].onBehalfOfAccount = alice;
         items[0].targetContract = address(cvc);
         items[0].value = seed; // this value will get ignored
         items[0].data = abi.encodeWithSelector(
@@ -77,27 +79,6 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         cvc.batch{value: seed}(items);
-
-        // should also succeed if the onBehalfOfAccount address passed is 0. it should be replaced with msg.sender
-        data = abi.encodeWithSelector(
-            Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
-            seed,
-            false,
-            alice
-        );
-
-        vm.deal(alice, seed);
-        vm.prank(alice);
-        (success, result) = cvc.call{value: seed}(
-            targetContract,
-            address(0),
-            data
-        );
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
 
         // on behalf of account should be correct in a nested call when checks are not deferred
         data = abi.encodeWithSelector(
@@ -143,7 +124,7 @@ contract CallTest is Test {
         address bob,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
+        vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, bob));
         vm.assume(bob != address(0));
 
@@ -171,6 +152,8 @@ contract CallTest is Test {
         address alice,
         uint seed
     ) public {
+        vm.assume(alice != address(cvc));
+
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvc));
 
@@ -197,6 +180,8 @@ contract CallTest is Test {
         address alice,
         uint seed
     ) public {
+        vm.assume(alice != address(cvc));
+
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvc));
 
@@ -226,6 +211,7 @@ contract CallTest is Test {
         uint seed
     ) public {
         vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();

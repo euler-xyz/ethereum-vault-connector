@@ -38,11 +38,11 @@ interface ICVC {
         address otherAccount
     ) external pure returns (bool);
 
-    /// @notice Returns the prefix of the specified account.
-    /// @dev The prefix is the first 19 bytes of the account address.
-    /// @param account The address of the account whose prefix is being retrieved.
-    /// @return A uint152 value that represents the prefix of the account.
-    function getPrefix(address account) external pure returns (uint152);
+    /// @notice Returns the address prefix of the specified account.
+    /// @dev The address prefix is the first 19 bytes of the account address.
+    /// @param account The address of the account whose address prefix is being retrieved.
+    /// @return A uint152 value that represents the address prefix of the account.
+    function getAddressPrefix(address account) external pure returns (uint152);
 
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
@@ -50,72 +50,45 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the authentication expiry timestamp for the operator of the specified account.
-    /// @param account The address of the account whose operator's authentication expiry timestamp is being retrieved.
-    /// @param operator The address of the operator whose authentication expiry timestamp is being retrieved.
-    /// @return authExpiryTimestamp The timestamp after which the operator is no longer authorized.
-    function getAccountOperatorAuthExpiryTimestamp(
+    /// @notice Returns the nonce for a given account and nonce namespace.
+    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
+    /// @param account The address of the account for which the nonce is being retrieved.
+    /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
+    /// @return nonce The current nonce for the given account and nonce namespace.
+    function getNonce(
+        address account,
+        uint nonceNamespace
+    ) external view returns (uint nonce);
+
+    /// @notice Returns information whether given operator has been authorized for the account.
+    /// @param account The address of the account whose operator is being checked.
+    /// @param operator The address of the operator that is being checked.
+    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized.
+    function getAccountOperator(
         address account,
         address operator
-    ) external view returns (uint40 authExpiryTimestamp);
+    ) external view returns (uint expiryTimestamp);
 
-    /// @notice Invalidates permits signed for all operators of all accounts belonging to the owner which have signature timestamp less than the current timestamp.
-    function invalidateAllPermits() external payable;
-
-    /// @notice Invalidates permits signed for an operator of an account which have signature tiemstamp less than the current timestamp.
-    /// @dev Only the owner of the account can call this function.
-    /// @param account The address of the account whose operator's permits are being invalidated.
-    /// @param operator The address of the operator whose permits are being invalidated.
-    function invalidateAccountOperatorPermits(
+    /// @notice Sets the nonce for a given account and nonce namespace.
+    /// @dev This function can only be called by the owner of the account. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// @param account The address of the account for which the nonce is being set.
+    /// @param nonceNamespace The nonce namespace for which the nonce is being set.
+    /// @param nonce The new nonce for the given account and nonce namespace.
+    function setNonce(
         address account,
-        address operator
+        uint nonceNamespace,
+        uint nonce
     ) external payable;
 
-    /// @notice Sets or unsets an operator for an account.
-    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only deauthorize ifself.
+    /// @notice Authorizes or deauthorizes an operator for the account.
+    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only uninstall ifself.
     /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block.
+    /// @param operator The address of the operator that is being installed or uninstalled.
+    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized.
     function setAccountOperator(
         address account,
         address operator,
-        uint40 authExpiryTimestamp
-    ) external payable;
-
-    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ECDSA signature.
-    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
-    /// @param signatureTimestamp The timestamp at which the signature was created.
-    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
-    /// @param signature The signature that is used to authorize or deauthorize the operator.
-    function setAccountOperatorPermitECDSA(
-        address account,
-        address operator,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp,
-        bytes calldata signature
-    ) external payable;
-
-    /// @notice Sets or unsets an operator for an account using EIP-712 standard and ERC-1271 signature.
-    /// @dev Only the owner of the account can sign the data used in this function. An operator is an address that can perform operations for an account on behalf of the owner.
-    /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being authorized or deauthorized.
-    /// @param authExpiryTimestamp The timestamp after which the operator is no longer authorized. If less than the current timestamp, the operator is not authorized. If 0 or less than current block.timestamp, the operator is deauthorized. If type(uint40).max, the authorization is only valid for the duration of one block in which the permit is exercised.
-    /// @param signatureTimestamp The timestamp at which the signature was created.
-    /// @param signatureDeadlineTimestamp The timestamp before which the signature must be submitted.
-    /// @param signature The signature that is used to authorize or deauthorize the operator.
-    /// @param ERC1271Signer The address of the ERC-1271 contract that is used to verify the signature.
-    function setAccountOperatorPermitERC1271(
-        address account,
-        address operator,
-        uint40 authExpiryTimestamp,
-        uint40 signatureTimestamp,
-        uint40 signatureDeadlineTimestamp,
-        bytes calldata signature,
-        address ERC1271Signer
+        uint40 expiryTimestamp
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
@@ -202,6 +175,21 @@ interface ICVC {
         address onBehalfOfAccount,
         bytes calldata data
     ) external payable returns (bool success, bytes memory result);
+
+    /// @notice Executes signed arbitrary data by self-calling into the CVC.
+    /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.
+    /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271). It's also an owner of all the accounts for which authentication will be needed during the execution of the arbitrary data call.
+    /// @param nonceNamespace The nonce namespace for which the nonce is being used.
+    /// @param deadline The timestamp after which the permit is considered expired.
+    /// @param data The encoded data which is self-called on the CVC contract.
+    /// @param signature The signature of the data signed by the signer.
+    function permit(
+        address signer,
+        uint nonceNamespace,
+        uint deadline,
+        bytes calldata data,
+        bytes calldata signature
+    ) external payable;
 
     /// @notice Defers the account and vault status checks until the end of the top-level batch and executes a batch of batch items.
     /// @dev Accounts status checks and vault status checks are performed after all the batch items of the last batch have been executed. It's possible to have nested batches where checks are executed ony once after the top level batch concludes.
