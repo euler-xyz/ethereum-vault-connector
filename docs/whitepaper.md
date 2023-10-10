@@ -2,6 +2,37 @@
 
 Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 
+<!-- TOC FOLLOWS -->
+<!-- START OF TOC -->
+* [Introduction](#introduction)
+* [Controller](#controller)
+* [Account Status Checks](#account-status-checks)
+  * [Collateral Validity](#collateral-validity)
+  * [Execution Flow](#execution-flow)
+  * [Single Controller](#single-controller)
+  * [Require Immediate](#require-immediate)
+  * [Forgiveness](#forgiveness)
+* [Vault Status Checks](#vault-status-checks)
+* [Execution](#execution)
+  * [Batches](#batches)
+  * [Authorisation](#authorisation)
+    * [Sub-Accounts](#sub-accounts)
+    * [Operators](#operators)
+    * [Permit](#permit)
+  * [call](#call)
+  * [impersonate](#impersonate)
+  * [Execution Contexts](#execution-contexts)
+    * [Nested Execution Contexts](#nested-execution-contexts)
+    * [checksLock](#checkslock)
+    * [impersonateLock](#impersonatelock)
+  * [Simulations](#simulations)
+* [Transient Storage](#transient-storage)
+* [Security Considerations](#security-considerations)
+  * [Authentication by Vaults](#authentication-by-vaults)
+  * [CVC Contract Privileges](#cvc-contract-privileges)
+  * [Read-only Re-entrancy](#read-only-re-entrancy)
+<!-- END OF TOC -->
+
 ## Introduction
 
 The Credit Vault Connector (CVC) Protocol is an attempt to distill the core functionality required for a lending market into a minimal specification that can be used as a foundation for many diverse protocols. Assets are deposited into Credit Vaults, which are contracts that expose a standard ERC-4626 interface, as well as additional logic for interfacing with other vaults.
