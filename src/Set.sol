@@ -27,96 +27,89 @@ library Set {
         SetStorage storage setStorage,
         address element
     ) internal returns (bool wasInserted) {
-        uint numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
-
-        if (numElements != 0) {
-            if (firstElement == element) return false;
-
-            for (uint i = 1; i < numElements; ) {
-                if (setStorage.elements[i].value == element) return false;
-
-                unchecked {
-                    ++i;
-                }
-            }
-        }
-
-        if (numElements >= MAX_ELEMENTS) revert TooManyElements();
+        uint numElements = setStorage.numElements;
 
         if (numElements == 0) {
-            setStorage.firstElement = element;
-
             // gas optimization:
             // on the first element insertion, set the stamp to non-zero value
             // to keep the storage slot dirty when the element is removed
+            setStorage.numElements = 1;
+            setStorage.firstElement = element;
             setStorage.stamp = 1;
-        } else {
-            setStorage.elements[numElements].value = element;
+            return true;
         }
+
+        if (firstElement == element) return false;
+
+        for (uint i = 1; i < numElements; ) {
+            if (setStorage.elements[i].value == element) return false;
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (numElements == MAX_ELEMENTS) revert TooManyElements();
+        setStorage.elements[numElements].value = element;
 
         unchecked {
             setStorage.numElements = uint8(numElements + 1);
         }
-
         return true;
+
     }
 
     /// @notice Removes an element and returns whether the operation was successful or not.
     /// @param setStorage The set storage from which the element will be removed.
     /// @param element The address of the element to be removed.
-    /// @return wasRemoved A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
+    /// @return  A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
     function remove(
         SetStorage storage setStorage,
         address element
-    ) internal returns (bool wasRemoved) {
-        uint numElements = setStorage.numElements;
+    ) internal returns (bool) {
         address firstElement = setStorage.firstElement;
-        uint searchIndex = type(uint).max;
-
+        uint numElements = setStorage.numElements;
         if (numElements == 0) return false;
 
-        if (firstElement == element) {
-            searchIndex = 0;
-        } else {
-            for (uint i = 1; i < numElements; ) {
-                if (setStorage.elements[i].value == element) {
-                    searchIndex = i;
+        uint searchIndex;
+        if (firstElement != element) {
+            for (searchIndex = 1; searchIndex < numElements; ) {
+                if (setStorage.elements[searchIndex].value == element) {
                     break;
                 }
                 unchecked {
-                    ++i;
+                    ++searchIndex;
                 }
             }
 
-            if (searchIndex == type(uint).max) return false;
+            if (searchIndex == numElements) return false;
         }
 
-        uint lastMarketIndex;
+        if (numElements == 1) {
+            setStorage.numElements = 0;
+            setStorage.firstElement = address(0);
+            setStorage.stamp = 1;
+            return true;
+        }
+
+        uint lastIndex;
         unchecked {
-            lastMarketIndex = numElements - 1;
+            lastIndex = numElements - 1;
         }
 
-        if (searchIndex != lastMarketIndex) {
+        if (searchIndex != lastIndex) {
             if (searchIndex == 0) {
-                setStorage.firstElement = setStorage
-                    .elements[lastMarketIndex]
-                    .value;
+                setStorage.firstElement = setStorage.elements[lastIndex].value;
+                setStorage.numElements = uint8(lastIndex);
             } else {
-                setStorage.elements[searchIndex].value = setStorage
-                    .elements[lastMarketIndex]
-                    .value;
+                setStorage.elements[searchIndex].value = setStorage.elements[lastIndex].value;
+                setStorage.numElements = uint8(lastIndex);
             }
-        }
-
-        setStorage.numElements = uint8(lastMarketIndex);
-
-        if (lastMarketIndex == 0) {
-            delete setStorage.firstElement;
         } else {
-            delete setStorage.elements[lastMarketIndex].value;
+            setStorage.numElements = uint8(lastIndex);
         }
-
+        delete setStorage.elements[lastIndex].value;
         return true;
     }
 
@@ -127,8 +120,8 @@ library Set {
     function get(
         SetStorage storage setStorage
     ) internal view returns (address[] memory) {
-        uint numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
+        uint numElements = setStorage.numElements;
         address[] memory output = new address[](numElements);
 
         if (numElements == 0) return output;
@@ -149,25 +142,27 @@ library Set {
     /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the result.
     /// @param setStorage The set storage to be searched.
     /// @param element The address of the element to be checked.
-    /// @return A boolean value that indicates whether the set storage includes the element or not.
+    /// @return found A boolean value that indicates whether the set storage includes the element or not.
     function contains(
         SetStorage storage setStorage,
         address element
-    ) internal view returns (bool) {
-        uint numElements = setStorage.numElements;
+    ) internal view returns (bool found) {
         address firstElement = setStorage.firstElement;
+        uint numElements = setStorage.numElements;
 
         if (numElements == 0) return false;
         if (firstElement == element) return true;
+        
+        assembly ("memory-safe") {
+            function eqElementAtSlot(slot, comparedElement) -> equals {
+                let storedElementAndStamp := sload(slot)
+                let storedElement := and(storedElementAndStamp, 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff)
+                equals := eq(storedElement, comparedElement)
+            }
 
-        for (uint i = 1; i < numElements; ) {
-            if (setStorage.elements[i].value == element) return true;
-
-            unchecked {
-                ++i;
+            for {let i := 2} iszero(or(gt(i, numElements), found)) {i := add(i, 1)} {
+                found := eqElementAtSlot(add(setStorage.slot, i), element)
             }
         }
-
-        return false;
     }
 }
