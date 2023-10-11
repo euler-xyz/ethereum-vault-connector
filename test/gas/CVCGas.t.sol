@@ -15,6 +15,14 @@ contract CVCHarness is CreditVaultConnector {
     ) external view returns (bytes32) {
         return getPermitHash(signer, nonceNamespace, nonce, deadline, data);
     }
+
+    function getIsValidERC1271Signature(
+        address signer,
+        bytes32 hash,
+        bytes memory signature
+    ) external view returns (bool isValid) {
+        return isValidERC1271Signature(signer, hash, signature);
+    }
 }
 
 contract CVCGas is Test {
@@ -38,5 +46,25 @@ contract CVCGas is Test {
 
     function testGas_haveCommonOwner(address a, address b) public {
         cvc.haveCommonOwner(a, b);
+    }
+
+    function testGas_isValidSignature_eoa(
+        address signer,
+        bytes32 hash,
+        bytes memory signature
+    ) public {
+        vm.assume(signature.length < 100);
+        cvc.getIsValidERC1271Signature(signer, hash, signature);
+    }
+
+    function testGas_isValidSignature_contract(
+        address signer,
+        bytes32 hash,
+        bytes memory signature
+    ) public {
+        vm.assume(uint160(signer) > 1000);
+        vm.assume(signature.length < 100);
+        vm.etch(signer, "ff");
+        cvc.getIsValidERC1271Signature(signer, hash, signature);
     }
 }
