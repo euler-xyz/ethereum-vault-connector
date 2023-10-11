@@ -28,7 +28,10 @@ contract CallTest is Test {
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(
+            targetContract != address(cvc) &&
+                !cvc.haveCommonOwner(targetContract, alice)
+        );
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,

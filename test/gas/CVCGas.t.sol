@@ -62,7 +62,7 @@ contract CVCGas is Test {
         bytes32 hash,
         bytes memory signature
     ) public {
-        vm.assume(uint160(signer) > 1000);
+        vm.assume(signer != address(cvc) && uint160(signer) > 1000);
         vm.assume(signature.length < 100);
         vm.etch(signer, "ff");
         cvc.getIsValidERC1271Signature(signer, hash, signature);
