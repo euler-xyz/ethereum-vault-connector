@@ -738,7 +738,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         for (uint i; i < length; ) {
             address account = accounts[i];
             accountStatusChecks.remove(account);
-            
+
             requireAccountStatusCheckInternal(account);
 
             unchecked {
