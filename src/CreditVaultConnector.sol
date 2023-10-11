@@ -35,6 +35,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     address internal constant ERC1820_REGISTRY =
         0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
+    uint256 internal immutable CACHED_CHAIN_ID;
+    bytes32 internal immutable CACHED_DOMAIN_SEPARATOR;
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                        STORAGE                                            //
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +101,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         BatchItemResult[] vaultsStatusResult
     );
     error CVC_BatchPanic();
+    error CVC_EmptyError();
+
+    constructor() {
+        CACHED_CHAIN_ID = block.chainid;
+        CACHED_DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                TYPE_HASH,
+                HASHED_NAME,
+                HASHED_VERSION,
+                block.chainid,
+                address(this)
+            )
+        );
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
@@ -1060,15 +1077,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         uint deadline,
         bytes calldata data
     ) internal view returns (bytes32 permitHash) {
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                TYPE_HASH,
-                HASHED_NAME,
-                HASHED_VERSION,
-                block.chainid,
-                address(this)
-            )
-        );
+        bytes32 domainSeparator = block.chainid == CACHED_CHAIN_ID
+            ? CACHED_DOMAIN_SEPARATOR
+            : calculateDomainSeparator();
 
         bytes32 structHash = keccak256(
             abi.encode(
@@ -1083,12 +1094,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         // Assembly block based on:
         // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, "\x19\x01")
-            mstore(add(ptr, 0x02), domainSeparator)
-            mstore(add(ptr, 0x22), structHash)
-            permitHash := keccak256(ptr, 0x42)
+        assembly ("memory-safe") {
+            let fmp := mload(0x40)
+            mstore(0x00, "\x19\x01")
+            mstore(0x02, domainSeparator)
+            mstore(0x22, structHash)
+            permitHash := keccak256(0x00, 0x42)
+            mstore(0x40, fmp)
         }
     }
 
@@ -1153,13 +1165,28 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             bytes32(IERC1271.isValidSignature.selector);
     }
 
+    function calculateDomainSeparator() internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    TYPE_HASH,
+                    HASHED_NAME,
+                    HASHED_VERSION,
+                    block.chainid,
+                    address(this)
+                )
+            );
+    }
+
     // Auxiliary functions
 
     function haveCommonOwnerInternal(
         address account,
         address otherAccount
-    ) internal pure returns (bool) {
-        return (uint160(account) | 0xFF) == (uint160(otherAccount) | 0xFF);
+    ) internal pure returns (bool res) {
+        assembly {
+            res := lt(xor(account, otherAccount), 0x100)
+        }
     }
 
     function getAddressPrefixInternal(
@@ -1187,7 +1214,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 revert(add(32, errMsg), mload(errMsg))
             }
         }
-        revert("CVC-empty-error");
+        revert CVC_EmptyError();
     }
 
     receive() external payable {}
