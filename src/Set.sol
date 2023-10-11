@@ -159,19 +159,11 @@ library Set {
         if (numElements == 0) return false;
         if (firstElement == element) return true;
 
-        assembly ("memory-safe") {
-            function eqElementAtSlot(slot, comparedElement) -> equals {
-                let storedElementAndStamp := sload(slot)
-                let storedElement := and(
-                    storedElementAndStamp,
-                    0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff
-                )
-                equals := eq(storedElement, comparedElement)
-            }
+        for (uint i = 1; i < numElements; ) {
+            if (setStorage.elements[i].value == element) return true;
 
-            // prettier-ignore
-            for {let i := 2} iszero(or(gt(i, numElements), found)) {i := add(i, 1)} {
-                found := eqElementAtSlot(add(setStorage.slot, i), element)
+            unchecked {
+                ++i;
             }
         }
     }
