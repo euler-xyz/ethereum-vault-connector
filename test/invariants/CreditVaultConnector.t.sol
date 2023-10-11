@@ -205,7 +205,9 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (uint160(signer) <= 10) return;
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
-        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] + 1;
+        nonce =
+            nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] +
+            1;
         deadline = block.timestamp;
         super.permit(signer, nonceNamespace, nonce, deadline, data, signature);
     }

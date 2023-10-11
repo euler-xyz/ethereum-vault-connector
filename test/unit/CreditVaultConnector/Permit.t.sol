@@ -439,7 +439,14 @@ contract permitTest is Test {
         cvc.setNonce(alice, nonceNamespace, nonce - 1);
 
         vm.expectRevert(CreditVaultConnector.CVC_InvalidData.selector);
-        cvc.permit(alice, nonceNamespace, nonce, deadline, bytes(""), signature);
+        cvc.permit(
+            alice,
+            nonceNamespace,
+            nonce,
+            deadline,
+            bytes(""),
+            signature
+        );
     }
 
     function test_RevertIfCallUnsuccessful_Permit(
