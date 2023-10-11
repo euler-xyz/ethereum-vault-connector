@@ -15,16 +15,6 @@ contract CVCHarness is CreditVaultConnector {
     ) external view returns (bytes32) {
         return getPermitHash(signer, nonceNamespace, nonce, deadline, data);
     }
-
-    function permitHash2(
-        address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        bytes calldata data
-    ) external view returns (bytes32) {
-        return getPermitHash(signer, nonceNamespace, nonce, deadline, data);
-    }
 }
 
 contract CVCGas is Test {
