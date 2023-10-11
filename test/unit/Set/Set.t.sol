@@ -104,8 +104,6 @@ contract SetTest is Test {
         );
     }
 
-
-
     function test_insert_first(address element) public {
         bool wasInserted = setStorage.insert(element);
 
@@ -130,7 +128,10 @@ contract SetTest is Test {
         assertEq(setStorage.firstElement, element);
     }
 
-    function test_insert_duplicateOfArrayElement(address elementA, address elementB) public {
+    function test_insert_duplicateOfArrayElement(
+        address elementA,
+        address elementB
+    ) public {
         vm.assume(elementA != elementB);
 
         assertTrue(setStorage.insert(elementA));
@@ -141,9 +142,9 @@ contract SetTest is Test {
     }
 
     function test_insert_and_contains_20Elements() public {
-        for(uint i = 0; i < 20; i++) {
+        for (uint i = 0; i < 20; i++) {
             address e = address(uint160(uint256(i)));
-            address eNext = address(uint160(uint256(i+1)));
+            address eNext = address(uint160(uint256(i + 1)));
             assertTrue(setStorage.insert(e));
             assertTrue(setStorage.contains(e));
             assertFalse(setStorage.contains(eNext));

@@ -27,11 +27,11 @@ contract SetGasTest is Test {
         size02.insert(ELEMENT_1);
         size02.insert(ELEMENT_2);
 
-        for(uint160 i = 1; i <= 20; ++i) {
+        for (uint160 i = 1; i <= 20; ++i) {
             size20.insert(address(i));
         }
 
-        for(uint160 i = 1; i <= 5; ++i) {
+        for (uint160 i = 1; i <= 5; ++i) {
             size05.insert(address(i));
         }
     }

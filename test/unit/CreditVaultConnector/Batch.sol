@@ -195,7 +195,7 @@ contract BatchTest is Test {
         items[0].data = abi.encodeWithSelector(Target.revertEmptyTest.selector);
 
         vm.prank(alice);
-        vm.expectRevert(bytes("CVC-empty-error"));
+        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
         cvc.handlerBatch(items);
     }
 

@@ -51,13 +51,14 @@ library Set {
         }
 
         if (numElements == MAX_ELEMENTS) revert TooManyElements();
+
         setStorage.elements[numElements].value = element;
 
         unchecked {
             setStorage.numElements = uint8(numElements + 1);
         }
-        return true;
 
+        return true;
     }
 
     /// @notice Removes an element and returns whether the operation was successful or not.
@@ -70,6 +71,7 @@ library Set {
     ) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint numElements = setStorage.numElements;
+
         if (numElements == 0) return false;
 
         uint searchIndex;
@@ -103,13 +105,17 @@ library Set {
                 setStorage.firstElement = setStorage.elements[lastIndex].value;
                 setStorage.numElements = uint8(lastIndex);
             } else {
-                setStorage.elements[searchIndex].value = setStorage.elements[lastIndex].value;
+                setStorage.elements[searchIndex].value = setStorage
+                    .elements[lastIndex]
+                    .value;
                 setStorage.numElements = uint8(lastIndex);
             }
         } else {
             setStorage.numElements = uint8(lastIndex);
         }
+
         delete setStorage.elements[lastIndex].value;
+
         return true;
     }
 
@@ -152,14 +158,18 @@ library Set {
 
         if (numElements == 0) return false;
         if (firstElement == element) return true;
-        
+
         assembly ("memory-safe") {
             function eqElementAtSlot(slot, comparedElement) -> equals {
                 let storedElementAndStamp := sload(slot)
-                let storedElement := and(storedElementAndStamp, 0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff)
+                let storedElement := and(
+                    storedElementAndStamp,
+                    0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff
+                )
                 equals := eq(storedElement, comparedElement)
             }
 
+            // prettier-ignore
             for {let i := 2} iszero(or(gt(i, numElements), found)) {i := add(i, 1)} {
                 found := eqElementAtSlot(add(setStorage.slot, i), element)
             }
