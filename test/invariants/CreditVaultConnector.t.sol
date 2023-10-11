@@ -67,7 +67,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        operatorLookup[account][msg.sender] = uint40(block.timestamp);
+        operatorLookup[account][msg.sender] = block.timestamp;
         vm.etch(vault, vaultMock.code);
     }
 
@@ -87,7 +87,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint expiryTimestamp
     ) public payable override {
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
@@ -195,17 +195,19 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 
     function permit(
-        address owner,
+        address signer,
         uint nonceNamespace,
+        uint nonce,
         uint deadline,
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
-        if (uint160(owner) <= 10) return;
+        if (uint160(signer) <= 10) return;
         if (data.length == 0) return;
-        vm.etch(owner, signerMock.code);
+        vm.etch(signer, signerMock.code);
+        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] + 1;
         deadline = block.timestamp;
-        super.permit(owner, nonceNamespace, deadline, data, signature);
+        super.permit(signer, nonceNamespace, nonce, deadline, data, signature);
     }
 
     function batch(BatchItem[] calldata items) public payable override {

@@ -67,11 +67,7 @@ contract ControllersManagementTest is Test {
         ) {
             msgSender = address(uint160(uint(keccak256(abi.encode(seed)))));
             vm.prank(alice);
-            cvc.setAccountOperator(
-                account,
-                msgSender,
-                uint40(block.timestamp + 100)
-            );
+            cvc.setAccountOperator(account, msgSender, block.timestamp + 100);
         }
 
         // enabling controller
@@ -143,7 +139,9 @@ contract ControllersManagementTest is Test {
         address alice,
         address bob
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc) && bob != address(cvc));
+        vm.assume(
+            alice != address(0) && alice != address(cvc) && bob != address(cvc)
+        );
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -153,7 +151,7 @@ contract ControllersManagementTest is Test {
         cvc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
+        cvc.setAccountOperator(bob, alice, block.timestamp + 100);
 
         vm.prank(alice);
         cvc.handlerEnableController(bob, vault);

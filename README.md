@@ -1,16 +1,111 @@
-The Credit Vault Connector (CVC) Protocol is an attempt to distill the core functionality required for a lending market into a minimal specification that can be used as a foundation for many diverse protocols. Assets are deposited into Credit Vaults, which are contracts that expose a standard ERC-4626 interface, as well as additional logic for interfacing with other vaults.
+# Credit Vault Connector
 
-The CVC is primarily a mediator between Credit Vaults. In order to borrow from a vault, users must attach their accounts and various collateral vaults to this borrowed-from vault via the CVC. From then on, whenever a user wants to perform an action such as removing collateral, the liability vault (called controller) will be consulted in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent.
+The Credit Vault Connector (CVC) is an attempt to distill the core functionality required for a lending market into a foundational layer that can be used as a base building block for many diverse protocols. The CVC is primarily a mediator between Credit Vaults, which are contracts that implement the ERC-4626 interface and contain a small amount of additional logic for interfacing with other vaults.
 
-In addition to vault mediation, the CVC contains the functionality required to build flexible products, both for EOAs and smart contracts. Here are some of the benefits of building on the CVC:
+For more information refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md).
 
-* Batching. Multiple operations can be performed within a single batch operation, even those that concurrently affect multiple vaults. This is more convenient for UI users (no need for smart wallets), more gas efficient, and allows deferring liquidity check until the end of the batch (for flash rebalancing, setting up leveraged positions, etc)
-* Simulations were a prized feature of the Euler V1 UI. The CVC exposes the optimal interface for simulating the effects of a set of operations and pre-visualising their effects in a UI.
-* Sub-accounts were also a widely appreciated feature of Euler V1. They allowed users to create multiple isolated positions within their single parent account, and easily rebalance collateral/liabilities between them (no approvals needed). The CVC will allow users of any participating protocol to use sub-accounts, without requiring any special logic to be implemented by vaults.
-* Operators allow users to attach external contracts to act on behalf of a sub-account. This is a generalisation of the E/DToken approval system and will unlock powerful functionality, even for EOAs. We have sketched out many possible use-cases to ensure that this system is fully general. For example, stop-loss/take-profit/trailing-stop/etc modifiers can be added to positions, or entire layered position managers can be built on top.
-* The protocol deliberately doesn't enforce specific properties about the assets being used as collateral or liabilities. CVC users can therefore create vaults backed by irregular asset classes, such as NFTs, uncollateralised IOUs, or synthetics.
-* As well as the primary liquidity enforcement interface, there is an additional vault status check hook which allows vaults to enforce global-concern limits such as supply caps. These checks can also be deferred so that transient violations that are gone at the end of the transaction do not cause a failure.
-* A common language for liquidations. If vaults choose, they can implement a core liquidation interface that will allow them to rely on an existing network of liquidators to keep their depositors safe.
-* The CVC has been carefully designed to support nested vaults without exposing a reentrancy-based attack surface. This will allow Credit Vaults to be used as the underlying asset for other Credit Vaults. Among other things, this will provide the basis for a "base yield" feature of Euler V2 where a low-risk assets can optionally be used as components of higher-yielding products.
+---
 
-As well as providing the above features to a common base ecosystem, their re-use also keeps a substantial amount of complexity to be kept out of the core lending/borrowing contracts, leaving them free to focus on their differentiating factors such as pricing and risk management.
+## Contracts
+
+```
+.
+├── interfaces
+│   ├── ICreditVault.sol
+│   ├── ICreditVaultConnector.sol
+│   └── IERC1271.sol
+├── CreditVaultConnector.sol
+├── ExecutionContext.sol
+├── Set.sol
+└── TransientStorage.sol
+```
+
+## Install
+
+To install Credit Vault Connector in a [**Foundry**](https://github.com/foundry-rs/foundry) project:
+
+```sh
+forge install euler-xyz/euler-cvc
+```
+
+## Usage
+
+Credit Vault Connector includes a suite of tests written in Solidity with Foundry.
+
+Please refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md) for an in-depth explanation of the Credit Vault Connector and integration considerations. An example vault using the Credit Vault Connector can be found in the [CVC Playground](https://github.com/euler-xyz/euler-cvc-playground) repo.
+
+To install Foundry:
+
+```sh
+curl -L https://foundry.paradigm.xyz | bash
+```
+
+This will download foundryup. To start Foundry, run:
+
+```sh
+foundryup
+```
+
+To clone the repo and install dependencies:
+
+```sh
+git clone https://github.com/euler-xyz/euler-cvc.git && cd euler-cvc && yarn
+```
+
+## Testing
+
+### in `default` mode
+
+To run the tests in a `default` mode:
+
+```sh
+forge test
+```
+
+### with `scribble` annotations
+
+To run the tests using `scribble` annotations first install [scribble](https://docs.scribble.codes/):
+
+```sh
+npm install -g eth-scribble
+```
+
+To instrument the contracts and run the tests:
+
+```sh
+scribble test/cvc/CreditVaultConnectorScribble.sol --output-mode files --arm && forge test
+```
+
+To remove instrumentation:
+
+```sh
+scribble test/cvc/CreditVaultConnectorScribble.sol --disarm
+```
+
+### in `coverage` mode
+
+```sh
+forge coverage
+```
+
+## Safety
+
+This is **experimental software** and is provided on an "as is" and "as available" basis.
+
+**No warranties are given** and **nobody will be liable for any loss** incurred through any use of this codebase.
+
+Please always include your own thorough tests when using Credit Vault Connector to make sure it works correctly with your code.
+
+At this point in time Credit Vault Connector **has not yet been audited** and must not be used in production.
+
+## Known limitations
+
+Please refer to the [WHITEPAPER](docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
+
+## Contributing
+
+The code is currently in an experimental phase leading up to the first audit. Any feedback or ideas how Credit Vault Connector can be improved will be appreciated. Contributions are welcome by anyone interested in carrying out security research, writing more tests including formal verification, improving readability and documenation, optimizing, simplifying or developing integrations.
+
+## License
+
+Licensed under the [GPL-2.0-or-later](/LICENSE) license.

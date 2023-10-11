@@ -48,7 +48,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     function setAccountOperator(
         address account,
         address operator,
-        uint40 expiryTimestamp
+        uint expiryTimestamp
     ) public payable virtual override {
         super.setAccountOperator(account, operator, expiryTimestamp);
     }
@@ -133,13 +133,14 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     function permit(
-        address owner,
+        address signer,
         uint nonceNamespace,
+        uint nonce,
         uint deadline,
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual override {
-        super.permit(owner, nonceNamespace, deadline, data, signature);
+        super.permit(signer, nonceNamespace, nonce, deadline, data, signature);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());

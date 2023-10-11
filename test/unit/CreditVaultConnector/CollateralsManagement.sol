@@ -67,13 +67,11 @@ contract CollateralsManagementTest is Test {
             seed % 2 == 0 &&
             !cvc.haveCommonOwner(account, address(uint160(seed)))
         ) {
-            msgSender = address(uint160(uint(keccak256(abi.encodePacked(seed)))));
-            vm.prank(alice);
-            cvc.setAccountOperator(
-                account,
-                msgSender,
-                uint40(block.timestamp + 100)
+            msgSender = address(
+                uint160(uint(keccak256(abi.encodePacked(seed))))
             );
+            vm.prank(alice);
+            cvc.setAccountOperator(account, msgSender, block.timestamp + 100);
             assertEq(cvc.getAccountOwner(account), alice);
         }
 
@@ -141,7 +139,9 @@ contract CollateralsManagementTest is Test {
         address alice,
         address bob
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc) && bob != address(cvc));
+        vm.assume(
+            alice != address(0) && alice != address(cvc) && bob != address(cvc)
+        );
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(cvc));
@@ -155,7 +155,7 @@ contract CollateralsManagementTest is Test {
         cvc.disableCollateral(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, uint40(block.timestamp + 100));
+        cvc.setAccountOperator(bob, alice, block.timestamp + 100);
 
         vm.prank(alice);
         cvc.enableCollateral(bob, vault);
@@ -238,7 +238,7 @@ contract CollateralsManagementTest is Test {
         address alice
     ) public {
         vm.assume(alice != address(cvc));
-        
+
         address vault = address(new Vault(cvc));
         address controller = address(new Vault(cvc));
 
