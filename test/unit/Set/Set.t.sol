@@ -10,6 +10,10 @@ contract SetTest is Test {
     SetStorage setStorage;
     uint counter;
 
+    function setUp() public {
+        delete setStorage;
+    }
+
     function test_InsertRemove(address[] memory elements, uint64 seed) public {
         // ------------------ SETUP ----------------------
         delete setStorage;
@@ -80,8 +84,8 @@ contract SetTest is Test {
     }
 
     function test_RevertIfTooManyElements_Insert(uint seed) public {
+        seed = bound(seed, 101, type(uint).max);
         delete setStorage;
-        vm.assume(seed > 100);
 
         for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {
             assertEq(
@@ -98,5 +102,84 @@ contract SetTest is Test {
         setStorage.insert(
             address(uint160(uint(bytes32(keccak256(abi.encode(seed, seed))))))
         );
+    }
+
+    function test_insert_first(address element) public {
+        bool wasInserted = setStorage.insert(element);
+
+        assertTrue(wasInserted);
+        assertEq(setStorage.numElements, 1);
+        assertEq(setStorage.firstElement, element);
+    }
+
+    function test_insert_second(address elementA, address elementB) public {
+        vm.assume(elementA != elementB);
+
+        assertTrue(setStorage.insert(elementA));
+        assertTrue(setStorage.insert(elementB));
+        assertEq(setStorage.numElements, 2);
+        assertEq(setStorage.firstElement, elementA);
+    }
+
+    function test_insert_duplicateOfFirstElement(address element) public {
+        assertTrue(setStorage.insert(element));
+        assertFalse(setStorage.insert(element));
+        assertEq(setStorage.numElements, 1);
+        assertEq(setStorage.firstElement, element);
+    }
+
+    function test_insert_duplicateOfArrayElement(
+        address elementA,
+        address elementB
+    ) public {
+        vm.assume(elementA != elementB);
+
+        assertTrue(setStorage.insert(elementA));
+        assertTrue(setStorage.insert(elementB));
+        assertFalse(setStorage.insert(elementB));
+        assertEq(setStorage.numElements, 2);
+        assertEq(setStorage.firstElement, elementA);
+    }
+
+    function test_insert_and_contains_20Elements() public {
+        for (uint i = 0; i < 20; i++) {
+            address e = address(uint160(uint256(i)));
+            address eNext = address(uint160(uint256(i + 1)));
+            assertTrue(setStorage.insert(e));
+            assertTrue(setStorage.contains(e));
+            assertFalse(setStorage.contains(eNext));
+        }
+
+        assertEq(setStorage.numElements, 20);
+    }
+
+    function test_contains_empty(address e) public {
+        assertFalse(setStorage.contains(e));
+    }
+
+    function test_contains_firstElement(address e) public {
+        setStorage.insert(e);
+        assertTrue(setStorage.contains(e));
+    }
+
+    function test_remove_empty(address e) public {
+        assertFalse(setStorage.remove(e));
+        assertEq(setStorage.numElements, 0);
+    }
+
+    function test_remove_firstElement(address e) public {
+        setStorage.insert(e);
+        assertTrue(setStorage.remove(e));
+        assertEq(setStorage.numElements, 0);
+    }
+
+    function test_remove_second(address elementA, address elementB) public {
+        vm.assume(elementA != elementB);
+        setStorage.insert(elementA);
+        setStorage.insert(elementB);
+        assertTrue(setStorage.remove(elementB));
+        assertEq(setStorage.numElements, 1);
+        assertTrue(setStorage.remove(elementA));
+        assertEq(setStorage.numElements, 0);
     }
 }
