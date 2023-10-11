@@ -105,15 +105,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     constructor() {
         CACHED_CHAIN_ID = block.chainid;
-        CACHED_DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                TYPE_HASH,
-                HASHED_NAME,
-                HASHED_VERSION,
-                block.chainid,
-                address(this)
-            )
-        );
+        CACHED_DOMAIN_SEPARATOR = calculateDomainSeparator();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -1094,15 +1086,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             )
         );
 
-        // Assembly block based on:
-        // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
         assembly ("memory-safe") {
-            let fmp := mload(0x40)
             mstore(0x00, "\x19\x01")
             mstore(0x02, domainSeparator)
             mstore(0x22, structHash)
             permitHash := keccak256(0x00, 0x42)
-            mstore(0x40, fmp)
+            mstore(0x22, 0)
         }
     }
 
