@@ -32,7 +32,7 @@ forge install euler-xyz/euler-cvc
 
 Credit Vault Connector includes a suite of tests written in Solidity with Foundry.
 
-Please refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md) for an in-depth explanation of the Credit Vault Connector and integration considerations. An example vault using the Credit Vault Connector can be found in the [CVC Playground](https://github.com/euler-xyz/euler-cvc-playground) repo.
+Please refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md) for an in-depth explanation of the Credit Vault Connector and integration considerations. Example vaults using the Credit Vault Connector can be found in the [CVC Playground](https://github.com/euler-xyz/euler-cvc-playground/tree/master/src) repo. Do not use the example vaults in production under any circumstances as they are not audited and are only meant to be used for testing and experimentation.
 
 To install Foundry:
 
