@@ -47,7 +47,8 @@ contract BatchTest is Test {
         address indexed operator,
         address indexed onBehalfOfAccount
     );
-    event Batch(address indexed caller, uint numOfItems);
+    event BatchStart(address indexed caller, uint batchDepth);
+    event BatchEnd(address indexed caller, uint batchDepth);
 
     function setUp() public {
         cvc = new CreditVaultConnectorHandler();
@@ -132,7 +133,9 @@ contract BatchTest is Test {
 
         vm.deal(alice, seed);
         vm.expectEmit(true, false, false, true, address(cvc));
-        emit Batch(alice, items.length);
+        emit BatchStart(alice, 1);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(alice, 1);
         vm.prank(alice);
         cvc.handlerBatch{value: seed}(items);
 
@@ -192,9 +195,11 @@ contract BatchTest is Test {
 
         vm.prank(bob);
         vm.expectEmit(true, false, false, true, address(cvc));
-        emit Batch(bob, items.length);
+        emit BatchStart(bob, 1);
         vm.expectEmit(true, true, false, false, address(cvc));
         emit OperatorAuthenticated(bob, alice);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(bob, 1);
         cvc.handlerBatch(items);
         assertFalse(cvc.isControllerEnabled(alice, controller));
 
@@ -277,6 +282,13 @@ contract BatchTest is Test {
         ICVC.BatchItem[] memory itemsOneLess = new ICVC.BatchItem[](8);
         for (uint i = 1; i <= itemsOneLess.length; ++i) {
             itemsOneLess[i - 1] = items[i];
+
+            vm.expectEmit(true, false, false, true, address(cvc));
+            emit BatchStart(alice, i);
+        }
+        for (uint i = itemsOneLess.length - 1; i >= 1; --i) {
+            vm.expectEmit(true, false, false, true, address(cvc));
+            emit BatchEnd(alice, i);
         }
 
         vm.prank(alice);

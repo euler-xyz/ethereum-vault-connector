@@ -37,7 +37,8 @@ contract ImpersonateTest is Test {
         address indexed collateral,
         address indexed onBehalfOfAccount
     );
-    event Batch(address indexed caller, uint numOfItems);
+    event BatchStart(address indexed caller, uint batchDepth);
+    event BatchEnd(address indexed caller, uint batchDepth);
 
     function setUp() public {
         cvc = new CreditVaultConnectorHandler();
@@ -104,9 +105,11 @@ contract ImpersonateTest is Test {
 
         vm.deal(controller, seed);
         vm.expectEmit(true, false, false, true, address(cvc));
-        emit Batch(controller, items.length);
+        emit BatchStart(controller, 1);
         vm.expectEmit(true, true, true, false, address(cvc));
         emit Impersonate(controller, collateral, alice);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(controller, 1);
         vm.prank(controller);
         cvc.batch(items);
         cvc.verifyVaultStatusChecks();

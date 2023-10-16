@@ -77,6 +77,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address indexed operator,
         address indexed onBehalfOfAccount
     );
+    event CollateralStatus(
+        address indexed account,
+        address indexed collateral,
+        bool indexed enabled
+    );
     event ControllerStatus(
         address indexed account,
         address indexed controller,
@@ -97,7 +102,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address indexed signer,
         bytes signature
     );
-    event Batch(address indexed caller, uint numOfItems);
+    event BatchStart(address indexed caller, uint batchDepth);
+    event BatchEnd(address indexed caller, uint batchDepth);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                         ERRORS                                            //
@@ -398,7 +404,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
         if (vault == address(this)) revert CVC_InvalidAddress();
 
-        accountCollaterals[account].insert(vault);
+        if (accountCollaterals[account].insert(vault)) {
+            emit CollateralStatus(account, vault, true);
+        }
         requireAccountStatusCheck(account);
     }
 
@@ -407,7 +415,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account,
         address vault
     ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
-        accountCollaterals[account].remove(vault);
+        if (accountCollaterals[account].remove(vault)) {
+            emit CollateralStatus(account, vault, false);
+        }
         requireAccountStatusCheck(account);
     }
 
@@ -468,7 +478,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         emit Call(msg.sender, targetContract, onBehalfOfAccount);
-        
+
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
         (success, result) = callInternal(
@@ -583,9 +593,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = contextCache.increaseBatchDepth();
+        uint8 batchDepth = contextCache.getBatchDepth() + 1;
+        executionContext = contextCache.setBatchDepth(batchDepth);
+
+        emit BatchStart(msg.sender, batchDepth);
 
         batchInternal(items, false);
+
+        emit BatchEnd(msg.sender, batchDepth);
 
         if (!contextCache.isInBatch()) {
             executionContext = contextCache.setChecksInProgress();
@@ -617,11 +632,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = contextCache.increaseBatchDepth();
+        uint8 batchDepth = contextCache.getBatchDepth() + 1;
+        executionContext = contextCache.setBatchDepth(batchDepth);
+
+        emit BatchStart(msg.sender, batchDepth);
 
         batchItemsResult = batchInternal(items, true);
 
-        // batch depth does not have to be explicitly decreased here as we're using cached context
+        emit BatchEnd(msg.sender, batchDepth);
 
         if (!contextCache.isInBatch()) {
             executionContext = contextCache.setChecksInProgress();
@@ -947,8 +965,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bool returnResult
     ) internal virtual returns (BatchItemResult[] memory batchItemsResult) {
         uint length = items.length;
-
-        emit Batch(msg.sender, length);
 
         if (returnResult) {
             batchItemsResult = new BatchItemResult[](length);

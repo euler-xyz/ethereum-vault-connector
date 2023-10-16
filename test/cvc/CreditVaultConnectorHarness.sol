@@ -59,9 +59,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext = EC.wrap(
-            (EC.unwrap(executionContext) & ~uint(0xff)) | uint(depth)
-        );
+        executionContext = executionContext.setBatchDepth(depth);
     }
 
     function setChecksLock(bool locked) external {

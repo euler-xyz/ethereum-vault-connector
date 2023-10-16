@@ -21,6 +21,10 @@ library ExecutionContext {
     uint internal constant BATCH_DEPTH_MAX = 9;
     uint internal constant STAMP_DUMMY_VALUE = 1;
 
+    function getBatchDepth(EC context) internal pure returns (uint8 result) {
+        result = uint8(EC.unwrap(context) & BATCH_DEPTH_MASK);
+    }
+
     function isInBatch(EC context) internal pure returns (bool result) {
         result = EC.unwrap(context) & BATCH_DEPTH_MASK != BATCH_DEPTH_INIT;
     }
@@ -32,17 +36,11 @@ library ExecutionContext {
     }
 
     /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function increaseBatchDepth(EC context) internal pure returns (EC result) {
-        unchecked {
-            result = EC.wrap(EC.unwrap(context) + 1);
-        }
-    }
-
-    /// #if_succeeds "batch depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function decreaseBatchDepth(EC context) internal pure returns (EC result) {
-        unchecked {
-            result = EC.wrap(EC.unwrap(context) - 1);
-        }
+    function setBatchDepth(
+        EC context,
+        uint8 batchDepth
+    ) internal pure returns (EC result) {
+        result = EC.wrap((EC.unwrap(context) & ~BATCH_DEPTH_MASK) | batchDepth);
     }
 
     function getOnBehalfOfAccount(
