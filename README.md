@@ -30,9 +30,9 @@ forge install euler-xyz/euler-cvc
 
 ## Usage
 
-Credit Vault Connector includes a suite of tests written in Solidity with Foundry.
+The Credit Vault Connector comes with a comprehensive set of tests written in Solidity, which can be executed using Foundry.
 
-Please refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md) for an in-depth explanation of the Credit Vault Connector and integration considerations. Example vaults using the Credit Vault Connector can be found in the [CVC Playground](https://github.com/euler-xyz/euler-cvc-playground/tree/master/src) repo. Do not use the example vaults in production under any circumstances as they are not audited and are only meant to be used for testing and experimentation.
+For a detailed understanding of the Credit Vault Connector and considerations for its integration, please refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md). You can find examples of vaults utilizing the Credit Vault Connector in the [CVC Playground](https://github.com/euler-xyz/euler-cvc-playground/tree/master/src) repository. However, these example vaults are not meant for production use as they have not been audited and are intended solely for testing and experimentation purposes.
 
 To install Foundry:
 
@@ -90,21 +90,21 @@ forge coverage
 
 ## Safety
 
-This is **experimental software** and is provided on an "as is" and "as available" basis.
+This software is **experimental** and is provided "as is" and "as available".
 
-**No warranties are given** and **nobody will be liable for any loss** incurred through any use of this codebase.
+**No warranties are provided** and **no liability will be accepted for any loss** incurred through the use of this codebase.
 
-Please always include your own thorough tests when using Credit Vault Connector to make sure it works correctly with your code.
+Always include thorough tests when using the Credit Vault Connector to ensure it interacts correctly with your code.
 
-At this point in time Credit Vault Connector **has not yet been audited** and must not be used in production.
+The Credit Vault Connector **has not yet undergone an audit** and should not be used in production.
 
 ## Known limitations
 
-Please refer to the [WHITEPAPER](docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
+Refer to the [WHITEPAPER](docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
 
 ## Contributing
 
-The code is currently in an experimental phase leading up to the first audit. Any feedback or ideas how Credit Vault Connector can be improved will be appreciated. Contributions are welcome by anyone interested in carrying out security research, writing more tests including formal verification, improving readability and documenation, optimizing, simplifying or developing integrations.
+The code is currently in an experimental phase leading up to the first audit. Feedback or ideas for improving the Credit Vault Connector are appreciated. Contributions are welcome from anyone interested in conducting security research, writing more tests including formal verification, improving readability and documentation, optimizing, simplifying, or developing integrations.
 
 ## License
 

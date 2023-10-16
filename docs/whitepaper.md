@@ -1,4 +1,4 @@
-# Credit Vault Connector (CVC) Protocol
+# Credit Vault Connector (CVC)
 
 Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 
@@ -36,7 +36,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 
 ## Introduction
 
-The Credit Vault Connector (CVC) Protocol is an attempt to distill the core functionality required for a lending market into a foundational layer that can be used as a base building block for many diverse protocols. The CVC is primarily a mediator between Credit Vaults, which are contracts that implement the ERC-4626 interface and contain a small amount of additional logic for interfacing with other vaults.
+The Credit Vault Connector (CVC) is an attempt to distill the core functionality required for a lending market into a foundational layer that can be used as a base building block for many diverse protocols. The CVC is primarily a mediator between Credit Vaults, which are contracts that implement the ERC-4626 interface and contain a small amount of additional logic for interfacing with other vaults.
 
 In order to borrow from a vault, users must attach their accounts and various collateral vaults to this borrowed-from vault via the CVC. From then on, whenever a user wants to perform an action such as removing collateral, the liability vault (called the "controller") will be consulted in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent.
 
