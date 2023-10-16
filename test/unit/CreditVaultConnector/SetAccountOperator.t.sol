@@ -13,6 +13,10 @@ contract installAccountOperatorTest is Test {
         address indexed operator,
         uint expiryTimestamp
     );
+    event OperatorAuthenticated(
+        address indexed operator,
+        address indexed onBehalfOfAccount
+    );
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
 
     function setUp() public {
@@ -175,6 +179,8 @@ contract installAccountOperatorTest is Test {
             assertEq(cvc.getAccountOwner(account), alice);
 
             // an operator can only deauthorize itself
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(operator, account);
             vm.expectEmit(true, true, false, true, address(cvc));
             emit OperatorAuthorized(account, operator, block.timestamp);
             vm.recordLogs();
@@ -182,7 +188,7 @@ contract installAccountOperatorTest is Test {
             cvc.setAccountOperator(account, operator, block.timestamp);
             logs = vm.getRecordedLogs();
 
-            assertEq(logs.length, 1);
+            assertEq(logs.length, 2);
             assertEq(
                 cvc.getAccountOperator(account, operator),
                 block.timestamp

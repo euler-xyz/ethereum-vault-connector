@@ -73,11 +73,31 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address indexed operator,
         uint expiryTimestamp
     );
+    event OperatorAuthenticated(
+        address indexed operator,
+        address indexed onBehalfOfAccount
+    );
     event ControllerStatus(
         address indexed account,
         address indexed controller,
         bool indexed enabled
     );
+    event Call(
+        address indexed caller,
+        address indexed targetContract,
+        address indexed onBehalfOfAccount
+    );
+    event Impersonate(
+        address indexed controller,
+        address indexed collateral,
+        address indexed onBehalfOfAccount
+    );
+    event Permit(
+        address indexed caller,
+        address indexed signer,
+        bytes signature
+    );
+    event Batch(address indexed caller, uint numOfItems);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                         ERRORS                                            //
@@ -160,6 +180,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 }
             } else if (operatorLookup[account][msgSender] < block.timestamp) {
                 revert CVC_NotAuthorized();
+            } else {
+                emit OperatorAuthenticated(msgSender, account);
             }
         }
 
@@ -445,6 +467,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
+        emit Call(msg.sender, targetContract, onBehalfOfAccount);
+        
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
         (success, result) = callInternal(
@@ -470,6 +494,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         EC contextCache = executionContext;
+
+        emit Impersonate(msg.sender, targetContract, onBehalfOfAccount);
 
         uint value = contextCache.isInBatch() ? 0 : msg.value;
 
@@ -527,6 +553,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_NotAuthorized();
         }
 
+        emit Permit(msg.sender, signer, signature);
         emit NonceUsed(addressPrefix, nonce);
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
@@ -920,6 +947,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bool returnResult
     ) internal virtual returns (BatchItemResult[] memory batchItemsResult) {
         uint length = items.length;
+
+        emit Batch(msg.sender, length);
 
         if (returnResult) {
             batchItemsResult = new BatchItemResult[](length);

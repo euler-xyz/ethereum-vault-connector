@@ -43,6 +43,12 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
 contract BatchTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
+    event OperatorAuthenticated(
+        address indexed operator,
+        address indexed onBehalfOfAccount
+    );
+    event Batch(address indexed caller, uint numOfItems);
+
     function setUp() public {
         cvc = new CreditVaultConnectorHandler();
     }
@@ -125,6 +131,8 @@ contract BatchTest is Test {
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit Batch(alice, items.length);
         vm.prank(alice);
         cvc.handlerBatch{value: seed}(items);
 
@@ -183,6 +191,10 @@ contract BatchTest is Test {
         );
 
         vm.prank(bob);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit Batch(bob, items.length);
+        vm.expectEmit(true, true, false, false, address(cvc));
+        emit OperatorAuthenticated(bob, alice);
         cvc.handlerBatch(items);
         assertFalse(cvc.isControllerEnabled(alice, controller));
 

@@ -40,11 +40,11 @@ contract CVCGas is Test {
         uint nonce,
         uint deadline,
         bytes calldata data
-    ) public {
+    ) public view {
         cvc.permitHash(signer, nonceNamespace, nonce, deadline, data);
     }
 
-    function testGas_haveCommonOwner(address a, address b) public {
+    function testGas_haveCommonOwner(address a, address b) public view {
         cvc.haveCommonOwner(a, b);
     }
 
@@ -52,7 +52,7 @@ contract CVCGas is Test {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) public {
+    ) public view {
         vm.assume(signature.length < 100);
         cvc.getIsValidERC1271Signature(signer, hash, signature);
     }
