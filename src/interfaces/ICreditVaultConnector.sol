@@ -155,26 +155,22 @@ interface ICVC {
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
     /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
     function call(
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) external payable returns (bool success, bytes memory result);
+    ) external payable;
 
     /// @notice For a given account, calls to one of the enabled collateral vaults from currently enabled controller vault as per data encoded.
     /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only enabled controller of the onBehalfOfAccount. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
     /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) external payable returns (bool success, bytes memory result);
+    ) external payable;
 
     /// @notice Executes signed arbitrary data by self-calling into the CVC.
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.

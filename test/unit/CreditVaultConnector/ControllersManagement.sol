@@ -224,6 +224,7 @@ contract ControllersManagementTest is Test {
     function test_RevertIfInvalidVault_ControllersManagement(
         address alice
     ) public {
+        vm.assume(alice != address(cvc));
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.enableController(alice, address(cvc));

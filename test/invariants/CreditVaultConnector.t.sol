@@ -136,13 +136,13 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable override returns (bool success, bytes memory result) {
-        if (onBehalfOfAccount == address(0)) return (true, "");
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == address(this)) return (true, "");
+    ) public payable override {
+        if (onBehalfOfAccount == address(0)) return;
+        if (uint160(targetContract) <= 10) return;
+        if (targetContract == address(this)) return;
         setup(onBehalfOfAccount, targetContract);
 
-        (success, result) = super.call(targetContract, onBehalfOfAccount, data);
+        super.call(targetContract, onBehalfOfAccount, data);
     }
 
     function callInternal(
@@ -168,11 +168,11 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable override returns (bool success, bytes memory result) {
-        if (uint160(msg.sender) <= 10) return (true, "");
-        if (onBehalfOfAccount == address(0)) return (true, "");
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == address(this)) return (true, "");
+    ) public payable override {
+        if (uint160(msg.sender) <= 10) return;
+        if (onBehalfOfAccount == address(0)) return;
+        if (uint160(targetContract) <= 10) return;
+        if (targetContract == address(this)) return;
 
         setup(onBehalfOfAccount, msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
@@ -184,11 +184,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
-        (success, result) = super.impersonate(
-            targetContract,
-            onBehalfOfAccount,
-            data
-        );
+        super.impersonate(targetContract, onBehalfOfAccount, data);
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;

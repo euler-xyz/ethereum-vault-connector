@@ -44,14 +44,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        (bool success, bytes memory result) = cvc.call{value: seed}(
-            targetContract,
-            account,
-            data
-        );
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
+        cvc.call{value: seed}(targetContract, account, data);
 
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
@@ -91,14 +84,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        (success, result) = cvc.call{value: seed}(
-            targetContract,
-            account,
-            data
-        );
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
+        cvc.call{value: seed}(targetContract, account, data);
 
         // on behalf of account should also be correct in a nested call when checks are deferred
         items[0].onBehalfOfAccount = account;
@@ -142,9 +128,7 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        (bool success, ) = cvc.call{value: seed}(targetContract, bob, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, bob, data);
     }
 
     function test_RevertIfChecksReentrancy_Call(
@@ -170,9 +154,7 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
-        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
     }
 
     function test_RevertIfImpersonateReentrancy_Call(
@@ -200,9 +182,7 @@ contract CallTest is Test {
         vm.expectRevert(
             CreditVaultConnector.CVC_ImpersonateReentrancy.selector
         );
-        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
     }
 
     function test_RevertIfTargetContractInvalid_Call(
@@ -230,10 +210,7 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
-
-        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
 
         // target contract is the ERC1820 registry
         targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
@@ -253,9 +230,6 @@ contract CallTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
-
-        (success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
     }
 }
