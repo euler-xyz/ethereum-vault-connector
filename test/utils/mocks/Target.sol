@@ -12,7 +12,7 @@ contract Target {
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
-    ) external payable returns (uint) {
+    ) external payable {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
             address(0)
         );
@@ -28,8 +28,6 @@ contract Target {
             _onBehalfOfAccount == onBehalfOfAccount,
             "ct/invalid-on-behalf-of-account"
         );
-
-        return msg.value;
     }
 
     function nestedCallTest(
@@ -38,7 +36,7 @@ contract Target {
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
-    ) external payable returns (uint) {
+    ) external payable {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
             address(0)
         );
@@ -55,7 +53,7 @@ contract Target {
             "nct/invalid-on-behalf-of-account"
         );
 
-        (bool success, bytes memory result) = ICVC(cvc).call(
+        ICVC(cvc).call(
             address(this),
             address(this),
             abi.encodeWithSelector(
@@ -68,16 +66,11 @@ contract Target {
             )
         );
 
-        require(success, "nct/success");
-        require(abi.decode(result, (uint)) == 0, "nct/result");
-
         (_onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(address(0));
         require(
             _onBehalfOfAccount == onBehalfOfAccount,
             "nct/invalid-on-behalf-of-account-2"
         );
-
-        return msg.value;
     }
 
     function impersonateTest(
@@ -86,7 +79,7 @@ contract Target {
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
-    ) external payable returns (uint) {
+    ) external payable {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
             address(0)
         );
@@ -122,8 +115,6 @@ contract Target {
         } else {
             ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
         }
-
-        return msg.value;
     }
 
     function revertEmptyTest() external pure {

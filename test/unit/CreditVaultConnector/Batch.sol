@@ -475,15 +475,11 @@ contract BatchTest is Test {
         );
 
         vm.prank(controller);
-        (bool success, bytes memory result) = cvc.impersonate(
+        vm.expectRevert("callBatch/expected-error");
+        cvc.impersonate(
             collateral,
             alice,
             abi.encodeWithSelector(VaultMalicious.callBatch.selector)
-        );
-        assertFalse(success);
-        assertEq(
-            result,
-            abi.encodeWithSignature("Error(string)", "callBatch/expected-error")
         );
     }
 
@@ -525,15 +521,11 @@ contract BatchTest is Test {
         );
 
         vm.prank(controller);
-        (bool success, bytes memory result) = cvc.impersonate(
+        vm.expectRevert("callBatch/expected-error");
+        cvc.impersonate(
             collateral,
             alice,
             abi.encodeWithSelector(VaultMalicious.callBatch.selector)
-        );
-        assertFalse(success);
-        assertEq(
-            result,
-            abi.encodeWithSignature("Error(string)", "callBatch/expected-error")
         );
     }
 

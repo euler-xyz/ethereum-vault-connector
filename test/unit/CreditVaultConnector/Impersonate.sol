@@ -12,17 +12,11 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable returns (bool success, bytes memory result) {
-        (success, ) = msg.sender.call(
-            abi.encodeWithSelector(Vault.clearChecks.selector)
-        );
+    ) public payable {
+        msg.sender.call(abi.encodeWithSelector(Vault.clearChecks.selector));
         clearExpectedChecks();
 
-        (success, result) = super.impersonate(
-            targetContract,
-            onBehalfOfAccount,
-            data
-        );
+        super.impersonate(targetContract, onBehalfOfAccount, data);
 
         verifyVaultStatusChecks();
         verifyAccountStatusChecks();
@@ -61,12 +55,7 @@ contract ImpersonateTest is Test {
 
         vm.deal(controller, seed);
         vm.prank(controller);
-        (bool success, bytes memory result) = cvc.handlerImpersonate{
-            value: seed
-        }(collateral, alice, data);
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
 
         cvc.clearExpectedChecks();
         Vault(controller).clearChecks();
@@ -122,14 +111,7 @@ contract ImpersonateTest is Test {
 
         vm.deal(controller, seed);
         vm.prank(controller);
-        (success, result) = cvc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }
 
     function test_RevertIfChecksReentrancy_Impersonate(
@@ -162,13 +144,7 @@ contract ImpersonateTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }
 
     function test_RevertIfImpersonateReentrancy_Impersonate(
@@ -203,13 +179,7 @@ contract ImpersonateTest is Test {
         vm.expectRevert(
             CreditVaultConnector.CVC_ImpersonateReentrancy.selector
         );
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }
 
     function test_RevertIfTargetContractInvalid_Impersonate(
@@ -236,13 +206,7 @@ contract ImpersonateTest is Test {
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            address(cvc),
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(address(cvc), alice, data);
     }
 
     function test_RevertIfNoControllerEnabled_Impersonate(
@@ -271,13 +235,7 @@ contract ImpersonateTest is Test {
         vm.deal(controller, seed);
         vm.prank(controller);
         vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }
 
     function test_RevertIfMultipleControllersEnabled_Impersonate(
@@ -316,13 +274,7 @@ contract ImpersonateTest is Test {
         vm.deal(controller_1, seed);
         vm.prank(controller_1);
         vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }
 
     function test_RevertIfMsgSenderIsNotEnabledController_Impersonate(
@@ -361,13 +313,7 @@ contract ImpersonateTest is Test {
                 CreditVaultConnector.CVC_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }
 
     function test_RevertIfTargetContractIsNotEnabledCollateral_Impersonate(
@@ -405,12 +351,6 @@ contract ImpersonateTest is Test {
                 CreditVaultConnector.CVC_NotAuthorized.selector
             )
         );
-        (bool success, ) = cvc.handlerImpersonate{value: seed}(
-            targetContract,
-            alice,
-            data
-        );
-
-        assertFalse(success);
+        cvc.handlerImpersonate{value: seed}(targetContract, alice, data);
     }
 }
