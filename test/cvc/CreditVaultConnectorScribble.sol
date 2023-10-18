@@ -35,15 +35,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         return super.getExecutionContext(controllerToCheck);
     }
 
-    /// #if_succeeds "only the account owner can call this" (address(this) != msg.sender && ownerLookup[uint152(uint160(account) >> 8)] == msg.sender) || (address(this) == msg.sender && ownerLookup[uint152(uint160(account) >> 8)] == executionContext.getOnBehalfOfAccount());
-    function setNonce(
-        address account,
-        uint nonceNamespace,
-        uint nonce
-    ) public payable virtual override {
-        super.setNonce(account, nonceNamespace, nonce);
-    }
-
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;

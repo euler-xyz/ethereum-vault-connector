@@ -42,9 +42,13 @@ contract VaultEchidna is ICreditVault {
     ) public returns (bytes4) {
         // try to reenter the CVC
 
-        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
-        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+        try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setOperator(prefix, address(this), 0) {} catch {}
 
         hevm.prank(account);
         try cvc.setAccountOperator(account, address(this), false) {} catch {}
@@ -102,9 +106,13 @@ contract VaultEchidna is ICreditVault {
         // try to reenter the CVC
         address account = address(1);
 
-        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
-        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+        try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setOperator(prefix, address(this), 0) {} catch {}
 
         hevm.prank(account);
         try cvc.setAccountOperator(account, address(this), false) {} catch {}
@@ -165,9 +173,13 @@ contract VaultEchidna is ICreditVault {
         // try to reenter the CVC
         address account = address(2);
 
-        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
-        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+        try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setOperator(prefix, address(this), 0) {} catch {}
 
         hevm.prank(account);
         try cvc.setAccountOperator(account, address(this), false) {} catch {}
@@ -292,7 +304,7 @@ contract EchidnaTest {
         cvc.permit(
             address(signerEchidna),
             0,
-            cvc.getNonce(address(cvc), 0) + 1,
+            cvc.getNonce(cvc.getAddressPrefix(address(cvc)), 0) + 1,
             block.timestamp,
             data,
             signature

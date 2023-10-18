@@ -59,7 +59,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     mapping(uint152 addressPrefix => mapping(uint nonceNamespace => uint nonce))
         internal nonceLookup;
 
-    mapping(uint152 addressPrefix => mapping(address operator => uint accountBitField))
+    mapping(uint152 addressPrefix => mapping(address operator => uint bitField))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,9 +69,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
     event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
     event OperatorStatus(
-        address indexed account,
+        uint152 indexed addressPrefix,
         address indexed operator,
-        bool indexed authorized
+        uint bitField
     );
     event ControllerStatus(
         address indexed account,
@@ -110,11 +110,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     //                                       MODIFIERS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /// @notice A modifier that allows only the owner of the account to call the function.
-    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. In case of the self-call in the permit() function, the CVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
-    /// @param account The address of the account for which it is checked whether the caller is the owner.
-    modifier onlyOwner(address account) virtual {
+    /// @notice A modifier that allows only the address recorded as an owner of the address prefix to call the function.
+    /// @dev The owner of an address prefix is an address that matches the address that has previously been recorded (or will be) as an owner in the ownerLookup. In case of the self-call in the permit() function, the CVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
+    /// @param addressPrefix The address prefix for which it is checked whether the caller is the owner.
+    modifier onlyOwner(uint152 addressPrefix) virtual {
         {
+            // calculate a phantom address from the address prefix which can be used as an input to internal functions
+            address account = address(uint160(addressPrefix) << 8);
+
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
             address msgSender = address(this) == msg.sender
@@ -284,11 +287,18 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     /// @inheritdoc ICVC
     function getNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace
     ) external view returns (uint) {
-        uint152 addressPrefix = getAddressPrefixInternal(account);
         return nonceLookup[addressPrefix][nonceNamespace];
+    }
+
+    /// @inheritdoc ICVC
+    function getOperator(
+        uint152 addressPrefix,
+        address operator
+    ) external view returns (uint bitField) {
+        return operatorLookup[addressPrefix][operator];
     }
 
     /// @inheritdoc ICVC
@@ -301,18 +311,41 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     /// @inheritdoc ICVC
     function setNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace,
         uint nonce
-    ) public payable virtual onlyOwner(account) {
-        uint152 addressPrefix = getAddressPrefixInternal(account);
-
+    ) public payable virtual onlyOwner(addressPrefix) {
         if (nonceLookup[addressPrefix][nonceNamespace] >= nonce) {
             revert CVC_InvalidNonce();
         }
 
         nonceLookup[addressPrefix][nonceNamespace] = nonce;
         emit NonceUsed(addressPrefix, nonce);
+    }
+
+    /// @inheritdoc ICVC
+    function setOperator(
+        uint152 addressPrefix,
+        address operator,
+        uint bitField
+    ) public payable virtual onlyOwner(addressPrefix) {
+        // if CVC is msg.sender (during the self-call in the permit() function), the owner address will
+        // be taken from the storage which must be storing the correct owner address
+        address owner = address(this) == msg.sender
+            ? ownerLookup[addressPrefix]
+            : msg.sender;
+
+        // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
+        if (
+            operator == address(0) || haveCommonOwnerInternal(owner, operator)
+        ) {
+            revert CVC_InvalidAddress();
+        }
+
+        if (operatorLookup[addressPrefix][operator] != bitField) {
+            operatorLookup[addressPrefix][operator] = bitField;
+            emit OperatorStatus(addressPrefix, operator, bitField);
+        }
     }
 
     /// @inheritdoc ICVC
@@ -323,22 +356,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual onlyOwnerOrOperator(account) {
         // if CVC is msg.sender (during the self-call in the permit() function), it won't have the common owner
         // with the account as it would mean that the CVC itself signed the ERC-1271 message which is not
-        // possible. hence in that case, the owner address will always be taken from the storage which
+        // possible. hence in that case, the owner address will be taken from the storage which
         // must be storing the correct owner address
         address owner = haveCommonOwnerInternal(account, msg.sender)
             ? msg.sender
             : getAccountOwnerInternal(account);
 
-        // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
-        if (
-            operator == address(0) || haveCommonOwnerInternal(owner, operator)
-        ) {
-            revert CVC_InvalidAddress();
-        }
-
         // if CVC is msg.sender (during the self-call in the permit() function), it acts as if it
         // was an owner, meaning it can authorize and deauthorize operators as per signed data.
-        // if it's an operator calling, it can only make changes for itself
+        // if it's an operator calling, it can only make changes for itself hence must be equal to msg.sender
         if (
             owner != msg.sender &&
             operator != msg.sender &&
@@ -347,7 +373,25 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_NotAuthorized();
         }
 
-        setAccountOperatorInternal(account, operator, authorized);
+        // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
+        if (
+            operator == address(0) || haveCommonOwnerInternal(owner, operator)
+        ) {
+            revert CVC_InvalidAddress();
+        }
+
+        uint152 addressPrefix = getAddressPrefixInternal(account);
+        uint bit = uint160(owner) ^ uint160(account);
+        uint bitMask = 1 << bit;
+        uint oldBitField = operatorLookup[addressPrefix][operator];
+        uint newBitField = authorized
+            ? oldBitField | bitMask
+            : oldBitField & ~bitMask;
+
+        if (oldBitField != newBitField) {
+            operatorLookup[addressPrefix][operator] = newBitField;
+            emit OperatorStatus(addressPrefix, operator, newBitField);
+        }
     }
 
     // Collaterals management
@@ -1212,27 +1256,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         uint152 addressPrefix = getAddressPrefixInternal(account);
         ownerLookup[addressPrefix] = owner;
         emit OwnerRegistered(addressPrefix, owner);
-    }
-
-    function setAccountOperatorInternal(
-        address account,
-        address operator,
-        bool authorized
-    ) internal {
-        address owner = getAccountOwnerInternal(account);
-        uint152 addressPrefix = getAddressPrefixInternal(account);
-        uint accountBit = uint160(owner) ^ uint160(account);
-        uint accountBitMask = 1 << accountBit;
-        uint accountBitField = operatorLookup[addressPrefix][operator];
-        bool oldAuthorized = accountBitField & accountBitMask != 0;
-
-        if (oldAuthorized != authorized) {
-            operatorLookup[addressPrefix][operator] = authorized
-                ? accountBitField | accountBitMask
-                : accountBitField & ~accountBitMask;
-
-            emit OperatorStatus(account, operator, authorized);
-        }
     }
 
     function revertBytes(bytes memory errMsg) internal pure {

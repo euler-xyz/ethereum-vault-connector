@@ -50,15 +50,25 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the nonce for a given account and nonce namespace.
+    /// @notice Returns the nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
-    /// @param account The address of the account for which the nonce is being retrieved.
+    /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
-    /// @return nonce The current nonce for the given account and nonce namespace.
+    /// @return nonce The current nonce for the given address prefix and nonce namespace.
     function getNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace
     ) external view returns (uint nonce);
+
+    /// @notice Returns the bit field for a given address prefix and operator.
+    /// @dev The bit field is used to store information about authorized operators for a given address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
+    /// @param addressPrefix The address prefix for which the bit field is being retrieved.
+    /// @param operator The address of the operator for which the bit field is being retrieved.
+    /// @return bitField The bit field for the given address prefix and operator.
+    function getOperator(
+        uint152 addressPrefix,
+        address operator
+    ) external view returns (uint bitField);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
@@ -69,15 +79,26 @@ interface ICVC {
         address operator
     ) external view returns (bool authorized);
 
-    /// @notice Sets the nonce for a given account and nonce namespace.
-    /// @dev This function can only be called by the owner of the account. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
-    /// @param account The address of the account for which the nonce is being set.
+    /// @notice Sets the nonce for a given address prefix and nonce namespace.
+    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
-    /// @param nonce The new nonce for the given account and nonce namespace.
+    /// @param nonce The new nonce for the given address prefix and nonce namespace.
     function setNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace,
         uint nonce
+    ) external payable;
+
+    /// @notice Sets the bit field for a given address prefix and operator.
+    /// @dev This function can only be called by the owner of the address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
+    /// @param addressPrefix The address prefix for which the bit field is being set.
+    /// @param operator The address of the operator for which the bit field is being set.
+    /// @param bitField The new bit field for the given address prefix and operator.
+    function setOperator(
+        uint152 addressPrefix,
+        address operator,
+        uint bitField
     ) external payable;
 
     /// @notice Authorizes or deauthorizes an operator for the account.

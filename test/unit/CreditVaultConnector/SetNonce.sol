@@ -24,49 +24,59 @@ contract SetNonceTest is Test {
         vm.assume(iterations > 0 && iterations < 5);
         vm.assume(nonce > 0 && nonce <= type(uint).max - 256 * iterations);
 
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
 
             for (uint j = 0; j < iterations; ++j) {
                 assertEq(
-                    cvc.getNonce(account, nonceNamespace),
+                    cvc.getNonce(addressPrefix, nonceNamespace),
                     i == 0 && j == 0 ? 0 : nonce
                 );
 
                 vm.expectEmit(true, true, false, false, address(cvc));
-                emit NonceUsed(cvc.getAddressPrefix(account), ++nonce);
+                emit NonceUsed(addressPrefix, ++nonce);
                 vm.prank(alice);
-                cvc.setNonce(account, nonceNamespace, nonce);
-                assertEq(cvc.getNonce(account, nonceNamespace), nonce);
+                cvc.setNonce(addressPrefix, nonceNamespace, nonce);
+                assertEq(cvc.getNonce(addressPrefix, nonceNamespace), nonce);
             }
         }
     }
 
-    function test_RevertIfNotOwner_SetNonce(
+    function test_RevertIfSenderNotOwner_SetNonce(
         address alice,
+        address operator,
         uint nonceNamespace,
         uint nonce
     ) public {
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(alice != address(uint160(uint160(alice) ^ 1)));
+        vm.assume(addressPrefix != type(uint152).max);
+        vm.assume(operator != address(0));
+        vm.assume(!cvc.haveCommonOwner(alice, operator));
         vm.assume(nonce > 0 && nonce < type(uint).max);
 
-        address account = address(uint160(uint160(alice) ^ 256));
-
-        // fails if account does not belong to an owner
+        // fails if address prefix does not belong to an owner
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setNonce(account, nonceNamespace, nonce);
+        cvc.setNonce(addressPrefix + 1, nonceNamespace, nonce);
 
-        // succeeds if sender is an owner
-        account = address(uint160(uint160(alice) ^ 255));
+        // succeeds if address prefix belongs to an owner
         vm.prank(alice);
-        cvc.setNonce(account, nonceNamespace, nonce);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
 
         // fails if owner not consistent
         vm.prank(address(uint160(uint160(alice) ^ 1)));
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setNonce(account, nonceNamespace, nonce);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
+
+        // reverts if sender is an operator
+        vm.prank(alice);
+        cvc.setAccountOperator(alice, operator, true);
+
+        vm.prank(operator);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
     function test_RevertIfInvalidNonce_SetNonce(
@@ -77,18 +87,20 @@ contract SetNonceTest is Test {
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 0);
 
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
+
         // fails if invalid nonce
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidNonce.selector);
-        cvc.setNonce(alice, nonceNamespace, 0);
+        cvc.setNonce(addressPrefix, nonceNamespace, 0);
 
         // succeeds if valid nonce
         vm.prank(alice);
-        cvc.setNonce(alice, nonceNamespace, nonce);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
 
         // fails again if invalid nonce
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidNonce.selector);
-        cvc.setNonce(alice, nonceNamespace, nonce);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 }

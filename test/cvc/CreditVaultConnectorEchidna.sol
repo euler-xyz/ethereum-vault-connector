@@ -10,24 +10,25 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
     bool private inPermit;
 
-    modifier onlyOwner(address account) override {
+    modifier onlyOwner(uint152 addressPrefix) override {
         assert(address(this) == msg.sender ? inPermit : true);
 
         {
-            // CVC can only be msg.sender during the permit() function call. in that case,
-            // the caller address (that is permit message signer) is taken from the execution context
-            address caller = address(this) == msg.sender
+            // calculate a phantom address from the address prefix which can be used as an input to internal functions
+            address account = address(uint160(addressPrefix) << 8);
+
+            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // the "true" sender address (that is the permit message signer) is taken from the execution context
+            address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
                 : msg.sender;
 
-            assert(caller != address(0));
-
-            if (haveCommonOwnerInternal(account, caller)) {
+            if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
 
                 if (owner == address(0)) {
-                    setAccountOwnerInternal(account, caller);
-                } else if (owner != caller) {
+                    setAccountOwnerInternal(account, msgSender);
+                } else if (owner != msgSender) {
                     revert CVC_NotAuthorized();
                 }
             } else {

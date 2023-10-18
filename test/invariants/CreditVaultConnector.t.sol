@@ -67,21 +67,38 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
             setAccountOwnerInternal(account, account);
         }
 
-        setAccountOperatorInternal(account, msg.sender, true);
+        operatorLookup[getAddressPrefixInternal(account)][msg.sender] = (1 <<
+            (uint160(account) ^ uint160(getAccountOwnerInternal(account))));
         vm.etch(vault, vaultMock.code);
     }
 
     function setNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace,
         uint nonce
     ) public payable override {
-        account = msg.sender;
-        setAccountOwnerInternal(account, msg.sender);
-        nonce =
-            nonceLookup[getAddressPrefixInternal(account)][nonceNamespace] +
-            1;
-        super.setNonce(account, nonceNamespace, nonce);
+        addressPrefix = getAddressPrefixInternal(msg.sender);
+        setAccountOwnerInternal(
+            address(uint160(addressPrefix) << 8),
+            msg.sender
+        );
+        nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
+        super.setNonce(addressPrefix, nonceNamespace, nonce);
+    }
+
+    function setOperator(
+        uint152 addressPrefix,
+        address operator,
+        uint bitField
+    ) public payable override {
+        if (operator == address(0) || operator == address(this)) return;
+        if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        addressPrefix = getAddressPrefixInternal(msg.sender);
+        setAccountOwnerInternal(
+            address(uint160(addressPrefix) << 8),
+            msg.sender
+        );
+        super.setOperator(addressPrefix, operator, bitField);
     }
 
     function setAccountOperator(
