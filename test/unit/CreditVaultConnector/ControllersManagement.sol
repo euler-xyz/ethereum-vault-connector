@@ -240,13 +240,7 @@ contract ControllersManagementTest is Test {
         Vault(vault).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert("account status violation");
         cvc.handlerEnableController(alice, vault);
 
         vm.prank(alice);
@@ -271,13 +265,7 @@ contract ControllersManagementTest is Test {
 
         vm.prank(alice);
         // it won't succeed as this time we have a controller so the account status check is performed
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert("account status violation");
         cvc.enableCollateral(alice, vault);
     }
 }

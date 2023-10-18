@@ -18,17 +18,12 @@ contract VaultMock is ICreditVault {
     function checkAccountStatus(
         address,
         address[] memory
-    ) external pure override returns (bool, bytes memory) {
-        return (true, "");
+    ) external pure override returns (bytes4) {
+        return this.checkAccountStatus.selector;
     }
 
-    function checkVaultStatus()
-        external
-        pure
-        override
-        returns (bool, bytes memory)
-    {
-        return (true, "");
+    function checkVaultStatus() external pure override returns (bytes4) {
+        return this.checkVaultStatus.selector;
     }
 
     fallback(bytes calldata) external payable returns (bytes memory) {

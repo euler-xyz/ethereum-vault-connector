@@ -93,8 +93,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     error CVC_ImpersonateReentrancy();
     error CVC_BatchDepthViolation();
     error CVC_ControllerViolation();
-    error CVC_AccountStatusViolation(address account, bytes data);
-    error CVC_VaultStatusViolation(address vault, bytes data);
     error CVC_RevertedBatchResult(
         BatchItemResult[] batchItemsResult,
         BatchItemResult[] accountsStatusResult,
@@ -953,7 +951,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     function checkAccountStatusInternal(
         address account
-    ) internal virtual returns (bool isValid, bytes memory data) {
+    ) internal virtual returns (bool isValid, bytes memory result) {
         uint numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
 
@@ -961,39 +959,57 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         else if (numOfControllers > 1) revert CVC_ControllerViolation();
 
         bool success;
-        (success, data) = controller.call(
+        (success, result) = controller.call(
             abi.encodeCall(
                 ICreditVault.checkAccountStatus,
                 (account, accountCollaterals[account].get())
             )
         );
 
-        if (success) (isValid, data) = abi.decode(data, (bool, bytes));
+        if (
+            success &&
+            ICreditVault.checkAccountStatus.selector ==
+            abi.decode(result, (bytes4))
+        ) {
+            isValid = true;
+        }
     }
 
     function requireAccountStatusCheckInternal(
         address account
     ) internal virtual {
-        (bool isValid, bytes memory data) = checkAccountStatusInternal(account);
+        (bool isValid, bytes memory result) = checkAccountStatusInternal(
+            account
+        );
 
-        if (!isValid) revert CVC_AccountStatusViolation(account, data);
+        if (!isValid) {
+            revertBytes(result);
+        }
     }
 
     function checkVaultStatusInternal(
         address vault
-    ) internal returns (bool isValid, bytes memory data) {
+    ) internal returns (bool isValid, bytes memory result) {
         bool success;
-        (success, data) = vault.call(
+        (success, result) = vault.call(
             abi.encodeCall(ICreditVault.checkVaultStatus, ())
         );
 
-        if (success) (isValid, data) = abi.decode(data, (bool, bytes));
+        if (
+            success &&
+            ICreditVault.checkVaultStatus.selector ==
+            abi.decode(result, (bytes4))
+        ) {
+            isValid = true;
+        }
     }
 
     function requireVaultStatusCheckInternal(address vault) internal virtual {
-        (bool isValid, bytes memory data) = checkVaultStatusInternal(vault);
+        (bool isValid, bytes memory result) = checkVaultStatusInternal(vault);
 
-        if (!isValid) revert CVC_VaultStatusViolation(vault, data);
+        if (!isValid) {
+            revertBytes(result);
+        }
     }
 
     function checkStatusAll(
@@ -1034,20 +1050,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             }
 
             if (returnResult) {
-                bytes memory data;
-                (result[i].success, data) = checkStatus(addressToCheck);
-
-                if (!result[i].success) {
-                    bytes4 violationSelector = setType == SetType.Account
-                        ? CVC_AccountStatusViolation.selector
-                        : CVC_VaultStatusViolation.selector;
-
-                    result[i].result = abi.encodeWithSelector(
-                        violationSelector,
-                        addressToCheck,
-                        data
-                    );
-                }
+                (result[i].success, result[i].result) = checkStatus(
+                    addressToCheck
+                );
             } else {
                 requireStatusCheck(addressToCheck);
             }

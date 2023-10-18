@@ -248,23 +248,11 @@ contract CollateralsManagementTest is Test {
         Vault(controller).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert(bytes("account status violation"));
         cvc.enableCollateral(alice, vault);
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert(bytes("account status violation"));
         cvc.disableCollateral(alice, vault);
 
         Vault(controller).setAccountStatusState(0); // account status is NOT violated

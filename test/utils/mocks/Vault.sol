@@ -67,22 +67,28 @@ contract Vault is ICreditVault, Target {
         external
         virtual
         override
-        returns (bool isValid, bytes memory data)
+        returns (bytes4 magicValue)
     {
-        if (vaultStatusState == 0) return (true, "");
-        else if (vaultStatusState == 1)
-            return (false, "vault status violation");
-        else revert("invalid vault");
+        if (vaultStatusState == 0) {
+            return 0x4b3d1223;
+        } else if (vaultStatusState == 1) {
+            revert("vault status violation");
+        } else {
+            return bytes4(uint32(1));
+        }
     }
 
     function checkAccountStatus(
         address,
         address[] memory
-    ) external virtual override returns (bool isValid, bytes memory data) {
-        if (accountStatusState == 0) return (true, "");
-        else if (accountStatusState == 1)
-            return (false, "account status violation");
-        else revert("invalid account");
+    ) external virtual override returns (bytes4 magicValue) {
+        if (accountStatusState == 0) {
+            return 0xb168c58f;
+        } else if (accountStatusState == 1) {
+            revert("account status violation");
+        } else {
+            return bytes4(uint32(2));
+        }
     }
 
     function requireChecks(address account) external payable {
@@ -115,37 +121,38 @@ contract VaultMalicious is Vault {
             revert("callBatch/expected-error");
     }
 
-    function checkVaultStatus()
-        external
-        virtual
-        override
-        returns (bool, bytes memory)
-    {
-        if (expectedErrorSelector == 0) return (true, "");
+    function checkVaultStatus() external virtual override returns (bytes4) {
+        if (expectedErrorSelector == 0) {
+            return this.checkVaultStatus.selector;
+        }
 
         (bool success, bytes memory result) = address(cvc).call(
             abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
         );
 
-        if (success || bytes4(result) != expectedErrorSelector)
-            return (true, "");
+        if (success || bytes4(result) != expectedErrorSelector) {
+            return this.checkVaultStatus.selector;
+        }
 
-        return (false, "malicious vault");
+        revert("malicious vault");
     }
 
     function checkAccountStatus(
         address,
         address[] memory
-    ) external override returns (bool isValid, bytes memory data) {
-        if (expectedErrorSelector == 0) return (true, "");
+    ) external override returns (bytes4) {
+        if (expectedErrorSelector == 0) {
+            return this.checkAccountStatus.selector;
+        }
 
         (bool success, bytes memory result) = address(cvc).call(
             abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
         );
 
-        if (success || bytes4(result) != expectedErrorSelector)
-            return (true, "");
+        if (success || bytes4(result) != expectedErrorSelector) {
+            return this.checkAccountStatus.selector;
+        }
 
-        return (false, "malicious vault");
+        revert("malicious vault");
     }
 }

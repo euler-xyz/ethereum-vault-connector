@@ -65,18 +65,9 @@ contract AccountAndVaultStatusTest is Test {
                 alredyExpectsRevert = true;
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector
-                            .CVC_AccountStatusViolation
-                            .selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
+                    uint160(account) % 3 == 1
+                        ? bytes("account status violation")
+                        : abi.encode(bytes4(uint32(2)))
                 );
             }
 
@@ -85,16 +76,9 @@ contract AccountAndVaultStatusTest is Test {
                 !alredyExpectsRevert
             ) {
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                        vault,
-                        uint160(vault) % 3 == 1
-                            ? bytes("vault status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid vault")
-                            )
-                    )
+                    uint160(vault) % 3 == 1
+                        ? bytes("vault status violation")
+                        : abi.encode(bytes4(uint32(1)))
                 );
             }
 
@@ -211,13 +195,7 @@ contract AccountAndVaultStatusTest is Test {
             );
 
             // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    accounts[i],
-                    "malicious vault"
-                )
-            );
+            vm.expectRevert(bytes("malicious vault"));
             vm.prank(vaults[i]);
             cvc.requireAccountAndVaultStatusCheck(accounts[i]);
         }

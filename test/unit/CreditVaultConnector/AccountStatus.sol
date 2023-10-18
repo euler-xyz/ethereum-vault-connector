@@ -173,18 +173,9 @@ contract AccountStatusTest is Test {
                 invalidAccounts[invalidAccountsCounter++] = accounts[i];
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector
-                            .CVC_AccountStatusViolation
-                            .selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
+                    uint160(account) % 3 == 1
+                        ? bytes("account status violation")
+                        : abi.encode(bytes4(uint32(2)))
                 );
             }
 
@@ -198,16 +189,9 @@ contract AccountStatusTest is Test {
         // if there's any account which is not valid, the whole transaction should revert
         if (invalidAccountsCounter > 0) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    invalidAccounts[0],
-                    uint160(invalidAccounts[0]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
+                uint160(invalidAccounts[0]) % 3 == 1
+                    ? bytes("account status violation")
+                    : abi.encode(bytes4(uint32(2)))
             );
         }
 
@@ -271,13 +255,7 @@ contract AccountStatusTest is Test {
             assertFalse(cvc.isAccountStatusCheckDeferred(accounts[i]));
         }
         if (accounts.length > 0) {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    accounts[0],
-                    "account status violation"
-                )
-            );
+            vm.expectRevert(bytes("account status violation"));
         }
         cvc.requireAccountsStatusCheck(accounts);
     }
@@ -333,23 +311,11 @@ contract AccountStatusTest is Test {
             );
 
             // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    accounts[i],
-                    "malicious vault"
-                )
-            );
+            vm.expectRevert(bytes("malicious vault"));
             cvc.requireAccountStatusCheck(accounts[i]);
         }
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                accounts[0],
-                "malicious vault"
-            )
-        );
+        vm.expectRevert(bytes("malicious vault"));
         cvc.requireAccountsStatusCheck(accounts);
     }
 
@@ -405,18 +371,9 @@ contract AccountStatusTest is Test {
                 invalidAccounts[invalidAccountsCounter++] = account;
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector
-                            .CVC_AccountStatusViolation
-                            .selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
+                    uint160(account) % 3 == 1
+                        ? bytes("account status violation")
+                        : abi.encode(bytes4(uint32(2)))
                 );
             }
             cvc.requireAccountStatusCheckNow(account);
@@ -446,16 +403,9 @@ contract AccountStatusTest is Test {
         }
         if (invalidAccountsCounter > 0) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    invalidAccounts[0],
-                    uint160(invalidAccounts[0]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
+                uint160(invalidAccounts[0]) % 3 == 1
+                    ? bytes("account status violation")
+                    : abi.encode(bytes4(uint32(2)))
             );
         }
         cvc.requireAccountsStatusCheckNow(accounts);
@@ -519,23 +469,11 @@ contract AccountStatusTest is Test {
             );
 
             // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    accounts[i],
-                    "malicious vault"
-                )
-            );
+            vm.expectRevert(bytes("malicious vault"));
             cvc.requireAccountStatusCheckNow(accounts[i]);
         }
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                accounts[0],
-                "malicious vault"
-            )
-        );
+        vm.expectRevert(bytes("malicious vault"));
         cvc.requireAccountsStatusCheckNow(accounts);
     }
 
@@ -590,18 +528,9 @@ contract AccountStatusTest is Test {
                 invalidAccounts[invalidAccountsCounter++] = account;
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector
-                            .CVC_AccountStatusViolation
-                            .selector,
-                        account,
-                        uint160(account) % 3 == 1
-                            ? bytes("account status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid account")
-                            )
-                    )
+                    uint160(account) % 3 == 1
+                        ? bytes("account status violation")
+                        : abi.encode(bytes4(uint32(2)))
                 );
             }
             cvc.requireAllAccountsStatusCheckNow();
@@ -629,16 +558,9 @@ contract AccountStatusTest is Test {
         }
         if (invalidAccountsCounter > 0) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                    invalidAccounts[0],
-                    uint160(invalidAccounts[0]) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid account")
-                        )
-                )
+                uint160(invalidAccounts[0]) % 3 == 1
+                    ? bytes("account status violation")
+                    : abi.encode(bytes4(uint32(2)))
             );
         }
         cvc.requireAllAccountsStatusCheckNow();
@@ -691,13 +613,7 @@ contract AccountStatusTest is Test {
         cvc.setBatchDepth(1);
         cvc.requireAccountsStatusCheck(accounts);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                accounts[0],
-                "malicious vault"
-            )
-        );
+        vm.expectRevert(bytes("malicious vault"));
         cvc.requireAllAccountsStatusCheckNow();
     }
 

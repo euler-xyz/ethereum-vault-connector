@@ -20,7 +20,7 @@ contract CVCHarness is CreditVaultConnector {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) external view returns (bool isValid) {
+    ) external returns (bool isValid) {
         return isValidERC1271Signature(signer, hash, signature);
     }
 }

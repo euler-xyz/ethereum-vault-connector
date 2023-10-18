@@ -39,7 +39,7 @@ contract VaultEchidna is ICreditVault {
     function checkAccountStatus(
         address account,
         address[] calldata
-    ) public returns (bool isValid, bytes memory data) {
+    ) public returns (bytes4) {
         // try to reenter the CVC
 
         uint nextNonce = cvc.getNonce(account, 0) + 1;
@@ -95,13 +95,10 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireAccountAndVaultStatusCheck(account) {} catch {}
 
-        return (true, "");
+        return this.checkAccountStatus.selector;
     }
 
-    function checkVaultStatus()
-        public
-        returns (bool isValid, bytes memory data)
-    {
+    function checkVaultStatus() public returns (bytes4) {
         // try to reenter the CVC
         address account = address(1);
 
@@ -159,7 +156,7 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireAccountAndVaultStatusCheck(account) {} catch {}
 
-        return (true, "");
+        return this.checkVaultStatus.selector;
     }
 
     fallback() external payable {
