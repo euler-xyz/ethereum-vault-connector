@@ -375,7 +375,7 @@ contract CreditVaultConnectorInvariants is Test {
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertEq(cvc.getRawExecutionContext(), 1 << 184);
+        assertEq(cvc.getRawExecutionContext(), 1 << 192);
     }
 
     function invariant_AccountAndVaultStatusChecks() external {

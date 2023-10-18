@@ -13,10 +13,12 @@ library ExecutionContext {
         0x00000000000000000000FF000000000000000000000000000000000000000000;
     uint internal constant IMPERSONATE_LOCK_MASK =
         0x000000000000000000FF00000000000000000000000000000000000000000000;
+    uint internal constant SIMULATION_MASK =
+        0x0000000000000000FF0000000000000000000000000000000000000000000000;
     uint internal constant STAMP_MASK =
-        0xFFFFFFFFFFFFFFFFFF0000000000000000000000000000000000000000000000;
+        0xFFFFFFFFFFFFFFFF000000000000000000000000000000000000000000000000;
     uint internal constant ON_BEHALF_OF_ACCOUNT_OFFSET = 8;
-    uint internal constant STAMP_OFFSET = 184;
+    uint internal constant STAMP_OFFSET = 192;
     uint internal constant BATCH_DEPTH_INIT = 0;
     uint internal constant BATCH_DEPTH_MAX = 9;
     uint internal constant STAMP_DUMMY_VALUE = 1;
@@ -98,6 +100,24 @@ library ExecutionContext {
         EC context
     ) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) & ~IMPERSONATE_LOCK_MASK);
+    }
+
+    function isSimulationInProgress(
+        EC context
+    ) internal pure returns (bool result) {
+        result = EC.unwrap(context) & SIMULATION_MASK != 0;
+    }
+
+    function setSimulationInProgress(
+        EC context
+    ) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(context) | SIMULATION_MASK);
+    }
+
+    function clearSimulationInProgress(
+        EC context
+    ) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(context) & ~SIMULATION_MASK);
     }
 
     function initialize() internal pure returns (EC result) {

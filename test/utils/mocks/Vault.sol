@@ -96,6 +96,23 @@ contract Vault is ICreditVault, Target {
         cvc.requireVaultStatusCheck();
     }
 
+    function requireChecksWithSimulationCheck(
+        address account,
+        bool expectedSimulationInProgress
+    ) external payable {
+        uint context = cvc.getRawExecutionContext();
+        bool simulationInProgress = context &
+            0x0000000000000000FF0000000000000000000000000000000000000000000000 !=
+            0;
+        require(
+            simulationInProgress == expectedSimulationInProgress,
+            "requireChecksWithSimulationCheck/simulation"
+        );
+
+        cvc.requireAccountStatusCheck(account);
+        cvc.requireVaultStatusCheck();
+    }
+
     function call(address target, bytes memory data) external payable virtual {
         (bool success, ) = target.call{value: msg.value}(data);
         require(success, "call/failed");

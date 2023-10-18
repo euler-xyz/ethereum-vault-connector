@@ -35,7 +35,7 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        // doesn't rever as expected
+        // doesn't revert as expected
         return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
     }
 }
@@ -312,8 +312,9 @@ contract BatchTest is Test {
         items[0].targetContract = vault;
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
-            Vault.requireChecks.selector,
-            alice
+            Vault.requireChecksWithSimulationCheck.selector,
+            alice,
+            false
         );
 
         // internal batch in the malicious vault reverts with CVC_ChecksReentrancy error,
@@ -355,8 +356,9 @@ contract BatchTest is Test {
         items[0].targetContract = vault;
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
-            Vault.requireChecks.selector,
-            alice
+            Vault.requireChecksWithSimulationCheck.selector,
+            alice,
+            true
         );
 
         // internal batch in the malicious vault reverts with CVC_ChecksReentrancy error,

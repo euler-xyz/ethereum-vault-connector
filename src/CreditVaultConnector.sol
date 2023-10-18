@@ -584,7 +584,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = contextCache.increaseBatchDepth();
+        executionContext = contextCache
+            .increaseBatchDepth()
+            .setSimulationInProgress();
 
         batchItemsResult = batchInternal(items, true);
 
@@ -966,13 +968,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             )
         );
 
-        if (
+        isValid =
             success &&
-            ICreditVault.checkAccountStatus.selector ==
-            abi.decode(result, (bytes4))
-        ) {
-            isValid = true;
-        }
+            result.length >= 32 &&
+            abi.decode(result, (bytes32)) ==
+            bytes32(ICreditVault.checkAccountStatus.selector);
     }
 
     function requireAccountStatusCheckInternal(
@@ -995,13 +995,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             abi.encodeCall(ICreditVault.checkVaultStatus, ())
         );
 
-        if (
+        isValid =
             success &&
-            ICreditVault.checkVaultStatus.selector ==
-            abi.decode(result, (bytes4))
-        ) {
-            isValid = true;
-        }
+            result.length >= 32 &&
+            abi.decode(result, (bytes32)) ==
+            bytes32(ICreditVault.checkVaultStatus.selector);
     }
 
     function requireVaultStatusCheckInternal(address vault) internal virtual {
@@ -1175,9 +1173,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function haveCommonOwnerInternal(
         address account,
         address otherAccount
-    ) internal pure returns (bool res) {
+    ) internal pure returns (bool result) {
         assembly {
-            res := lt(xor(account, otherAccount), 0x100)
+            result := lt(xor(account, otherAccount), 0x100)
         }
     }
 

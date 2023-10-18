@@ -23,7 +23,7 @@ contract GetExecutionContextTest is Test {
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertEq(context, 1 << 184);
+        assertEq(context, 1 << 192);
 
         if (seed % 2 == 0) {
             vm.prank(account);
@@ -34,6 +34,7 @@ contract GetExecutionContextTest is Test {
         cvc.setOnBehalfOfAccount(account);
         cvc.setChecksLock(false);
         cvc.setImpersonateLock(seed % 4 == 0 ? true : false);
+        cvc.setSimulation(seed % 5 == 0 ? true : false);
 
         (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
             controller
@@ -64,6 +65,12 @@ contract GetExecutionContextTest is Test {
                 0,
             seed % 4 == 0 ? true : false
         );
+        assertEq(
+            context &
+                0x0000000000000000FF0000000000000000000000000000000000000000000000 !=
+                0,
+            seed % 5 == 0 ? true : false
+        );
     }
 
     function test_RevertIfChecksReentrancy_GetExecutionContext(
@@ -80,7 +87,7 @@ contract GetExecutionContextTest is Test {
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertEq(context, 1 << 184);
+        assertEq(context, 1 << 192);
 
         if (seed % 2 == 0) {
             vm.prank(account);
@@ -119,6 +126,12 @@ contract GetExecutionContextTest is Test {
         assertEq(
             context &
                 0x000000000000000000FF00000000000000000000000000000000000000000000 !=
+                0,
+            false
+        );
+        assertEq(
+            context &
+                0x0000000000000000FF0000000000000000000000000000000000000000000000 !=
                 0,
             false
         );

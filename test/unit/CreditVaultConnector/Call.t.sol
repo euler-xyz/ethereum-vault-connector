@@ -18,19 +18,20 @@ contract CallTest is Test {
         address account;
         if (seed % 2 == 0) {
             // in this case the account is not alice's sub-account thus alice must be an operator
-            account = address(uint160(uint160(alice) ^ 256));
+            account = address(uint160(alice) ^ 256);
             vm.prank(account);
             cvc.setAccountOperator(account, alice, true);
         } else {
             // in this case the account is alice's sub-account
-            account = address(uint160(uint160(alice) ^ (seed % 256)));
+            account = address(uint160(alice) ^ (seed % 256));
         }
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
         vm.assume(
             targetContract != address(cvc) &&
-                !cvc.haveCommonOwner(targetContract, alice)
+                !cvc.haveCommonOwner(targetContract, alice) &&
+                !cvc.haveCommonOwner(targetContract, account)
         );
 
         bytes memory data = abi.encodeWithSelector(

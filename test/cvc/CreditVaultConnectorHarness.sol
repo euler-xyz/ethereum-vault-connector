@@ -84,6 +84,16 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
+    function setSimulation(bool inProgress) external {
+        if (isFuzzSender()) return;
+
+        if (inProgress) {
+            executionContext = executionContext.setSimulationInProgress();
+        } else {
+            executionContext = executionContext.clearSimulationInProgress();
+        }
+    }
+
     function setOnBehalfOfAccount(address account) external {
         if (isFuzzSender()) return;
         executionContext = executionContext.setOnBehalfOfAccount(account);
