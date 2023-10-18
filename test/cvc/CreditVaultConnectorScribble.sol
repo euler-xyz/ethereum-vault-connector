@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 
 import "../../src/CreditVaultConnector.sol";
 
-/// #define ownerOrOperator(address caller, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)] == caller || (ownerLookup[uint152(uint160(account) >> 8)] == address(0) && (uint160(caller) | 0xFF) == (uint160(account) | 0xFF))) || operatorLookup[account][caller] >= block.timestamp;
 /// #if_succeeds "batch state doesn't change" old(executionContext.isInBatch()) == executionContext.isInBatch();
 /// #if_succeeds "on behalf account state doesn't change" old(executionContext.getOnBehalfOfAccount()) == executionContext.getOnBehalfOfAccount();
 /// #if_succeeds "checks in progress state doesn't change" old(executionContext.areChecksInProgress()) == executionContext.areChecksInProgress();
@@ -44,16 +43,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.setNonce(account, nonceNamespace, nonce);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
-    function setAccountOperator(
-        address account,
-        address operator,
-        uint expiryTimestamp
-    ) public payable virtual override {
-        super.setAccountOperator(account, operator, expiryTimestamp);
-    }
-
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
@@ -65,7 +54,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.enableCollateral(account, vault);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
@@ -76,7 +64,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.disableCollateral(account, vault);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
@@ -97,7 +84,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.disableController(account);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, onBehalfOfAccount);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
     function call(

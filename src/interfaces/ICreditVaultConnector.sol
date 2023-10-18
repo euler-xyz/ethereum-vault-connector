@@ -63,11 +63,11 @@ interface ICVC {
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
     /// @param operator The address of the operator that is being checked.
-    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized.
-    function getAccountOperator(
+    /// @return authorized A boolean value that indicates whether the operator is authorized for the account.
+    function isAccountOperatorAuthorized(
         address account,
         address operator
-    ) external view returns (uint expiryTimestamp);
+    ) external view returns (bool authorized);
 
     /// @notice Sets the nonce for a given account and nonce namespace.
     /// @dev This function can only be called by the owner of the account. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
@@ -81,14 +81,14 @@ interface ICVC {
     ) external payable;
 
     /// @notice Authorizes or deauthorizes an operator for the account.
-    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only uninstall ifself.
+    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only deauthorize ifself.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being installed or uninstalled.
-    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized.
+    /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
     function setAccountOperator(
         address account,
         address operator,
-        uint expiryTimestamp
+        bool authorized
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.

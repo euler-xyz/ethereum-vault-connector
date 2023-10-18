@@ -219,7 +219,7 @@ contract CreditVaultConnectorWithFallback is CreditVaultConnectorHarness {
     }
 }
 
-contract permitTest is Test {
+contract PermitTest is Test {
     CreditVaultConnectorWithFallback internal cvc;
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
@@ -456,6 +456,7 @@ contract permitTest is Test {
         uint deadline,
         bytes memory data
     ) public {
+        vm.chainId(5); // for coverage
         vm.assume(
             privateKey > 0 &&
                 privateKey <
@@ -999,11 +1000,12 @@ contract permitTest is Test {
         vm.assume(
             privateKey > 0 &&
                 privateKey <
-                115792089237316195423570985008687907852837564279074904382605163141518161494336
+                115792089237316195423570985008687907852837564279074904382605163141518161494335
         );
         address alice = vm.addr(privateKey);
         address bob = address(new SignerERC1271(cvc));
         address operator = vm.addr(privateKey + 1);
+        address otherOperator = vm.addr(privateKey + 2);
 
         vm.assume(alice != address(0) && bob != address(0));
         vm.assume(operator != address(0) && operator != address(cvc));
@@ -1025,7 +1027,7 @@ contract permitTest is Test {
             ICVC.setAccountOperator.selector,
             alice,
             operator,
-            1
+            true
         );
         items[1].targetContract = address(cvc);
         items[1].onBehalfOfAccount = address(0);
@@ -1034,7 +1036,7 @@ contract permitTest is Test {
             ICVC.setAccountOperator.selector,
             address(uint160(alice) ^ subAccountId),
             operator,
-            1
+            true
         );
         bytes memory data = abi.encodeWithSelector(ICVC.batch.selector, items);
 
@@ -1047,13 +1049,13 @@ contract permitTest is Test {
             data
         );
         cvc.permit(alice, 0, 1, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(alice, operator), 1);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, operator), true);
         assertEq(
-            cvc.getAccountOperator(
+            cvc.isAccountOperatorAuthorized(
                 address(uint160(alice) ^ subAccountId),
                 operator
             ),
-            1
+            true
         );
 
         // a call using ERC-1271 signature succeeds
@@ -1061,13 +1063,13 @@ contract permitTest is Test {
             ICVC.setAccountOperator.selector,
             bob,
             operator,
-            1
+            true
         );
         items[1].data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
             address(uint160(bob) ^ subAccountId),
             operator,
-            1
+            true
         );
         data = abi.encodeWithSelector(ICVC.batch.selector, items);
 
@@ -1075,42 +1077,42 @@ contract permitTest is Test {
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 1, block.timestamp, data);
         cvc.permit(bob, 0, 1, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(bob, operator), 1);
+        assertEq(cvc.isAccountOperatorAuthorized(bob, operator), true);
         assertEq(
-            cvc.getAccountOperator(
+            cvc.isAccountOperatorAuthorized(
                 address(uint160(bob) ^ subAccountId),
                 operator
             ),
-            1
+            true
         );
 
-        // if the operator tries authorize themselves directly, it's not possible
+        // if the operator tries authorize some other operator directly, it's not possible
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(alice, operator, type(uint).max);
+        cvc.setAccountOperator(alice, otherOperator, true);
 
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(bob, operator, type(uint).max);
+        cvc.setAccountOperator(bob, otherOperator, true);
 
         // but it succeeds if it's done using the signed data
         data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
             alice,
-            operator,
-            type(uint).max
+            otherOperator,
+            true
         );
 
         signature = signerECDSA.signPermit(alice, 0, 2, block.timestamp, data);
         vm.prank(operator);
         cvc.permit(alice, 0, 2, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(alice, operator), type(uint).max);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, otherOperator), true);
 
         data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
             bob,
-            operator,
-            type(uint).max
+            otherOperator,
+            true
         );
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
@@ -1118,11 +1120,10 @@ contract permitTest is Test {
 
         vm.prank(operator);
         cvc.permit(bob, 0, 2, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(bob, operator), type(uint).max);
+        assertEq(cvc.isAccountOperatorAuthorized(bob, otherOperator), true);
 
         // when operator is authorized, it can sign permit messages on behalf of the authorized account
         signerECDSA.setPrivateKey(privateKey + 1);
-        vm.warp(2);
 
         data = abi.encodeWithSelector(
             ICVC.enableCollateral.selector,
@@ -1141,7 +1142,13 @@ contract permitTest is Test {
         assertEq(cvc.isCollateralEnabled(alice, address(0)), true);
 
         // but it cannot sign permit messages on behalf of other accounts for which it's not authorized
-        // or authorization has expired
+        vm.prank(operator);
+        cvc.setAccountOperator(
+            address(uint160(alice) ^ subAccountId),
+            operator,
+            false
+        );
+
         data = abi.encodeWithSelector(
             ICVC.enableCollateral.selector,
             address(uint160(alice) ^ subAccountId),

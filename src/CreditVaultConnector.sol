@@ -59,7 +59,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     mapping(uint152 addressPrefix => mapping(uint nonceNamespace => uint nonce))
         internal nonceLookup;
 
-    mapping(address account => mapping(address operator => uint expiryTimestamp))
+    mapping(uint152 addressPrefix => mapping(address operator => uint accountBitField))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,10 +68,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
     event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
-    event OperatorAuthorized(
+    event OperatorStatus(
         address indexed account,
         address indexed operator,
-        uint expiryTimestamp
+        bool indexed authorized
     );
     event ControllerStatus(
         address indexed account,
@@ -156,7 +156,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 } else if (owner != msgSender) {
                     revert CVC_NotAuthorized();
                 }
-            } else if (operatorLookup[account][msgSender] < block.timestamp) {
+            } else if (
+                !isAccountOperatorAuthorizedInternal(account, msgSender)
+            ) {
                 revert CVC_NotAuthorized();
             }
         }
@@ -290,11 +292,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function getAccountOperator(
+    function isAccountOperatorAuthorized(
         address account,
         address operator
-    ) external view returns (uint expiryTimestamp) {
-        return operatorLookup[account][operator];
+    ) external view returns (bool authorized) {
+        return isAccountOperatorAuthorizedInternal(account, operator);
     }
 
     /// @inheritdoc ICVC
@@ -317,7 +319,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function setAccountOperator(
         address account,
         address operator,
-        uint expiryTimestamp
+        bool authorized
     ) public payable virtual onlyOwnerOrOperator(account) {
         // if CVC is msg.sender (during the self-call in the permit() function), it won't have the common owner
         // with the account as it would mean that the CVC itself signed the ERC-1271 message which is not
@@ -336,18 +338,16 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         // if CVC is msg.sender (during the self-call in the permit() function), it acts as if it
         // was an owner, meaning it can authorize and deauthorize operators as per signed data.
-        // if it's an operator calling, it can only deauthorize itself
-        if (!(owner == msg.sender || address(this) == msg.sender)) {
-            if (operator != msg.sender || expiryTimestamp > block.timestamp) {
-                revert CVC_NotAuthorized();
-            }
+        // if it's an operator calling, it can only make changes for itself
+        if (
+            owner != msg.sender &&
+            operator != msg.sender &&
+            address(this) != msg.sender
+        ) {
+            revert CVC_NotAuthorized();
         }
 
-        if (operatorLookup[account][operator] != expiryTimestamp) {
-            operatorLookup[account][operator] = expiryTimestamp;
-
-            emit OperatorAuthorized(account, operator, expiryTimestamp);
-        }
+        setAccountOperatorInternal(account, operator, authorized);
     }
 
     // Collaterals management
@@ -1194,10 +1194,47 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         return ownerLookup[addressPrefix];
     }
 
+    function isAccountOperatorAuthorizedInternal(
+        address account,
+        address operator
+    ) internal view returns (bool isAuthorized) {
+        address owner = getAccountOwnerInternal(account);
+
+        // if the owner is not registered yet, it means that the operator couldn't have been authorized
+        if (owner == address(0)) return false;
+
+        uint152 addressPrefix = getAddressPrefixInternal(account);
+        uint accountBit = uint160(owner) ^ uint160(account);
+        uint accountBitMask = 1 << accountBit;
+
+        return operatorLookup[addressPrefix][operator] & accountBitMask != 0;
+    }
+
     function setAccountOwnerInternal(address account, address owner) internal {
         uint152 addressPrefix = getAddressPrefixInternal(account);
         ownerLookup[addressPrefix] = owner;
         emit OwnerRegistered(addressPrefix, owner);
+    }
+
+    function setAccountOperatorInternal(
+        address account,
+        address operator,
+        bool authorized
+    ) internal {
+        address owner = getAccountOwnerInternal(account);
+        uint152 addressPrefix = getAddressPrefixInternal(account);
+        uint accountBit = uint160(owner) ^ uint160(account);
+        uint accountBitMask = 1 << accountBit;
+        uint accountBitField = operatorLookup[addressPrefix][operator];
+        bool oldAuthorized = accountBitField & accountBitMask != 0;
+
+        if (oldAuthorized != authorized) {
+            operatorLookup[addressPrefix][operator] = authorized
+                ? accountBitField | accountBitMask
+                : accountBitField & ~accountBitMask;
+
+            emit OperatorStatus(account, operator, authorized);
+        }
     }
 
     function revertBytes(bytes memory errMsg) internal pure {

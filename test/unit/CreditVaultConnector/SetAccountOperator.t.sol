@@ -8,10 +8,10 @@ import "../../cvc/CreditVaultConnectorHarness.sol";
 contract installAccountOperatorTest is Test {
     CreditVaultConnectorHarness internal cvc;
 
-    event OperatorAuthorized(
+    event OperatorStatus(
         address indexed account,
         address indexed operator,
-        uint expiryTimestamp
+        bool indexed authorized
     );
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
 
@@ -21,21 +21,15 @@ contract installAccountOperatorTest is Test {
 
     function test_WhenOwnerCalling_setAccountOperator(
         address alice,
-        address operator,
-        uint authExpiry,
-        uint seed
+        address operator
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(operator != address(0));
+        vm.assume(operator != address(0) && operator != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 10 && seed < type(uint).max - 1000);
-        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint).max - 1);
 
         for (uint i = 0; i < 256; ++i) {
-            vm.warp(seed);
             address account = address(uint160(uint160(alice) ^ i));
-
-            assertEq(cvc.getAccountOperator(account, operator), 0);
+            assertEq(cvc.isAccountOperatorAuthorized(account, operator), false);
 
             if (i == 0) {
                 vm.expectRevert(
@@ -51,80 +45,65 @@ contract installAccountOperatorTest is Test {
                 vm.expectEmit(true, true, false, false, address(cvc));
                 emit OwnerRegistered(cvc.getAddressPrefix(alice), alice);
             }
-            vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorAuthorized(account, operator, authExpiry);
+            vm.expectEmit(true, true, true, false, address(cvc));
+            emit OperatorStatus(account, operator, true);
             vm.recordLogs();
             vm.prank(alice);
-            cvc.setAccountOperator(account, operator, authExpiry);
+            cvc.setAccountOperator(account, operator, true);
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // OwnerRegistered event is emitted only once
-                assertEq(cvc.getAccountOperator(account, operator), authExpiry);
+                assertEq(
+                    cvc.isAccountOperatorAuthorized(account, operator),
+                    true
+                );
                 assertEq(cvc.getAccountOwner(account), alice);
             }
 
-            // don't emit the event if the operator is already enabled with the same expiry timestamp
-            vm.warp(block.timestamp + 1);
-            vm.prank(alice);
+            // don't emit the event if the operator is already authorized
             vm.recordLogs();
-            cvc.setAccountOperator(account, operator, authExpiry);
+            vm.prank(alice);
+            cvc.setAccountOperator(account, operator, true);
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 0);
-                assertEq(cvc.getAccountOperator(account, operator), authExpiry);
-                assertEq(cvc.getAccountOwner(account), alice);
-            }
-
-            // change the authorization expiry timestamp
-            vm.warp(block.timestamp + 1);
-            vm.prank(alice);
-            vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorAuthorized(account, operator, authExpiry + 1);
-            vm.recordLogs();
-            cvc.setAccountOperator(account, operator, authExpiry + 1);
-
-            {
-                Vm.Log[] memory logs = vm.getRecordedLogs();
-                assertEq(logs.length, 1);
                 assertEq(
-                    cvc.getAccountOperator(account, operator),
-                    authExpiry + 1
+                    cvc.isAccountOperatorAuthorized(account, operator),
+                    true
                 );
                 assertEq(cvc.getAccountOwner(account), alice);
             }
 
             // deauthorize the operator
-            vm.warp(block.timestamp + 1);
-            vm.prank(alice);
-            vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorAuthorized(account, operator, block.timestamp - 1);
+            vm.expectEmit(true, true, true, false, address(cvc));
+            emit OperatorStatus(account, operator, false);
             vm.recordLogs();
-            cvc.setAccountOperator(account, operator, block.timestamp - 1);
+            vm.prank(alice);
+            cvc.setAccountOperator(account, operator, false);
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 1);
                 assertEq(
-                    cvc.getAccountOperator(account, operator),
-                    block.timestamp - 1
+                    cvc.isAccountOperatorAuthorized(account, operator),
+                    false
                 );
                 assertEq(cvc.getAccountOwner(account), alice);
             }
 
-            // don't emit the event if the operator is already deauthorized with the same timestamp
-            vm.warp(block.timestamp + 1);
-            vm.prank(alice);
+            // don't emit the event if the operator is already deauthorized
             vm.recordLogs();
-            cvc.setAccountOperator(account, operator, block.timestamp - 2);
+            vm.prank(alice);
+            cvc.setAccountOperator(account, operator, false);
 
             {
                 Vm.Log[] memory logs = vm.getRecordedLogs();
                 assertEq(logs.length, 0);
                 assertEq(
-                    cvc.getAccountOperator(account, operator),
-                    block.timestamp - 2
+                    cvc.isAccountOperatorAuthorized(account, operator),
+                    false
                 );
                 assertEq(cvc.getAccountOwner(account), alice);
             }
@@ -133,21 +112,15 @@ contract installAccountOperatorTest is Test {
 
     function test_WhenOperatorCalling_setAccountOperator(
         address alice,
-        address operator,
-        uint authExpiry,
-        uint seed
+        address operator
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(operator != address(0) && operator != address(cvc));
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 10 && seed < type(uint).max - 1000);
-        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint).max - 1);
 
         for (uint i = 0; i < 256; ++i) {
-            vm.warp(seed);
             address account = address(uint160(uint160(alice) ^ i));
-
-            assertEq(cvc.getAccountOperator(account, operator), 0);
+            assertEq(cvc.isAccountOperatorAuthorized(account, operator), false);
 
             if (i == 0) {
                 vm.expectRevert(
@@ -163,30 +136,27 @@ contract installAccountOperatorTest is Test {
                 vm.expectEmit(true, true, false, false, address(cvc));
                 emit OwnerRegistered(cvc.getAddressPrefix(alice), alice);
             }
-            vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorAuthorized(account, operator, authExpiry);
+            vm.expectEmit(true, true, true, false, address(cvc));
+            emit OperatorStatus(account, operator, true);
             vm.recordLogs();
             vm.prank(alice);
-            cvc.setAccountOperator(account, operator, authExpiry);
+            cvc.setAccountOperator(account, operator, true);
             Vm.Log[] memory logs = vm.getRecordedLogs();
 
             assertTrue(i == 0 ? logs.length == 2 : logs.length == 1); // OwnerRegistered event is emitted only once
-            assertEq(cvc.getAccountOperator(account, operator), authExpiry);
+            assertEq(cvc.isAccountOperatorAuthorized(account, operator), true);
             assertEq(cvc.getAccountOwner(account), alice);
 
             // an operator can only deauthorize itself
-            vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorAuthorized(account, operator, block.timestamp);
+            vm.expectEmit(true, true, true, false, address(cvc));
+            emit OperatorStatus(account, operator, false);
             vm.recordLogs();
             vm.prank(operator);
-            cvc.setAccountOperator(account, operator, block.timestamp);
+            cvc.setAccountOperator(account, operator, false);
             logs = vm.getRecordedLogs();
 
             assertEq(logs.length, 1);
-            assertEq(
-                cvc.getAccountOperator(account, operator),
-                block.timestamp
-            );
+            assertEq(cvc.isAccountOperatorAuthorized(account, operator), false);
             assertEq(cvc.getAccountOwner(account), alice);
         }
     }
@@ -207,29 +177,27 @@ contract installAccountOperatorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(account, operator, 0);
+        cvc.setAccountOperator(account, operator, true);
 
         // succeeds if sender is authorized
         account = address(uint160(uint160(alice) ^ 255));
         vm.prank(address(uint160(uint160(alice) ^ 254)));
-        cvc.setAccountOperator(account, operator, 0);
+        cvc.setAccountOperator(account, operator, true);
 
         // reverts if sender is not a registered owner nor operator
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(account, operator, 0);
+        cvc.setAccountOperator(account, operator, true);
 
         // reverts if sender is not a registered owner nor operator
         vm.prank(address(uint160(uint160(operator) ^ 1)));
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(account, operator, 0);
+        cvc.setAccountOperator(account, operator, true);
     }
 
     function test_RevertWhenOperatorNotAuthorizedToPerformTheOperation_setAccountOperator(
         address alice,
-        address operator,
-        uint authExpiry,
-        uint seed
+        address operator
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(
@@ -238,43 +206,38 @@ contract installAccountOperatorTest is Test {
                 operator != address(cvc)
         );
         vm.assume(!cvc.haveCommonOwner(alice, operator));
-        vm.assume(seed > 10 && seed < type(uint).max - 1000);
-        vm.assume(authExpiry >= seed + 10 && authExpiry < type(uint).max - 1);
 
-        vm.warp(seed);
-        assertEq(cvc.getAccountOperator(alice, operator), 0);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, operator), false);
 
         vm.prank(alice);
-        cvc.setAccountOperator(alice, operator, authExpiry);
-        assertEq(cvc.getAccountOperator(alice, operator), authExpiry);
+        cvc.setAccountOperator(alice, operator, true);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, operator), true);
 
-        // operator cannot authorize itself (set authorization expiry timestamp in the future)
+        // operator can re-authorize itself as it has no effect (but there will be no revert)
         vm.prank(operator);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(alice, operator, block.timestamp + 1);
+        cvc.setAccountOperator(alice, operator, true);
 
         // operator cannot change authorization status for any other operator nor account
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(
-            address(uint160(alice) ^ 1),
-            operator,
-            block.timestamp
-        );
+        cvc.setAccountOperator(address(uint160(alice) ^ 1), operator, true);
 
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(
-            alice,
-            address(uint160(operator) ^ 1),
-            block.timestamp
-        );
+        cvc.setAccountOperator(alice, address(uint160(operator) ^ 1), true);
 
-        // but operator can deauthorize itself
+        vm.prank(alice);
+        cvc.setAccountOperator(alice, address(uint160(operator) ^ 1), true);
+
         vm.prank(operator);
-        cvc.setAccountOperator(alice, operator, block.timestamp);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setAccountOperator(alice, address(uint160(operator) ^ 1), false);
 
-        assertEq(cvc.getAccountOperator(alice, operator), block.timestamp);
+        // operator can deauthorize itself
+        vm.prank(operator);
+        cvc.setAccountOperator(alice, operator, false);
+
+        assertEq(cvc.isAccountOperatorAuthorized(alice, operator), false);
     }
 
     function test_RevertIfOperatorIsInvalidAddress_setAccountOperator(
@@ -285,14 +248,14 @@ contract installAccountOperatorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
-        cvc.setAccountOperator(alice, address(0), 0);
+        cvc.setAccountOperator(alice, address(0), true);
 
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.setAccountOperator(
             alice,
             address(uint160(uint160(alice) ^ subAccountId)),
-            0
+            true
         );
     }
 }

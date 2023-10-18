@@ -47,7 +47,7 @@ contract VaultEchidna is ICreditVault {
         try cvc.setNonce(account, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
-        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
+        try cvc.setAccountOperator(account, address(this), false) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -107,7 +107,7 @@ contract VaultEchidna is ICreditVault {
         try cvc.setNonce(account, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
-        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
+        try cvc.setAccountOperator(account, address(this), false) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -170,7 +170,7 @@ contract VaultEchidna is ICreditVault {
         try cvc.setNonce(account, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
-        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
+        try cvc.setAccountOperator(account, address(this), false) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}

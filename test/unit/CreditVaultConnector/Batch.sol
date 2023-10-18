@@ -48,7 +48,9 @@ contract BatchTest is Test {
     }
 
     function test_Batch(address alice, address bob, uint seed) external {
-        vm.assume(alice != address(cvc) && bob != address(cvc));
+        vm.assume(
+            alice != address(0) && alice != address(cvc) && bob != address(cvc)
+        );
         vm.assume(bob != address(0) && !cvc.haveCommonOwner(alice, bob));
         vm.assume(seed >= 4);
 
@@ -76,7 +78,7 @@ contract BatchTest is Test {
             cvc.setAccountOperator.selector,
             alice,
             bob,
-            block.timestamp
+            true
         );
 
         items[2].onBehalfOfAccount = alicesSubAccount;
@@ -130,8 +132,7 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        uint expiryTimestamp = cvc.getAccountOperator(alice, bob);
-        assertEq(expiryTimestamp, block.timestamp);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, bob), true);
         assertEq(address(otherVault).balance, seed);
 
         cvc.reset();

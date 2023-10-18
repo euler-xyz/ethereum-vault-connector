@@ -62,7 +62,12 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        operatorLookup[account][msg.sender] = block.timestamp;
+
+        if (getAccountOwnerInternal(account) == address(0)) {
+            setAccountOwnerInternal(account, account);
+        }
+
+        setAccountOperatorInternal(account, msg.sender, true);
         vm.etch(vault, vaultMock.code);
     }
 
@@ -82,13 +87,13 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function setAccountOperator(
         address account,
         address operator,
-        uint expiryTimestamp
+        bool authorized
     ) public payable override {
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        super.setAccountOperator(account, operator, expiryTimestamp);
+        super.setAccountOperator(account, operator, authorized);
     }
 
     function enableCollateral(

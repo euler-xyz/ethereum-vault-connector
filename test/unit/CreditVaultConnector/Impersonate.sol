@@ -13,7 +13,10 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
-        msg.sender.call(abi.encodeWithSelector(Vault.clearChecks.selector));
+        (bool success, ) = msg.sender.call(
+            abi.encodeWithSelector(Vault.clearChecks.selector)
+        );
+        success;
         clearExpectedChecks();
 
         super.impersonate(targetContract, onBehalfOfAccount, data);
@@ -352,5 +355,32 @@ contract ImpersonateTest is Test {
             )
         );
         cvc.handlerImpersonate{value: seed}(targetContract, alice, data);
+    }
+
+    function test_RevertIfInternalCallIsUnsuccessful_Impersonate(
+        address alice
+    ) public {
+        vm.assume(alice != address(0) && alice != address(cvc));
+
+        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        setUp();
+
+        address collateral = address(new Vault(cvc));
+        address controller = address(new Vault(cvc));
+        vm.assume(collateral != address(cvc) && controller != address(cvc));
+
+        vm.prank(alice);
+        cvc.enableCollateral(alice, collateral);
+
+        vm.prank(alice);
+        cvc.enableController(alice, controller);
+
+        bytes memory data = abi.encodeWithSelector(
+            Target(collateral).revertEmptyTest.selector
+        );
+
+        vm.prank(controller);
+        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
+        cvc.impersonate(collateral, alice, data);
     }
 }

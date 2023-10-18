@@ -20,7 +20,7 @@ contract CallTest is Test {
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(uint160(alice) ^ 256));
             vm.prank(account);
-            cvc.setAccountOperator(account, alice, block.timestamp + 100);
+            cvc.setAccountOperator(account, alice, true);
         } else {
             // in this case the account is alice's sub-account
             account = address(uint160(uint160(alice) ^ (seed % 256)));
@@ -189,8 +189,7 @@ contract CallTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();
@@ -231,5 +230,25 @@ contract CallTest is Test {
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.call{value: seed}(targetContract, alice, data);
+    }
+
+    function test_RevertIfInternalCallIsUnsuccessful_Call(
+        address alice
+    ) public {
+        vm.assume(alice != address(0) && alice != address(cvc));
+
+        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        setUp();
+
+        address targetContract = address(new Target());
+        vm.assume(targetContract != address(cvc));
+
+        bytes memory data = abi.encodeWithSelector(
+            Target(targetContract).revertEmptyTest.selector
+        );
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
+        cvc.call(targetContract, alice, data);
     }
 }
