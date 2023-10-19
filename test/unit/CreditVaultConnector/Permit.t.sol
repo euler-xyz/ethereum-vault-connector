@@ -225,6 +225,11 @@ contract permitTest is Test {
     SignerERC1271 internal signerERC1271;
 
     event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
+    event Permit(
+        address indexed caller,
+        address indexed signer,
+        bytes signature
+    );
 
     function setUp() public {
         cvc = new CreditVaultConnectorWithFallback();
@@ -274,6 +279,8 @@ contract permitTest is Test {
             data
         );
 
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Permit(address(this), alice, signature);
         vm.expectEmit(true, true, false, true, address(cvc));
         emit NonceUsed(cvc.getAddressPrefix(alice), nonce);
         cvc.permit{value: value}(
@@ -336,6 +343,8 @@ contract permitTest is Test {
             data
         );
 
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Permit(address(this), alice, signature);
         vm.expectEmit(true, true, false, true, address(cvc));
         emit NonceUsed(cvc.getAddressPrefix(alice), nonce);
         cvc.permit{value: value}(

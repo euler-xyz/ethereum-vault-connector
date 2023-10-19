@@ -207,24 +207,26 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         BatchItem[] calldata items
     ) public payable override nonReentrant {
         // copied function body with inserted assertion
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        if (context.isBatchDepthExceeded()) {
+        if (contextCache.isBatchDepthExceeded()) {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBatchDepth();
+        uint8 batchDepth = contextCache.getBatchDepth() + 1;
+        executionContext = contextCache.setBatchDepth(batchDepth);
+
+        emit BatchStart(msg.sender, batchDepth);
 
         batchInternal(items, false);
 
-        // verify if cached context value can be reused
-        assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.increaseBatchDepth())
-        );
+        emit BatchEnd(msg.sender, batchDepth);
 
-        if (!context.isInBatch()) {
-            executionContext = context.setChecksInProgress();
+        // verify if cached context value can be reused
+        assert(EC.unwrap(executionContext) == EC.unwrap(contextCache) + 1);
+
+        if (!contextCache.isInBatch()) {
+            executionContext = contextCache.setChecksInProgress();
 
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
@@ -232,10 +234,10 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             // verify if cached context value can be reused
             assert(
                 EC.unwrap(executionContext) ==
-                    EC.unwrap(context.setChecksInProgress())
+                    EC.unwrap(contextCache.setChecksInProgress())
             );
         }
 
-        executionContext = context;
+        executionContext = contextCache;
     }
 }

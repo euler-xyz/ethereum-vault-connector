@@ -8,6 +8,18 @@ import "../../cvc/CreditVaultConnectorHarness.sol";
 contract CallTest is Test {
     CreditVaultConnectorHarness internal cvc;
 
+    event OperatorAuthenticated(
+        address indexed operator,
+        address indexed onBehalfOfAccount
+    );
+    event Call(
+        address indexed caller,
+        address indexed targetContract,
+        address indexed onBehalfOfAccount
+    );
+    event BatchStart(address indexed caller, uint batchDepth);
+    event BatchEnd(address indexed caller, uint batchDepth);
+
     function setUp() public {
         cvc = new CreditVaultConnectorHarness();
     }
@@ -43,6 +55,12 @@ contract CallTest is Test {
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Call(alice, targetContract, account);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
         vm.prank(alice);
         cvc.call{value: seed}(targetContract, account, data);
 
@@ -69,6 +87,16 @@ contract CallTest is Test {
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchStart(alice, 1);
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Call(alice, targetContract, account);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(alice, 1);
         vm.prank(alice);
         cvc.batch{value: seed}(items);
 
@@ -83,6 +111,12 @@ contract CallTest is Test {
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Call(alice, targetContract, account);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
         vm.prank(alice);
         cvc.call{value: seed}(targetContract, account, data);
 
@@ -100,6 +134,14 @@ contract CallTest is Test {
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchStart(alice, 1);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(alice, 1);
         vm.prank(alice);
         cvc.batch{value: seed}(items);
     }
