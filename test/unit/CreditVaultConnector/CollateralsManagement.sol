@@ -44,7 +44,7 @@ contract CollateralsManagementTest is Test {
     event CollateralStatus(
         address indexed account,
         address indexed collateral,
-        bool indexed enabled
+        bool enabled
     );
 
     function setUp() public {
@@ -114,7 +114,7 @@ contract CollateralsManagementTest is Test {
                 emit OperatorAuthenticated(msgSender, account);
             }
             if (!alreadyEnabled) {
-                vm.expectEmit(true, true, true, false, address(cvc));
+                vm.expectEmit(true, true, false, true, address(cvc));
                 emit CollateralStatus(account, vault, true);
             }
             vm.prank(msgSender);
@@ -144,7 +144,7 @@ contract CollateralsManagementTest is Test {
                 vm.expectEmit(true, true, false, false, address(cvc));
                 emit OperatorAuthenticated(msgSender, account);
             }
-            vm.expectEmit(true, true, true, false, address(cvc));
+            vm.expectEmit(true, true, false, true, address(cvc));
             emit CollateralStatus(account, vault, false);
             vm.prank(msgSender);
             cvc.handlerDisableCollateral(account, vault);

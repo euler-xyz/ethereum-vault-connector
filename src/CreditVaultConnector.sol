@@ -67,7 +67,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
-    event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
     event OperatorStatus(
         uint152 indexed addressPrefix,
         address indexed operator,
@@ -80,12 +80,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     event CollateralStatus(
         address indexed account,
         address indexed collateral,
-        bool indexed enabled
+        bool enabled
     );
     event ControllerStatus(
         address indexed account,
         address indexed controller,
-        bool indexed enabled
+        bool enabled
     );
     event Call(
         address indexed caller,
@@ -685,7 +685,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
 
         uint8 batchDepth = contextCache.getBatchDepth() + 1;
-        executionContext = contextCache.setBatchDepth(batchDepth).setSimulationInProgress();
+        executionContext = contextCache
+            .setBatchDepth(batchDepth)
+            .setSimulationInProgress();
 
         emit BatchStart(msg.sender, batchDepth);
 

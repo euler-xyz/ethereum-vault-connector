@@ -46,7 +46,7 @@ contract ControllersManagementTest is Test {
     event ControllerStatus(
         address indexed account,
         address indexed controller,
-        bool indexed enabled
+        bool enabled
     );
 
     function setUp() public {
@@ -84,7 +84,7 @@ contract ControllersManagementTest is Test {
             vm.expectEmit(true, true, false, false, address(cvc));
             emit OperatorAuthenticated(msgSender, account);
         }
-        vm.expectEmit(true, true, true, false, address(cvc));
+        vm.expectEmit(true, true, false, true, address(cvc));
         emit ControllerStatus(account, vault, true);
         vm.prank(msgSender);
         vm.recordLogs();
@@ -130,7 +130,7 @@ contract ControllersManagementTest is Test {
         controllersPre = cvc.getControllers(account);
 
         vm.prank(msgSender);
-        vm.expectEmit(true, true, true, false, address(cvc));
+        vm.expectEmit(true, true, false, true, address(cvc));
         emit ControllerStatus(account, vault, false);
         Vault(vault).call(
             address(cvc),

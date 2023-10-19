@@ -224,7 +224,7 @@ contract PermitTest is Test {
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
     event Permit(
         address indexed caller,
         address indexed signer,
@@ -282,7 +282,7 @@ contract PermitTest is Test {
 
         vm.expectEmit(true, true, false, true, address(cvc));
         emit Permit(address(this), alice, signature);
-        vm.expectEmit(true, true, false, true, address(cvc));
+        vm.expectEmit(true, false, false, true, address(cvc));
         emit NonceUsed(cvc.getAddressPrefix(alice), nonce);
         cvc.permit{value: value}(
             alice,
@@ -347,7 +347,7 @@ contract PermitTest is Test {
 
         vm.expectEmit(true, true, false, true, address(cvc));
         emit Permit(address(this), alice, signature);
-        vm.expectEmit(true, true, false, true, address(cvc));
+        vm.expectEmit(true, false, false, true, address(cvc));
         emit NonceUsed(cvc.getAddressPrefix(alice), nonce);
         cvc.permit{value: value}(
             alice,

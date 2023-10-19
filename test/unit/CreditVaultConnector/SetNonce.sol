@@ -8,7 +8,7 @@ import "../../cvc/CreditVaultConnectorHarness.sol";
 contract SetNonceTest is Test {
     CreditVaultConnectorHarness internal cvc;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
 
     function setUp() public {
         cvc = new CreditVaultConnectorHarness();
@@ -27,7 +27,7 @@ contract SetNonceTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         assertEq(cvc.getNonce(addressPrefix, nonceNamespace), 0);
 
-        vm.expectEmit(true, true, false, false, address(cvc));
+        vm.expectEmit(true, false, false, true, address(cvc));
         emit NonceUsed(addressPrefix, ++nonce);
         vm.prank(alice);
         cvc.setNonce(addressPrefix, nonceNamespace, nonce);
