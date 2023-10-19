@@ -193,12 +193,9 @@ contract SetOperatorTest is Test {
             // but the operator can deauthorize itself calling setAccountOperator()
             vm.expectEmit(true, true, false, true, address(cvc));
             emit OperatorStatus(addressPrefix, operator, 0);
-            vm.recordLogs();
             vm.prank(operator);
             cvc.setAccountOperator(account, operator, false);
-            logs = vm.getRecordedLogs();
 
-            assertEq(logs.length, 1);
             assertEq(cvc.isAccountOperatorAuthorized(account, operator), false);
             assertEq(cvc.getAccountOwner(account), alice);
         }

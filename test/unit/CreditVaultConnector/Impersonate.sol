@@ -29,6 +29,14 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 contract ImpersonateTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
+    event Impersonate(
+        address indexed controller,
+        address indexed collateral,
+        address indexed onBehalfOfAccount
+    );
+    event BatchStart(address indexed caller, uint batchDepth);
+    event BatchEnd(address indexed caller, uint batchDepth);
+
     function setUp() public {
         cvc = new CreditVaultConnectorHandler();
     }
@@ -57,6 +65,8 @@ contract ImpersonateTest is Test {
         );
 
         vm.deal(controller, seed);
+        vm.expectEmit(true, true, true, false, address(cvc));
+        emit Impersonate(controller, collateral, alice);
         vm.prank(controller);
         cvc.handlerImpersonate{value: seed}(collateral, alice, data);
 
@@ -86,6 +96,12 @@ contract ImpersonateTest is Test {
         );
 
         vm.deal(controller, seed);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchStart(controller, 1);
+        vm.expectEmit(true, true, true, false, address(cvc));
+        emit Impersonate(controller, collateral, alice);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(controller, 1);
         vm.prank(controller);
         cvc.batch(items);
         cvc.verifyVaultStatusChecks();
@@ -113,6 +129,8 @@ contract ImpersonateTest is Test {
         );
 
         vm.deal(controller, seed);
+        vm.expectEmit(true, true, true, false, address(cvc));
+        emit Impersonate(controller, collateral, alice);
         vm.prank(controller);
         cvc.handlerImpersonate{value: seed}(collateral, alice, data);
     }

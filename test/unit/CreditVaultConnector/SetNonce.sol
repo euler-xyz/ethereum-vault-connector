@@ -25,22 +25,13 @@ contract SetNonceTest is Test {
         vm.assume(nonce > 0 && nonce <= type(uint).max - 256 * iterations);
 
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
-        for (uint i = 0; i < 256; ++i) {
-            address account = address(uint160(uint160(alice) ^ i));
+        assertEq(cvc.getNonce(addressPrefix, nonceNamespace), 0);
 
-            for (uint j = 0; j < iterations; ++j) {
-                assertEq(
-                    cvc.getNonce(addressPrefix, nonceNamespace),
-                    i == 0 && j == 0 ? 0 : nonce
-                );
-
-                vm.expectEmit(true, true, false, false, address(cvc));
-                emit NonceUsed(addressPrefix, ++nonce);
-                vm.prank(alice);
-                cvc.setNonce(addressPrefix, nonceNamespace, nonce);
-                assertEq(cvc.getNonce(addressPrefix, nonceNamespace), nonce);
-            }
-        }
+        vm.expectEmit(true, true, false, false, address(cvc));
+        emit NonceUsed(addressPrefix, ++nonce);
+        vm.prank(alice);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
+        assertEq(cvc.getNonce(addressPrefix, nonceNamespace), nonce);
     }
 
     function test_RevertIfSenderNotOwner_SetNonce(

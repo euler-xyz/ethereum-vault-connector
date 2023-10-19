@@ -37,6 +37,16 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 contract CollateralsManagementTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
+    event OperatorAuthenticated(
+        address indexed operator,
+        address indexed onBehalfOfAccount
+    );
+    event CollateralStatus(
+        address indexed account,
+        address indexed collateral,
+        bool indexed enabled
+    );
+
     function setUp() public {
         cvc = new CreditVaultConnectorHandler();
     }
@@ -99,6 +109,14 @@ contract CollateralsManagementTest is Test {
                     (!alreadyEnabled && i % 5 != 0)
             );
 
+            if (msgSender != alice) {
+                vm.expectEmit(true, true, false, false, address(cvc));
+                emit OperatorAuthenticated(msgSender, account);
+            }
+            if (!alreadyEnabled) {
+                vm.expectEmit(true, true, true, false, address(cvc));
+                emit CollateralStatus(account, vault, true);
+            }
             vm.prank(msgSender);
             cvc.handlerEnableCollateral(account, vault);
 
@@ -122,6 +140,12 @@ contract CollateralsManagementTest is Test {
             address[] memory collateralsPre = cvc.getCollaterals(account);
             address vault = collateralsPre[seed % collateralsPre.length];
 
+            if (msgSender != alice) {
+                vm.expectEmit(true, true, false, false, address(cvc));
+                emit OperatorAuthenticated(msgSender, account);
+            }
+            vm.expectEmit(true, true, true, false, address(cvc));
+            emit CollateralStatus(account, vault, false);
             vm.prank(msgSender);
             cvc.handlerDisableCollateral(account, vault);
 
