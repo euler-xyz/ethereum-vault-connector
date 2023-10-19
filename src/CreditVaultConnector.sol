@@ -59,7 +59,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     mapping(uint152 addressPrefix => mapping(uint nonceNamespace => uint nonce))
         internal nonceLookup;
 
-    mapping(uint152 addressPrefix => mapping(address operator => uint bitField))
+    mapping(uint152 addressPrefix => mapping(address operator => uint accountOperatorAuthorized))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +71,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     event OperatorStatus(
         uint152 indexed addressPrefix,
         address indexed operator,
-        uint bitField
+        uint accountOperatorAuthorized
     );
     event ControllerStatus(
         address indexed account,
@@ -297,7 +297,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function getOperator(
         uint152 addressPrefix,
         address operator
-    ) external view returns (uint bitField) {
+    ) external view returns (uint accountOperatorAuthorized) {
         return operatorLookup[addressPrefix][operator];
     }
 
@@ -327,7 +327,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint bitField
+        uint accountOperatorAuthorized
     ) public payable virtual onlyOwner(addressPrefix) {
         // if CVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
@@ -342,9 +342,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidAddress();
         }
 
-        if (operatorLookup[addressPrefix][operator] != bitField) {
-            operatorLookup[addressPrefix][operator] = bitField;
-            emit OperatorStatus(addressPrefix, operator, bitField);
+        if (
+            operatorLookup[addressPrefix][operator] != accountOperatorAuthorized
+        ) {
+            operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
+            emit OperatorStatus(
+                addressPrefix,
+                operator,
+                accountOperatorAuthorized
+            );
         }
     }
 
@@ -381,16 +387,24 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
-        uint bit = uint160(owner) ^ uint160(account);
-        uint bitMask = 1 << bit;
-        uint oldBitField = operatorLookup[addressPrefix][operator];
-        uint newBitField = authorized
-            ? oldBitField | bitMask
-            : oldBitField & ~bitMask;
+        uint bitMask = 1 << (uint160(owner) ^ uint160(account));
+        uint oldAccountOperatorAuthorized = operatorLookup[addressPrefix][
+            operator
+        ];
+        uint newAccountOperatorAuthorized = authorized
+            ? oldAccountOperatorAuthorized | bitMask
+            : oldAccountOperatorAuthorized & ~bitMask;
 
-        if (oldBitField != newBitField) {
-            operatorLookup[addressPrefix][operator] = newBitField;
-            emit OperatorStatus(addressPrefix, operator, newBitField);
+        if (oldAccountOperatorAuthorized != newAccountOperatorAuthorized) {
+            operatorLookup[addressPrefix][
+                operator
+            ] = newAccountOperatorAuthorized;
+
+            emit OperatorStatus(
+                addressPrefix,
+                operator,
+                newAccountOperatorAuthorized
+            );
         }
     }
 
@@ -1246,10 +1260,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (owner == address(0)) return false;
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
-        uint accountBit = uint160(owner) ^ uint160(account);
-        uint accountBitMask = 1 << accountBit;
+        uint bitMask = 1 << (uint160(owner) ^ uint160(account));
 
-        return operatorLookup[addressPrefix][operator] & accountBitMask != 0;
+        return operatorLookup[addressPrefix][operator] & bitMask != 0;
     }
 
     function setAccountOwnerInternal(address account, address owner) internal {

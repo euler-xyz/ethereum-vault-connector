@@ -64,11 +64,11 @@ interface ICVC {
     /// @dev The bit field is used to store information about authorized operators for a given address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being retrieved.
     /// @param operator The address of the operator for which the bit field is being retrieved.
-    /// @return bitField The bit field for the given address prefix and operator.
+    /// @return accountOperatorAuthorized The bit field for the given address prefix and operator.
     function getOperator(
         uint152 addressPrefix,
         address operator
-    ) external view returns (uint bitField);
+    ) external view returns (uint accountOperatorAuthorized);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
@@ -94,11 +94,11 @@ interface ICVC {
     /// @dev This function can only be called by the owner of the address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being set.
     /// @param operator The address of the operator for which the bit field is being set.
-    /// @param bitField The new bit field for the given address prefix and operator.
+    /// @param accountOperatorAuthorized The new bit field for the given address prefix and operator.
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint bitField
+        uint accountOperatorAuthorized
     ) external payable;
 
     /// @notice Authorizes or deauthorizes an operator for the account.

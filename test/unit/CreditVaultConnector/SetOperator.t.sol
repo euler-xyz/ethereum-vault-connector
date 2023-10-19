@@ -11,7 +11,7 @@ contract SetOperatorTest is Test {
     event OperatorStatus(
         uint152 indexed addressPrefix,
         address indexed operator,
-        uint bitField
+        uint accountOperatorAuthorized
     );
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
 
@@ -22,7 +22,7 @@ contract SetOperatorTest is Test {
     function test_WhenOwnerCalling_SetOperator(
         address alice,
         address operator,
-        uint bitField
+        uint accountOperatorAuthorized
     ) public {
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(operator != address(0) && operator != address(cvc));
@@ -38,30 +38,41 @@ contract SetOperatorTest is Test {
 
         vm.expectEmit(true, true, false, false, address(cvc));
         emit OwnerRegistered(addressPrefix, alice);
-        if (bitField > 0) {
+        if (accountOperatorAuthorized > 0) {
             vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorStatus(addressPrefix, operator, bitField);
+            emit OperatorStatus(
+                addressPrefix,
+                operator,
+                accountOperatorAuthorized
+            );
         }
         vm.prank(alice);
-        cvc.setOperator(addressPrefix, operator, bitField);
+        cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
 
-        assertEq(cvc.getOperator(addressPrefix, operator), bitField);
+        assertEq(
+            cvc.getOperator(addressPrefix, operator),
+            accountOperatorAuthorized
+        );
 
         // don't emit the event if the bit field doesn't change
         vm.recordLogs();
         vm.prank(alice);
-        cvc.setOperator(addressPrefix, operator, bitField);
+        cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
 
         {
             Vm.Log[] memory logs = vm.getRecordedLogs();
             assertEq(logs.length, 0);
-            assertEq(cvc.getOperator(addressPrefix, operator), bitField);
+            assertEq(
+                cvc.getOperator(addressPrefix, operator),
+                accountOperatorAuthorized
+            );
             assertEq(cvc.getAccountOwner(alice), alice);
         }
 
         for (uint i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
-            bool isAlreadyAuthorized = bitField & (1 << i) != 0;
+            bool isAlreadyAuthorized = accountOperatorAuthorized & (1 << i) !=
+                0;
             assertEq(
                 cvc.isAccountOperatorAuthorized(account, operator),
                 isAlreadyAuthorized
@@ -73,7 +84,7 @@ contract SetOperatorTest is Test {
                 emit OperatorStatus(
                     addressPrefix,
                     operator,
-                    bitField | (1 << i)
+                    accountOperatorAuthorized | (1 << i)
                 );
             }
             vm.prank(alice);
@@ -96,7 +107,11 @@ contract SetOperatorTest is Test {
 
             // deauthorize the operator
             vm.expectEmit(true, true, false, true, address(cvc));
-            emit OperatorStatus(addressPrefix, operator, bitField & ~(1 << i));
+            emit OperatorStatus(
+                addressPrefix,
+                operator,
+                accountOperatorAuthorized & ~(1 << i)
+            );
             vm.prank(alice);
             cvc.setAccountOperator(account, operator, false);
             assertEq(cvc.isAccountOperatorAuthorized(account, operator), false);
@@ -117,11 +132,11 @@ contract SetOperatorTest is Test {
 
             // restore to the original state
             vm.prank(alice);
-            cvc.setOperator(addressPrefix, operator, bitField);
+            cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
         }
 
         // reset the operator status
-        if (bitField > 0) {
+        if (accountOperatorAuthorized > 0) {
             vm.expectEmit(true, true, false, true, address(cvc));
             emit OperatorStatus(addressPrefix, operator, 0);
         }
@@ -192,7 +207,7 @@ contract SetOperatorTest is Test {
     function test_RevertIfSenderNotOwner_SetOperator(
         address alice,
         address operator,
-        uint bitField
+        uint accountOperatorAuthorized
     ) public {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(cvc));
@@ -203,21 +218,21 @@ contract SetOperatorTest is Test {
         // fails if address prefix does not belong to an owner
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setOperator(addressPrefix + 1, operator, bitField);
+        cvc.setOperator(addressPrefix + 1, operator, accountOperatorAuthorized);
 
         // succeeds if address prefix belongs to an owner
         vm.prank(alice);
-        cvc.setOperator(addressPrefix, operator, bitField);
+        cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
 
         // fails if owner not consistent
         vm.prank(address(uint160(uint160(alice) ^ 1)));
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setOperator(addressPrefix, operator, bitField);
+        cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
 
         // reverts if sender is an operator
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setOperator(addressPrefix, operator, bitField);
+        cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
     }
 
     function test_RevertIfSenderNotOwnerAndNotOperator_SetAccountOperator(
