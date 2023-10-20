@@ -140,15 +140,23 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @dev The owner of an address prefix is an address that matches the address that has previously been recorded (or will be) as an owner in the ownerLookup. In case of the self-call in the permit() function, the CVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
     /// @param addressPrefix The address prefix for which it is checked whether the caller is the owner.
     modifier onlyOwner(uint152 addressPrefix) virtual {
+        EC contextCache = executionContext;
+        EC contextCopy = contextCache;
+
         {
             // calculate a phantom address from the address prefix which can be used as an input to internal functions
             address account = address(uint160(addressPrefix) << 8);
 
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender
-                ? executionContext.getOnBehalfOfAccount()
-                : msg.sender;
+            address msgSender;
+            if (address(this) == msg.sender) {
+                contextCopy = contextCopy.setPermitInProgress();
+                msgSender = contextCopy.getOnBehalfOfAccount();
+            } else {
+                contextCopy = contextCopy.clearPermitInProgress();
+                msgSender = msg.sender;
+            }
 
             if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
@@ -163,23 +171,40 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             }
         }
 
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCopy;
+        }
+
         _;
+
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCache;
+        }
     }
 
     /// @notice A modifier that allows only the owner or an operator of the account to call the function.
     /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner. In case of the self-call in the permit() function, the CVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
     /// @param account The address of the account for which it is checked whether the caller is the owner or an operator.
     modifier onlyOwnerOrOperator(address account) virtual {
+        EC contextCache = executionContext;
+        EC contextCopy = contextCache;
+
         {
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender
-                ? executionContext.getOnBehalfOfAccount()
-                : msg.sender;
+            address msgSender;
+            if (address(this) == msg.sender) {
+                contextCopy = contextCopy.setPermitInProgress();
+                msgSender = contextCopy.getOnBehalfOfAccount();
+            } else {
+                contextCopy = contextCopy.clearPermitInProgress();
+                msgSender = msg.sender;
+            }
 
             if (haveCommonOwnerInternal(account, msgSender)) {
-                address owner = getAccountOwnerInternal(account);
+                contextCopy = contextCopy.clearOperatorAuthenticated();
 
+                address owner = getAccountOwnerInternal(account);
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
                 } else if (owner != msgSender) {
@@ -190,11 +215,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             ) {
                 revert CVC_NotAuthorized();
             } else {
+                contextCopy = contextCopy.setOperatorAuthenticated();
                 emit OperatorAuthenticated(msgSender, account);
             }
         }
 
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCopy;
+        }
+
         _;
+
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCache;
+        }
     }
 
     /// @notice A modifier checks whether msg.sender is the only controller for the account.

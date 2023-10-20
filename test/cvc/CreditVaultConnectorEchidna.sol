@@ -13,15 +13,25 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     modifier onlyOwner(uint152 addressPrefix) override {
         assert(address(this) == msg.sender ? inPermit : true);
 
+        EC contextCache = executionContext;
+        EC contextCopy = contextCache;
+
         {
             // calculate a phantom address from the address prefix which can be used as an input to internal functions
             address account = address(uint160(addressPrefix) << 8);
 
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender
-                ? executionContext.getOnBehalfOfAccount()
-                : msg.sender;
+            address msgSender;
+            if (address(this) == msg.sender) {
+                contextCopy = contextCopy.setPermitInProgress();
+                msgSender = contextCopy.getOnBehalfOfAccount();
+            } else {
+                contextCopy = contextCopy.clearPermitInProgress();
+                msgSender = msg.sender;
+            }
+
+            assert(msgSender != address(0));
 
             if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
@@ -36,24 +46,44 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             }
         }
 
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCopy;
+        }
+
         _;
+
+        // verify if cached context value can be reused
+        assert(executionContext.isEqual(contextCopy));
+
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCache;
+        }
     }
 
     modifier onlyOwnerOrOperator(address account) override {
         assert(address(this) == msg.sender ? inPermit : true);
 
+        EC contextCache = executionContext;
+        EC contextCopy = contextCache;
+
         {
             // CVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender
-                ? executionContext.getOnBehalfOfAccount()
-                : msg.sender;
+            address msgSender;
+            if (address(this) == msg.sender) {
+                contextCopy = contextCopy.setPermitInProgress();
+                msgSender = contextCopy.getOnBehalfOfAccount();
+            } else {
+                contextCopy = contextCopy.clearPermitInProgress();
+                msgSender = msg.sender;
+            }
 
             assert(msgSender != address(0));
 
             if (haveCommonOwnerInternal(account, msgSender)) {
-                address owner = getAccountOwnerInternal(account);
+                contextCopy = contextCopy.clearOperatorAuthenticated();
 
+                address owner = getAccountOwnerInternal(account);
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
                 } else if (owner != msgSender) {
@@ -63,10 +93,24 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
                 !isAccountOperatorAuthorizedInternal(account, msgSender)
             ) {
                 revert CVC_NotAuthorized();
+            } else {
+                contextCopy = contextCopy.setOperatorAuthenticated();
+                emit OperatorAuthenticated(msgSender, account);
             }
         }
 
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCopy;
+        }
+
         _;
+
+        // verify if cached context value can be reused
+        assert(executionContext.isEqual(contextCopy));
+
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCache;
+        }
     }
 
     modifier nonReentrantChecks() override {
@@ -81,10 +125,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         _;
 
         // verify if cached context value can be reused
-        assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.setChecksInProgress())
-        );
+        assert(executionContext.isEqual(context.setChecksInProgress()));
 
         executionContext = context;
     }
@@ -97,10 +138,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         _;
 
         // verify if cached context value can be reused
-        assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.setOnBehalfOfAccount(account))
-        );
+        assert(executionContext.isEqual(context.setOnBehalfOfAccount(account)));
 
         executionContext = context;
     }
@@ -131,10 +169,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         );
 
         // verify if cached context value can be reused
-        assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.setImpersonationInProgress())
-        );
+        assert(executionContext.isEqual(context.setImpersonationInProgress()));
 
         executionContext = context;
 
@@ -187,6 +222,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_NotAuthorized();
         }
 
+        emit Permit(msg.sender, signer, signature);
         emit NonceUsed(addressPrefix, nonce);
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
@@ -226,7 +262,9 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         emit BatchEnd(msg.sender, batchDepth);
 
         // verify if cached context value can be reused
-        assert(EC.unwrap(executionContext) == EC.unwrap(contextCache) + 1);
+        assert(
+            executionContext.isEqual(contextCache.setBatchDepth(batchDepth))
+        );
 
         if (!contextCache.isInBatch()) {
             executionContext = contextCache.setChecksInProgress();
@@ -236,8 +274,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
             // verify if cached context value can be reused
             assert(
-                EC.unwrap(executionContext) ==
-                    EC.unwrap(contextCache.setChecksInProgress())
+                executionContext.isEqual(contextCache.setChecksInProgress())
             );
         }
 

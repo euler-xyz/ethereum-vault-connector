@@ -108,7 +108,9 @@ contract BatchTest is Test {
                 controller,
                 seed / 3,
                 true,
-                alice
+                alice,
+                false,
+                false
             )
         );
 
@@ -121,7 +123,9 @@ contract BatchTest is Test {
             address(cvc),
             seed - seed / 3,
             true,
-            alice
+            alice,
+            false,
+            false
         );
 
         items[5].onBehalfOfAccount = alicesSubAccount;
@@ -168,7 +172,7 @@ contract BatchTest is Test {
         cvc.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
-        items = new ICVC.BatchItem[](3);
+        items = new ICVC.BatchItem[](4);
 
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
@@ -192,6 +196,20 @@ contract BatchTest is Test {
         items[2].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alicesSubAccount
+        );
+
+        items[3].onBehalfOfAccount = alice;
+        items[3].targetContract = otherVault;
+        items[3].value = 0;
+        items[3].data = abi.encodeWithSelector(
+            Target.callTest.selector,
+            address(cvc),
+            address(cvc),
+            0,
+            true,
+            alice,
+            true,
+            false
         );
 
         vm.prank(bob);

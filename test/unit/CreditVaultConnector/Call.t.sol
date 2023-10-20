@@ -52,7 +52,9 @@ contract CallTest is Test {
             address(cvc),
             seed,
             false,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         vm.deal(alice, seed);
@@ -72,7 +74,9 @@ contract CallTest is Test {
             address(cvc),
             0, // we're expecting ETH not to get forwarded
             true,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
@@ -108,7 +112,9 @@ contract CallTest is Test {
             address(cvc),
             seed,
             false,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         vm.deal(alice, seed);
@@ -131,7 +137,9 @@ contract CallTest is Test {
             address(cvc),
             seed,
             true,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         vm.deal(alice, seed);
@@ -165,7 +173,9 @@ contract CallTest is Test {
             address(cvc),
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
@@ -191,7 +201,9 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
@@ -217,7 +229,9 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
@@ -247,7 +261,9 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
@@ -267,7 +283,9 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
@@ -279,7 +297,8 @@ contract CallTest is Test {
     function test_RevertIfInternalCallIsUnsuccessful_Call(
         address alice
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();

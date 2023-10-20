@@ -102,7 +102,7 @@ contract Vault is ICreditVault, Target {
     ) external payable {
         uint context = cvc.getRawExecutionContext();
         bool simulationInProgress = context &
-            0x0000000000000000FF0000000000000000000000000000000000000000000000 !=
+            0x000000000000FF00000000000000000000000000000000000000000000000000 !=
             0;
         require(
             simulationInProgress == expectedSimulationInProgress,

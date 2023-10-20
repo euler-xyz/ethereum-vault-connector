@@ -13,15 +13,26 @@ library ExecutionContext {
         0x00000000000000000000FF000000000000000000000000000000000000000000;
     uint internal constant IMPERSONATE_LOCK_MASK =
         0x000000000000000000FF00000000000000000000000000000000000000000000;
-    uint internal constant SIMULATION_MASK =
+    uint internal constant OPERATOR_AUTHENTICATED_MASK =
         0x0000000000000000FF0000000000000000000000000000000000000000000000;
+    uint internal constant PERMIT_MASK =
+        0x00000000000000FF000000000000000000000000000000000000000000000000;
+    uint internal constant SIMULATION_MASK =
+        0x000000000000FF00000000000000000000000000000000000000000000000000;
     uint internal constant STAMP_MASK =
-        0xFFFFFFFFFFFFFFFF000000000000000000000000000000000000000000000000;
+        0xFFFFFFFFFFFF0000000000000000000000000000000000000000000000000000;
     uint internal constant ON_BEHALF_OF_ACCOUNT_OFFSET = 8;
-    uint internal constant STAMP_OFFSET = 192;
+    uint internal constant STAMP_OFFSET = 208;
     uint internal constant BATCH_DEPTH_INIT = 0;
     uint internal constant BATCH_DEPTH_MAX = 9;
     uint internal constant STAMP_DUMMY_VALUE = 1;
+
+    function isEqual(
+        EC context1,
+        EC context2
+    ) internal pure returns (bool result) {
+        result = EC.unwrap(context1) == EC.unwrap(context2);
+    }
 
     function getBatchDepth(EC context) internal pure returns (uint8 result) {
         result = uint8(EC.unwrap(context) & BATCH_DEPTH_MASK);
@@ -98,6 +109,40 @@ library ExecutionContext {
         EC context
     ) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) & ~IMPERSONATE_LOCK_MASK);
+    }
+
+    function isOperatorAuthenticated(
+        EC context
+    ) internal pure returns (bool result) {
+        result = EC.unwrap(context) & OPERATOR_AUTHENTICATED_MASK != 0;
+    }
+
+    function setOperatorAuthenticated(
+        EC context
+    ) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(context) | OPERATOR_AUTHENTICATED_MASK);
+    }
+
+    function clearOperatorAuthenticated(
+        EC context
+    ) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(context) & ~OPERATOR_AUTHENTICATED_MASK);
+    }
+
+    function isPermitInProgress(
+        EC context
+    ) internal pure returns (bool result) {
+        result = EC.unwrap(context) & PERMIT_MASK != 0;
+    }
+
+    function setPermitInProgress(EC context) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(context) | PERMIT_MASK);
+    }
+
+    function clearPermitInProgress(
+        EC context
+    ) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(context) & ~PERMIT_MASK);
     }
 
     function isSimulationInProgress(

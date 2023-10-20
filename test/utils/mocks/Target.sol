@@ -11,7 +11,9 @@ contract Target {
         address msgSender,
         uint value,
         bool checksDeferred,
-        address onBehalfOfAccount
+        address onBehalfOfAccount,
+        bool operatorAuthenticated,
+        bool permitInProgress
     ) external payable {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
             address(0)
@@ -28,6 +30,20 @@ contract Target {
             _onBehalfOfAccount == onBehalfOfAccount,
             "ct/invalid-on-behalf-of-account"
         );
+        require(
+            context & 0x0000ff00000000000000000000000000000000000000000000 == 0,
+            "ct/impersonate-lock"
+        );
+        require(
+            (context & 0x00ff0000000000000000000000000000000000000000000000 !=
+                0) == operatorAuthenticated,
+            "ct/operator-authenticated"
+        );
+        require(
+            (context & 0xff000000000000000000000000000000000000000000000000 !=
+                0) == permitInProgress,
+            "ct/permit-in-progress"
+        );
     }
 
     function nestedCallTest(
@@ -35,7 +51,9 @@ contract Target {
         address msgSender,
         uint value,
         bool checksDeferred,
-        address onBehalfOfAccount
+        address onBehalfOfAccount,
+        bool operatorAuthenticated,
+        bool permitInProgress
     ) external payable {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
             address(0)
@@ -52,6 +70,20 @@ contract Target {
             _onBehalfOfAccount == onBehalfOfAccount,
             "nct/invalid-on-behalf-of-account"
         );
+        require(
+            context & 0x0000ff00000000000000000000000000000000000000000000 == 0,
+            "nct/impersonate-lock"
+        );
+        require(
+            (context & 0x00ff0000000000000000000000000000000000000000000000 !=
+                0) == operatorAuthenticated,
+            "nct/operator-authenticated"
+        );
+        require(
+            (context & 0xff000000000000000000000000000000000000000000000000 !=
+                0) == permitInProgress,
+            "nct/permit-in-progress"
+        );
 
         ICVC(cvc).call(
             address(this),
@@ -62,14 +94,31 @@ contract Target {
                 cvc,
                 0,
                 checksDeferred,
-                address(this)
+                address(this),
+                false,
+                false
             )
         );
 
         (_onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(address(0));
+        context = ICVC(cvc).getRawExecutionContext();
         require(
             _onBehalfOfAccount == onBehalfOfAccount,
             "nct/invalid-on-behalf-of-account-2"
+        );
+        require(
+            context & 0x0000ff00000000000000000000000000000000000000000000 == 0,
+            "nct/impersonate-lock"
+        );
+        require(
+            (context & 0x00ff0000000000000000000000000000000000000000000000 !=
+                0) == operatorAuthenticated,
+            "nct/operator-authenticated"
+        );
+        require(
+            (context & 0xff000000000000000000000000000000000000000000000000 !=
+                0) == permitInProgress,
+            "nct/permit-in-progress"
         );
     }
 

@@ -859,7 +859,9 @@ contract PermitTest is Test {
                 address(cvc),
                 123,
                 false,
-                bob
+                bob,
+                false,
+                true
             )
         );
 
@@ -879,7 +881,9 @@ contract PermitTest is Test {
                 address(cvc),
                 123,
                 false,
-                alice
+                alice,
+                false,
+                true
             )
         );
 
@@ -896,7 +900,9 @@ contract PermitTest is Test {
             address(cvc),
             123,
             true,
-            bob
+            bob,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = bob;
@@ -916,7 +922,9 @@ contract PermitTest is Test {
             address(cvc),
             123,
             true,
-            alice
+            alice,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = alice;
@@ -941,7 +949,9 @@ contract PermitTest is Test {
                 address(cvc),
                 123,
                 false,
-                alice
+                alice,
+                false,
+                true
             )
         );
 
@@ -960,7 +970,9 @@ contract PermitTest is Test {
                 address(cvc),
                 123,
                 false,
-                bob
+                bob,
+                false,
+                true
             )
         );
 
@@ -976,7 +988,9 @@ contract PermitTest is Test {
             address(cvc),
             456,
             true,
-            alice
+            alice,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = alice;
@@ -995,7 +1009,9 @@ contract PermitTest is Test {
             address(cvc),
             456,
             true,
-            bob
+            bob,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = bob;
@@ -1256,6 +1272,27 @@ contract PermitTest is Test {
         cvc.permit(operator, 0, 1, block.timestamp, data, signature);
         assertEq(cvc.isCollateralEnabled(alice, address(0)), true);
 
+        // and another one
+        data = abi.encodeWithSelector(
+            Target.callTest.selector,
+            address(cvc),
+            address(cvc),
+            0,
+            false,
+            alice,
+            true,
+            true
+        );
+
+        signature = signerECDSA.signPermit(
+            operator,
+            0,
+            2,
+            block.timestamp,
+            data
+        );
+        cvc.permit(operator, 0, 2, block.timestamp, data, signature);
+
         // but it cannot sign permit messages on behalf of other accounts for which it's not authorized
         vm.prank(operator);
         cvc.setAccountOperator(
@@ -1273,11 +1310,11 @@ contract PermitTest is Test {
         signature = signerECDSA.signPermit(
             operator,
             0,
-            2,
+            3,
             block.timestamp,
             data
         );
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.permit(operator, 0, 2, block.timestamp, data, signature);
+        cvc.permit(operator, 0, 3, block.timestamp, data, signature);
     }
 }

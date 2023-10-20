@@ -248,25 +248,25 @@ contract EchidnaTest {
         SignerEchidna(address(0xbeefbeefbeef));
 
     function enableCollateral(address account, address vault) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         hevm.prank(account);
         cvc.enableCollateral(account, vault);
     }
 
     function disableCollateral(address account, address vault) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         hevm.prank(account);
         cvc.disableCollateral(account, vault);
     }
 
     function enableController(address account, address) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         hevm.prank(account);
         cvc.enableController(account, address(vaultEchidna));
     }
 
     function disableController(address account) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         if (cvc.getControllers(account).length > 0) {
             hevm.prank(cvc.getControllers(account)[0]);
         }
@@ -277,7 +277,9 @@ contract EchidnaTest {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
-        if (onBehalfOfAccount == address(cvc)) return;
+        if (
+            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(cvc)
+        ) return;
         hevm.prank(onBehalfOfAccount);
         cvc.call(address(vaultEchidna), onBehalfOfAccount, data);
     }
@@ -286,7 +288,10 @@ contract EchidnaTest {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
-        if (onBehalfOfAccount == address(cvc)) return;
+        if (
+            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(cvc)
+        ) return;
+
         hevm.prank(onBehalfOfAccount);
         cvc.enableCollateral(onBehalfOfAccount, address(vaultEchidna));
 
@@ -315,7 +320,12 @@ contract EchidnaTest {
         if (items.length > 0) {
             ICVC.BatchItem[] memory _items = new ICVC.BatchItem[](1);
 
-            if (items[0].onBehalfOfAccount == address(cvc)) return;
+            for (uint i; i < items.length; ++i) {
+                if (
+                    items[i].onBehalfOfAccount == address(0) ||
+                    items[i].onBehalfOfAccount == address(cvc)
+                ) return;
+            }
 
             _items[0].targetContract = address(vaultEchidna);
             _items[0].onBehalfOfAccount = items[0].onBehalfOfAccount;
