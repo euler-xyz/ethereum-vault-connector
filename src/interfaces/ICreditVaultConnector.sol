@@ -16,11 +16,12 @@ interface ICVC {
     }
 
     /// @notice Returns current raw execution context.
-    /// @dev Check for checks reentrancy in order to consume on behalf of account.
+    /// @dev When checks in progress, on behalf of account is always address(0).
     /// @return context Current raw execution context.
     function getRawExecutionContext() external view returns (uint context);
 
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
+    /// @dev When checks in progress, on behalf of account is always address(0).
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the operation is being executed at the moment.
     /// @return onBehalfOfAccount An account that has been authenticated and on behalf of which the operation is being executed at the moment.
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck is address(0).

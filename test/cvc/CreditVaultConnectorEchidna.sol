@@ -130,19 +130,6 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         executionContext = context;
     }
 
-    modifier onBehalfOfAccountContext(address account) override {
-        EC context = executionContext;
-
-        executionContext = context.setOnBehalfOfAccount(account);
-
-        _;
-
-        // verify if cached context value can be reused
-        assert(executionContext.isEqual(context.setOnBehalfOfAccount(account)));
-
-        executionContext = context;
-    }
-
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
@@ -228,7 +215,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
         // CVC address becomes msg.sender for the duration this self-call
-        (bool success, bytes memory result) = callPermitDataInternal(
+        (bool success, bytes memory result) = callWithContextInternal(
             address(this),
             signer,
             value,
@@ -277,6 +264,29 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
                 executionContext.isEqual(contextCache.setChecksInProgress())
             );
         }
+
+        executionContext = contextCache;
+    }
+
+    function callWithContextInternal(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) internal override returns (bool success, bytes memory result) {
+        // copied function body with inserted assertion
+        EC contextCache = executionContext;
+
+        executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount);
+
+        (success, result) = targetContract.call{value: value}(data);
+
+        // verify if cached context value can be reused
+        assert(
+            executionContext.isEqual(
+                contextCache.setOnBehalfOfAccount(onBehalfOfAccount)
+            )
+        );
 
         executionContext = contextCache;
     }

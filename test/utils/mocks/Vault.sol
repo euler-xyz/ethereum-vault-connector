@@ -69,6 +69,9 @@ contract Vault is ICreditVault, Target {
         override
         returns (bytes4 magicValue)
     {
+        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        require(onBehalfOfAccount == address(0), "cvs/on-behalf-of-account");
+
         if (vaultStatusState == 0) {
             return 0x4b3d1223;
         } else if (vaultStatusState == 1) {
@@ -82,6 +85,9 @@ contract Vault is ICreditVault, Target {
         address,
         address[] memory
     ) external virtual override returns (bytes4 magicValue) {
+        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        require(onBehalfOfAccount == address(0), "cas/on-behalf-of-account");
+
         if (accountStatusState == 0) {
             return 0xb168c58f;
         } else if (accountStatusState == 1) {
@@ -139,6 +145,9 @@ contract VaultMalicious is Vault {
     }
 
     function checkVaultStatus() external virtual override returns (bytes4) {
+        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        require(onBehalfOfAccount == address(0), "cvs/on-behalf-of-account");
+
         if (expectedErrorSelector == 0) {
             return this.checkVaultStatus.selector;
         }
@@ -158,6 +167,9 @@ contract VaultMalicious is Vault {
         address,
         address[] memory
     ) external override returns (bytes4) {
+        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        require(onBehalfOfAccount == address(0), "cas/on-behalf-of-account");
+
         if (expectedErrorSelector == 0) {
             return this.checkAccountStatus.selector;
         }

@@ -11,6 +11,7 @@ import "../../src/CreditVaultConnector.sol";
 /// #if_succeeds "operator authenticated state doesn't change" old(executionContext.isOperatorAuthenticated()) == executionContext.isOperatorAuthenticated();
 /// #if_succeeds "permit in progress state doesn't change" old(executionContext.isPermitInProgress()) == executionContext.isPermitInProgress();
 /// #if_succeeds "simulation in progress state doesn't change" old(executionContext.isSimulationInProgress()) == executionContext.isSimulationInProgress();
+/// #if_succeeds "on behalf of account is zero when checks in progress" executionContext.areChecksInProgress() ==> executionContext.getOnBehalfOfAccount() == address(0);
 /// #if_succeeds "account status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
 /// #if_succeeds "account status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
 /// #if_succeeds "account status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
@@ -23,19 +24,6 @@ import "../../src/CreditVaultConnector.sol";
 contract CreditVaultConnectorScribble is CreditVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    function getExecutionContext(
-        address controllerToCheck
-    )
-        public
-        view
-        virtual
-        override
-        returns (address onBehalfOfAccount, bool controllerEnabled)
-    {
-        return super.getExecutionContext(controllerToCheck);
-    }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);

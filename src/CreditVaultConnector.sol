@@ -269,19 +269,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_ChecksReentrancy();
         }
 
-        executionContext = contextCache.setChecksInProgress();
-
-        _;
-
-        executionContext = contextCache;
-    }
-
-    /// @notice A modifier that sets onBehalfOfAccount in the execution context to the specified account.
-    /// @dev Should be used as the last modifier in the function so that context is limited only to the function body.
-    modifier onBehalfOfAccountContext(address account) virtual {
-        EC contextCache = executionContext;
-
-        executionContext = contextCache.setOnBehalfOfAccount(account);
+        executionContext = contextCache
+            .setChecksInProgress()
+            .setOnBehalfOfAccount(address(0));
 
         _;
 
@@ -308,15 +298,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         returns (address onBehalfOfAccount, bool controllerEnabled)
     {
-        EC context = executionContext;
-
-        // execution context must be checks reentrancy protected because on behalf of account
-        // might be inconsistent while checks are in progress
-        if (context.areChecksInProgress()) {
-            revert CVC_ChecksReentrancy();
-        }
-
-        onBehalfOfAccount = context.getOnBehalfOfAccount();
+        onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
 
         controllerEnabled = controllerToCheck == address(0)
             ? false
@@ -655,7 +637,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
         // CVC address becomes msg.sender for the duration this self-call
-        (bool success, bytes memory result) = callPermitDataInternal(
+        (bool success, bytes memory result) = callWithContextInternal(
             address(this),
             signer,
             value,
@@ -689,7 +671,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         emit BatchEnd(msg.sender, batchDepth);
 
         if (!contextCache.isInBatch()) {
-            executionContext = contextCache.setChecksInProgress();
+            executionContext = contextCache
+                .setChecksInProgress()
+                .setOnBehalfOfAccount(address(0));
 
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
@@ -730,7 +714,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         emit BatchEnd(msg.sender, batchDepth);
 
         if (!contextCache.isInBatch()) {
-            executionContext = contextCache.setChecksInProgress();
+            executionContext = contextCache
+                .setChecksInProgress()
+                .setOnBehalfOfAccount(address(0));
 
             accountsStatusResult = checkStatusAll(SetType.Account, true);
             vaultsStatusResult = checkStatusAll(SetType.Vault, true);
@@ -1005,14 +991,18 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         internal
         virtual
         onlyOwnerOrOperator(onBehalfOfAccount)
-        onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
         if (targetContract == ERC1820_REGISTRY) revert CVC_InvalidAddress();
 
         value = value == type(uint).max ? address(this).balance : value;
 
-        (success, result) = targetContract.call{value: value}(data);
+        (success, result) = callWithContextInternal(
+            targetContract,
+            onBehalfOfAccount,
+            value,
+            data
+        );
     }
 
     function impersonateInternal(
@@ -1024,28 +1014,33 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         internal
         virtual
         onlyController(onBehalfOfAccount)
-        onBehalfOfAccountContext(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
         if (!accountCollaterals[onBehalfOfAccount].contains(targetContract)) {
             revert CVC_NotAuthorized();
         }
 
-        (success, result) = targetContract.call{value: value}(data);
+        (success, result) = callWithContextInternal(
+            targetContract,
+            onBehalfOfAccount,
+            value,
+            data
+        );
     }
 
-    function callPermitDataInternal(
+    function callWithContextInternal(
         address targetContract,
-        address signer,
+        address onBehalfOfAccount,
         uint value,
         bytes calldata data
-    )
-        internal
-        virtual
-        onBehalfOfAccountContext(signer)
-        returns (bool success, bytes memory result)
-    {
+    ) internal virtual returns (bool success, bytes memory result) {
+        EC contextCache = executionContext;
+
+        executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount);
+
         (success, result) = targetContract.call{value: value}(data);
+
+        executionContext = contextCache;
     }
 
     function batchInternal(
