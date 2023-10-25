@@ -120,12 +120,18 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_ChecksReentrancy();
         }
 
-        executionContext = context.setChecksInProgress();
+        executionContext = context.setChecksInProgress().setOnBehalfOfAccount(
+            address(0)
+        );
 
         _;
 
         // verify if cached context value can be reused
-        assert(executionContext.isEqual(context.setChecksInProgress()));
+        assert(
+            executionContext.isEqual(
+                context.setChecksInProgress().setOnBehalfOfAccount(address(0))
+            )
+        );
 
         executionContext = context;
     }
@@ -254,14 +260,20 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         );
 
         if (!contextCache.isInBatch()) {
-            executionContext = contextCache.setChecksInProgress();
+            executionContext = contextCache
+                .setChecksInProgress()
+                .setOnBehalfOfAccount(address(0));
 
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
 
             // verify if cached context value can be reused
             assert(
-                executionContext.isEqual(contextCache.setChecksInProgress())
+                executionContext.isEqual(
+                    contextCache.setChecksInProgress().setOnBehalfOfAccount(
+                        address(0)
+                    )
+                )
             );
         }
 
