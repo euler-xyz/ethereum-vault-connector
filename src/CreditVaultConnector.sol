@@ -415,6 +415,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             operatorLookup[addressPrefix][operator] != accountOperatorAuthorized
         ) {
             operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
+            
             emit OperatorStatus(
                 addressPrefix,
                 operator,
@@ -592,9 +593,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
-        EC contextCache = executionContext;
-
         emit Impersonate(msg.sender, targetContract, onBehalfOfAccount);
+
+        EC contextCache = executionContext;
 
         uint value = contextCache.isInBatch() ? 0 : msg.value;
 
