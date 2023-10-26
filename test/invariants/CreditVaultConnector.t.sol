@@ -18,17 +18,12 @@ contract VaultMock is ICreditVault {
     function checkAccountStatus(
         address,
         address[] memory
-    ) external pure override returns (bool, bytes memory) {
-        return (true, "");
+    ) external pure override returns (bytes4) {
+        return this.checkAccountStatus.selector;
     }
 
-    function checkVaultStatus()
-        external
-        pure
-        override
-        returns (bool, bytes memory)
-    {
-        return (true, "");
+    function checkVaultStatus() external pure override returns (bytes4) {
+        return this.checkVaultStatus.selector;
     }
 
     fallback(bytes calldata) external payable returns (bytes memory) {
@@ -67,33 +62,55 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        operatorLookup[account][msg.sender] = block.timestamp;
+
+        if (getAccountOwnerInternal(account) == address(0)) {
+            setAccountOwnerInternal(account, account);
+        }
+
+        operatorLookup[getAddressPrefixInternal(account)][msg.sender] = (1 <<
+            (uint160(account) ^ uint160(getAccountOwnerInternal(account))));
         vm.etch(vault, vaultMock.code);
     }
 
     function setNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace,
         uint nonce
     ) public payable override {
-        account = msg.sender;
-        setAccountOwnerInternal(account, msg.sender);
-        nonce =
-            nonceLookup[getAddressPrefixInternal(account)][nonceNamespace] +
-            1;
-        super.setNonce(account, nonceNamespace, nonce);
+        addressPrefix = getAddressPrefixInternal(msg.sender);
+        setAccountOwnerInternal(
+            address(uint160(addressPrefix) << 8),
+            msg.sender
+        );
+        nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
+        super.setNonce(addressPrefix, nonceNamespace, nonce);
+    }
+
+    function setOperator(
+        uint152 addressPrefix,
+        address operator,
+        uint accountOperatorAuthorized
+    ) public payable override {
+        if (operator == address(0) || operator == address(this)) return;
+        if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        addressPrefix = getAddressPrefixInternal(msg.sender);
+        setAccountOwnerInternal(
+            address(uint160(addressPrefix) << 8),
+            msg.sender
+        );
+        super.setOperator(addressPrefix, operator, accountOperatorAuthorized);
     }
 
     function setAccountOperator(
         address account,
         address operator,
-        uint expiryTimestamp
+        bool authorized
     ) public payable override {
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
-        super.setAccountOperator(account, operator, expiryTimestamp);
+        super.setAccountOperator(account, operator, authorized);
     }
 
     function enableCollateral(
@@ -136,13 +153,13 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable override returns (bool success, bytes memory result) {
-        if (onBehalfOfAccount == address(0)) return (true, "");
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == address(this)) return (true, "");
+    ) public payable override {
+        if (onBehalfOfAccount == address(0)) return;
+        if (uint160(targetContract) <= 10) return;
+        if (targetContract == address(this)) return;
         setup(onBehalfOfAccount, targetContract);
 
-        (success, result) = super.call(targetContract, onBehalfOfAccount, data);
+        super.call(targetContract, onBehalfOfAccount, data);
     }
 
     function callInternal(
@@ -168,11 +185,11 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable override returns (bool success, bytes memory result) {
-        if (uint160(msg.sender) <= 10) return (true, "");
-        if (onBehalfOfAccount == address(0)) return (true, "");
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == address(this)) return (true, "");
+    ) public payable override {
+        if (uint160(msg.sender) <= 10) return;
+        if (onBehalfOfAccount == address(0)) return;
+        if (uint160(targetContract) <= 10) return;
+        if (targetContract == address(this)) return;
 
         setup(onBehalfOfAccount, msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
@@ -184,11 +201,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
-        (success, result) = super.impersonate(
-            targetContract,
-            onBehalfOfAccount,
-            data
-        );
+        super.impersonate(targetContract, onBehalfOfAccount, data);
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
@@ -373,13 +386,19 @@ contract CreditVaultConnectorInvariants is Test {
         targetContract(address(cvc));
     }
 
-    function invariant_executionContext() external {
+    function invariant_ExecutionContext() external {
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getExecutionContext(address(this));
+            .getCurrentOnBehalfOfAccount(address(this));
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertEq(cvc.getRawExecutionContext(), 1 << 184);
+        assertEq(cvc.getRawExecutionContext(), 1 << 208);
+        assertEq(cvc.getCurrentBatchDepth(), 0);
+        assertEq(cvc.areChecksInProgress(), false);
+        assertEq(cvc.isImpersonationInProgress(), false);
+        assertEq(cvc.isOperatorAuthenticated(), false);
+        assertEq(cvc.isPermitInProgress(), false);
+        assertEq(cvc.isSimulationInProgress(), false);
     }
 
     function invariant_AccountAndVaultStatusChecks() external {
@@ -401,7 +420,7 @@ contract CreditVaultConnectorInvariants is Test {
         }
     }
 
-    function invariant_controllers_collaterals() external {
+    function invariant_ControllersCollaterals() external {
         address[] memory touchedAccounts = cvc.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
             // controllers

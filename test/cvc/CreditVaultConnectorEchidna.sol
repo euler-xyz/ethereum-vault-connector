@@ -10,24 +10,35 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
     bool private inPermit;
 
-    modifier onlyOwner(address account) override {
+    modifier onlyOwner(uint152 addressPrefix) override {
         assert(address(this) == msg.sender ? inPermit : true);
 
+        EC contextCache = executionContext;
+        EC contextCopy = contextCache;
+
         {
-            // CVC can only be msg.sender during the permit() function call. in that case,
-            // the caller address (that is permit message signer) is taken from the execution context
-            address caller = address(this) == msg.sender
-                ? executionContext.getOnBehalfOfAccount()
-                : msg.sender;
+            // calculate a phantom address from the address prefix which can be used as an input to internal functions
+            address account = address(uint160(addressPrefix) << 8);
 
-            assert(caller != address(0));
+            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // the "true" sender address (that is the permit message signer) is taken from the execution context
+            address msgSender;
+            if (address(this) == msg.sender) {
+                contextCopy = contextCopy.setPermitInProgress();
+                msgSender = contextCopy.getOnBehalfOfAccount();
+            } else {
+                contextCopy = contextCopy.clearPermitInProgress();
+                msgSender = msg.sender;
+            }
 
-            if (haveCommonOwnerInternal(account, caller)) {
+            assert(msgSender != address(0));
+
+            if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
 
                 if (owner == address(0)) {
-                    setAccountOwnerInternal(account, caller);
-                } else if (owner != caller) {
+                    setAccountOwnerInternal(account, msgSender);
+                } else if (owner != msgSender) {
                     revert CVC_NotAuthorized();
                 }
             } else {
@@ -35,35 +46,71 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             }
         }
 
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCopy;
+        }
+
         _;
+
+        // verify if cached context value can be reused
+        assert(executionContext.isEqual(contextCopy));
+
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCache;
+        }
     }
 
     modifier onlyOwnerOrOperator(address account) override {
         assert(address(this) == msg.sender ? inPermit : true);
 
+        EC contextCache = executionContext;
+        EC contextCopy = contextCache;
+
         {
-            // CVC can only be msg.sender during the permit() function call. in that case,
-            // the caller address (that is permit message signer) is taken from the execution context
-            address caller = address(this) == msg.sender
-                ? executionContext.getOnBehalfOfAccount()
-                : msg.sender;
+            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // the "true" sender address (that is the permit message signer) is taken from the execution context
+            address msgSender;
+            if (address(this) == msg.sender) {
+                contextCopy = contextCopy.setPermitInProgress();
+                msgSender = contextCopy.getOnBehalfOfAccount();
+            } else {
+                contextCopy = contextCopy.clearPermitInProgress();
+                msgSender = msg.sender;
+            }
 
-            assert(caller != address(0));
+            assert(msgSender != address(0));
 
-            if (haveCommonOwnerInternal(account, caller)) {
+            if (haveCommonOwnerInternal(account, msgSender)) {
+                contextCopy = contextCopy.clearOperatorAuthenticated();
+
                 address owner = getAccountOwnerInternal(account);
-
                 if (owner == address(0)) {
-                    setAccountOwnerInternal(account, caller);
-                } else if (owner != caller) {
+                    setAccountOwnerInternal(account, msgSender);
+                } else if (owner != msgSender) {
                     revert CVC_NotAuthorized();
                 }
-            } else if (operatorLookup[account][caller] < block.timestamp) {
+            } else if (
+                !isAccountOperatorAuthorizedInternal(account, msgSender)
+            ) {
                 revert CVC_NotAuthorized();
+            } else {
+                contextCopy = contextCopy.setOperatorAuthenticated();
+                emit OperatorAuthenticated(msgSender, account);
             }
         }
 
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCopy;
+        }
+
         _;
+
+        // verify if cached context value can be reused
+        assert(executionContext.isEqual(contextCopy));
+
+        if (!contextCache.isEqual(contextCopy)) {
+            executionContext = contextCache;
+        }
     }
 
     modifier nonReentrantChecks() override {
@@ -73,30 +120,17 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_ChecksReentrancy();
         }
 
-        executionContext = context.setChecksInProgress();
-
-        _;
-
-        // verify if cached context value can be reused
-        assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.setChecksInProgress())
+        executionContext = context.setChecksInProgress().setOnBehalfOfAccount(
+            address(0)
         );
 
-        executionContext = context;
-    }
-
-    modifier onBehalfOfAccountContext(address account) override {
-        EC context = executionContext;
-
-        executionContext = context.setOnBehalfOfAccount(account);
-
         _;
 
         // verify if cached context value can be reused
         assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.setOnBehalfOfAccount(account))
+            executionContext.isEqual(
+                context.setChecksInProgress().setOnBehalfOfAccount(address(0))
+            )
         );
 
         executionContext = context;
@@ -106,13 +140,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    )
-        public
-        payable
-        override
-        nonReentrant
-        returns (bool success, bytes memory result)
-    {
+    ) public payable override nonReentrant {
         // copied function body with inserted assertion
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
@@ -126,7 +154,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
         executionContext = context.setImpersonationInProgress();
 
-        (success, result) = impersonateInternal(
+        (bool success, bytes memory result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
             value,
@@ -134,12 +162,13 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         );
 
         // verify if cached context value can be reused
-        assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.setImpersonationInProgress())
-        );
+        assert(executionContext.isEqual(context.setImpersonationInProgress()));
 
         executionContext = context;
+
+        if (!success) {
+            revertBytes(result);
+        }
     }
 
     function permit(
@@ -186,12 +215,13 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revert CVC_NotAuthorized();
         }
 
+        emit Permit(msg.sender, signer, signature);
         emit NonceUsed(addressPrefix, nonce);
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
         // CVC address becomes msg.sender for the duration this self-call
-        (bool success, bytes memory result) = callPermitDataInternal(
+        (bool success, bytes memory result) = callWithContextInternal(
             address(this),
             signer,
             value,
@@ -209,35 +239,67 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         BatchItem[] calldata items
     ) public payable override nonReentrant {
         // copied function body with inserted assertion
-        EC context = executionContext;
+        EC contextCache = executionContext;
 
-        if (context.isBatchDepthExceeded()) {
+        if (contextCache.isBatchDepthExceeded()) {
             revert CVC_BatchDepthViolation();
         }
 
-        executionContext = context.increaseBatchDepth();
+        uint8 batchDepth = contextCache.getBatchDepth() + 1;
+        executionContext = contextCache.setBatchDepth(batchDepth);
+
+        emit BatchStart(msg.sender, batchDepth);
 
         batchInternal(items, false);
 
+        emit BatchEnd(msg.sender, batchDepth);
+
         // verify if cached context value can be reused
         assert(
-            EC.unwrap(executionContext) ==
-                EC.unwrap(context.increaseBatchDepth())
+            executionContext.isEqual(contextCache.setBatchDepth(batchDepth))
         );
 
-        if (!context.isInBatch()) {
-            executionContext = context.setChecksInProgress();
+        if (!contextCache.isInBatch()) {
+            executionContext = contextCache
+                .setChecksInProgress()
+                .setOnBehalfOfAccount(address(0));
 
             checkStatusAll(SetType.Account, false);
             checkStatusAll(SetType.Vault, false);
 
             // verify if cached context value can be reused
             assert(
-                EC.unwrap(executionContext) ==
-                    EC.unwrap(context.setChecksInProgress())
+                executionContext.isEqual(
+                    contextCache.setChecksInProgress().setOnBehalfOfAccount(
+                        address(0)
+                    )
+                )
             );
         }
 
-        executionContext = context;
+        executionContext = contextCache;
+    }
+
+    function callWithContextInternal(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) internal override returns (bool success, bytes memory result) {
+        // copied function body with inserted assertion
+        EC contextCache = executionContext;
+
+        executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount);
+
+        (success, result) = targetContract.call{value: value}(data);
+
+        // verify if cached context value can be reused
+        assert(
+            executionContext.isEqual(
+                contextCache.setOnBehalfOfAccount(onBehalfOfAccount)
+            )
+        );
+
+        executionContext = contextCache;
     }
 }

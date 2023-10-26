@@ -20,7 +20,8 @@ contract CVCHarness is CreditVaultConnector {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) external view returns (bool isValid) {
+    ) external returns (bool isValid) {
+        // for compatibility with scribble, do not make this view
         return isValidERC1271Signature(signer, hash, signature);
     }
 }
@@ -40,11 +41,11 @@ contract CVCGas is Test {
         uint nonce,
         uint deadline,
         bytes calldata data
-    ) public {
+    ) public view {
         cvc.permitHash(signer, nonceNamespace, nonce, deadline, data);
     }
 
-    function testGas_haveCommonOwner(address a, address b) public {
+    function testGas_haveCommonOwner(address a, address b) public view {
         cvc.haveCommonOwner(a, b);
     }
 

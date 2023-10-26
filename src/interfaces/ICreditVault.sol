@@ -10,17 +10,13 @@ interface ICreditVault {
 
     /// @notice Checks the status of an account and returns whether it is valid or not.
     /// @param account The address of the account to be checked.
-    /// @return isValid A boolean value that indicates whether the account status is valid or not.
-    /// @return data Bytes data that indicates the reason why the account status is not valid. Irrelevant if the account status is valid.
+    /// @return magicValue Must return the bytes4 magic value 0xb168c58f (which is a selector of this function) when account status is valid, or revert otherwise.
     function checkAccountStatus(
         address account,
         address[] calldata collaterals
-    ) external returns (bool isValid, bytes memory data);
+    ) external returns (bytes4 magicValue);
 
     /// @notice Checks the status of the vault and returns whether it is valid or not.
-    /// @return isValid A boolean value that indicates whether the vault status is valid or not.
-    /// @return data Bytes data that indicates the reason why the vault status is not valid. Irrelevant if the vault status is valid.
-    function checkVaultStatus()
-        external
-        returns (bool isValid, bytes memory data);
+    /// @return magicValue Must return the bytes4 magic value 0x4b3d1223 (which is a selector of this function) when account status is valid, or revert otherwise.
+    function checkVaultStatus() external returns (bytes4 magicValue);
 }

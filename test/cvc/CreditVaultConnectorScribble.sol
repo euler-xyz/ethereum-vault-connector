@@ -4,11 +4,14 @@ pragma solidity ^0.8.20;
 
 import "../../src/CreditVaultConnector.sol";
 
-/// #define ownerOrOperator(address caller, address account) bool = (ownerLookup[uint152(uint160(account) >> 8)] == caller || (ownerLookup[uint152(uint160(account) >> 8)] == address(0) && (uint160(caller) | 0xFF) == (uint160(account) | 0xFF))) || operatorLookup[account][caller] >= block.timestamp;
 /// #if_succeeds "batch state doesn't change" old(executionContext.isInBatch()) == executionContext.isInBatch();
 /// #if_succeeds "on behalf account state doesn't change" old(executionContext.getOnBehalfOfAccount()) == executionContext.getOnBehalfOfAccount();
 /// #if_succeeds "checks in progress state doesn't change" old(executionContext.areChecksInProgress()) == executionContext.areChecksInProgress();
 /// #if_succeeds "impersonation in progress state doesn't change" old(executionContext.isImpersonationInProgress()) == executionContext.isImpersonationInProgress();
+/// #if_succeeds "operator authenticated state doesn't change" old(executionContext.isOperatorAuthenticated()) == executionContext.isOperatorAuthenticated();
+/// #if_succeeds "permit in progress state doesn't change" old(executionContext.isPermitInProgress()) == executionContext.isPermitInProgress();
+/// #if_succeeds "simulation in progress state doesn't change" old(executionContext.isSimulationInProgress()) == executionContext.isSimulationInProgress();
+/// #if_succeeds "on behalf of account is zero when checks in progress" executionContext.areChecksInProgress() ==> executionContext.getOnBehalfOfAccount() == address(0);
 /// #if_succeeds "account status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
 /// #if_succeeds "account status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
 /// #if_succeeds "account status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
@@ -22,38 +25,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    function getExecutionContext(
-        address controllerToCheck
-    )
-        public
-        view
-        virtual
-        override
-        returns (address onBehalfOfAccount, bool controllerEnabled)
-    {
-        return super.getExecutionContext(controllerToCheck);
-    }
-
-    /// #if_succeeds "only the account owner can call this" (address(this) != msg.sender && ownerLookup[uint152(uint160(account) >> 8)] == msg.sender) || (address(this) == msg.sender && ownerLookup[uint152(uint160(account) >> 8)] == executionContext.getOnBehalfOfAccount());
-    function setNonce(
-        address account,
-        uint nonceNamespace,
-        uint nonce
-    ) public payable virtual override {
-        super.setNonce(account, nonceNamespace, nonce);
-    }
-
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
-    function setAccountOperator(
-        address account,
-        address operator,
-        uint expiryTimestamp
-    ) public payable virtual override {
-        super.setAccountOperator(account, operator, expiryTimestamp);
-    }
-
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
@@ -65,7 +36,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.enableCollateral(account, vault);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
@@ -76,7 +46,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.disableCollateral(account, vault);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, account);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
@@ -97,21 +66,14 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         super.disableController(account);
     }
 
-    /// #if_succeeds "only the account owner or operator can call this" ownerOrOperator(address(this) == msg.sender ? old(executionContext.getOnBehalfOfAccount()) : msg.sender, onBehalfOfAccount);
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
     function call(
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    )
-        public
-        payable
-        virtual
-        override
-        returns (bool success, bytes memory result)
-    {
-        (success, result) = super.call(targetContract, onBehalfOfAccount, data);
+    ) public payable virtual override {
+        super.call(targetContract, onBehalfOfAccount, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -121,14 +83,8 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    )
-        public
-        payable
-        virtual
-        override
-        returns (bool success, bytes memory result)
-    {
-        return super.impersonate(targetContract, onBehalfOfAccount, data);
+    ) public payable virtual override {
+        super.impersonate(targetContract, onBehalfOfAccount, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());

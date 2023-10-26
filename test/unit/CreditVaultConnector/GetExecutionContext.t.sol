@@ -12,62 +12,9 @@ contract GetExecutionContextTest is Test {
         cvc = new CreditVaultConnectorHarness();
     }
 
-    function test_GetExecutionContext(address account, uint seed) external {
-        vm.assume(account != address(0) && account != address(cvc));
-
-        address controller = address(new Vault(cvc));
-
-        (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getExecutionContext(controller);
-        uint context = cvc.getRawExecutionContext();
-
-        assertEq(onBehalfOfAccount, address(0));
-        assertFalse(controllerEnabled);
-        assertEq(context, 1 << 184);
-
-        if (seed % 2 == 0) {
-            vm.prank(account);
-            cvc.enableController(account, controller);
-        }
-
-        cvc.setBatchDepth(seed % 3 == 0 ? 1 : 0);
-        cvc.setOnBehalfOfAccount(account);
-        cvc.setChecksLock(false);
-        cvc.setImpersonateLock(seed % 4 == 0 ? true : false);
-
-        (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
-            controller
-        );
-        context = cvc.getRawExecutionContext();
-
-        assertEq(onBehalfOfAccount, account);
-        assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
-        assertEq(
-            context &
-                0x00000000000000000000000000000000000000000000000000000000000000FF,
-            seed % 3 == 0 ? 1 : 0
-        );
-        assertEq(
-            context &
-                0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00,
-            uint(uint160(account)) << 8
-        );
-        assertEq(
-            context &
-                0x00000000000000000000FF000000000000000000000000000000000000000000 !=
-                0,
-            false
-        );
-        assertEq(
-            context &
-                0x000000000000000000FF00000000000000000000000000000000000000000000 !=
-                0,
-            seed % 4 == 0 ? true : false
-        );
-    }
-
-    function test_RevertIfChecksReentrancy_GetExecutionContext(
+    function test_GetExecutionContext(
         address account,
+        uint8 batchDepth,
         uint seed
     ) external {
         vm.assume(account != address(0) && account != address(cvc));
@@ -75,36 +22,38 @@ contract GetExecutionContextTest is Test {
         address controller = address(new Vault(cvc));
 
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getExecutionContext(controller);
+            .getCurrentOnBehalfOfAccount(controller);
         uint context = cvc.getRawExecutionContext();
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
-        assertEq(context, 1 << 184);
+        assertEq(context, 1 << 208);
 
         if (seed % 2 == 0) {
             vm.prank(account);
             cvc.enableController(account, controller);
         }
 
-        cvc.setChecksLock(true);
+        cvc.setBatchDepth(seed % 3 == 0 ? batchDepth : 0);
         cvc.setOnBehalfOfAccount(account);
+        cvc.setChecksLock(seed % 4 == 0 ? true : false);
+        cvc.setImpersonateLock(seed % 5 == 0 ? true : false);
+        cvc.setOperatorAuthenticated(seed % 6 == 0 ? true : false);
+        cvc.setPermit(seed % 7 == 0 ? true : false);
+        cvc.setSimulation(seed % 8 == 0 ? true : false);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
-        );
-        (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
-            controller
-        );
-
+        (onBehalfOfAccount, controllerEnabled) = cvc
+            .getCurrentOnBehalfOfAccount(controller);
         context = cvc.getRawExecutionContext();
+
+        assertEq(onBehalfOfAccount, account);
+        assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
         assertEq(
             context &
                 0x00000000000000000000000000000000000000000000000000000000000000FF,
-            0
+            seed % 3 == 0 ? batchDepth : 0
         );
+        assertEq(cvc.getCurrentBatchDepth(), seed % 3 == 0 ? batchDepth : 0);
         assertEq(
             context &
                 0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00,
@@ -114,13 +63,36 @@ contract GetExecutionContextTest is Test {
             context &
                 0x00000000000000000000FF000000000000000000000000000000000000000000 !=
                 0,
-            true
+            seed % 4 == 0 ? true : false
         );
+        assertEq(cvc.areChecksInProgress(), seed % 4 == 0 ? true : false);
         assertEq(
             context &
                 0x000000000000000000FF00000000000000000000000000000000000000000000 !=
                 0,
-            false
+            seed % 5 == 0 ? true : false
         );
+        assertEq(cvc.isImpersonationInProgress(), seed % 5 == 0 ? true : false);
+        assertEq(
+            context &
+                0x0000000000000000FF0000000000000000000000000000000000000000000000 !=
+                0,
+            seed % 6 == 0 ? true : false
+        );
+        assertEq(cvc.isOperatorAuthenticated(), seed % 6 == 0 ? true : false);
+        assertEq(
+            context &
+                0x00000000000000FF000000000000000000000000000000000000000000000000 !=
+                0,
+            seed % 7 == 0 ? true : false
+        );
+        assertEq(cvc.isPermitInProgress(), seed % 7 == 0 ? true : false);
+        assertEq(
+            context &
+                0x000000000000FF00000000000000000000000000000000000000000000000000 !=
+                0,
+            seed % 8 == 0 ? true : false
+        );
+        assertEq(cvc.isSimulationInProgress(), seed % 8 == 0 ? true : false);
     }
 }

@@ -11,25 +11,39 @@ contract Target {
         address msgSender,
         uint value,
         bool checksDeferred,
-        address onBehalfOfAccount
-    ) external payable returns (uint) {
-        (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
+        address onBehalfOfAccount,
+        bool operatorAuthenticated,
+        bool permitInProgress
+    ) external payable {
+        (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
         );
-        uint context = ICVC(cvc).getRawExecutionContext();
 
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
         require(
-            (context & 0xff != 0) == checksDeferred,
+            checksDeferred
+                ? ICVC(cvc).getCurrentBatchDepth() > 0
+                : ICVC(cvc).getCurrentBatchDepth() == 0,
             "ct/invalid-checks-deferred"
         );
         require(
             _onBehalfOfAccount == onBehalfOfAccount,
             "ct/invalid-on-behalf-of-account"
         );
-
-        return msg.value;
+        require(!ICVC(cvc).isImpersonationInProgress(), "ct/impersonate-lock");
+        require(
+            operatorAuthenticated
+                ? ICVC(cvc).isOperatorAuthenticated()
+                : !ICVC(cvc).isOperatorAuthenticated(),
+            "ct/operator-authenticated"
+        );
+        require(
+            permitInProgress
+                ? ICVC(cvc).isPermitInProgress()
+                : !ICVC(cvc).isPermitInProgress(),
+            "ct/permit-in-progress"
+        );
     }
 
     function nestedCallTest(
@@ -37,25 +51,41 @@ contract Target {
         address msgSender,
         uint value,
         bool checksDeferred,
-        address onBehalfOfAccount
-    ) external payable returns (uint) {
-        (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
+        address onBehalfOfAccount,
+        bool operatorAuthenticated,
+        bool permitInProgress
+    ) external payable {
+        (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
         );
-        uint context = ICVC(cvc).getRawExecutionContext();
 
         require(msg.sender == msgSender, "nct/invalid-sender");
         require(msg.value == value, "nct/invalid-msg-value");
         require(
-            (context & 0xff != 0) == checksDeferred,
+            checksDeferred
+                ? ICVC(cvc).getCurrentBatchDepth() > 0
+                : ICVC(cvc).getCurrentBatchDepth() == 0,
             "nct/invalid-checks-deferred"
         );
         require(
             _onBehalfOfAccount == onBehalfOfAccount,
             "nct/invalid-on-behalf-of-account"
         );
+        require(!ICVC(cvc).isImpersonationInProgress(), "nct/impersonate-lock");
+        require(
+            operatorAuthenticated
+                ? ICVC(cvc).isOperatorAuthenticated()
+                : !ICVC(cvc).isOperatorAuthenticated(),
+            "nct/operator-authenticated"
+        );
+        require(
+            permitInProgress
+                ? ICVC(cvc).isPermitInProgress()
+                : !ICVC(cvc).isPermitInProgress(),
+            "nct/permit-in-progress"
+        );
 
-        (bool success, bytes memory result) = ICVC(cvc).call(
+        ICVC(cvc).call(
             address(this),
             address(this),
             abi.encodeWithSelector(
@@ -64,20 +94,41 @@ contract Target {
                 cvc,
                 0,
                 checksDeferred,
-                address(this)
+                address(this),
+                false,
+                false
             )
         );
 
-        require(success, "nct/success");
-        require(abi.decode(result, (uint)) == 0, "nct/result");
-
-        (_onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(address(0));
+        (_onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
+            address(0)
+        );
+        require(
+            checksDeferred
+                ? ICVC(cvc).getCurrentBatchDepth() > 0
+                : ICVC(cvc).getCurrentBatchDepth() == 0,
+            "nct/invalid-checks-deferred-2"
+        );
         require(
             _onBehalfOfAccount == onBehalfOfAccount,
             "nct/invalid-on-behalf-of-account-2"
         );
-
-        return msg.value;
+        require(
+            !ICVC(cvc).isImpersonationInProgress(),
+            "nct/impersonate-lock-2"
+        );
+        require(
+            operatorAuthenticated
+                ? ICVC(cvc).isOperatorAuthenticated()
+                : !ICVC(cvc).isOperatorAuthenticated(),
+            "nct/operator-authenticated-2"
+        );
+        require(
+            permitInProgress
+                ? ICVC(cvc).isPermitInProgress()
+                : !ICVC(cvc).isPermitInProgress(),
+            "nct/permit-in-progress-2"
+        );
     }
 
     function impersonateTest(
@@ -86,26 +137,24 @@ contract Target {
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
-    ) external payable returns (uint) {
-        (address _onBehalfOfAccount, ) = ICVC(cvc).getExecutionContext(
+    ) external payable {
+        (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
         );
-        uint context = ICVC(cvc).getRawExecutionContext();
 
         require(msg.sender == msgSender, "it/invalid-sender");
         require(msg.value == value, "it/invalid-msg-value");
         require(
-            (context & 0xff != 0) == checksDeferred,
+            checksDeferred
+                ? ICVC(cvc).getCurrentBatchDepth() > 0
+                : ICVC(cvc).getCurrentBatchDepth() == 0,
             "it/invalid-checks-deferred"
         );
         require(
             _onBehalfOfAccount == onBehalfOfAccount,
             "it/invalid-on-behalf-of-account"
         );
-        require(
-            context & 0xff00000000000000000000000000000000000000000000 != 0,
-            "it/impersonate-lock"
-        );
+        require(ICVC(cvc).isImpersonationInProgress(), "it/impersonate-lock");
 
         // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
         // therefore it's not necessary to fully verify it here
@@ -122,8 +171,6 @@ contract Target {
         } else {
             ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
         }
-
-        return msg.value;
     }
 
     function revertEmptyTest() external pure {

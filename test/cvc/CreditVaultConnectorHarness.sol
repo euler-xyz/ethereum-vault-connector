@@ -59,9 +59,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setBatchDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext = EC.wrap(
-            (EC.unwrap(executionContext) & ~uint(0xff)) | uint(depth)
-        );
+        executionContext = executionContext.setBatchDepth(depth);
     }
 
     function setChecksLock(bool locked) external {
@@ -81,6 +79,36 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
             executionContext = executionContext.setImpersonationInProgress();
         } else {
             executionContext = executionContext.clearImpersonationInProgress();
+        }
+    }
+
+    function setOperatorAuthenticated(bool authenticated) external {
+        if (isFuzzSender()) return;
+
+        if (authenticated) {
+            executionContext = executionContext.setOperatorAuthenticated();
+        } else {
+            executionContext = executionContext.clearOperatorAuthenticated();
+        }
+    }
+
+    function setPermit(bool inProgress) external {
+        if (isFuzzSender()) return;
+
+        if (inProgress) {
+            executionContext = executionContext.setPermitInProgress();
+        } else {
+            executionContext = executionContext.clearPermitInProgress();
+        }
+    }
+
+    function setSimulation(bool inProgress) external {
+        if (isFuzzSender()) return;
+
+        if (inProgress) {
+            executionContext = executionContext.setSimulationInProgress();
+        } else {
+            executionContext = executionContext.clearSimulationInProgress();
         }
     }
 

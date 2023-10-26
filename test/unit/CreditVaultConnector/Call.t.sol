@@ -8,6 +8,18 @@ import "../../cvc/CreditVaultConnectorHarness.sol";
 contract CallTest is Test {
     CreditVaultConnectorHarness internal cvc;
 
+    event OperatorAuthenticated(
+        address indexed operator,
+        address indexed onBehalfOfAccount
+    );
+    event Call(
+        address indexed caller,
+        address indexed targetContract,
+        address indexed onBehalfOfAccount
+    );
+    event BatchStart(address indexed caller, uint batchDepth);
+    event BatchEnd(address indexed caller, uint batchDepth);
+
     function setUp() public {
         cvc = new CreditVaultConnectorHarness();
     }
@@ -18,19 +30,20 @@ contract CallTest is Test {
         address account;
         if (seed % 2 == 0) {
             // in this case the account is not alice's sub-account thus alice must be an operator
-            account = address(uint160(uint160(alice) ^ 256));
+            account = address(uint160(alice) ^ 256);
             vm.prank(account);
-            cvc.setAccountOperator(account, alice, block.timestamp + 100);
+            cvc.setAccountOperator(account, alice, true);
         } else {
             // in this case the account is alice's sub-account
-            account = address(uint160(uint160(alice) ^ (seed % 256)));
+            account = address(uint160(alice) ^ (seed % 256));
         }
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
         vm.assume(
             targetContract != address(cvc) &&
-                !cvc.haveCommonOwner(targetContract, alice)
+                !cvc.haveCommonOwner(targetContract, alice) &&
+                !cvc.haveCommonOwner(targetContract, account)
         );
 
         bytes memory data = abi.encodeWithSelector(
@@ -39,19 +52,20 @@ contract CallTest is Test {
             address(cvc),
             seed,
             false,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Call(alice, targetContract, account);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
         vm.prank(alice);
-        (bool success, bytes memory result) = cvc.call{value: seed}(
-            targetContract,
-            account,
-            data
-        );
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
+        cvc.call{value: seed}(targetContract, account, data);
 
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
@@ -60,7 +74,9 @@ contract CallTest is Test {
             address(cvc),
             0, // we're expecting ETH not to get forwarded
             true,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
@@ -76,6 +92,16 @@ contract CallTest is Test {
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchStart(alice, 1);
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Call(alice, targetContract, account);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(alice, 1);
         vm.prank(alice);
         cvc.batch{value: seed}(items);
 
@@ -86,19 +112,20 @@ contract CallTest is Test {
             address(cvc),
             seed,
             false,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, true, false, true, address(cvc));
+        emit Call(alice, targetContract, account);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
         vm.prank(alice);
-        (success, result) = cvc.call{value: seed}(
-            targetContract,
-            account,
-            data
-        );
-
-        assertTrue(success);
-        assertEq(abi.decode(result, (uint)), seed);
+        cvc.call{value: seed}(targetContract, account, data);
 
         // on behalf of account should also be correct in a nested call when checks are deferred
         items[0].onBehalfOfAccount = account;
@@ -110,10 +137,20 @@ contract CallTest is Test {
             address(cvc),
             seed,
             true,
-            account
+            account,
+            seed % 2 == 0,
+            false
         );
 
         vm.deal(alice, seed);
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchStart(alice, 1);
+        if (seed % 2 == 0) {
+            vm.expectEmit(true, true, false, false, address(cvc));
+            emit OperatorAuthenticated(alice, account);
+        }
+        vm.expectEmit(true, false, false, true, address(cvc));
+        emit BatchEnd(alice, 1);
         vm.prank(alice);
         cvc.batch{value: seed}(items);
     }
@@ -136,15 +173,15 @@ contract CallTest is Test {
             address(cvc),
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        (bool success, ) = cvc.call{value: seed}(targetContract, bob, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, bob, data);
     }
 
     function test_RevertIfChecksReentrancy_Call(
@@ -164,15 +201,15 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
-        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
     }
 
     function test_RevertIfImpersonateReentrancy_Call(
@@ -192,7 +229,9 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
@@ -200,9 +239,7 @@ contract CallTest is Test {
         vm.expectRevert(
             CreditVaultConnector.CVC_ImpersonateReentrancy.selector
         );
-        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
     }
 
     function test_RevertIfTargetContractInvalid_Call(
@@ -224,16 +261,15 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
-
-        (bool success, ) = cvc.call{value: seed}(targetContract, alice, data);
-
-        assertFalse(success);
+        cvc.call{value: seed}(targetContract, alice, data);
 
         // target contract is the ERC1820 registry
         targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
@@ -247,15 +283,35 @@ contract CallTest is Test {
             targetContract,
             seed,
             false,
-            alice
+            alice,
+            false,
+            false
         );
 
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        cvc.call{value: seed}(targetContract, alice, data);
+    }
 
-        (success, ) = cvc.call{value: seed}(targetContract, alice, data);
+    function test_RevertIfInternalCallIsUnsuccessful_Call(
+        address alice
+    ) public {
+        vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
-        assertFalse(success);
+        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        setUp();
+
+        address targetContract = address(new Target());
+        vm.assume(targetContract != address(cvc));
+
+        bytes memory data = abi.encodeWithSelector(
+            Target(targetContract).revertEmptyTest.selector
+        );
+
+        vm.prank(alice);
+        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
+        cvc.call(targetContract, alice, data);
     }
 }

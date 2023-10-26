@@ -16,17 +16,42 @@ interface ICVC {
     }
 
     /// @notice Returns current raw execution context.
-    /// @dev Check for checks reentrancy in order to consume on behalf of account.
+    /// @dev When checks in progress, on behalf of account is always address(0).
     /// @return context Current raw execution context.
     function getRawExecutionContext() external view returns (uint context);
 
+    /// @notice Returns the current batch depth.
+    /// @return The current batch depth.
+    function getCurrentBatchDepth() external view returns (uint);
+
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
+    /// @dev When checks in progress, on behalf of account is always address(0).
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the operation is being executed at the moment.
     /// @return onBehalfOfAccount An account that has been authenticated and on behalf of which the operation is being executed at the moment.
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck is address(0).
-    function getExecutionContext(
+    function getCurrentOnBehalfOfAccount(
         address controllerToCheck
     ) external view returns (address onBehalfOfAccount, bool controllerEnabled);
+
+    /// @notice Checks if checks are in progress.
+    /// @return A boolean indicating whether checks are in progress.
+    function areChecksInProgress() external view returns (bool);
+
+    /// @notice Checks if there is an impersonation in progress.
+    /// @return A boolean indicating whether an impersonation is in progress.
+    function isImpersonationInProgress() external view returns (bool);
+
+    /// @notice Checks if an operator is authenticated.
+    /// @return A boolean indicating whether an operator is authenticated.
+    function isOperatorAuthenticated() external view returns (bool);
+
+    /// @notice Checks if a permit is in progress.
+    /// @return A boolean indicating whether a permit is in progress.
+    function isPermitInProgress() external view returns (bool);
+
+    /// @notice Checks if a simulation is in progress.
+    /// @return A boolean indicating whether a simulation is in progress.
+    function isSimulationInProgress() external view returns (bool);
 
     /// @notice Checks whether the specified account and the other account have the same owner.
     /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other. Accounts are considered to have a common owner if they share the first 19 bytes of their address.
@@ -50,45 +75,66 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the nonce for a given account and nonce namespace.
+    /// @notice Returns the nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
-    /// @param account The address of the account for which the nonce is being retrieved.
+    /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
-    /// @return nonce The current nonce for the given account and nonce namespace.
+    /// @return nonce The current nonce for the given address prefix and nonce namespace.
     function getNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace
     ) external view returns (uint nonce);
+
+    /// @notice Returns the bit field for a given address prefix and operator.
+    /// @dev The bit field is used to store information about authorized operators for a given address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
+    /// @param addressPrefix The address prefix for which the bit field is being retrieved.
+    /// @param operator The address of the operator for which the bit field is being retrieved.
+    /// @return accountOperatorAuthorized The bit field for the given address prefix and operator.
+    function getOperator(
+        uint152 addressPrefix,
+        address operator
+    ) external view returns (uint accountOperatorAuthorized);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
     /// @param operator The address of the operator that is being checked.
-    /// @return expiryTimestamp The timestamp after which the operator is no longer authorized.
-    function getAccountOperator(
+    /// @return authorized A boolean value that indicates whether the operator is authorized for the account.
+    function isAccountOperatorAuthorized(
         address account,
         address operator
-    ) external view returns (uint expiryTimestamp);
+    ) external view returns (bool authorized);
 
-    /// @notice Sets the nonce for a given account and nonce namespace.
-    /// @dev This function can only be called by the owner of the account. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
-    /// @param account The address of the account for which the nonce is being set.
+    /// @notice Sets the nonce for a given address prefix and nonce namespace.
+    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
-    /// @param nonce The new nonce for the given account and nonce namespace.
+    /// @param nonce The new nonce for the given address prefix and nonce namespace.
     function setNonce(
-        address account,
+        uint152 addressPrefix,
         uint nonceNamespace,
         uint nonce
     ) external payable;
 
+    /// @notice Sets the bit field for a given address prefix and operator.
+    /// @dev This function can only be called by the owner of the address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
+    /// @param addressPrefix The address prefix for which the bit field is being set.
+    /// @param operator The address of the operator for which the bit field is being set.
+    /// @param accountOperatorAuthorized The new bit field for the given address prefix and operator.
+    function setOperator(
+        uint152 addressPrefix,
+        address operator,
+        uint accountOperatorAuthorized
+    ) external payable;
+
     /// @notice Authorizes or deauthorizes an operator for the account.
-    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only uninstall ifself.
+    /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can only deauthorize ifself.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being installed or uninstalled.
-    /// @param expiryTimestamp The timestamp after which the operator is no longer authorized. If less than current block.timestamp, the operator is considered deauthorized.
+    /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
     function setAccountOperator(
         address account,
         address operator,
-        uint expiryTimestamp
+        bool authorized
     ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
@@ -155,26 +201,22 @@ interface ICVC {
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
     /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
     function call(
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) external payable returns (bool success, bytes memory result);
+    ) external payable;
 
     /// @notice For a given account, calls to one of the enabled collateral vaults from currently enabled controller vault as per data encoded.
     /// @dev This function can be used to interact with any vault if it is enabled as a collateral of the onBehalfOfAccount and the caller is the only enabled controller of the onBehalfOfAccount. This function prevents sending ETH if it's called from a batch via delegatecall. If zero address passed as onBehalfOfAccount, msg.sender is used instead.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on its behalf.
     /// @param data The encoded data which is called on the target contract.
-    /// @return success A boolean value that indicates whether the call succeeded or not.
-    /// @return result Returned data from the call.
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) external payable returns (bool success, bytes memory result);
+    ) external payable;
 
     /// @notice Executes signed arbitrary data by self-calling into the CVC.
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.
