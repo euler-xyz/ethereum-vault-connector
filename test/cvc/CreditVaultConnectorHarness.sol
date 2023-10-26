@@ -82,6 +82,36 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
+    function setOperatorAuthenticated(bool authenticated) external {
+        if (isFuzzSender()) return;
+
+        if (authenticated) {
+            executionContext = executionContext.setOperatorAuthenticated();
+        } else {
+            executionContext = executionContext.clearOperatorAuthenticated();
+        }
+    }
+
+    function setPermit(bool inProgress) external {
+        if (isFuzzSender()) return;
+
+        if (inProgress) {
+            executionContext = executionContext.setPermitInProgress();
+        } else {
+            executionContext = executionContext.clearPermitInProgress();
+        }
+    }
+
+    function setSimulation(bool inProgress) external {
+        if (isFuzzSender()) return;
+
+        if (inProgress) {
+            executionContext = executionContext.setSimulationInProgress();
+        } else {
+            executionContext = executionContext.clearSimulationInProgress();
+        }
+    }
+
     function setOnBehalfOfAccount(address account) external {
         if (isFuzzSender()) return;
         executionContext = executionContext.setOnBehalfOfAccount(account);

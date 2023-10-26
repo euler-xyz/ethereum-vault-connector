@@ -35,7 +35,7 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
             BatchItemResult[] memory vaultsStatusResult
         )
     {
-        // doesn't rever as expected
+        // doesn't revert as expected
         return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
     }
 }
@@ -55,7 +55,9 @@ contract BatchTest is Test {
     }
 
     function test_Batch(address alice, address bob, uint seed) external {
-        vm.assume(alice != address(cvc) && bob != address(cvc));
+        vm.assume(
+            alice != address(0) && alice != address(cvc) && bob != address(cvc)
+        );
         vm.assume(bob != address(0) && !cvc.haveCommonOwner(alice, bob));
         vm.assume(seed >= 4);
 
@@ -83,7 +85,7 @@ contract BatchTest is Test {
             cvc.setAccountOperator.selector,
             alice,
             bob,
-            block.timestamp
+            true
         );
 
         items[2].onBehalfOfAccount = alicesSubAccount;
@@ -106,7 +108,9 @@ contract BatchTest is Test {
                 controller,
                 seed / 3,
                 true,
-                alice
+                alice,
+                false,
+                false
             )
         );
 
@@ -119,7 +123,9 @@ contract BatchTest is Test {
             address(cvc),
             seed - seed / 3,
             true,
-            alice
+            alice,
+            false,
+            false
         );
 
         items[5].onBehalfOfAccount = alicesSubAccount;
@@ -141,8 +147,7 @@ contract BatchTest is Test {
 
         assertTrue(cvc.isControllerEnabled(alice, controller));
         assertTrue(cvc.isControllerEnabled(alicesSubAccount, controller));
-        uint expiryTimestamp = cvc.getAccountOperator(alice, bob);
-        assertEq(expiryTimestamp, block.timestamp);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, bob), true);
         assertEq(address(otherVault).balance, seed);
 
         cvc.reset();
@@ -167,7 +172,7 @@ contract BatchTest is Test {
         cvc.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
-        items = new ICVC.BatchItem[](3);
+        items = new ICVC.BatchItem[](4);
 
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
@@ -191,6 +196,20 @@ contract BatchTest is Test {
         items[2].data = abi.encodeWithSelector(
             Vault.requireChecks.selector,
             alicesSubAccount
+        );
+
+        items[3].onBehalfOfAccount = alice;
+        items[3].targetContract = otherVault;
+        items[3].value = 0;
+        items[3].data = abi.encodeWithSelector(
+            Target.callTest.selector,
+            address(cvc),
+            address(cvc),
+            0,
+            true,
+            alice,
+            true,
+            false
         );
 
         vm.prank(bob);
@@ -335,8 +354,9 @@ contract BatchTest is Test {
         items[0].targetContract = vault;
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
-            Vault.requireChecks.selector,
-            alice
+            Vault.requireChecksWithSimulationCheck.selector,
+            alice,
+            false
         );
 
         // internal batch in the malicious vault reverts with CVC_ChecksReentrancy error,
@@ -346,13 +366,7 @@ contract BatchTest is Test {
         );
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                vault,
-                "malicious vault"
-            )
-        );
+        vm.expectRevert(bytes("malicious vault"));
         cvc.batch(items);
     }
 
@@ -384,8 +398,9 @@ contract BatchTest is Test {
         items[0].targetContract = vault;
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(
-            Vault.requireChecks.selector,
-            alice
+            Vault.requireChecksWithSimulationCheck.selector,
+            alice,
+            true
         );
 
         // internal batch in the malicious vault reverts with CVC_ChecksReentrancy error,
@@ -405,9 +420,8 @@ contract BatchTest is Test {
         expectedAccountsStatusResult[0].result = "";
 
         expectedVaultsStatusResult[0].success = false;
-        expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
-            CreditVaultConnector.CVC_VaultStatusViolation.selector,
-            vault,
+        expectedVaultsStatusResult[0].result = abi.encodeWithSignature(
+            "Error(string)",
             "malicious vault"
         );
 
@@ -581,10 +595,14 @@ contract BatchTest is Test {
         expectedBatchItemsResult[0].result = "";
 
         expectedAccountsStatusResult[0].success = true;
-        expectedAccountsStatusResult[0].result = "";
+        expectedAccountsStatusResult[0].result = abi.encode(
+            ICreditVault.checkAccountStatus.selector
+        );
 
         expectedVaultsStatusResult[0].success = true;
-        expectedVaultsStatusResult[0].result = "";
+        expectedVaultsStatusResult[0].result = abi.encode(
+            ICreditVault.checkVaultStatus.selector
+        );
 
         // regular batch doesn't revert
         vm.prank(alice);
@@ -708,28 +726,20 @@ contract BatchTest is Test {
 
         // update expected behavior
         expectedAccountsStatusResult[0].success = false;
-        expectedAccountsStatusResult[0].result = abi.encodeWithSelector(
-            CreditVaultConnector.CVC_AccountStatusViolation.selector,
-            alice,
+        expectedAccountsStatusResult[0].result = abi.encodeWithSignature(
+            "Error(string)",
             "account status violation"
         );
 
         expectedVaultsStatusResult[0].success = false;
-        expectedVaultsStatusResult[0].result = abi.encodeWithSelector(
-            CreditVaultConnector.CVC_VaultStatusViolation.selector,
-            controller,
+        expectedVaultsStatusResult[0].result = abi.encodeWithSignature(
+            "Error(string)",
             "vault status violation"
         );
 
         // regular batch reverts now
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert(bytes("account status violation"));
         cvc.batch(items);
 
         {

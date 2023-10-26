@@ -46,7 +46,7 @@ contract ControllersManagementTest is Test {
     event ControllerStatus(
         address indexed account,
         address indexed controller,
-        bool indexed enabled
+        bool enabled
     );
 
     function setUp() public {
@@ -71,7 +71,7 @@ contract ControllersManagementTest is Test {
         ) {
             msgSender = address(uint160(uint(keccak256(abi.encode(seed)))));
             vm.prank(alice);
-            cvc.setAccountOperator(account, msgSender, block.timestamp + 100);
+            cvc.setAccountOperator(account, msgSender, true);
         }
 
         // enabling controller
@@ -84,7 +84,7 @@ contract ControllersManagementTest is Test {
             vm.expectEmit(true, true, false, false, address(cvc));
             emit OperatorAuthenticated(msgSender, account);
         }
-        vm.expectEmit(true, true, true, false, address(cvc));
+        vm.expectEmit(true, true, false, true, address(cvc));
         emit ControllerStatus(account, vault, true);
         vm.prank(msgSender);
         vm.recordLogs();
@@ -130,7 +130,7 @@ contract ControllersManagementTest is Test {
         controllersPre = cvc.getControllers(account);
 
         vm.prank(msgSender);
-        vm.expectEmit(true, true, true, false, address(cvc));
+        vm.expectEmit(true, true, false, true, address(cvc));
         emit ControllerStatus(account, vault, false);
         Vault(vault).call(
             address(cvc),
@@ -152,7 +152,10 @@ contract ControllersManagementTest is Test {
         address bob
     ) public {
         vm.assume(
-            alice != address(0) && alice != address(cvc) && bob != address(cvc)
+            alice != address(0) &&
+                alice != address(cvc) &&
+                bob != address(0) &&
+                bob != address(cvc)
         );
         vm.assume(!cvc.haveCommonOwner(alice, bob));
 
@@ -163,7 +166,7 @@ contract ControllersManagementTest is Test {
         cvc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, block.timestamp + 100);
+        cvc.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
         cvc.handlerEnableController(bob, vault);
@@ -252,13 +255,7 @@ contract ControllersManagementTest is Test {
         Vault(vault).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert("account status violation");
         cvc.handlerEnableController(alice, vault);
 
         vm.prank(alice);
@@ -283,13 +280,7 @@ contract ControllersManagementTest is Test {
 
         vm.prank(alice);
         // it won't succeed as this time we have a controller so the account status check is performed
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_AccountStatusViolation.selector,
-                alice,
-                "account status violation"
-            )
-        );
+        vm.expectRevert("account status violation");
         cvc.enableCollateral(alice, vault);
     }
 }

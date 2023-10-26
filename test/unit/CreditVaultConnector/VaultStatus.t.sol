@@ -34,16 +34,9 @@ contract VaultStatusTest is Test {
             vm.prank(vault);
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                        vault,
-                        uint160(vault) % 3 == 1
-                            ? bytes("vault status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid vault")
-                            )
-                    )
+                    uint160(vault) % 3 == 1
+                        ? bytes("vault status violation")
+                        : abi.encode(bytes4(uint32(1)))
                 );
             }
             cvc.requireVaultStatusCheck();
@@ -86,13 +79,7 @@ contract VaultStatusTest is Test {
                 cvc.setBatchDepth(0);
 
                 vm.prank(vault);
-                vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                        vault,
-                        "vault status violation"
-                    )
-                );
+                vm.expectRevert(bytes("vault status violation"));
                 cvc.requireVaultStatusCheck();
             }
         }
@@ -140,13 +127,7 @@ contract VaultStatusTest is Test {
 
             vm.prank(vaults[i]);
             // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                    vaults[i],
-                    "malicious vault"
-                )
-            );
+            vm.expectRevert(bytes("malicious vault"));
             cvc.requireVaultStatusCheck();
         }
     }
@@ -196,16 +177,9 @@ contract VaultStatusTest is Test {
                 invalidVaults[invalidVaultsCounter++] = vault;
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                        vault,
-                        uint160(vault) % 3 == 1
-                            ? bytes("vault status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid vault")
-                            )
-                    )
+                    uint160(vault) % 3 == 1
+                        ? bytes("vault status violation")
+                        : abi.encode(bytes4(uint32(1)))
                 );
             }
             cvc.requireVaultStatusCheckNow(vault);
@@ -234,16 +208,9 @@ contract VaultStatusTest is Test {
         }
         if (invalidVaultsCounter > 0) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                    invalidVaults[0],
-                    uint160(invalidVaults[0]) % 3 == 1
-                        ? bytes("vault status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid vault")
-                        )
-                )
+                uint160(invalidVaults[0]) % 3 == 1
+                    ? bytes("vault status violation")
+                    : abi.encode(bytes4(uint32(1)))
             );
         }
         cvc.requireVaultsStatusCheckNow(vaults);
@@ -284,16 +251,9 @@ contract VaultStatusTest is Test {
                 invalidVaults[invalidVaultsCounter++] = vault;
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                        vault,
-                        uint160(vault) % 3 == 1
-                            ? bytes("vault status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid vault")
-                            )
-                    )
+                    uint160(vault) % 3 == 1
+                        ? bytes("vault status violation")
+                        : abi.encode(bytes4(uint32(1)))
                 );
             }
             cvc.requireVaultStatusCheckNow(vault);
@@ -334,16 +294,9 @@ contract VaultStatusTest is Test {
         }
         if (invalidVaultsCounter > 0) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                    invalidVaults[0],
-                    uint160(invalidVaults[0]) % 3 == 1
-                        ? bytes("vault status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid vault")
-                        )
-                )
+                uint160(invalidVaults[0]) % 3 == 1
+                    ? bytes("vault status violation")
+                    : abi.encode(bytes4(uint32(1)))
             );
         }
         cvc.requireVaultsStatusCheckNow(vaults);
@@ -409,23 +362,11 @@ contract VaultStatusTest is Test {
             );
 
             // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                    vaults[i],
-                    "malicious vault"
-                )
-            );
+            vm.expectRevert(bytes("malicious vault"));
             cvc.requireVaultStatusCheckNow(vaults[i]);
         }
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                vaults[0],
-                "malicious vault"
-            )
-        );
+        vm.expectRevert(bytes("malicious vault"));
         cvc.requireVaultsStatusCheckNow(vaults);
     }
 
@@ -473,16 +414,9 @@ contract VaultStatusTest is Test {
                 invalidVaults[invalidVaultsCounter++] = vault;
 
                 vm.expectRevert(
-                    abi.encodeWithSelector(
-                        CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                        vault,
-                        uint160(vault) % 3 == 1
-                            ? bytes("vault status violation")
-                            : abi.encodeWithSignature(
-                                "Error(string)",
-                                bytes("invalid vault")
-                            )
-                    )
+                    uint160(vault) % 3 == 1
+                        ? bytes("vault status violation")
+                        : abi.encode(bytes4(uint32(1)))
                 );
             }
             cvc.requireAllVaultsStatusCheckNow();
@@ -510,16 +444,9 @@ contract VaultStatusTest is Test {
         }
         if (invalidVaultsCounter > 0) {
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                    invalidVaults[0],
-                    uint160(invalidVaults[0]) % 3 == 1
-                        ? bytes("vault status violation")
-                        : abi.encodeWithSignature(
-                            "Error(string)",
-                            bytes("invalid vault")
-                        )
-                )
+                uint160(invalidVaults[0]) % 3 == 1
+                    ? bytes("vault status violation")
+                    : abi.encode(bytes4(uint32(1)))
             );
         }
         cvc.requireAllVaultsStatusCheckNow();
@@ -565,13 +492,7 @@ contract VaultStatusTest is Test {
             );
         }
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_VaultStatusViolation.selector,
-                vaults[0],
-                "malicious vault"
-            )
-        );
+        vm.expectRevert(bytes("malicious vault"));
         cvc.requireAllVaultsStatusCheckNow();
     }
 

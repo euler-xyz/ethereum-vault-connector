@@ -20,7 +20,8 @@ contract CVCHarness is CreditVaultConnector {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) external view returns (bool isValid) {
+    ) external returns (bool isValid) {
+        // for compatibility with scribble, do not make this view
         return isValidERC1271Signature(signer, hash, signature);
     }
 }
@@ -52,7 +53,7 @@ contract CVCGas is Test {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) public view {
+    ) public {
         vm.assume(signature.length < 100);
         cvc.getIsValidERC1271Signature(signer, hash, signature);
     }

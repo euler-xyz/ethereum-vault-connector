@@ -219,12 +219,12 @@ contract CreditVaultConnectorWithFallback is CreditVaultConnectorHarness {
     }
 }
 
-contract permitTest is Test {
+contract PermitTest is Test {
     CreditVaultConnectorWithFallback internal cvc;
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint indexed nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
     event Permit(
         address indexed caller,
         address indexed signer,
@@ -251,6 +251,7 @@ contract permitTest is Test {
                 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
 
         vm.assume(alice != address(0) && alice != address(cvc));
@@ -263,7 +264,7 @@ contract permitTest is Test {
 
         if (nonce > 1) {
             vm.prank(alice);
-            cvc.setNonce(alice, nonceNamespace, nonce - 1);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
         }
 
         cvc.clearFallbackCalled();
@@ -281,7 +282,7 @@ contract permitTest is Test {
 
         vm.expectEmit(true, true, false, true, address(cvc));
         emit Permit(address(this), alice, signature);
-        vm.expectEmit(true, true, false, true, address(cvc));
+        vm.expectEmit(true, false, false, true, address(cvc));
         emit NonceUsed(cvc.getAddressPrefix(alice), nonce);
         cvc.permit{value: value}(
             alice,
@@ -315,6 +316,7 @@ contract permitTest is Test {
         bool inBatch
     ) public {
         address alice = address(new SignerERC1271(cvc));
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
 
         vm.assume(alice != address(0));
@@ -327,7 +329,7 @@ contract permitTest is Test {
 
         if (nonce > 1) {
             vm.prank(alice);
-            cvc.setNonce(alice, nonceNamespace, nonce - 1);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
         }
 
         cvc.clearFallbackCalled();
@@ -345,7 +347,7 @@ contract permitTest is Test {
 
         vm.expectEmit(true, true, false, true, address(cvc));
         emit Permit(address(this), alice, signature);
-        vm.expectEmit(true, true, false, true, address(cvc));
+        vm.expectEmit(true, false, false, true, address(cvc));
         emit NonceUsed(cvc.getAddressPrefix(alice), nonce);
         cvc.permit{value: value}(
             alice,
@@ -377,13 +379,14 @@ contract permitTest is Test {
         bytes calldata signature
     ) public {
         address alice = address(0);
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(nonce > 1 && nonce < type(uint).max);
         vm.warp(deadline);
 
         // reverts if signer is zero address
         vm.prank(alice);
-        cvc.setNonce(alice, nonceNamespace, nonce - 1);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
 
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.permit(alice, nonceNamespace, nonce, deadline, data, signature);
@@ -397,6 +400,7 @@ contract permitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 1 && nonce < type(uint).max);
@@ -404,7 +408,7 @@ contract permitTest is Test {
 
         // reverts if nonce is invalid
         vm.prank(alice);
-        cvc.setNonce(alice, nonceNamespace, nonce);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce);
 
         vm.expectRevert(CreditVaultConnector.CVC_InvalidNonce.selector);
         cvc.permit(alice, nonceNamespace, nonce, deadline, data, signature);
@@ -418,6 +422,7 @@ contract permitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 1 && nonce < type(uint).max);
@@ -426,7 +431,7 @@ contract permitTest is Test {
 
         // reverts if deadline is missed
         vm.prank(alice);
-        cvc.setNonce(alice, nonceNamespace, nonce - 1);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
 
         vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
         cvc.permit(alice, nonceNamespace, nonce, deadline, data, signature);
@@ -439,13 +444,14 @@ contract permitTest is Test {
         uint deadline,
         bytes calldata signature
     ) public {
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(nonce > 1 && nonce < type(uint).max);
         vm.warp(deadline);
 
         // reverts if data is empty
         vm.prank(alice);
-        cvc.setNonce(alice, nonceNamespace, nonce - 1);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
 
         vm.expectRevert(CreditVaultConnector.CVC_InvalidData.selector);
         cvc.permit(
@@ -465,12 +471,14 @@ contract permitTest is Test {
         uint deadline,
         bytes memory data
     ) public {
+        vm.chainId(5); // for coverage
         vm.assume(
             privateKey > 0 &&
                 privateKey <
                 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
+        uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         signerECDSA.setPrivateKey(privateKey);
 
@@ -484,7 +492,7 @@ contract permitTest is Test {
 
         // reverts if CVC self-call unsuccessful
         vm.prank(alice);
-        cvc.setNonce(alice, nonceNamespace, nonce - 1);
+        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
 
         bytes memory signature = signerECDSA.signPermit(
             alice,
@@ -851,7 +859,9 @@ contract permitTest is Test {
                 address(cvc),
                 123,
                 false,
-                bob
+                bob,
+                false,
+                true
             )
         );
 
@@ -871,7 +881,9 @@ contract permitTest is Test {
                 address(cvc),
                 123,
                 false,
-                alice
+                alice,
+                false,
+                true
             )
         );
 
@@ -888,7 +900,9 @@ contract permitTest is Test {
             address(cvc),
             123,
             true,
-            bob
+            bob,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = bob;
@@ -908,7 +922,9 @@ contract permitTest is Test {
             address(cvc),
             123,
             true,
-            alice
+            alice,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = alice;
@@ -933,7 +949,9 @@ contract permitTest is Test {
                 address(cvc),
                 123,
                 false,
-                alice
+                alice,
+                false,
+                true
             )
         );
 
@@ -952,7 +970,9 @@ contract permitTest is Test {
                 address(cvc),
                 123,
                 false,
-                bob
+                bob,
+                false,
+                true
             )
         );
 
@@ -968,7 +988,9 @@ contract permitTest is Test {
             address(cvc),
             456,
             true,
-            alice
+            alice,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = alice;
@@ -987,7 +1009,9 @@ contract permitTest is Test {
             address(cvc),
             456,
             true,
-            bob
+            bob,
+            false,
+            true
         );
         items[0].targetContract = target;
         items[0].onBehalfOfAccount = bob;
@@ -1001,18 +1025,22 @@ contract permitTest is Test {
         cvc.permit{value: 456}(bob, 0, 6, block.timestamp, data, signature);
     }
 
-    function test_SetAccountOperator_Permit(
+    function test_SetOperator_Permit(
         uint privateKey,
-        uint8 subAccountId
+        uint8 subAccountId1,
+        uint8 subAccountId2
     ) public {
         vm.assume(
             privateKey > 0 &&
                 privateKey <
-                115792089237316195423570985008687907852837564279074904382605163141518161494336
+                115792089237316195423570985008687907852837564279074904382605163141518161494335
         );
         address alice = vm.addr(privateKey);
         address bob = address(new SignerERC1271(cvc));
+        uint152 addressPrefixAlice = cvc.getAddressPrefix(alice);
+        uint152 addressPrefixBob = cvc.getAddressPrefix(bob);
         address operator = vm.addr(privateKey + 1);
+        address otherOperator = vm.addr(privateKey + 2);
 
         vm.assume(alice != address(0) && bob != address(0));
         vm.assume(operator != address(0) && operator != address(cvc));
@@ -1020,10 +1048,14 @@ contract permitTest is Test {
             !cvc.haveCommonOwner(alice, operator) &&
                 !cvc.haveCommonOwner(bob, operator)
         );
-        vm.assume(subAccountId > 0);
+        vm.assume(
+            subAccountId1 > 0 &&
+                subAccountId2 > 0 &&
+                subAccountId1 != subAccountId2
+        );
         signerECDSA.setPrivateKey(privateKey);
 
-        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](2);
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](3);
 
         // encode the setAccountOperator to prove that it's possible to set an operator
         // on behalf of the signer or their accounts
@@ -1034,16 +1066,25 @@ contract permitTest is Test {
             ICVC.setAccountOperator.selector,
             alice,
             operator,
-            1
+            true
         );
         items[1].targetContract = address(cvc);
         items[1].onBehalfOfAccount = address(0);
         items[1].value = 0;
         items[1].data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
-            address(uint160(alice) ^ subAccountId),
+            address(uint160(alice) ^ subAccountId1),
             operator,
-            1
+            true
+        );
+        items[2].targetContract = address(cvc);
+        items[2].onBehalfOfAccount = address(0);
+        items[2].value = 0;
+        items[2].data = abi.encodeWithSelector(
+            ICVC.setOperator.selector,
+            addressPrefixAlice,
+            operator,
+            (1 << 0) | (1 << subAccountId1) | (1 << subAccountId2)
         );
         bytes memory data = abi.encodeWithSelector(ICVC.batch.selector, items);
 
@@ -1056,13 +1097,24 @@ contract permitTest is Test {
             data
         );
         cvc.permit(alice, 0, 1, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(alice, operator), 1);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, operator), true);
         assertEq(
-            cvc.getAccountOperator(
-                address(uint160(alice) ^ subAccountId),
+            cvc.isAccountOperatorAuthorized(
+                address(uint160(alice) ^ subAccountId1),
                 operator
             ),
-            1
+            true
+        );
+        assertEq(
+            cvc.isAccountOperatorAuthorized(
+                address(uint160(alice) ^ subAccountId2),
+                operator
+            ),
+            true
+        );
+        assertEq(
+            cvc.getOperator(addressPrefixAlice, operator),
+            (1 << 0) | (1 << subAccountId1) | (1 << subAccountId2)
         );
 
         // a call using ERC-1271 signature succeeds
@@ -1070,13 +1122,19 @@ contract permitTest is Test {
             ICVC.setAccountOperator.selector,
             bob,
             operator,
-            1
+            true
         );
         items[1].data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
-            address(uint160(bob) ^ subAccountId),
+            address(uint160(bob) ^ subAccountId1),
             operator,
-            1
+            true
+        );
+        items[2].data = abi.encodeWithSelector(
+            ICVC.setOperator.selector,
+            addressPrefixBob,
+            operator,
+            (1 << 0) | (1 << subAccountId1) | (1 << subAccountId2)
         );
         data = abi.encodeWithSelector(ICVC.batch.selector, items);
 
@@ -1084,54 +1142,119 @@ contract permitTest is Test {
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 1, block.timestamp, data);
         cvc.permit(bob, 0, 1, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(bob, operator), 1);
+        assertEq(cvc.isAccountOperatorAuthorized(bob, operator), true);
         assertEq(
-            cvc.getAccountOperator(
-                address(uint160(bob) ^ subAccountId),
+            cvc.isAccountOperatorAuthorized(
+                address(uint160(bob) ^ subAccountId1),
                 operator
             ),
-            1
+            true
+        );
+        assertEq(
+            cvc.isAccountOperatorAuthorized(
+                address(uint160(bob) ^ subAccountId2),
+                operator
+            ),
+            true
+        );
+        assertEq(
+            cvc.getOperator(addressPrefixBob, operator),
+            (1 << 0) | (1 << subAccountId1) | (1 << subAccountId2)
         );
 
-        // if the operator tries authorize themselves directly, it's not possible
+        // if the operator tries to authorize some other operator directly, it's not possible
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(alice, operator, type(uint).max);
+        cvc.setOperator(addressPrefixAlice, operator, 0);
 
         vm.prank(operator);
         vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
-        cvc.setAccountOperator(bob, operator, type(uint).max);
+        cvc.setOperator(addressPrefixAlice, otherOperator, 0);
+
+        vm.prank(operator);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setAccountOperator(alice, otherOperator, true);
+
+        vm.prank(operator);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setOperator(addressPrefixBob, operator, 0);
+
+        vm.prank(operator);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setOperator(addressPrefixBob, otherOperator, 0);
+
+        vm.prank(operator);
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.setAccountOperator(bob, otherOperator, true);
 
         // but it succeeds if it's done using the signed data
         data = abi.encodeWithSelector(
-            ICVC.setAccountOperator.selector,
-            alice,
-            operator,
-            type(uint).max
+            ICVC.setOperator.selector,
+            addressPrefixAlice,
+            otherOperator,
+            3
         );
 
         signature = signerECDSA.signPermit(alice, 0, 2, block.timestamp, data);
         vm.prank(operator);
         cvc.permit(alice, 0, 2, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(alice, operator), type(uint).max);
+        assertEq(
+            cvc.isAccountOperatorAuthorized(
+                address(uint160(alice) ^ 1),
+                otherOperator
+            ),
+            true
+        );
 
         data = abi.encodeWithSelector(
             ICVC.setAccountOperator.selector,
-            bob,
-            operator,
-            type(uint).max
+            alice,
+            otherOperator,
+            true
         );
+
+        signature = signerECDSA.signPermit(alice, 0, 3, block.timestamp, data);
+        vm.prank(operator);
+        cvc.permit(alice, 0, 3, block.timestamp, data, signature);
+        assertEq(cvc.isAccountOperatorAuthorized(alice, otherOperator), true);
+
+        data = abi.encodeWithSelector(
+            ICVC.setOperator.selector,
+            addressPrefixBob,
+            otherOperator,
+            3
+        );
+
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 2, block.timestamp, data);
 
         vm.prank(operator);
         cvc.permit(bob, 0, 2, block.timestamp, data, signature);
-        assertEq(cvc.getAccountOperator(bob, operator), type(uint).max);
+        assertEq(
+            cvc.isAccountOperatorAuthorized(
+                address(uint160(bob) ^ 1),
+                otherOperator
+            ),
+            true
+        );
 
-        // when operator is authorized, it can sign permit messages on behalf of the authorized account
+        data = abi.encodeWithSelector(
+            ICVC.setAccountOperator.selector,
+            bob,
+            otherOperator,
+            true
+        );
+        signature = bytes("bob's signature");
+        SignerERC1271(bob).setSignatureHash(signature);
+        SignerERC1271(bob).setPermitHash(bob, 0, 3, block.timestamp, data);
+
+        vm.prank(operator);
+        cvc.permit(bob, 0, 3, block.timestamp, data, signature);
+        assertEq(cvc.isAccountOperatorAuthorized(bob, otherOperator), true);
+
+        // when the operator is authorized, it can sign permit messages on behalf of the authorized account
         signerECDSA.setPrivateKey(privateKey + 1);
-        vm.warp(2);
 
         data = abi.encodeWithSelector(
             ICVC.enableCollateral.selector,
@@ -1149,12 +1272,16 @@ contract permitTest is Test {
         cvc.permit(operator, 0, 1, block.timestamp, data, signature);
         assertEq(cvc.isCollateralEnabled(alice, address(0)), true);
 
-        // but it cannot sign permit messages on behalf of other accounts for which it's not authorized
-        // or authorization has expired
+        // and another one
         data = abi.encodeWithSelector(
-            ICVC.enableCollateral.selector,
-            address(uint160(alice) ^ subAccountId),
-            address(0)
+            Target.callTest.selector,
+            address(cvc),
+            address(cvc),
+            0,
+            false,
+            alice,
+            true,
+            true
         );
 
         signature = signerECDSA.signPermit(
@@ -1164,7 +1291,30 @@ contract permitTest is Test {
             block.timestamp,
             data
         );
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
         cvc.permit(operator, 0, 2, block.timestamp, data, signature);
+
+        // but it cannot sign permit messages on behalf of other accounts for which it's not authorized
+        vm.prank(operator);
+        cvc.setAccountOperator(
+            address(uint160(alice) ^ subAccountId1),
+            operator,
+            false
+        );
+
+        data = abi.encodeWithSelector(
+            ICVC.enableCollateral.selector,
+            address(uint160(alice) ^ subAccountId1),
+            address(0)
+        );
+
+        signature = signerECDSA.signPermit(
+            operator,
+            0,
+            3,
+            block.timestamp,
+            data
+        );
+        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        cvc.permit(operator, 0, 3, block.timestamp, data, signature);
     }
 }

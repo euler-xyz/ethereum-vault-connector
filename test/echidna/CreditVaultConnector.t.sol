@@ -39,15 +39,19 @@ contract VaultEchidna is ICreditVault {
     function checkAccountStatus(
         address account,
         address[] calldata
-    ) public returns (bool isValid, bytes memory data) {
+    ) public returns (bytes4) {
         // try to reenter the CVC
 
-        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
-        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+        try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
-        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
+        try cvc.setOperator(prefix, address(this), 0) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setAccountOperator(account, address(this), false) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -95,22 +99,23 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireAccountAndVaultStatusCheck(account) {} catch {}
 
-        return (true, "");
+        return this.checkAccountStatus.selector;
     }
 
-    function checkVaultStatus()
-        public
-        returns (bool isValid, bytes memory data)
-    {
+    function checkVaultStatus() public returns (bytes4) {
         // try to reenter the CVC
         address account = address(1);
 
-        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
-        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+        try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
-        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
+        try cvc.setOperator(prefix, address(this), 0) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setAccountOperator(account, address(this), false) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -159,7 +164,7 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireAccountAndVaultStatusCheck(account) {} catch {}
 
-        return (true, "");
+        return this.checkVaultStatus.selector;
     }
 
     fallback() external payable {
@@ -168,12 +173,16 @@ contract VaultEchidna is ICreditVault {
         // try to reenter the CVC
         address account = address(2);
 
-        uint nextNonce = cvc.getNonce(account, 0) + 1;
+        uint152 prefix = uint152(uint160(account) >> 8);
+        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
-        try cvc.setNonce(account, 0, nextNonce) {} catch {}
+        try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
-        try cvc.setAccountOperator(account, address(this), 0) {} catch {}
+        try cvc.setOperator(prefix, address(this), 0) {} catch {}
+
+        hevm.prank(account);
+        try cvc.setAccountOperator(account, address(this), false) {} catch {}
 
         hevm.prank(account);
         try cvc.disableCollateral(account, address(this)) {} catch {}
@@ -239,25 +248,25 @@ contract EchidnaTest {
         SignerEchidna(address(0xbeefbeefbeef));
 
     function enableCollateral(address account, address vault) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         hevm.prank(account);
         cvc.enableCollateral(account, vault);
     }
 
     function disableCollateral(address account, address vault) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         hevm.prank(account);
         cvc.disableCollateral(account, vault);
     }
 
     function enableController(address account, address) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         hevm.prank(account);
         cvc.enableController(account, address(vaultEchidna));
     }
 
     function disableController(address account) public payable {
-        if (account == address(cvc)) return;
+        if (account == address(0) || account == address(cvc)) return;
         if (cvc.getControllers(account).length > 0) {
             hevm.prank(cvc.getControllers(account)[0]);
         }
@@ -268,7 +277,9 @@ contract EchidnaTest {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
-        if (onBehalfOfAccount == address(cvc)) return;
+        if (
+            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(cvc)
+        ) return;
         hevm.prank(onBehalfOfAccount);
         cvc.call(address(vaultEchidna), onBehalfOfAccount, data);
     }
@@ -277,7 +288,10 @@ contract EchidnaTest {
         address onBehalfOfAccount,
         bytes calldata data
     ) public payable {
-        if (onBehalfOfAccount == address(cvc)) return;
+        if (
+            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(cvc)
+        ) return;
+
         hevm.prank(onBehalfOfAccount);
         cvc.enableCollateral(onBehalfOfAccount, address(vaultEchidna));
 
@@ -295,7 +309,7 @@ contract EchidnaTest {
         cvc.permit(
             address(signerEchidna),
             0,
-            cvc.getNonce(address(cvc), 0) + 1,
+            cvc.getNonce(cvc.getAddressPrefix(address(cvc)), 0) + 1,
             block.timestamp,
             data,
             signature
@@ -306,7 +320,12 @@ contract EchidnaTest {
         if (items.length > 0) {
             ICVC.BatchItem[] memory _items = new ICVC.BatchItem[](1);
 
-            if (items[0].onBehalfOfAccount == address(cvc)) return;
+            for (uint i; i < items.length; ++i) {
+                if (
+                    items[i].onBehalfOfAccount == address(0) ||
+                    items[i].onBehalfOfAccount == address(cvc)
+                ) return;
+            }
 
             _items[0].targetContract = address(vaultEchidna);
             _items[0].onBehalfOfAccount = items[0].onBehalfOfAccount;
