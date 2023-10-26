@@ -26,6 +26,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [Nested Execution Contexts](#nested-execution-contexts)
     * [checksInProgress](#checksinprogress)
     * [impersonationInProgress](#impersonationinprogress)
+    * [Extra Information](#extra-information)
   * [Simulations](#simulations)
 * [Transient Storage](#transient-storage)
 * [Security Considerations](#security-considerations)
@@ -70,7 +71,7 @@ However, suppose a user wants to take out a borrow from a separate vault. In thi
 
 ## Account Status Checks
 
-Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return `true`. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state, either returning `true` or failing by returning `false` (or throwing an exception).
+Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return `true`. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkAccountStatus` method), otherwise throw an exception.
 
 ### Collateral Validity
 
@@ -121,7 +122,7 @@ It does not necessarily make sense to enforce these checks when checking account
 
 Secondly, some types of checks require an initial snapshot of the vault state before any operations have been performed. In the case of a borrow cap, it could be that the borrow cap has been exceeded for some reason (perhaps due to a price movement, or the borrow cap itself was reduced). The vault would still want to permit repaying debts, even if the repay was insufficient to bring the total borrows below the borrow cap.
 
-Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state, either returning `true` or failing by returning `false` (or throwing an exception).
+Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
 
 Although the vaults themselves implement `checkVaultStatus`, there is no need for them to invoke this function directly. It will be called by the CVC when necessary. Instead, after performing any operation that could affect the vault's status, a vault should invoke `requireVaultStatusCheck` on the CVC to schedule a future callback.
 
@@ -269,6 +270,10 @@ However, when interacting with complicated vaults that may invoke external contr
 In order to simplify the implementation of this check, the `impersonateLock` mutex is locked while invoking a collateral vault during the `impersonate` flow. While locked, no accounts' collateral or controller sets can be modified.
 
 Additionally, during an impersonation, the CVC cannot be re-entered via `call`, `batch`, `impersonate`, or `permit`.
+
+#### Extra Information
+
+The execution context also indicates some extra information, which could be useful if a contract wants to know extra information about the CVC's authentication. This includes information about simulation, operator, and permit status.
 
 
 
