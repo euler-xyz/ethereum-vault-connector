@@ -69,8 +69,9 @@ contract Vault is ICreditVault, Target {
         override
         returns (bytes4 magicValue)
     {
-        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        (address onBehalfOfAccount, ) = cvc.getCurrentOnBehalfOfAccount(address(0));
         require(onBehalfOfAccount == address(0), "cvs/on-behalf-of-account");
+        require(cvc.areChecksInProgress(), "cvs/checks-not-in-progress");
 
         if (vaultStatusState == 0) {
             return 0x4b3d1223;
@@ -85,8 +86,9 @@ contract Vault is ICreditVault, Target {
         address,
         address[] memory
     ) external virtual override returns (bytes4 magicValue) {
-        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        (address onBehalfOfAccount, ) = cvc.getCurrentOnBehalfOfAccount(address(0));
         require(onBehalfOfAccount == address(0), "cas/on-behalf-of-account");
+        require(cvc.areChecksInProgress(), "cas/checks-not-in-progress");
 
         if (accountStatusState == 0) {
             return 0xb168c58f;
@@ -106,12 +108,8 @@ contract Vault is ICreditVault, Target {
         address account,
         bool expectedSimulationInProgress
     ) external payable {
-        uint context = cvc.getRawExecutionContext();
-        bool simulationInProgress = context &
-            0x000000000000FF00000000000000000000000000000000000000000000000000 !=
-            0;
         require(
-            simulationInProgress == expectedSimulationInProgress,
+            cvc.isSimulationInProgress() == expectedSimulationInProgress,
             "requireChecksWithSimulationCheck/simulation"
         );
 
@@ -145,8 +143,9 @@ contract VaultMalicious is Vault {
     }
 
     function checkVaultStatus() external virtual override returns (bytes4) {
-        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        (address onBehalfOfAccount, ) = cvc.getCurrentOnBehalfOfAccount(address(0));
         require(onBehalfOfAccount == address(0), "cvs/on-behalf-of-account");
+        require(cvc.areChecksInProgress(), "cvs/checks-not-in-progress");
 
         if (expectedErrorSelector == 0) {
             return this.checkVaultStatus.selector;
@@ -167,8 +166,9 @@ contract VaultMalicious is Vault {
         address,
         address[] memory
     ) external override returns (bytes4) {
-        (address onBehalfOfAccount, ) = cvc.getExecutionContext(address(0));
+        (address onBehalfOfAccount, ) = cvc.getCurrentOnBehalfOfAccount(address(0));
         require(onBehalfOfAccount == address(0), "cas/on-behalf-of-account");
+        require(cvc.areChecksInProgress(), "cas/checks-not-in-progress");
 
         if (expectedErrorSelector == 0) {
             return this.checkAccountStatus.selector;

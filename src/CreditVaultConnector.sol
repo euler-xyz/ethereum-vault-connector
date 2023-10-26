@@ -290,12 +290,16 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function getExecutionContext(
+    function getCurrentBatchDepth() external view returns (uint) {
+        return executionContext.getBatchDepth();
+    }
+
+    /// @inheritdoc ICVC
+    function getCurrentOnBehalfOfAccount(
         address controllerToCheck
     )
         public
         view
-        virtual
         returns (address onBehalfOfAccount, bool controllerEnabled)
     {
         onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
@@ -303,6 +307,31 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         controllerEnabled = controllerToCheck == address(0)
             ? false
             : accountControllers[onBehalfOfAccount].contains(controllerToCheck);
+    }
+
+    /// @inheritdoc ICVC
+    function areChecksInProgress() external view returns (bool) {
+        return executionContext.areChecksInProgress();
+    }
+
+    /// @inheritdoc ICVC
+    function isImpersonationInProgress() external view returns (bool) {
+        return executionContext.isImpersonationInProgress();
+    }
+
+    /// @inheritdoc ICVC
+    function isOperatorAuthenticated() external view returns (bool) {
+        return executionContext.isOperatorAuthenticated();
+    }
+
+    /// @inheritdoc ICVC
+    function isPermitInProgress() external view returns (bool) {
+        return executionContext.isPermitInProgress();
+    }
+
+    /// @inheritdoc ICVC
+    function isSimulationInProgress() external view returns (bool) {
+        return executionContext.isSimulationInProgress();
     }
 
     // Owners and operators
@@ -1028,21 +1057,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         );
     }
 
-    function callWithContextInternal(
-        address targetContract,
-        address onBehalfOfAccount,
-        uint value,
-        bytes calldata data
-    ) internal virtual returns (bool success, bytes memory result) {
-        EC contextCache = executionContext;
-
-        executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount);
-
-        (success, result) = targetContract.call{value: value}(data);
-
-        executionContext = contextCache;
-    }
-
     function batchInternal(
         BatchItem[] calldata items,
         bool returnResult
@@ -1081,6 +1095,22 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                 ++i;
             }
         }
+    }
+
+    function callWithContextInternal(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) internal virtual returns (bool success, bytes memory result) {
+        EC contextCache = executionContext;
+
+        // set the onBehalfOfAccount in the execution context for the duration of the call
+        executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount);
+
+        (success, result) = targetContract.call{value: value}(data);
+
+        executionContext = contextCache;
     }
 
     function checkAccountStatusInternal(

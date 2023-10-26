@@ -12,13 +12,17 @@ contract GetExecutionContextTest is Test {
         cvc = new CreditVaultConnectorHarness();
     }
 
-    function test_GetExecutionContext(address account, uint seed) external {
+    function test_GetExecutionContext(
+        address account,
+        uint8 batchDepth,
+        uint seed
+    ) external {
         vm.assume(account != address(0) && account != address(cvc));
 
         address controller = address(new Vault(cvc));
 
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getExecutionContext(controller);
+            .getCurrentOnBehalfOfAccount(controller);
         uint context = cvc.getRawExecutionContext();
 
         assertEq(onBehalfOfAccount, address(0));
@@ -30,17 +34,16 @@ contract GetExecutionContextTest is Test {
             cvc.enableController(account, controller);
         }
 
-        cvc.setBatchDepth(seed % 3 == 0 ? 1 : 0);
+        cvc.setBatchDepth(seed % 3 == 0 ? batchDepth : 0);
         cvc.setOnBehalfOfAccount(account);
-        cvc.setChecksLock(false);
-        cvc.setImpersonateLock(seed % 4 == 0 ? true : false);
-        cvc.setOperatorAuthenticated(seed % 5 == 0 ? true : false);
-        cvc.setPermit(seed % 6 == 0 ? true : false);
-        cvc.setSimulation(seed % 7 == 0 ? true : false);
+        cvc.setChecksLock(seed % 4 == 0 ? true : false);
+        cvc.setImpersonateLock(seed % 5 == 0 ? true : false);
+        cvc.setOperatorAuthenticated(seed % 6 == 0 ? true : false);
+        cvc.setPermit(seed % 7 == 0 ? true : false);
+        cvc.setSimulation(seed % 8 == 0 ? true : false);
 
-        (onBehalfOfAccount, controllerEnabled) = cvc.getExecutionContext(
-            controller
-        );
+        (onBehalfOfAccount, controllerEnabled) = cvc
+            .getCurrentOnBehalfOfAccount(controller);
         context = cvc.getRawExecutionContext();
 
         assertEq(onBehalfOfAccount, account);
@@ -48,8 +51,9 @@ contract GetExecutionContextTest is Test {
         assertEq(
             context &
                 0x00000000000000000000000000000000000000000000000000000000000000FF,
-            seed % 3 == 0 ? 1 : 0
+            seed % 3 == 0 ? batchDepth : 0
         );
+        assertEq(cvc.getCurrentBatchDepth(), seed % 3 == 0 ? batchDepth : 0);
         assertEq(
             context &
                 0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00,
@@ -59,31 +63,36 @@ contract GetExecutionContextTest is Test {
             context &
                 0x00000000000000000000FF000000000000000000000000000000000000000000 !=
                 0,
-            false
+            seed % 4 == 0 ? true : false
         );
+        assertEq(cvc.areChecksInProgress(), seed % 4 == 0 ? true : false);
         assertEq(
             context &
                 0x000000000000000000FF00000000000000000000000000000000000000000000 !=
                 0,
-            seed % 4 == 0 ? true : false
+            seed % 5 == 0 ? true : false
         );
+        assertEq(cvc.isImpersonationInProgress(), seed % 5 == 0 ? true : false);
         assertEq(
             context &
                 0x0000000000000000FF0000000000000000000000000000000000000000000000 !=
                 0,
-            seed % 5 == 0 ? true : false
+            seed % 6 == 0 ? true : false
         );
+        assertEq(cvc.isOperatorAuthenticated(), seed % 6 == 0 ? true : false);
         assertEq(
             context &
                 0x00000000000000FF000000000000000000000000000000000000000000000000 !=
                 0,
-            seed % 6 == 0 ? true : false
+            seed % 7 == 0 ? true : false
         );
+        assertEq(cvc.isPermitInProgress(), seed % 7 == 0 ? true : false);
         assertEq(
             context &
                 0x000000000000FF00000000000000000000000000000000000000000000000000 !=
                 0,
-            seed % 7 == 0 ? true : false
+            seed % 8 == 0 ? true : false
         );
+        assertEq(cvc.isSimulationInProgress(), seed % 8 == 0 ? true : false);
     }
 }

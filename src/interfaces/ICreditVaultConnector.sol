@@ -20,14 +20,38 @@ interface ICVC {
     /// @return context Current raw execution context.
     function getRawExecutionContext() external view returns (uint context);
 
+    /// @notice Returns the current batch depth.
+    /// @return The current batch depth.
+    function getCurrentBatchDepth() external view returns (uint);
+
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
     /// @dev When checks in progress, on behalf of account is always address(0).
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the operation is being executed at the moment.
     /// @return onBehalfOfAccount An account that has been authenticated and on behalf of which the operation is being executed at the moment.
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck is address(0).
-    function getExecutionContext(
+    function getCurrentOnBehalfOfAccount(
         address controllerToCheck
     ) external view returns (address onBehalfOfAccount, bool controllerEnabled);
+
+    /// @notice Checks if checks are in progress.
+    /// @return A boolean indicating whether checks are in progress.
+    function areChecksInProgress() external view returns (bool);
+
+    /// @notice Checks if there is an impersonation in progress.
+    /// @return A boolean indicating whether an impersonation is in progress.
+    function isImpersonationInProgress() external view returns (bool);
+
+    /// @notice Checks if an operator is authenticated.
+    /// @return A boolean indicating whether an operator is authenticated.
+    function isOperatorAuthenticated() external view returns (bool);
+
+    /// @notice Checks if a permit is in progress.
+    /// @return A boolean indicating whether a permit is in progress.
+    function isPermitInProgress() external view returns (bool);
+
+    /// @notice Checks if a simulation is in progress.
+    /// @return A boolean indicating whether a simulation is in progress.
+    function isSimulationInProgress() external view returns (bool);
 
     /// @notice Checks whether the specified account and the other account have the same owner.
     /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the other. Accounts are considered to have a common owner if they share the first 19 bytes of their address.

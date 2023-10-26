@@ -388,11 +388,17 @@ contract CreditVaultConnectorInvariants is Test {
 
     function invariant_executionContext() external {
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getExecutionContext(address(this));
+            .getCurrentOnBehalfOfAccount(address(this));
 
         assertEq(onBehalfOfAccount, address(0));
         assertFalse(controllerEnabled);
         assertEq(cvc.getRawExecutionContext(), 1 << 208);
+        assertEq(cvc.getCurrentBatchDepth(), 0);
+        assertEq(cvc.areChecksInProgress(), false);
+        assertEq(cvc.isImpersonationInProgress(), false);
+        assertEq(cvc.isOperatorAuthenticated(), false);
+        assertEq(cvc.isPermitInProgress(), false);
+        assertEq(cvc.isSimulationInProgress(), false);
     }
 
     function invariant_AccountAndVaultStatusChecks() external {
