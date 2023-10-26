@@ -100,7 +100,9 @@ contract Target {
             )
         );
 
-        (_onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(address(0));
+        (_onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
+            address(0)
+        );
         require(
             checksDeferred
                 ? ICVC(cvc).getCurrentBatchDepth() > 0
@@ -111,7 +113,10 @@ contract Target {
             _onBehalfOfAccount == onBehalfOfAccount,
             "nct/invalid-on-behalf-of-account-2"
         );
-        require(!ICVC(cvc).isImpersonationInProgress(), "nct/impersonate-lock-2");
+        require(
+            !ICVC(cvc).isImpersonationInProgress(),
+            "nct/impersonate-lock-2"
+        );
         require(
             operatorAuthenticated
                 ? ICVC(cvc).isOperatorAuthenticated()

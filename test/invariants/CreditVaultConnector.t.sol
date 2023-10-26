@@ -386,7 +386,7 @@ contract CreditVaultConnectorInvariants is Test {
         targetContract(address(cvc));
     }
 
-    function invariant_executionContext() external {
+    function invariant_ExecutionContext() external {
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getCurrentOnBehalfOfAccount(address(this));
 
@@ -420,7 +420,7 @@ contract CreditVaultConnectorInvariants is Test {
         }
     }
 
-    function invariant_controllers_collaterals() external {
+    function invariant_ControllersCollaterals() external {
         address[] memory touchedAccounts = cvc.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
             // controllers

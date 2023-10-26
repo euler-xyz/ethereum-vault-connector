@@ -297,11 +297,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function getCurrentOnBehalfOfAccount(
         address controllerToCheck
-    )
-        public
-        view
-        returns (address onBehalfOfAccount, bool controllerEnabled)
-    {
+    ) public view returns (address onBehalfOfAccount, bool controllerEnabled) {
         onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
 
         controllerEnabled = controllerToCheck == address(0)
@@ -1074,6 +1070,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             bytes memory result;
 
             if (targetContract == address(this)) {
+                // delegatecall is used here to preserve msg.sender in order
+                // to be able to perform authentication
                 (success, result) = address(this).delegatecall(item.data);
             } else {
                 (success, result) = callInternal(
