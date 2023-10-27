@@ -211,12 +211,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                     revert CVC_NotAuthorized();
                 }
             } else if (
-                !isAccountOperatorAuthorizedInternal(account, msgSender)
+                isAccountOperatorAuthorizedInternal(account, msgSender)
             ) {
-                revert CVC_NotAuthorized();
-            } else {
                 contextCopy = contextCopy.setOperatorAuthenticated();
                 emit OperatorAuthenticated(msgSender, account);
+            } else {
+                revert CVC_NotAuthorized();
             }
         }
 
@@ -415,7 +415,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             operatorLookup[addressPrefix][operator] != accountOperatorAuthorized
         ) {
             operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
-            
+
             emit OperatorStatus(
                 addressPrefix,
                 operator,
