@@ -133,7 +133,7 @@ In order to evaluate the vault status, `checkVaultStatus` may need access to a s
 * Before performing any actions, each operation that requires a vault status check should first make an appropriate snapshot and store the data in transient storage (if a snapshot has not already been made)
 * The operations should be performed
 * The vault should then call `requireVaultStatusCheck`
-* When the `checkVaultStatus` callback is invoked, it should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return `false` (or revert) if there is a violation.
+* When the `checkVaultStatus` callback is invoked, it should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return a special magic success value, or revert if there is a violation.
 
 As with the account status check, there is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the CVC), then when it calls `requireVaultStatusCheck` on the CVC, the CVC may immediately call back into the vault's `checkVaultStatus` function. A normal reentrancy guard would fail upon re-entering at this point. Because of this, the vault reference implementation relaxes the reentrancy modifier to allow `checkVaultStatus` call while invoking `requireVaultStatusCheck`.
 
@@ -146,7 +146,11 @@ At the time of this writing, public/private keypair Ethereum accounts (EOAs) can
 
 * Atomicity: The user knows that either all of the operations in a batch will execute, or none of them will, so there is no risk of being left with partial or inconsistent positions.
 * Gas savings: If contracts are invoked multiple times, then the cost of "cold" access can be amortised across all of the invocations.
-* Status check deferrals: Sometimes it is more convenient or efficient to perform some operation that would leave an account/vault in an invalid state, but fix this state in a subsequent operation in a batch. For example, you may want to borrow and swap *before* you deposit your collateral. With batches, these checks can be performed once at the end of a batch (which can also itself be more gas efficient).
+* Status check deferrals: Sometimes multiple operations in a batch may require status checks or it is more convenient or efficient to perform some operation that would leave an account/vault in an invalid state, but fix this state in a subsequent operation in a batch. For example, you may want to perform withdrawal and borrow in one batch or borrow and swap *before* you deposit your collateral. With batches, these checks can be performed once at the end of a batch (which can also itself be more gas efficient).
+
+Batches can be composed of both calls to the CVC itself and external calls (when the `targetContract` is not the CVC). Calling the CVC is how users can enable collateral from within a batch, for example. In order to preseve `msg.sender`, CVC self-`call`s are in fact done with `delegatecall` (except for [permit](#permits)).
+
+Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
 
 ### Authorisation
 
@@ -154,7 +158,7 @@ Inside each batch item, an `onBehalfOfAccount` can be specified. The `batch` fun
 
 * If `msg.sender` has never before interacted with the CVC, if it shares the first 19 bytes with the `onBehalfOfAccount`, then `onBehalfOfAccount` is considered to be a *sub-account* of `msg.sender` and therefore `msg.sender` is authorised. Upon that first interaction with the CVC, `msg.sender` address is stored in CVC's storage as an owner of the group of 256 accounts having the same first 19 bytes.
 * If `msg.sender` has interacted with the CVC before and it shares the first 19 bytes with the `onBehalfOfAccount`, its address is supposed to match the one stored in the CVC's storage. If it does, then it is authorised.
-* If `setAccountOperator` has previously been called for the `onBehalfOfAccount` to install `msg.sender` as an [operator](#operators) for this account, it is authorised.
+* If `msg.sender` has previously been authorized as an [operator](#operators) for the `onBehalfOfAccount`, it is authorised.
 * If the `msg.sender` is the CVC itself, then this must be from a permit and the effective sender is taken from the execution context
 * In all other cases, the batch item is invalid, and the entire batch transaction will fail.
 
@@ -164,13 +168,13 @@ Sub-accounts allow users access to multiple (up to 256) virtual accounts that ar
 
 Since an account can only have one controller at a time (except for mid-transaction), sub-accounts are also the only way an Ethereum account can hold multiple Credit Vault borrows concurrently.
 
-The CVC also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on or off chain. This mapping is populated when an address interacts with the CVC for the first time. In order to resolve a sub-account, call the `getAccountOwner` function with a sub-account address. It will either return the account's primary address, or revert with an error if the account has not yet interacted with the CVC.
+The CVC also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on or off chain. This mapping is populated when an address interacts with the CVC for the first time. In order to resolve a sub-account, the `getAccountOwner` function should be called with a sub-account address. It will either return the account's primary address, or revert with an error if the account has not yet interacted with the CVC.
 
 #### Operators
 
 Operators are a more flexible and powerful version of approvals. While in effect, the operator contract can act on behalf of the specified account. This includes interacting with vaults (ie, withdrawing/borrowing funds), enabling vaults as collateral, etc. Because of this, it is recommended that only trusted and audited contracts, or EOAs held by a trusted individuals, be installed as operators.
 
-Operators have many use cases. For instance, a user might want to install a modifier such as stop-loss/take-profit/trailing-stop to a position in an account. To accomplish this, special operator contract that allows "keepers" to close out the user's position when certain conditions are met can be selected as an operator. Multiple operators can be installed per account.
+Operators have many use cases. For instance, a user might want to install a modifier such as stop-loss/take-profit/trailing-stop to a position in an account. To accomplish this, special operator contract that allows "keepers" to close out the user's position when certain conditions are met can be selected as an operator. Multiple operators can be installed per account. Note however that the operators may implement contradictory logic, so care should be taken when installing multiple operators for a single account.
 
 An operator is similar to a controller, in that an account gives considerable permissions to a smart contract (that presumably has been well audited). However, the important difference is that an account owner can always revoke an operator's privileges at any time, however they can not do so with a controller. Instead, the controller must release its own privileges. Another difference is that controllers can not change the account's collateral or controller sets, whereas an operator can.
 
@@ -218,11 +222,6 @@ Permit messages can be cancelled in three ways:
 The `call` function on the CVC allows users to invoke functions on vaults and other target smart contracts. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function rather than calling the vaults directly. This is because vaults themselves don't understand sub-accounts or operators, and defer their authorisation logic to the CVC (see the [Authentication By Vaults](#authentication-by-vaults) section).
 
 `call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the CVC as `msg.sender`. For this reason, it is critical that the CVC itself never be given any special privileges, or hold any token or ETH balances (except for a few corner cases where it is temporarily safe, see the [CVC Contract Privileges](#cvc-contract-privileges) section).
-
-Batches can be composed of both calls to the CVC itself and external `call` calls (when the `targetContract` is not the CVC). Calling the CVC is how users can enable collateral from within a batch, for example. In order to preseve `msg.sender`, CVC self-`call`s are in fact done with `delegatecall`.
-
-Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
-
 
 ### impersonate
 
@@ -306,10 +305,10 @@ Vaults out-source their authentication to the CVC, but are responsible for autho
 
 In order to support sub-accounts, operators, and impersonating (ie, liquidations), vaults can be invoked via the CVC's `call`, `batch`, or `impersonate` functions, which will then execute the desired operations on the vault. However, the vault will see the CVC as the `msg.sender`.
 
-When a vault detects that `msg.sender` is the CVC, it should call back into the CVC to retrieve the current execution context using `getExecutionContext`. This will tell the vault two things:
+When a vault detects that `msg.sender` is the CVC, it should call back into the CVC to retrieve the current execution context using `getCurrentOnBehalfOfAccount`. This will tell the vault two things:
 
 * The `onBehalfOfAccount` which indicates the account that has been authenticated by the CVC. The vault should consider this the "true" value of `msg.sender` for authorisation purposes.
-* The `controllerEnabled` which indicates whether or not a vault is currently enabled as a controller for the `onBehalfOfAccount` account. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account. The caller of `getExecutionContext` itself passes the vault it is interested in via the `controllerToCheck` parameter. When `controllerToCheck` is set to the zero address, the value returned is always `false`.
+* The `controllerEnabled` which indicates whether or not a vault is currently enabled as a controller for the `onBehalfOfAccount` account. This information is needed if the vault is performing an operation (such as a borrow) that requires it to be the controller for an account. The caller of `getCurrentOnBehalfOfAccount` itself passes the vault it is interested in via the `controllerToCheck` parameter. When `controllerToCheck` is set to the zero address, the value returned is always `false`.
 
 ### CVC Contract Privileges
 
