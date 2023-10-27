@@ -72,8 +72,8 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual override {
-        super.call(targetContract, onBehalfOfAccount, data);
+    ) public payable virtual override returns (bytes memory result) {
+        return super.call(targetContract, onBehalfOfAccount, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -83,8 +83,8 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual override {
-        super.impersonate(targetContract, onBehalfOfAccount, data);
+    ) public payable virtual override returns (bytes memory result) {
+        return super.impersonate(targetContract, onBehalfOfAccount, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -123,22 +123,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         )
     {
         return super.batchRevert(items);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "account is never added to the set or it's still present" old(accountStatusChecks.contains(account)) == accountStatusChecks.contains(account);
-    function checkAccountStatus(
-        address account
-    ) public payable virtual override returns (bool isValid) {
-        return super.checkAccountStatus(account);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "accounts are never added to the set or they're still present" old(accountStatusChecks.get().length) == accountStatusChecks.get().length;
-    function checkAccountsStatus(
-        address[] calldata accounts
-    ) public payable virtual override returns (bool[] memory isValid) {
-        return super.checkAccountsStatus(accounts);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());

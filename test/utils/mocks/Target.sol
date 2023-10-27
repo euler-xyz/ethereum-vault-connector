@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import "../../../src/interfaces/ICreditVaultConnector.sol";
+import "../../../src/CreditVaultConnector.sol";
 
 // mock target contract that allows to test call() and impersonate() functions of the CVC
 contract Target {
@@ -14,11 +14,21 @@ contract Target {
         address onBehalfOfAccount,
         bool operatorAuthenticated,
         bool permitInProgress
-    ) external payable {
-        (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
-            address(0)
-        );
-
+    ) external payable returns (uint) {
+        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+            address _onBehalfOfAccount,
+            bool
+        ) {
+            require(
+                _onBehalfOfAccount == onBehalfOfAccount,
+                "ct/invalid-on-behalf-of-account"
+            );
+        } catch {
+            require(
+                onBehalfOfAccount == address(0),
+                "ct/invalid-on-behalf-of-account-2"
+            );
+        }
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
         require(
@@ -27,10 +37,7 @@ contract Target {
                 : ICVC(cvc).getCurrentBatchDepth() == 0,
             "ct/invalid-checks-deferred"
         );
-        require(
-            _onBehalfOfAccount == onBehalfOfAccount,
-            "ct/invalid-on-behalf-of-account"
-        );
+
         require(!ICVC(cvc).isImpersonationInProgress(), "ct/impersonate-lock");
         require(
             operatorAuthenticated
@@ -44,6 +51,8 @@ contract Target {
                 : !ICVC(cvc).isPermitInProgress(),
             "ct/permit-in-progress"
         );
+
+        return msg.value;
     }
 
     function nestedCallTest(
@@ -54,11 +63,21 @@ contract Target {
         address onBehalfOfAccount,
         bool operatorAuthenticated,
         bool permitInProgress
-    ) external payable {
-        (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
-            address(0)
-        );
-
+    ) external payable returns (uint) {
+        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+            address _onBehalfOfAccount,
+            bool
+        ) {
+            require(
+                _onBehalfOfAccount == onBehalfOfAccount,
+                "nct/invalid-on-behalf-of-account"
+            );
+        } catch {
+            require(
+                onBehalfOfAccount == address(0),
+                "nct/invalid-on-behalf-of-account-2"
+            );
+        }
         require(msg.sender == msgSender, "nct/invalid-sender");
         require(msg.value == value, "nct/invalid-msg-value");
         require(
@@ -66,10 +85,6 @@ contract Target {
                 ? ICVC(cvc).getCurrentBatchDepth() > 0
                 : ICVC(cvc).getCurrentBatchDepth() == 0,
             "nct/invalid-checks-deferred"
-        );
-        require(
-            _onBehalfOfAccount == onBehalfOfAccount,
-            "nct/invalid-on-behalf-of-account"
         );
         require(!ICVC(cvc).isImpersonationInProgress(), "nct/impersonate-lock");
         require(
@@ -85,7 +100,7 @@ contract Target {
             "nct/permit-in-progress"
         );
 
-        ICVC(cvc).call(
+        bytes memory result = ICVC(cvc).call(
             address(this),
             address(this),
             abi.encodeWithSelector(
@@ -99,19 +114,27 @@ contract Target {
                 false
             )
         );
+        require(abi.decode(result, (uint)) == 0, "nct/result");
 
-        (_onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
-            address(0)
-        );
+        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+            address _onBehalfOfAccount,
+            bool
+        ) {
+            require(
+                _onBehalfOfAccount == onBehalfOfAccount,
+                "nct/invalid-on-behalf-of-account-3"
+            );
+        } catch {
+            require(
+                onBehalfOfAccount == address(0),
+                "nct/invalid-on-behalf-of-account-4"
+            );
+        }
         require(
             checksDeferred
                 ? ICVC(cvc).getCurrentBatchDepth() > 0
                 : ICVC(cvc).getCurrentBatchDepth() == 0,
             "nct/invalid-checks-deferred-2"
-        );
-        require(
-            _onBehalfOfAccount == onBehalfOfAccount,
-            "nct/invalid-on-behalf-of-account-2"
         );
         require(
             !ICVC(cvc).isImpersonationInProgress(),
@@ -129,6 +152,8 @@ contract Target {
                 : !ICVC(cvc).isPermitInProgress(),
             "nct/permit-in-progress-2"
         );
+
+        return msg.value;
     }
 
     function impersonateTest(
@@ -137,11 +162,21 @@ contract Target {
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
-    ) external payable {
-        (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
-            address(0)
-        );
-
+    ) external payable returns (uint) {
+        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+            address _onBehalfOfAccount,
+            bool
+        ) {
+            require(
+                _onBehalfOfAccount == onBehalfOfAccount,
+                "it/invalid-on-behalf-of-account"
+            );
+        } catch {
+            require(
+                onBehalfOfAccount == address(0),
+                "it/invalid-on-behalf-of-account-2"
+            );
+        }
         require(msg.sender == msgSender, "it/invalid-sender");
         require(msg.value == value, "it/invalid-msg-value");
         require(
@@ -149,10 +184,6 @@ contract Target {
                 ? ICVC(cvc).getCurrentBatchDepth() > 0
                 : ICVC(cvc).getCurrentBatchDepth() == 0,
             "it/invalid-checks-deferred"
-        );
-        require(
-            _onBehalfOfAccount == onBehalfOfAccount,
-            "it/invalid-on-behalf-of-account"
         );
         require(ICVC(cvc).isImpersonationInProgress(), "it/impersonate-lock");
 
@@ -171,6 +202,8 @@ contract Target {
         } else {
             ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
         }
+
+        return msg.value;
     }
 
     function revertEmptyTest() external pure {

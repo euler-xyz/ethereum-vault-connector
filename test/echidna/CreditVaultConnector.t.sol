@@ -79,7 +79,6 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(account);
         try cvc.batch(items) {} catch {}
 
-        try cvc.checkAccountStatus(account) {} catch {}
         try cvc.requireAccountStatusCheck(account) {} catch {}
         try cvc.requireAccountStatusCheckNow(account) {} catch {}
         try cvc.requireAllAccountsStatusCheckNow() {} catch {}
@@ -144,7 +143,6 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(account);
         try cvc.batch(items) {} catch {}
 
-        try cvc.checkAccountStatus(account) {} catch {}
         try cvc.requireAccountStatusCheck(account) {} catch {}
         try cvc.requireAccountStatusCheckNow(account) {} catch {}
         try cvc.requireAllAccountsStatusCheckNow() {} catch {}
@@ -213,7 +211,6 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(account);
         try cvc.batch(items) {} catch {}
 
-        try cvc.checkAccountStatus(account) {} catch {}
         try cvc.requireAccountStatusCheck(account) {} catch {}
         try cvc.requireAccountStatusCheckNow(account) {} catch {}
         try cvc.requireAllAccountsStatusCheckNow() {} catch {}
@@ -339,14 +336,6 @@ contract EchidnaTest {
         } else {
             cvc.batch(items);
         }
-    }
-
-    function checkAccountStatus(address account) public payable {
-        cvc.checkAccountStatus(account);
-    }
-
-    function checkAccountStatus(address[] calldata accounts) public payable {
-        cvc.checkAccountsStatus(accounts);
     }
 
     function requireAccountStatusCheck(address account) public payable {

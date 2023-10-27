@@ -111,6 +111,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
+    error CVC_OnBehalfOfAccountNotAuthenticated();
     error CVC_InvalidNonce();
     error CVC_InvalidAddress();
     error CVC_InvalidTimestamp();
@@ -211,12 +212,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
                     revert CVC_NotAuthorized();
                 }
             } else if (
-                !isAccountOperatorAuthorizedInternal(account, msgSender)
+                isAccountOperatorAuthorizedInternal(account, msgSender)
             ) {
-                revert CVC_NotAuthorized();
-            } else {
                 contextCopy = contextCopy.setOperatorAuthenticated();
                 emit OperatorAuthenticated(msgSender, account);
+            } else {
+                revert CVC_NotAuthorized();
             }
         }
 
@@ -299,6 +300,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address controllerToCheck
     ) public view returns (address onBehalfOfAccount, bool controllerEnabled) {
         onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
+
+        // for safety, revert if no account has been auhenticated
+        if (onBehalfOfAccount == address(0)) {
+            revert CVC_OnBehalfOfAccountNotAuthenticated();
+        }
 
         controllerEnabled = controllerToCheck == address(0)
             ? false
@@ -415,7 +421,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             operatorLookup[addressPrefix][operator] != accountOperatorAuthorized
         ) {
             operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
-            
+
             emit OperatorStatus(
                 addressPrefix,
                 operator,
@@ -566,14 +572,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual nonReentrant {
+    ) public payable virtual nonReentrant returns (bytes memory result) {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         emit Call(msg.sender, targetContract, onBehalfOfAccount);
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
-        (bool success, bytes memory result) = callInternal(
+        bool success;
+        (success, result) = callInternal(
             targetContract,
             onBehalfOfAccount,
             value,
@@ -590,7 +597,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual nonReentrant {
+    ) public payable virtual nonReentrant returns (bytes memory result) {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         emit Impersonate(msg.sender, targetContract, onBehalfOfAccount);
@@ -601,7 +608,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         executionContext = contextCache.setImpersonationInProgress();
 
-        (bool success, bytes memory result) = impersonateInternal(
+        bool success;
+        (success, result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
             value,
@@ -798,35 +806,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address account
     ) external view returns (bool) {
         return accountStatusChecks.contains(account);
-    }
-
-    /// @inheritdoc ICVC
-    function checkAccountStatus(
-        address account
-    ) public payable virtual nonReentrantChecks returns (bool isValid) {
-        (isValid, ) = checkAccountStatusInternal(account);
-    }
-
-    /// @inheritdoc ICVC
-    function checkAccountsStatus(
-        address[] calldata accounts
-    )
-        public
-        payable
-        virtual
-        nonReentrantChecks
-        returns (bool[] memory isValid)
-    {
-        isValid = new bool[](accounts.length);
-
-        uint length = accounts.length;
-        for (uint i; i < length; ) {
-            (isValid[i], ) = checkAccountStatusInternal(accounts[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
     }
 
     /// @inheritdoc ICVC
