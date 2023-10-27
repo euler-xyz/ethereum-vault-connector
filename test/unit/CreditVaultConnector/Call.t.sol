@@ -65,7 +65,12 @@ contract CallTest is Test {
             emit OperatorAuthenticated(alice, account);
         }
         vm.prank(alice);
-        cvc.call{value: seed}(targetContract, account, data);
+        bytes memory result = cvc.call{value: seed}(
+            targetContract,
+            account,
+            data
+        );
+        assertEq(abi.decode(result, (uint)), seed);
 
         // if called from a batch, the ETH value does not get forwarded
         data = abi.encodeWithSelector(
@@ -125,7 +130,8 @@ contract CallTest is Test {
             emit OperatorAuthenticated(alice, account);
         }
         vm.prank(alice);
-        cvc.call{value: seed}(targetContract, account, data);
+        result = cvc.call{value: seed}(targetContract, account, data);
+        assertEq(abi.decode(result, (uint)), seed);
 
         // on behalf of account should also be correct in a nested call when checks are deferred
         items[0].onBehalfOfAccount = account;
@@ -246,11 +252,11 @@ contract CallTest is Test {
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
-
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();
+
+        vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
         // target contract is the CVC
         address targetContract = address(cvc);
@@ -297,11 +303,11 @@ contract CallTest is Test {
     function test_RevertIfInternalCallIsUnsuccessful_Call(
         address alice
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
-
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();
+
+        vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
         vm.assume(targetContract != address(cvc));

@@ -140,7 +140,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable override nonReentrant {
+    ) public payable override nonReentrant returns (bytes memory result) {
         // copied function body with inserted assertion
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
@@ -154,7 +154,8 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
         executionContext = context.setImpersonationInProgress();
 
-        (bool success, bytes memory result) = impersonateInternal(
+        bool success;
+        (success, result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
             value,

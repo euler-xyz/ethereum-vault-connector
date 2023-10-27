@@ -57,12 +57,12 @@ contract CollateralsManagementTest is Test {
         uint8 numberOfVaults,
         uint seed
     ) public {
+        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        setUp();
+
         vm.assume(alice != address(0) && alice != address(cvc));
         vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
         vm.assume(seed > 1000);
-
-        // call setUp() explicitly for Dilligence Fuzzing tool to pass
-        setUp();
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 

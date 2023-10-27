@@ -12,14 +12,14 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable {
+    ) public payable returns (bytes memory result) {
         (bool success, ) = msg.sender.call(
             abi.encodeWithSelector(Vault.clearChecks.selector)
         );
         success;
         clearExpectedChecks();
 
-        super.impersonate(targetContract, onBehalfOfAccount, data);
+        result = super.impersonate(targetContract, onBehalfOfAccount, data);
 
         verifyVaultStatusChecks();
         verifyAccountStatusChecks();
@@ -68,7 +68,12 @@ contract ImpersonateTest is Test {
         vm.expectEmit(true, true, true, false, address(cvc));
         emit Impersonate(controller, collateral, alice);
         vm.prank(controller);
-        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
+        bytes memory result = cvc.handlerImpersonate{value: seed}(
+            collateral,
+            alice,
+            data
+        );
+        assertEq(abi.decode(result, (uint)), seed);
 
         cvc.clearExpectedChecks();
         Vault(controller).clearChecks();
@@ -132,7 +137,8 @@ contract ImpersonateTest is Test {
         vm.expectEmit(true, true, true, false, address(cvc));
         emit Impersonate(controller, collateral, alice);
         vm.prank(controller);
-        cvc.handlerImpersonate{value: seed}(collateral, alice, data);
+        result = cvc.handlerImpersonate{value: seed}(collateral, alice, data);
+        assertEq(abi.decode(result, (uint)), seed);
     }
 
     function test_RevertIfChecksReentrancy_Impersonate(
@@ -378,11 +384,11 @@ contract ImpersonateTest is Test {
     function test_RevertIfInternalCallIsUnsuccessful_Impersonate(
         address alice
     ) public {
-        vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
-
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();
+
+        vm.assume(alice != address(0));
+        vm.assume(alice != address(cvc));
 
         address collateral = address(new Vault(cvc));
         address controller = address(new Vault(cvc));

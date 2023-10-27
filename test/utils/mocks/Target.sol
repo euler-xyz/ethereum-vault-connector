@@ -14,7 +14,7 @@ contract Target {
         address onBehalfOfAccount,
         bool operatorAuthenticated,
         bool permitInProgress
-    ) external payable {
+    ) external payable returns (uint) {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
         );
@@ -44,6 +44,8 @@ contract Target {
                 : !ICVC(cvc).isPermitInProgress(),
             "ct/permit-in-progress"
         );
+
+        return msg.value;
     }
 
     function nestedCallTest(
@@ -54,7 +56,7 @@ contract Target {
         address onBehalfOfAccount,
         bool operatorAuthenticated,
         bool permitInProgress
-    ) external payable {
+    ) external payable returns (uint) {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
         );
@@ -85,7 +87,7 @@ contract Target {
             "nct/permit-in-progress"
         );
 
-        ICVC(cvc).call(
+        bytes memory result = ICVC(cvc).call(
             address(this),
             address(this),
             abi.encodeWithSelector(
@@ -99,6 +101,7 @@ contract Target {
                 false
             )
         );
+        require(abi.decode(result, (uint)) == 0, "nct/result");
 
         (_onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
@@ -129,6 +132,8 @@ contract Target {
                 : !ICVC(cvc).isPermitInProgress(),
             "nct/permit-in-progress-2"
         );
+
+        return msg.value;
     }
 
     function impersonateTest(
@@ -137,7 +142,7 @@ contract Target {
         uint value,
         bool checksDeferred,
         address onBehalfOfAccount
-    ) external payable {
+    ) external payable returns (uint) {
         (address _onBehalfOfAccount, ) = ICVC(cvc).getCurrentOnBehalfOfAccount(
             address(0)
         );
@@ -171,6 +176,8 @@ contract Target {
         } else {
             ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
         }
+
+        return msg.value;
     }
 
     function revertEmptyTest() external pure {

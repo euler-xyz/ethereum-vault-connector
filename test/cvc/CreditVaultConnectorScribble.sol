@@ -72,8 +72,8 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual override {
-        super.call(targetContract, onBehalfOfAccount, data);
+    ) public payable virtual override returns (bytes memory result) {
+        return super.call(targetContract, onBehalfOfAccount, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -83,8 +83,8 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual override {
-        super.impersonate(targetContract, onBehalfOfAccount, data);
+    ) public payable virtual override returns (bytes memory result) {
+        return super.impersonate(targetContract, onBehalfOfAccount, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());

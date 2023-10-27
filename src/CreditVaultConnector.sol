@@ -566,14 +566,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual nonReentrant {
+    ) public payable virtual nonReentrant returns (bytes memory result) {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         emit Call(msg.sender, targetContract, onBehalfOfAccount);
 
         uint value = executionContext.isInBatch() ? 0 : msg.value;
 
-        (bool success, bytes memory result) = callInternal(
+        bool success;
+        (success, result) = callInternal(
             targetContract,
             onBehalfOfAccount,
             value,
@@ -590,7 +591,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address targetContract,
         address onBehalfOfAccount,
         bytes calldata data
-    ) public payable virtual nonReentrant {
+    ) public payable virtual nonReentrant returns (bytes memory result) {
         if (targetContract == address(this)) revert CVC_InvalidAddress();
 
         emit Impersonate(msg.sender, targetContract, onBehalfOfAccount);
@@ -601,7 +602,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         executionContext = contextCache.setImpersonationInProgress();
 
-        (bool success, bytes memory result) = impersonateInternal(
+        bool success;
+        (success, result) = impersonateInternal(
             targetContract,
             onBehalfOfAccount,
             value,
