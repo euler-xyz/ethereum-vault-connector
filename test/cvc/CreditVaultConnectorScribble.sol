@@ -126,22 +126,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "account is never added to the set or it's still present" old(accountStatusChecks.contains(account)) == accountStatusChecks.contains(account);
-    function checkAccountStatus(
-        address account
-    ) public payable virtual override returns (bool isValid) {
-        return super.checkAccountStatus(account);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "accounts are never added to the set or they're still present" old(accountStatusChecks.get().length) == accountStatusChecks.get().length;
-    function checkAccountsStatus(
-        address[] calldata accounts
-    ) public payable virtual override returns (bool[] memory isValid) {
-        return super.checkAccountsStatus(accounts);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" old(executionContext.isInBatch()) ==> accountStatusChecks.contains(account);
     function requireAccountStatusCheck(
         address account

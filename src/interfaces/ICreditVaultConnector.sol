@@ -282,22 +282,6 @@ interface ICVC {
         address account
     ) external view returns (bool);
 
-    /// @notice Checks the status of an account and returns whether it is valid or not.
-    /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
-    /// @param account The address of the account to be checked.
-    /// @return isValid A boolean value that indicates whether the account is valid or not.
-    function checkAccountStatus(
-        address account
-    ) external payable returns (bool isValid);
-
-    /// @notice Checks the status of multiple accounts and returns an array of boolean values that indicate whether each account is valid or not.
-    /// @dev Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is considered valid.
-    /// @param accounts An array of addresses of the accounts to be checked.
-    /// @return isValid An array of boolean values that indicate whether each account is valid or not.
-    function checkAccountsStatus(
-        address[] calldata accounts
-    ) external payable returns (bool[] memory isValid);
-
     /// @notice Checks the status of an account and reverts if it is not valid.
     /// @dev If in a batch, the account is added to the set of accounts to be checked at the end of the top-level batch (account status check is considered deferred). Account status check is performed by calling into selected controller vault and passing the array of currently enabled collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.

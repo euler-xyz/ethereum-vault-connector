@@ -801,35 +801,6 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function checkAccountStatus(
-        address account
-    ) public payable virtual nonReentrantChecks returns (bool isValid) {
-        (isValid, ) = checkAccountStatusInternal(account);
-    }
-
-    /// @inheritdoc ICVC
-    function checkAccountsStatus(
-        address[] calldata accounts
-    )
-        public
-        payable
-        virtual
-        nonReentrantChecks
-        returns (bool[] memory isValid)
-    {
-        isValid = new bool[](accounts.length);
-
-        uint length = accounts.length;
-        for (uint i; i < length; ) {
-            (isValid[i], ) = checkAccountStatusInternal(accounts[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    /// @inheritdoc ICVC
     function requireAccountStatusCheck(
         address account
     ) public payable virtual nonReentrantChecks {
