@@ -65,7 +65,7 @@ NOTE: It may be tempting to allow a large set of collateral assets for a Credit 
 
 NOTE: There is a subtle complication that Credit Vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked without Status Checks being deferred (i.e. vault called directly, not via the CVC), then when it calls `require(Account|Vault)StatusCheck` (or similar) on the CVC, the CVC may immediately call back into the vault's `check(Account|Vault)Status` function. A normal reentrancy guard would fail upon re-entering at this point. Because of this, the vault implementation should relax the reentrancy modifier to allow `check(Account|Vault)Status` call while invoking `require(Account|Vault)StatusCheck`.
 
-NOTE: It may be critical to protect `check(Account|Vault)Status` function against reentrancy or implement the following checks for abundance of caution:
+NOTE: It may be critical to protect `check(Account|Vault)Status` functions against reentrancy. For abundance of caution it is recommended to include the following checks as well:
 `require(msg.sender == address(cvc) && cvc.areChecksInProgress());`
 
 NOTE: Care should be taken not to transfer any assets to the Accounts other than the Account Owner (ID 0). Otherwise, the assets may be lost. If unsure, a vault may call `getAccountOwner()` function that returns an address of the Account Owner.
