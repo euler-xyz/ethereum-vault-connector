@@ -21,12 +21,12 @@ contract GetExecutionContextTest is Test {
 
         address controller = address(new Vault(cvc));
 
-        (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getCurrentOnBehalfOfAccount(controller);
-        uint context = cvc.getRawExecutionContext();
+        vm.expectRevert(
+            CreditVaultConnector.CVC_OnBehalfOfAccountNotAuthenticated.selector
+        );
+        cvc.getCurrentOnBehalfOfAccount(controller);
 
-        assertEq(onBehalfOfAccount, address(0));
-        assertFalse(controllerEnabled);
+        uint context = cvc.getRawExecutionContext();
         assertEq(context, 1 << 208);
 
         if (seed % 2 == 0) {
@@ -42,7 +42,7 @@ contract GetExecutionContextTest is Test {
         cvc.setPermit(seed % 7 == 0 ? true : false);
         cvc.setSimulation(seed % 8 == 0 ? true : false);
 
-        (onBehalfOfAccount, controllerEnabled) = cvc
+        (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getCurrentOnBehalfOfAccount(controller);
         context = cvc.getRawExecutionContext();
 

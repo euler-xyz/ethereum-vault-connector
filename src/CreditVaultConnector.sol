@@ -111,6 +111,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
+    error CVC_OnBehalfOfAccountNotAuthenticated();
     error CVC_InvalidNonce();
     error CVC_InvalidAddress();
     error CVC_InvalidTimestamp();
@@ -299,6 +300,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         address controllerToCheck
     ) public view returns (address onBehalfOfAccount, bool controllerEnabled) {
         onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
+
+        // for safety, revert if no account has been auhenticated
+        if (onBehalfOfAccount == address(0)) {
+            revert CVC_OnBehalfOfAccountNotAuthenticated();
+        }
 
         controllerEnabled = controllerToCheck == address(0)
             ? false

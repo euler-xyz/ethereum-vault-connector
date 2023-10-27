@@ -387,11 +387,11 @@ contract CreditVaultConnectorInvariants is Test {
     }
 
     function invariant_ExecutionContext() external {
-        (address onBehalfOfAccount, bool controllerEnabled) = cvc
-            .getCurrentOnBehalfOfAccount(address(this));
+        vm.expectRevert(
+            CreditVaultConnector.CVC_OnBehalfOfAccountNotAuthenticated.selector
+        );
+        cvc.getCurrentOnBehalfOfAccount(address(0));
 
-        assertEq(onBehalfOfAccount, address(0));
-        assertFalse(controllerEnabled);
         assertEq(cvc.getRawExecutionContext(), 1 << 208);
         assertEq(cvc.getCurrentBatchDepth(), 0);
         assertEq(cvc.areChecksInProgress(), false);
