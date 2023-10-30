@@ -33,3 +33,4 @@ Thumbs.db
 # Echidna Files
 crytic-export/
 corpus-echidna/
+gambit_out/
