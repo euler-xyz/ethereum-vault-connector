@@ -2,11 +2,19 @@
 
 pragma solidity ^0.8.20;
 
+// the stamp field is used to keep the storage slot non-zero when the element is removed.
+// if used, it allows for cheaper SSTORE when an element is inserted.
 struct ElementStorage {
     address value;
     uint96 stamp;
 }
 
+// to optimize the gas consuption, firstElement is stored in the same storage slot as
+// the numElements so that for sets with one element, only one storage slot has to be
+// read/written. to keep the elements array indexing consistent and because the first
+// element is stored outside of the array, the elements[0] is not utilized.
+// the stamp field is used to keep the storage slot non-zero when the element is removed.
+// it allows for cheaper SSTORE when an element is inserted.
 struct SetStorage {
     uint8 numElements;
     address firstElement;
@@ -17,26 +25,29 @@ struct SetStorage {
 library Set {
     error TooManyElements();
 
-    uint public constant MAX_ELEMENTS = 20;
+    uint8 public constant DUMMY_STAMP = 1;
+    uint8 public constant MAX_ELEMENTS = 20;
 
-    /// @notice Inserts an element and returns whether the operation was successful or not.
+    /// @notice Inserts an element and returns information whether the element was inserted or not.
+    /// @dev Reverts if the set is full but the element is not in the set storage.
     /// @param setStorage The set storage to which the element will be inserted.
     /// @param element The address of the element to be inserted.
-    /// @return wasInserted A boolean value that indicates whether the element was inserted or not. If the element was already in the set storage, it returns false.
+    /// @return A boolean value that indicates whether the element was inserted or not. If the element was already in the set storage, it returns false.
     function insert(
         SetStorage storage setStorage,
         address element
-    ) internal returns (bool wasInserted) {
+    ) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint numElements = setStorage.numElements;
 
         if (numElements == 0) {
             // gas optimization:
             // on the first element insertion, set the stamp to non-zero value
-            // to keep the storage slot dirty when the element is removed
+            // to keep the storage slot non-zero when the element is removed.
+            // when a new element is inserted after the removal, it should be cheaper
             setStorage.numElements = 1;
             setStorage.firstElement = element;
-            setStorage.stamp = 1;
+            setStorage.stamp = DUMMY_STAMP;
             return true;
         }
 
@@ -61,10 +72,10 @@ library Set {
         return true;
     }
 
-    /// @notice Removes an element and returns whether the operation was successful or not.
+    /// @notice Removes an element and returns information whether the element was removed or not.
     /// @param setStorage The set storage from which the element will be removed.
     /// @param element The address of the element to be removed.
-    /// @return  A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
+    /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
     function remove(
         SetStorage storage setStorage,
         address element
@@ -91,7 +102,7 @@ library Set {
         if (numElements == 1) {
             setStorage.numElements = 0;
             setStorage.firstElement = address(0);
-            setStorage.stamp = 1;
+            setStorage.stamp = DUMMY_STAMP;
             return true;
         }
 
@@ -148,11 +159,11 @@ library Set {
     /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the result.
     /// @param setStorage The set storage to be searched.
     /// @param element The address of the element to be checked.
-    /// @return found A boolean value that indicates whether the set storage includes the element or not.
+    /// @return A boolean value that indicates whether the set storage includes the element or not.
     function contains(
         SetStorage storage setStorage,
         address element
-    ) internal view returns (bool found) {
+    ) internal view returns (bool) {
         address firstElement = setStorage.firstElement;
         uint numElements = setStorage.numElements;
 
