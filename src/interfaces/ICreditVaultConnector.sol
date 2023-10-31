@@ -75,8 +75,8 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the nonce for a given address prefix and nonce namespace.
-    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
+    /// @notice Returns the current nonce for a given address prefix and nonce namespace.
+    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. A valid nonce value for permit purposes is considered to be the current nonce value plus one.
     /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
     /// @return nonce The current nonce for the given address prefix and nonce namespace.
@@ -224,7 +224,7 @@ interface ICVC {
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner on the CVC contract. During that call, CVC becomes msg.sender.
     /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271). It's also an owner of all the accounts for which authentication will be needed during the execution of the arbitrary data call.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
-    /// @param nonce The nonce for the given account and nonce namespace.
+    /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the current nonce value plus one.
     /// @param deadline The timestamp after which the permit is considered expired.
     /// @param data The encoded data which is self-called on the CVC contract.
     /// @param signature The signature of the data signed by the signer.
