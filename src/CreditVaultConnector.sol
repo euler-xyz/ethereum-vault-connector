@@ -372,7 +372,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function getOperator(
         uint152 addressPrefix,
         address operator
-    ) external view returns (uint accountOperatorAuthorized) {
+    ) external view returns (uint) {
         return operatorLookup[addressPrefix][operator];
     }
 
@@ -380,7 +380,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function isAccountOperatorAuthorized(
         address account,
         address operator
-    ) external view returns (bool authorized) {
+    ) external view returns (bool) {
         return isAccountOperatorAuthorizedInternal(account, operator);
     }
 
