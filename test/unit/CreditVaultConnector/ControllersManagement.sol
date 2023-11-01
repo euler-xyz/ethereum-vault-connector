@@ -15,7 +15,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.enableController(account, vault);
 
-        if (executionContext.isInBatch()) return;
+        if (executionContext.areChecksDeferred()) return;
 
         expectedAccountsChecked.push(account);
 
@@ -28,7 +28,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.disableController(account);
 
-        if (executionContext.isInBatch()) return;
+        if (executionContext.areChecksDeferred()) return;
 
         expectedAccountsChecked.push(account);
 
@@ -39,10 +39,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 contract ControllersManagementTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
-    event OperatorAuthenticated(
-        address indexed operator,
-        address indexed onBehalfOfAccount
-    );
     event ControllerStatus(
         address indexed account,
         address indexed controller,
@@ -80,20 +76,12 @@ contract ControllersManagementTest is Test {
         assertFalse(cvc.isControllerEnabled(account, vault));
         address[] memory controllersPre = cvc.getControllers(account);
 
-        if (msgSender != alice) {
-            vm.expectEmit(true, true, false, false, address(cvc));
-            emit OperatorAuthenticated(msgSender, account);
-        }
         vm.expectEmit(true, true, false, true, address(cvc));
         emit ControllerStatus(account, vault, true);
         vm.prank(msgSender);
-        vm.recordLogs();
         cvc.handlerEnableController(account, vault);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         address[] memory controllersPost = cvc.getControllers(account);
-
-        assertEq(logs.length, 2);
         assertEq(controllersPost.length, controllersPre.length + 1);
         assertEq(controllersPost[controllersPost.length - 1], vault);
         assertTrue(cvc.isControllerEnabled(account, vault));
@@ -102,18 +90,11 @@ contract ControllersManagementTest is Test {
         assertTrue(cvc.isControllerEnabled(account, vault));
         controllersPre = cvc.getControllers(account);
 
-        if (msgSender != alice) {
-            vm.expectEmit(true, true, false, false, address(cvc));
-            emit OperatorAuthenticated(msgSender, account);
-        }
         vm.prank(msgSender);
-        vm.recordLogs();
         cvc.handlerEnableController(account, vault);
-        logs = vm.getRecordedLogs();
 
         controllersPost = cvc.getControllers(account);
 
-        assertEq(logs.length, msgSender != alice ? 1 : 0);
         assertEq(controllersPost.length, controllersPre.length);
         assertEq(controllersPost[0], controllersPre[0]);
         assertTrue(cvc.isControllerEnabled(account, vault));

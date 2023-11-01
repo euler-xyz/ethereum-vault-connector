@@ -56,19 +56,18 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         signerMock = address(new SignerMock());
     }
 
+    fallback() external payable {}
+
     function getTouchedAccounts() external view returns (address[] memory) {
         return touchedAccounts;
     }
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-
-        if (getAccountOwnerInternal(account) == address(0)) {
-            setAccountOwnerInternal(account, account);
-        }
-
-        operatorLookup[getAddressPrefixInternal(account)][msg.sender] = (1 <<
-            (uint160(account) ^ uint160(getAccountOwnerInternal(account))));
+        setAccountOwnerInternal(account, account);
+        operatorLookup[getAddressPrefixInternal(account)][msg.sender] = type(
+            uint
+        ).max;
         vm.etch(vault, vaultMock.code);
     }
 
@@ -77,6 +76,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         uint nonceNamespace,
         uint nonce
     ) public payable override {
+        if (msg.sender == address(this)) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
         setAccountOwnerInternal(
             address(uint160(addressPrefix) << 8),
@@ -91,6 +91,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address operator,
         uint accountOperatorAuthorized
     ) public payable override {
+        if (msg.sender == address(this)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
@@ -106,6 +107,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address operator,
         bool authorized
     ) public payable override {
+        if (msg.sender == address(this)) return;
+        if (account == address(0)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         account = msg.sender;
@@ -117,6 +120,9 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address account,
         address vault
     ) public payable override {
+        if (msg.sender == address(this)) return;
+        if (haveCommonOwnerInternal(account, msg.sender)) return;
+        if (account == address(0)) return;
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
@@ -127,6 +133,9 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address account,
         address vault
     ) public payable override {
+        if (msg.sender == address(this)) return;
+        if (haveCommonOwnerInternal(account, msg.sender)) return;
+        if (account == address(0)) return;
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
@@ -137,6 +146,9 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         address account,
         address vault
     ) public payable override {
+        if (msg.sender == address(this)) return;
+        if (haveCommonOwnerInternal(account, msg.sender)) return;
+        if (account == address(0)) return;
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
@@ -144,22 +156,35 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 
     function disableController(address account) public payable override {
+        if (account == address(0)) return;
         if (uint160(msg.sender) <= 10) return;
         setup(account, msg.sender);
         super.disableController(account);
     }
 
+    function callback(
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) public payable override returns (bytes memory result) {
+        deal(address(this), value);
+        result = super.callback(onBehalfOfAccount, value, data);
+    }
+
     function call(
         address targetContract,
         address onBehalfOfAccount,
+        uint value,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
+        if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
         if (targetContract == address(this)) return "";
         setup(onBehalfOfAccount, targetContract);
+        deal(address(this), value);
 
-        result = super.call(targetContract, onBehalfOfAccount, data);
+        result = super.call(targetContract, onBehalfOfAccount, value, data);
     }
 
     function callInternal(
@@ -168,6 +193,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         uint value,
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
+        if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender))
+            return (true, "");
         if (uint160(targetContract) <= 10) return (true, "");
         if (targetContract == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)
             return (true, "");
@@ -184,6 +211,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,
+        uint value,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
         if (uint160(msg.sender) <= 10) return "";
@@ -192,6 +220,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (targetContract == address(this)) return "";
 
         setup(onBehalfOfAccount, msg.sender);
+        deal(address(this), value);
         accountCollaterals[onBehalfOfAccount].insert(targetContract);
 
         uint8 numElementsCache = accountControllers[onBehalfOfAccount]
@@ -201,7 +230,12 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
-        result = super.impersonate(targetContract, onBehalfOfAccount, data);
+        result = super.impersonate(
+            targetContract,
+            onBehalfOfAccount,
+            value,
+            data
+        );
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
@@ -212,17 +246,27 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         uint nonceNamespace,
         uint nonce,
         uint deadline,
+        uint value,
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
         if (uint160(signer) <= 10) return;
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
+        deal(address(this), value);
         nonce =
             nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] +
             1;
         deadline = block.timestamp;
-        super.permit(signer, nonceNamespace, nonce, deadline, data, signature);
+        super.permit(
+            signer,
+            nonceNamespace,
+            nonce,
+            deadline,
+            value,
+            data,
+            signature
+        );
     }
 
     function batch(BatchItem[] calldata items) public payable override {
@@ -286,31 +330,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         accountControllers[account].firstElement = firstElementCache;
     }
 
-    function forgiveAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable override {
-        if (msg.sender == address(0)) return;
-        if (accounts.length > Set.MAX_ELEMENTS) return;
-
-        uint8[] memory numElementsCache = new uint8[](accounts.length);
-        address[] memory firstElementCache = new address[](accounts.length);
-        for (uint i = 0; i < accounts.length; i++) {
-            address account = accounts[i];
-            numElementsCache[i] = accountControllers[account].numElements;
-            firstElementCache[i] = accountControllers[account].firstElement;
-            accountControllers[account].numElements = 1;
-            accountControllers[account].firstElement = msg.sender;
-        }
-
-        super.forgiveAccountsStatusCheck(accounts);
-
-        for (uint i = accounts.length; i > 0; i--) {
-            address account = accounts[i - 1];
-            accountControllers[account].numElements = numElementsCache[i - 1];
-            accountControllers[account].firstElement = firstElementCache[i - 1];
-        }
-    }
-
     function requireAccountStatusCheckInternal(address) internal pure override {
         return;
     }
@@ -318,8 +337,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function requireVaultStatusCheckInternal(address) internal pure override {
         return;
     }
-
-    fallback() external payable {}
 
     function exposeAccountCollaterals(
         address account
@@ -392,12 +409,11 @@ contract CreditVaultConnectorInvariants is Test {
         );
         cvc.getCurrentOnBehalfOfAccount(address(0));
 
-        assertEq(cvc.getRawExecutionContext(), 1 << 208);
-        assertEq(cvc.getCurrentBatchDepth(), 0);
+        assertEq(cvc.getRawExecutionContext(), 1 << 200);
+        assertEq(cvc.getCurrentCallDepth(), 0);
         assertEq(cvc.areChecksInProgress(), false);
         assertEq(cvc.isImpersonationInProgress(), false);
         assertEq(cvc.isOperatorAuthenticated(), false);
-        assertEq(cvc.isPermitInProgress(), false);
         assertEq(cvc.isSimulationInProgress(), false);
     }
 

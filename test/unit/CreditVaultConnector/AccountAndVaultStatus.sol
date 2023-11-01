@@ -113,7 +113,7 @@ contract AccountAndVaultStatusTest is Test {
         }
 
         for (uint i = 0; i < numberOfAddresses; i++) {
-            cvc.setBatchDepth(0);
+            cvc.setCallDepth(0);
 
             address account = accounts[i];
             address controller = controllers[i];
@@ -125,7 +125,7 @@ contract AccountAndVaultStatusTest is Test {
             Vault(vault).setVaultStatusState(1);
 
             // status checks will be scheduled for later due to deferred state
-            cvc.setBatchDepth(1);
+            cvc.setCallDepth(1);
 
             // even though the account status state and the vault status state were
             // set to 1 which should revert, it doesn't because in checks deferral

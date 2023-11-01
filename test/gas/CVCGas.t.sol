@@ -11,9 +11,11 @@ contract CVCHarness is CreditVaultConnector {
         uint nonceNamespace,
         uint nonce,
         uint deadline,
+        uint value,
         bytes calldata data
     ) external view returns (bytes32) {
-        return getPermitHash(signer, nonceNamespace, nonce, deadline, data);
+        return
+            getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
     }
 
     function getIsValidERC1271Signature(
@@ -40,9 +42,10 @@ contract CVCGas is Test {
         uint nonceNamespace,
         uint nonce,
         uint deadline,
+        uint value,
         bytes calldata data
     ) public view {
-        cvc.permitHash(signer, nonceNamespace, nonce, deadline, data);
+        cvc.permitHash(signer, nonceNamespace, nonce, deadline, value, data);
     }
 
     function testGas_haveCommonOwner(address a, address b) public view {

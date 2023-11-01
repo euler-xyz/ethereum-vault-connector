@@ -65,11 +65,13 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.disableController(account) {} catch {}
 
+        try cvc.callback(account, 0, "") {} catch {}
+
         hevm.prank(account);
-        try cvc.call(address(this), account, "") {} catch {}
+        try cvc.call(address(this), account, 0, "") {} catch {}
 
         hevm.prank(address(this));
-        try cvc.impersonate(address(this), account, "") {} catch {}
+        try cvc.impersonate(address(this), account, 0, "") {} catch {}
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
         items[0].targetContract = address(this);
@@ -128,12 +130,14 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.disableController(account) {} catch {}
 
+        try cvc.callback(account, 0, "") {} catch {}
+
         hevm.prank(account);
-        try cvc.call(address(this), account, "") {} catch {}
+        try cvc.call(address(this), account, 0, "") {} catch {}
 
         hevm.prank(address(this));
         cvc.enableCollateral(account, address(this));
-        try cvc.impersonate(address(this), account, "") {} catch {}
+        try cvc.impersonate(address(this), account, 0, "") {} catch {}
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
         items[0].targetContract = address(this);
@@ -195,13 +199,13 @@ contract VaultEchidna is ICreditVault {
         try cvc.disableController(account) {} catch {}
 
         hevm.prank(account);
-        try cvc.call(address(targetEchidna), account, "") {} catch {}
+        try cvc.call(address(targetEchidna), account, 0, "") {} catch {}
 
         hevm.prank(account);
         try cvc.enableCollateral(account, address(targetEchidna)) {} catch {}
 
         hevm.prank(address(this));
-        try cvc.impersonate(address(targetEchidna), account, "") {} catch {}
+        try cvc.impersonate(address(targetEchidna), account, 0, "") {} catch {}
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
         items[0].targetContract = address(targetEchidna);
@@ -270,6 +274,32 @@ contract EchidnaTest {
         cvc.disableController(account);
     }
 
+    function permit(
+        bytes calldata data,
+        bytes calldata signature
+    ) public payable {
+        cvc.permit(
+            address(signerEchidna),
+            0,
+            cvc.getNonce(cvc.getAddressPrefix(address(cvc)), 0) + 1,
+            block.timestamp,
+            0,
+            data,
+            signature
+        );
+    }
+
+    function callback(
+        address onBehalfOfAccount,
+        bytes calldata data
+    ) public payable {
+        if (
+            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(cvc)
+        ) return;
+        hevm.prank(address(vaultEchidna));
+        cvc.callback(onBehalfOfAccount, 0, data);
+    }
+
     function call(
         address onBehalfOfAccount,
         bytes calldata data
@@ -278,7 +308,7 @@ contract EchidnaTest {
             onBehalfOfAccount == address(0) || onBehalfOfAccount == address(cvc)
         ) return;
         hevm.prank(onBehalfOfAccount);
-        cvc.call(address(vaultEchidna), onBehalfOfAccount, data);
+        cvc.call(address(vaultEchidna), onBehalfOfAccount, 0, data);
     }
 
     function impersonate(
@@ -296,21 +326,7 @@ contract EchidnaTest {
         cvc.enableController(onBehalfOfAccount, address(vaultEchidna));
 
         hevm.prank(address(vaultEchidna));
-        cvc.impersonate(address(vaultEchidna), onBehalfOfAccount, data);
-    }
-
-    function permit(
-        bytes calldata data,
-        bytes calldata signature
-    ) public payable {
-        cvc.permit(
-            address(signerEchidna),
-            0,
-            cvc.getNonce(cvc.getAddressPrefix(address(cvc)), 0) + 1,
-            block.timestamp,
-            data,
-            signature
-        );
+        cvc.impersonate(address(vaultEchidna), onBehalfOfAccount, 0, data);
     }
 
     function batch(ICVC.BatchItem[] calldata items) public payable {
@@ -342,20 +358,8 @@ contract EchidnaTest {
         cvc.requireAccountStatusCheck(account);
     }
 
-    function requireAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable {
-        cvc.requireAccountsStatusCheck(accounts);
-    }
-
     function requireAccountStatusCheckNow(address account) public payable {
         cvc.requireAccountStatusCheckNow(account);
-    }
-
-    function requireAccountsStatusCheckNow(
-        address[] memory accounts
-    ) public payable {
-        cvc.requireAccountsStatusCheckNow(accounts);
     }
 
     function requireAllAccountsStatusCheckNow() public payable {
@@ -366,24 +370,12 @@ contract EchidnaTest {
         cvc.forgiveAccountStatusCheck(account);
     }
 
-    function forgiveAccountsStatusCheck(
-        address[] memory account
-    ) public payable {
-        cvc.forgiveAccountsStatusCheck(account);
-    }
-
     function requireVaultStatusCheck() public payable {
         cvc.requireVaultStatusCheck();
     }
 
     function requireVaultStatusCheckNow(address vault) public payable {
         cvc.requireVaultStatusCheckNow(vault);
-    }
-
-    function requireVaultsStatusCheckNow(
-        address[] calldata vaults
-    ) public payable {
-        cvc.requireVaultsStatusCheckNow(vaults);
     }
 
     function requireAllVaultsStatusCheckNow() public payable {
