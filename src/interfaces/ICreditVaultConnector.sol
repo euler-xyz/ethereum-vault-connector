@@ -272,19 +272,7 @@ interface ICVC {
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
     /// @dev This function always reverts as it's only used for simulation purposes.
     /// @param items An array of batch items to be executed.
-    /// @return batchItemsResult An array of batch item results for each item.
-    /// @return accountsStatusResult An array of account status results for each account.
-    /// @return vaultsStatusResult An array of vault status results for each vault.
-    function batchRevert(
-        BatchItem[] calldata items
-    )
-        external
-        payable
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        );
+    function batchRevert(BatchItem[] calldata items) external payable;
 
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
     /// @dev This function does not modify state and should only be used for simulation purposes.

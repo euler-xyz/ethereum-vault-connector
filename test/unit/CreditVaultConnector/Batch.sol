@@ -22,19 +22,9 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
 
     function batchRevert(
         BatchItem[] calldata
-    )
-        public
-        payable
-        override
-        nonReentrant
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
+    ) public payable override nonReentrant {
         // doesn't revert as expected
-        return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
+        return;
     }
 }
 
