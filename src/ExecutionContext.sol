@@ -26,13 +26,6 @@ library ExecutionContext {
 
     error CallDepthViolation();
 
-    function isEqual(
-        EC context1,
-        EC context2
-    ) internal pure returns (bool result) {
-        result = EC.unwrap(context1) == EC.unwrap(context2);
-    }
-
     function areChecksDeferred(EC context) internal pure returns (bool result) {
         result = EC.unwrap(context) & CALL_DEPTH_MASK != 0;
     }
@@ -50,29 +43,6 @@ library ExecutionContext {
         unchecked {
             result = EC.wrap(EC.unwrap(context) + 1);
         }
-    }
-
-    /// #if_succeeds "call depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function decreaseCallDepth(EC context) internal pure returns (EC result) {
-        if (getCallDepth(context) > 0) {
-            revert CallDepthViolation();
-        }
-
-        unchecked {
-            result = EC.wrap(EC.unwrap(context) - 1);
-        }
-    }
-
-    /// #if_succeeds "call depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function setCallDepth(
-        EC context,
-        uint8 callDepth
-    ) internal pure returns (EC result) {
-        if (callDepth > CALL_DEPTH_MAX) {
-            revert CallDepthViolation();
-        }
-
-        result = EC.wrap((EC.unwrap(context) & ~CALL_DEPTH_MASK) | callDepth);
     }
 
     function getOnBehalfOfAccount(
@@ -106,12 +76,6 @@ library ExecutionContext {
         result = EC.wrap(EC.unwrap(context) | CHECKS_LOCK_MASK);
     }
 
-    function clearChecksInProgress(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~CHECKS_LOCK_MASK);
-    }
-
     function isImpersonationInProgress(
         EC context
     ) internal pure returns (bool result) {
@@ -122,12 +86,6 @@ library ExecutionContext {
         EC context
     ) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | IMPERSONATE_LOCK_MASK);
-    }
-
-    function clearImpersonationInProgress(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~IMPERSONATE_LOCK_MASK);
     }
 
     function isOperatorAuthenticated(
@@ -158,12 +116,6 @@ library ExecutionContext {
         EC context
     ) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | SIMULATION_MASK);
-    }
-
-    function clearSimulationInProgress(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~SIMULATION_MASK);
     }
 
     function initialize() internal pure returns (EC result) {
