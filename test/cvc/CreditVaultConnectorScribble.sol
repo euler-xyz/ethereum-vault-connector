@@ -187,11 +187,9 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(vault);
-    function requireVaultStatusCheckNow(
-        address vault
-    ) public payable virtual override {
-        super.requireVaultStatusCheckNow(vault);
+    /// #if_succeeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(msg.sender);
+    function requireVaultStatusCheckNow() public payable virtual override {
+        super.requireVaultStatusCheckNow();
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());

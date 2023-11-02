@@ -149,12 +149,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         expectedVaultsChecked.push(msg.sender);
     }
 
-    function requireVaultStatusCheckNow(address vault) public payable override {
-        if (vaultStatusChecks.contains(vault)) {
-            expectedVaultsChecked.push(vault);
+    function requireVaultStatusCheckNow() public payable override {
+        if (vaultStatusChecks.contains(msg.sender)) {
+            expectedVaultsChecked.push(msg.sender);
         }
 
-        super.requireVaultStatusCheckNow(vault);
+        super.requireVaultStatusCheckNow();
     }
 
     function requireAccountAndVaultStatusCheck(

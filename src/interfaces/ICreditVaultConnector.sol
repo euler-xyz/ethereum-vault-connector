@@ -340,10 +340,9 @@ interface ICVC {
     /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the top-level checks-deferrable call. This function can only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
 
-    /// @notice Immediately checks the status of a vault if the check had been deferred by it prior to this call. It reverts if status is not valid.
-    /// @dev Vault status check is performed on the fly regardless of the current execution context state, but only if the check had been deferred by the vault prior to this call. If vault status check was previously deferred, it is removed from the set.
-    /// @param vault The address of the vault to be checked.
-    function requireVaultStatusCheckNow(address vault) external payable;
+    /// @notice Immediately checks the status of a vault. It reverts if status is not valid.
+    /// @dev Vault status check is performed on the fly regardless of the current execution context state. If vault status check was previously deferred, it is removed from the set. This function can only be called by the vault itself. If checking the vault status is a two-step process, i.e. the vault requires its prior state snapshot, this function should be called after the snapshot is taken and the vault should handle the situation when the snapshot is not available then calling this function.
+    function requireVaultStatusCheckNow() external payable;
 
     /// @notice Immediately checks the status of all vaults for which the checks were deferred and reverts if any of them is not valid.
     /// @dev Vault status checks are performed on the fly regardless of the current execution context state. The deferred vaults set is cleared.

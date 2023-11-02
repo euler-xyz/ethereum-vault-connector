@@ -91,7 +91,9 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireVaultStatusCheck() {} catch {}
 
-        try cvc.requireVaultStatusCheckNow(address(this)) {} catch {}
+        hevm.prank(address(this));
+        try cvc.requireVaultStatusCheckNow() {} catch {}
+
         try cvc.requireAllVaultsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
@@ -157,7 +159,9 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireVaultStatusCheck() {} catch {}
 
-        try cvc.requireVaultStatusCheckNow(address(this)) {} catch {}
+        hevm.prank(address(this));
+        try cvc.requireVaultStatusCheckNow() {} catch {}
+
         try cvc.requireAllVaultsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
@@ -225,7 +229,9 @@ contract VaultEchidna is ICreditVault {
         hevm.prank(address(this));
         try cvc.requireVaultStatusCheck() {} catch {}
 
-        try cvc.requireVaultStatusCheckNow(address(this)) {} catch {}
+        hevm.prank(address(this));
+        try cvc.requireVaultStatusCheckNow() {} catch {}
+
         try cvc.requireAllVaultsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
@@ -374,8 +380,8 @@ contract EchidnaTest {
         cvc.requireVaultStatusCheck();
     }
 
-    function requireVaultStatusCheckNow(address vault) public payable {
-        cvc.requireVaultStatusCheckNow(vault);
+    function requireVaultStatusCheckNow() public payable {
+        cvc.requireVaultStatusCheckNow();
     }
 
     function requireAllVaultsStatusCheckNow() public payable {

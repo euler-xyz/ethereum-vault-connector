@@ -852,12 +852,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function requireVaultStatusCheckNow(
-        address vault
-    ) public payable virtual nonReentrantChecks {
-        if (vaultStatusChecks.remove(vault)) {
-            requireVaultStatusCheckInternal(vault);
-        }
+    function requireVaultStatusCheckNow()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
+        vaultStatusChecks.remove(msg.sender);
+        requireVaultStatusCheckInternal(msg.sender);
     }
 
     /// @inheritdoc ICVC
