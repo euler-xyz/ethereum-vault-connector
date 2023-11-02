@@ -714,17 +714,11 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function batchRevert(
         BatchItem[] calldata items
-    )
-        public
-        payable
-        virtual
-        nonReentrant
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
+    ) public payable virtual nonReentrant {
+        BatchItemResult[] memory batchItemsResult;
+        BatchItemResult[] memory accountsStatusResult;
+        BatchItemResult[] memory vaultsStatusResult;
+
         EC contextCache = executionContext;
 
         executionContext = contextCache

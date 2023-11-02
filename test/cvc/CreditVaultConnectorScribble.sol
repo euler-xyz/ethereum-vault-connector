@@ -131,18 +131,8 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "this function must always revert" false;
     function batchRevert(
         BatchItem[] calldata items
-    )
-        public
-        payable
-        virtual
-        override
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
-        return super.batchRevert(items);
+    ) public payable virtual override {
+        super.batchRevert(items);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());

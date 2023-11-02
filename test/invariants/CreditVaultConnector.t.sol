@@ -282,20 +282,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         super.batch(items);
     }
 
-    function batchRevert(
-        BatchItem[] calldata
-    )
-        public
-        payable
-        override
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
-        BatchItemResult[] memory x = new BatchItemResult[](0);
-        return (x, x, x);
+    function batchRevert(BatchItem[] calldata) public payable override {
+        return;
     }
 
     function batchSimulation(
