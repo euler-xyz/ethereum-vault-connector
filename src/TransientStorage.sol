@@ -26,8 +26,8 @@ abstract contract TransientStorage {
 
         // for the permanent data, there's no need to care that much about optimizations. each account has its two sets.
         // usually, an address inserted to either of them won't be removed within the same transaction. the only optimization
-        // applied (directly in the Set contract) is that on the first element insertion, the stamp is set to non-zero value 
-        // to always keep that storage slot in non-zero state. it allows for cheaper SSTORE when an element is inserted again 
+        // applied (directly in the Set contract) is that on the first element insertion, the stamp is set to non-zero value
+        // to always keep that storage slot in non-zero state. it allows for cheaper SSTORE when an element is inserted again
         // after clearing the set.
 
         // for the transient data, an address insertion should be as cheap as possible. hence on construction, we store

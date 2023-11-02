@@ -59,7 +59,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     mapping(uint152 addressPrefix => mapping(uint nonceNamespace => uint nonce))
         internal nonceLookup;
 
-    mapping(uint152 addressPrefix => mapping(address operator => uint accountOperatorAuthorized))
+    mapping(uint152 addressPrefix => mapping(address operator => uint operatorBitField))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +71,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     event OperatorStatus(
         uint152 indexed addressPrefix,
         address indexed operator,
-        uint accountOperatorAuthorized
+        uint operatorBitField
     );
     event OperatorAuthenticated(
         address indexed operator,
@@ -402,7 +402,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint accountOperatorAuthorized
+        uint operatorBitField
     ) public payable virtual onlyOwner(addressPrefix) {
         // if CVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
@@ -417,16 +417,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidAddress();
         }
 
-        if (
-            operatorLookup[addressPrefix][operator] != accountOperatorAuthorized
-        ) {
-            operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
+        if (operatorLookup[addressPrefix][operator] != operatorBitField) {
+            operatorLookup[addressPrefix][operator] = operatorBitField;
 
-            emit OperatorStatus(
-                addressPrefix,
-                operator,
-                accountOperatorAuthorized
-            );
+            emit OperatorStatus(addressPrefix, operator, operatorBitField);
         }
     }
 
@@ -464,23 +458,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
         uint bitMask = 1 << (uint160(owner) ^ uint160(account));
-        uint oldAccountOperatorAuthorized = operatorLookup[addressPrefix][
-            operator
-        ];
-        uint newAccountOperatorAuthorized = authorized
-            ? oldAccountOperatorAuthorized | bitMask
-            : oldAccountOperatorAuthorized & ~bitMask;
+        uint oldOperatorBitField = operatorLookup[addressPrefix][operator];
+        uint newOperatorBitField = authorized
+            ? oldOperatorBitField | bitMask
+            : oldOperatorBitField & ~bitMask;
 
-        if (oldAccountOperatorAuthorized != newAccountOperatorAuthorized) {
-            operatorLookup[addressPrefix][
-                operator
-            ] = newAccountOperatorAuthorized;
+        if (oldOperatorBitField != newOperatorBitField) {
+            operatorLookup[addressPrefix][operator] = newOperatorBitField;
 
-            emit OperatorStatus(
-                addressPrefix,
-                operator,
-                newAccountOperatorAuthorized
-            );
+            emit OperatorStatus(addressPrefix, operator, newOperatorBitField);
         }
     }
 

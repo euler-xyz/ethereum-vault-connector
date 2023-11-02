@@ -25,7 +25,7 @@ interface ICVC {
     function getCurrentBatchDepth() external view returns (uint);
 
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
-    /// @dev When checks in progress, on behalf of account is always address(0).
+    /// @dev When checks in progress, on behalf of account is always address(0). When address is zero, the function reverts to protect the consumer from ever relying on the on behalf of account address which is in its default state.
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the operation is being executed at the moment.
     /// @return onBehalfOfAccount An account that has been authenticated and on behalf of which the operation is being executed at the moment.
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck is address(0).
