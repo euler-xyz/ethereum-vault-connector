@@ -247,11 +247,8 @@ contract BatchTest is Test {
         cvc.handlerBatch(items);
     }
 
-    function test_RevertIfDepthExceeded_Batch_BatchRevert(
-        address alice,
-        uint seed
-    ) external {
-        vm.assume(alice != address(cvc));
+    function test_RevertIfDepthExceeded_Batch(address alice) external {
+        vm.assume(alice != address(0) && alice != address(cvc));
         address vault = address(new Vault(cvc));
 
         ICVC.BatchItem[] memory items = new ICVC.BatchItem[](10);
@@ -265,6 +262,7 @@ contract BatchTest is Test {
             if (j == items.length - 1) {
                 ICVC.BatchItem[] memory nestedItems = new ICVC.BatchItem[](2);
 
+                // non-checks-deferrable call
                 nestedItems[0].onBehalfOfAccount = alice;
                 nestedItems[0].targetContract = vault;
                 nestedItems[0].value = 0;
@@ -273,6 +271,7 @@ contract BatchTest is Test {
                     alice
                 );
 
+                // non-checks-deferrable call
                 nestedItems[1].onBehalfOfAccount = alice;
                 nestedItems[1].targetContract = address(cvc);
                 nestedItems[1].value = 0;
@@ -283,9 +282,7 @@ contract BatchTest is Test {
                 );
 
                 items[j].data = abi.encodeWithSelector(
-                    seed % 2 == 0
-                        ? cvc.batch.selector
-                        : cvc.batchRevert.selector,
+                    cvc.batch.selector,
                     nestedItems
                 );
             } else {
@@ -303,11 +300,6 @@ contract BatchTest is Test {
         vm.expectRevert(ExecutionContext.CallDepthViolation.selector);
         cvc.batch(items);
 
-        // check one item less call only if the most nested batch call doesn't go through
-        // the batchRevert() function. if it does, we'll revert with a standard
-        // CVC_RevertedBatchResult error
-        if (seed % 2 != 0) return;
-
         // should succeed when one less item. doesn't revert anymore,
         // but checks are performed only once, when the top level batch concludes
         ICVC.BatchItem[] memory itemsOneLess = new ICVC.BatchItem[](8);
@@ -320,7 +312,7 @@ contract BatchTest is Test {
     }
 
     // for coverage
-    function test_RevertIfDepthExceeded_BatchSimulation(
+    function test_RevertIfSimulationBatchNested_BatchRevert_BatchSimulation(
         address alice
     ) external {
         vm.assume(alice != address(cvc));
@@ -335,7 +327,15 @@ contract BatchTest is Test {
         cvc.setCallDepth(10);
 
         vm.prank(alice);
-        vm.expectRevert(ExecutionContext.CallDepthViolation.selector);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_SimulationBatchNested.selector
+        );
+        cvc.batchRevert(items);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            CreditVaultConnector.CVC_SimulationBatchNested.selector
+        );
         cvc.batchSimulation(items);
     }
 

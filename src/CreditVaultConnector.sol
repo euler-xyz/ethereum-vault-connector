@@ -105,6 +105,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     error CVC_ChecksReentrancy();
     error CVC_ImpersonateReentrancy();
     error CVC_ControllerViolation();
+    error CVC_SimulationBatchNested();
     error CVC_RevertedBatchResult(
         BatchItemResult[] batchItemsResult,
         BatchItemResult[] accountsStatusResult,
@@ -721,18 +722,20 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         EC contextCache = executionContext;
 
+        if (contextCache.areChecksDeferred()) {
+            revert CVC_SimulationBatchNested();
+        }
+
         executionContext = contextCache
             .increaseCallDepth()
             .setSimulationInProgress();
 
         batchItemsResult = batchInternal(items, true);
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
+        executionContext = contextCache.setChecksInProgress();
 
-            accountsStatusResult = checkStatusAll(SetType.Account, true);
-            vaultsStatusResult = checkStatusAll(SetType.Vault, true);
-        }
+        accountsStatusResult = checkStatusAll(SetType.Account, true);
+        vaultsStatusResult = checkStatusAll(SetType.Vault, true);
 
         executionContext = contextCache;
 
