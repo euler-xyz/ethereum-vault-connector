@@ -167,4 +167,75 @@ library Set {
             }
         }
     }
+
+    /// @notice Iterates over each element in the set and applies the callback function to it.
+    /// @dev The set is cleared as a result of this call.
+    /// @param setStorage The set storage to be processed.
+    /// @param callback The function to be applied to each element.
+    function forEachAndClear(
+        SetStorage storage setStorage,
+        function(address) callback
+    ) internal {
+        uint numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
+
+        if (numElements == 0) return;
+
+        setStorage.numElements = 0;
+
+        for (uint i; i < numElements; ) {
+            address element;
+            if (i == 0) {
+                element = firstElement;
+                delete setStorage.firstElement;
+            } else {
+                element = setStorage.elements[i].value;
+                delete setStorage.elements[i].value;
+            }
+
+            callback(element);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Iterates over each element in the set and applies the callback function to it, returning the array of callback results.
+    /// @dev The set is cleared as a result of this call.
+    /// @param setStorage The set storage to be processed.
+    /// @param callback The function to be applied to each element.
+    /// @return result An array of encoded bytes that are the results of the callback function.
+    function forEachAndClearWithResult(
+        SetStorage storage setStorage,
+        function(address) returns (bool, bytes memory) callback
+    ) internal returns (bytes[] memory) {
+        uint numElements = setStorage.numElements;
+        address firstElement = setStorage.firstElement;
+        bytes[] memory result = new bytes[](numElements);
+
+        if (numElements == 0) return result;
+
+        setStorage.numElements = 0;
+
+        for (uint i; i < numElements; ) {
+            address element;
+            if (i == 0) {
+                element = firstElement;
+                delete setStorage.firstElement;
+            } else {
+                element = setStorage.elements[i].value;
+                delete setStorage.elements[i].value;
+            }
+
+            (bool result1, bytes memory result2) = callback(element);
+            result[i] = abi.encode(result1, result2);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        return result;
+    }
 }

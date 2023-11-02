@@ -610,8 +610,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
         }
 
         executionContext = contextCache;
@@ -646,8 +646,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
         }
 
         executionContext = contextCache;
@@ -684,8 +684,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
         }
 
         executionContext = contextCache;
@@ -698,13 +698,13 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         EC contextCache = executionContext;
         executionContext = contextCache.increaseCallDepth();
 
-        batchInternal(items, false);
+        batchInternal(items);
 
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
         }
 
         executionContext = contextCache;
@@ -730,12 +730,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             .increaseCallDepth()
             .setSimulationInProgress();
 
-        batchItemsResult = batchInternal(items, true);
+        batchItemsResult = batchInternalWithResult(items);
 
         executionContext = contextCache.setChecksInProgress();
 
-        accountsStatusResult = checkStatusAll(SetType.Account, true);
-        vaultsStatusResult = checkStatusAll(SetType.Vault, true);
+        accountsStatusResult = checkStatusAllWithResult(SetType.Account);
+        vaultsStatusResult = checkStatusAllWithResult(SetType.Vault);
 
         executionContext = contextCache;
 
@@ -815,7 +815,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         nonReentrantChecks
     {
-        checkStatusAll(SetType.Account, false);
+        checkStatusAll(SetType.Account);
     }
 
     /// @inheritdoc ICVC
@@ -866,7 +866,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         nonReentrantChecks
     {
-        checkStatusAll(SetType.Vault, false);
+        checkStatusAll(SetType.Vault);
     }
 
     /// @inheritdoc ICVC
@@ -995,41 +995,52 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         );
     }
 
-    function batchInternal(
-        BatchItem[] calldata items,
-        bool returnResult
-    ) internal virtual returns (BatchItemResult[] memory batchItemsResult) {
+    function callBatchItemInternal(
+        BatchItem calldata item
+    ) internal returns (bool success, bytes memory result) {
+        if (item.targetContract == address(this)) {
+            // delegatecall is used here to preserve msg.sender in order
+            // to be able to perform authentication
+            (success, result) = address(this).delegatecall(item.data);
+        } else {
+            (success, result) = callInternal(
+                item.targetContract,
+                item.onBehalfOfAccount,
+                item.value,
+                item.data
+            );
+        }
+    }
+
+    function batchInternal(BatchItem[] calldata items) internal {
         uint length = items.length;
 
-        if (returnResult) {
-            batchItemsResult = new BatchItemResult[](length);
-        }
-
         for (uint i; i < length; ) {
-            BatchItem calldata item = items[i];
-            address targetContract = item.targetContract;
-            bool success;
-            bytes memory result;
+            (bool success, bytes memory result) = callBatchItemInternal(
+                items[i]
+            );
 
-            if (targetContract == address(this)) {
-                // delegatecall is used here to preserve msg.sender in order
-                // to be able to perform authentication
-                (success, result) = address(this).delegatecall(item.data);
-            } else {
-                (success, result) = callInternal(
-                    targetContract,
-                    item.onBehalfOfAccount,
-                    item.value,
-                    item.data
-                );
-            }
-
-            if (returnResult) {
-                batchItemsResult[i].success = success;
-                batchItemsResult[i].result = result;
-            } else if (!success) {
+            if (!success) {
                 revertBytes(result);
             }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function batchInternalWithResult(
+        BatchItem[] calldata items
+    ) internal returns (BatchItemResult[] memory batchItemsResult) {
+        uint length = items.length;
+        batchItemsResult = new BatchItemResult[](length);
+
+        for (uint i; i < length; ) {
+            (
+                batchItemsResult[i].success,
+                batchItemsResult[i].result
+            ) = callBatchItemInternal(items[i]);
 
             unchecked {
                 ++i;
@@ -1096,50 +1107,36 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
-    function checkStatusAll(
-        SetType setType,
-        bool returnResult
-    ) internal virtual returns (BatchItemResult[] memory result) {
-        function(address) returns (bool, bytes memory) checkStatus;
-        function(address) requireStatusCheck;
-        SetStorage storage setStorage;
+    function checkStatusAll(SetType setType) internal virtual {
+        setType == SetType.Account
+            ? accountStatusChecks.forEachAndClear(
+                requireAccountStatusCheckInternal
+            )
+            : vaultStatusChecks.forEachAndClear(
+                requireVaultStatusCheckInternal
+            );
+    }
 
-        if (setType == SetType.Account) {
-            checkStatus = checkAccountStatusInternal;
-            requireStatusCheck = requireAccountStatusCheckInternal;
-            setStorage = accountStatusChecks;
-        } else {
-            checkStatus = checkVaultStatusInternal;
-            requireStatusCheck = requireVaultStatusCheckInternal;
-            setStorage = vaultStatusChecks;
-        }
+    function checkStatusAllWithResult(
+        SetType setType
+    ) internal virtual returns (BatchItemResult[] memory checksResult) {
+        bytes[] memory callbackResult = setType == SetType.Account
+            ? accountStatusChecks.forEachAndClearWithResult(
+                checkAccountStatusInternal
+            )
+            : vaultStatusChecks.forEachAndClearWithResult(
+                checkVaultStatusInternal
+            );
 
-        uint numElements = setStorage.numElements;
-        address firstElement = setStorage.firstElement;
+        uint length = callbackResult.length;
+        checksResult = new BatchItemResult[](length);
 
-        if (returnResult) result = new BatchItemResult[](numElements);
-
-        if (numElements == 0) return result;
-
-        setStorage.numElements = 0;
-
-        for (uint i; i < numElements; ) {
-            address addressToCheck;
-            if (i == 0) {
-                addressToCheck = firstElement;
-                delete setStorage.firstElement;
-            } else {
-                addressToCheck = setStorage.elements[i].value;
-                delete setStorage.elements[i].value;
-            }
-
-            if (returnResult) {
-                (result[i].success, result[i].result) = checkStatus(
-                    addressToCheck
-                );
-            } else {
-                requireStatusCheck(addressToCheck);
-            }
+        for (uint i; i < length; ) {
+            (bool isValid, bytes memory result) = abi.decode(
+                callbackResult[i],
+                (bool, bytes)
+            );
+            checksResult[i] = BatchItemResult(isValid, result);
 
             unchecked {
                 ++i;

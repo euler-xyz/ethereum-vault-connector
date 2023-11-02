@@ -246,10 +246,17 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
     /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
     /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
-    function checkStatusAll(
-        SetType setType,
-        bool returnResult
+    function checkStatusAll(SetType setType) internal override {
+        return super.checkStatusAll(setType);
+    }
+
+    /// #if_succeeds "checks reentrancy guard must be locked" executionContext.areChecksInProgress();
+    /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
+    /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
+    /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
+    function checkStatusAllWithResult(
+        SetType setType
     ) internal override returns (BatchItemResult[] memory result) {
-        return super.checkStatusAll(setType, returnResult);
+        return super.checkStatusAllWithResult(setType);
     }
 }
