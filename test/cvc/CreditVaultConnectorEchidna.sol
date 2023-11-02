@@ -155,8 +155,8 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
 
             // verify if cached context value can be reused
             assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
@@ -197,8 +197,8 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
 
             // verify if cached context value can be reused
             assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
@@ -244,8 +244,8 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
 
             // verify if cached context value can be reused
             assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
@@ -261,7 +261,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         EC contextCache = executionContext;
         executionContext = contextCache.increaseCallDepth();
 
-        batchInternal(items, false);
+        batchInternal(items);
 
         // verify if cached context value can be reused
         assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
@@ -269,8 +269,8 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress();
 
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
 
             // verify if cached context value can be reused
             assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
