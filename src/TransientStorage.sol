@@ -6,6 +6,8 @@ import "./ExecutionContext.sol";
 import "./Set.sol";
 
 abstract contract TransientStorage {
+    using Set for SetStorage;
+    
     enum SetType {
         Account,
         Vault
@@ -35,16 +37,7 @@ abstract contract TransientStorage {
         // that both accountStatusChecks and vaultStatusChecks are always cleared at the end of the transaction.
         // with dummy values set, the transition from zero to non-zero and back to zero will be significantly cheaper
         // than it would be otherwise
-        accountStatusChecks.stamp = Set.DUMMY_STAMP;
-        vaultStatusChecks.stamp = Set.DUMMY_STAMP;
-
-        for (uint i = 1; i < Set.MAX_ELEMENTS; ) {
-            accountStatusChecks.elements[i].stamp = Set.DUMMY_STAMP;
-            vaultStatusChecks.elements[i].stamp = Set.DUMMY_STAMP;
-
-            unchecked {
-                ++i;
-            }
-        }
+        accountStatusChecks.initializeStamps();
+        vaultStatusChecks.initializeStamps();
     }
 }
