@@ -531,7 +531,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant {
         uint152 addressPrefix = getAddressPrefixInternal(signer);
 
-        if (signer == address(0) || !isSignerAddressValid(signer)) {
+        if (signer == address(0) || !isSignerValid(signer)) {
             revert CVC_InvalidAddress();
         }
 
@@ -1149,7 +1149,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     // Permit-related functions
 
-    function isSignerAddressValid(
+    function isSignerValid(
         address signer
     ) internal pure returns (bool isValid) {
         // not valid if the signer address falls into any of the precompiles/predeploys
