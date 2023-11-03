@@ -387,13 +387,15 @@ contract PermitTest is Test {
         address alice = address(0);
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(nonce > 1 && nonce < type(uint).max);
+        vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.warp(deadline);
 
-        // reverts if signer is zero address
-        vm.prank(alice);
-        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        if (nonce > 1) {
+            vm.prank(alice);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        }
 
+        // reverts if signer is zero address
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.permit(
             alice,
@@ -418,13 +420,13 @@ contract PermitTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(nonce > 1 && nonce < type(uint).max);
+        vm.assume(nonce > 0);
         vm.warp(deadline);
 
-        // reverts if nonce is invalid
         vm.prank(alice);
         cvc.setNonce(addressPrefix, nonceNamespace, nonce);
 
+        // reverts if nonce is invalid
         vm.expectRevert(CreditVaultConnector.CVC_InvalidNonce.selector);
         cvc.permit(
             alice,
@@ -449,14 +451,16 @@ contract PermitTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(nonce > 1 && nonce < type(uint).max);
+        vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.assume(deadline < type(uint).max);
         vm.warp(deadline + 1);
 
-        // reverts if deadline is missed
-        vm.prank(alice);
-        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        if (nonce > 1) {
+            vm.prank(alice);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        }
 
+        // reverts if deadline is missed
         vm.expectRevert(CreditVaultConnector.CVC_InvalidTimestamp.selector);
         cvc.permit(
             alice,
@@ -486,7 +490,7 @@ contract PermitTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(nonce > 1 && nonce < type(uint).max);
+        vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.assume(value > 0);
         vm.warp(deadline);
 
@@ -500,10 +504,12 @@ contract PermitTest is Test {
             data
         );
 
-        // reverts if value exceeds balance
-        vm.prank(alice);
-        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        if (nonce > 1) {
+            vm.prank(alice);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        }
 
+        // reverts if value exceeds balance
         vm.deal(address(cvc), value - 1);
         vm.expectRevert(CreditVaultConnector.CVC_InvalidValue.selector);
         cvc.permit(
@@ -539,13 +545,15 @@ contract PermitTest is Test {
     ) public {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(nonce > 1 && nonce < type(uint).max);
+        vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.warp(deadline);
 
-        // reverts if data is empty
-        vm.prank(alice);
-        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        if (nonce > 1) {
+            vm.prank(alice);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        }
 
+        // reverts if data is empty
         vm.expectRevert(CreditVaultConnector.CVC_InvalidData.selector);
         cvc.permit(
             alice,
@@ -578,7 +586,7 @@ contract PermitTest is Test {
         signerECDSA.setPrivateKey(privateKey);
 
         vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(nonce > 1 && nonce < type(uint).max);
+        vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.warp(deadline);
         vm.deal(address(cvc), value);
 
@@ -587,10 +595,12 @@ contract PermitTest is Test {
         cvc.setExpectedValue(value);
         cvc.setShouldRevert(true);
 
-        // reverts if CVC self-call unsuccessful
-        vm.prank(alice);
-        cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        if (nonce > 1) {
+            vm.prank(alice);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        }
 
+        // reverts if CVC self-call unsuccessful
         bytes memory signature = signerECDSA.signPermit(
             alice,
             nonceNamespace,
