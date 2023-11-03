@@ -535,7 +535,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidAddress();
         }
 
-        if (++nonceLookup[addressPrefix][nonceNamespace] != nonce) {
+        if (
+            nonce == type(uint256).max ||
+            ++nonceLookup[addressPrefix][nonceNamespace] != nonce
+        ) {
             revert CVC_InvalidNonce();
         }
 
