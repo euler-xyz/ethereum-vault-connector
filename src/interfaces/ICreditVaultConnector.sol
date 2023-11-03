@@ -313,7 +313,7 @@ interface ICVC {
     function requireAllAccountsStatusCheckNow() external payable;
 
     /// @notice Forgives previously deferred account status check.
-    /// @dev Account address is removed from the set of addresses for which status checks are deferred. This function can only be called by the currently enabled controller of a given account.
+    /// @dev Account address is removed from the set of addresses for which status checks are deferred. This function can only be called by the currently enabled controller of a given account. Depending on the vault implementation, may be needed in the liquidation flow.
     /// @param account The address of the account for which the status check is forgiven.
     function forgiveAccountStatusCheck(address account) external payable;
 
