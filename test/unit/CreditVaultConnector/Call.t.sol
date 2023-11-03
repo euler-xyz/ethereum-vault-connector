@@ -93,10 +93,12 @@ contract CallTest is Test {
         Vault(controller).reset();
 
         // on behalf of account should be correct in a nested call as well
+        address nestedTargetContract = address(new TargetWithNesting());
         data = abi.encodeWithSelector(
-            Target(targetContract).nestedCallTest.selector,
+            TargetWithNesting(nestedTargetContract).nestedCallTest.selector,
             address(cvc),
             address(cvc),
+            targetContract,
             seed,
             account,
             seed % 2 == 0
@@ -106,20 +108,20 @@ contract CallTest is Test {
         vm.expectEmit(true, true, true, true, address(cvc));
         emit CallWithContext(
             alice,
-            targetContract,
+            nestedTargetContract,
             account,
-            Target.nestedCallTest.selector
+            TargetWithNesting.nestedCallTest.selector
         );
         vm.expectEmit(true, true, true, true, address(cvc));
         emit CallWithContext(
+            nestedTargetContract,
             targetContract,
-            targetContract,
-            targetContract,
+            nestedTargetContract,
             Target.callTest.selector
         );
         vm.prank(alice);
         result = cvc.handlerCall{value: seed}(
-            targetContract,
+            nestedTargetContract,
             account,
             seed,
             data
@@ -128,7 +130,7 @@ contract CallTest is Test {
     }
 
     function test_RevertIfDepthExceeded_Call(address alice) external {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(cvc));
 
         cvc.setCallDepth(10);
 
@@ -230,7 +232,6 @@ contract CallTest is Test {
 
         // target contract is the CVC
         address targetContract = address(cvc);
-
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
             address(cvc),
@@ -245,12 +246,23 @@ contract CallTest is Test {
         vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
         cvc.call{value: seed}(targetContract, alice, seed, data);
 
+        // target contract is the msg.sender
+        targetContract = address(this);
+        data = abi.encodeWithSelector(
+            Target(targetContract).callTest.selector,
+            address(cvc),
+            address(cvc),
+            seed,
+            address(this),
+            false
+        );
+
+        vm.deal(address(this), seed);
+        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        cvc.call{value: seed}(targetContract, address(this), seed, data);
+
         // target contract is the ERC1820 registry
         targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-        address dummyTarget = address(new Target());
-
-        vm.etch(targetContract, dummyTarget.code);
-
         data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
             address(cvc),
