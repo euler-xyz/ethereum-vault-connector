@@ -258,7 +258,9 @@ contract PermitTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
 
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) && alice != address(cvc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint).max);
 
         vm.warp(deadline);
@@ -323,7 +325,7 @@ contract PermitTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
 
-        vm.assume(alice != address(0));
+        vm.assume(!cvc.haveCommonOwner(alice, address(0)));
         vm.assume(nonce > 0 && nonce < type(uint).max);
 
         vm.warp(deadline);
@@ -377,6 +379,7 @@ contract PermitTest is Test {
     }
 
     function test_RevertIfSignerInvalid_Permit(
+        address alice,
         uint nonceNamespace,
         uint nonce,
         uint deadline,
@@ -384,7 +387,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
-        address alice = address(0);
+        alice = address(uint160(bound(uint160(alice), 0, 0xFF)));
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(nonce > 0 && nonce < type(uint).max);
@@ -419,7 +422,9 @@ contract PermitTest is Test {
     ) public {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) && alice != address(cvc)
+        );
         vm.assume(nonce > 0);
         vm.warp(deadline);
 
@@ -450,7 +455,9 @@ contract PermitTest is Test {
     ) public {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) && alice != address(cvc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.assume(deadline < type(uint).max);
         vm.warp(deadline + 1);
@@ -489,7 +496,9 @@ contract PermitTest is Test {
         address alice = vm.addr(privateKey);
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) && alice != address(cvc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.assume(value > 0);
         vm.warp(deadline);
@@ -544,7 +553,9 @@ contract PermitTest is Test {
         bytes calldata signature
     ) public {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) && alice != address(cvc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.warp(deadline);
 
@@ -585,7 +596,9 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
         signerECDSA.setPrivateKey(privateKey);
 
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) && alice != address(cvc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint).max);
         vm.warp(deadline);
         vm.deal(address(cvc), value);
@@ -648,7 +661,7 @@ contract PermitTest is Test {
         address alice = vm.addr(privateKey);
         signerECDSA.setPrivateKey(privateKey);
 
-        vm.assume(alice != address(0));
+        vm.assume(!cvc.haveCommonOwner(alice, address(0)));
         vm.warp(deadline);
 
         // ECDSA signature invalid due to signer.
@@ -797,7 +810,7 @@ contract PermitTest is Test {
         address alice = address(new SignerERC1271(cvc));
         SignerERC1271(alice).setSignatureHash(signature);
 
-        vm.assume(alice != address(0));
+        vm.assume(!cvc.haveCommonOwner(alice, address(0)));
         vm.warp(deadline);
 
         // ECDSA signature is always invalid here hence we fall back to ERC-1271 signature
@@ -898,7 +911,10 @@ contract PermitTest is Test {
         address bob = address(new SignerERC1271(cvc));
         address target = address(new Target());
 
-        vm.assume(alice != address(0) && !cvc.haveCommonOwner(alice, bob));
+        vm.assume(
+            !cvc.haveCommonOwner(alice, address(0)) &&
+                !cvc.haveCommonOwner(alice, bob)
+        );
         vm.deal(address(this), type(uint128).max);
         signerECDSA.setPrivateKey(privateKey);
 

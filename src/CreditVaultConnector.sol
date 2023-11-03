@@ -531,7 +531,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant {
         uint152 addressPrefix = getAddressPrefixInternal(signer);
 
-        if (signer == address(0)) {
+        if (signer == address(0) || !isSignerAddressValid(signer)) {
             revert CVC_InvalidAddress();
         }
 
@@ -1148,6 +1148,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     // Permit-related functions
+
+    function isSignerAddressValid(
+        address signer
+    ) internal pure returns (bool isValid) {
+        // not valid if the signer address falls into any of the precompiles/predeploys
+        // addresses space (depends on the chain ID).
+        // IMPORTANT: revisit this logic when deploying on chains other than the Ethereum mainnet
+        return !haveCommonOwnerInternal(signer, address(0));
+    }
 
     function getPermitHash(
         address signer,
