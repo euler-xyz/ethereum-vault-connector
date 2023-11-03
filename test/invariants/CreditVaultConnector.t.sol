@@ -250,7 +250,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
-        if (uint160(signer) <= 10 || signer == address(this)) return;
+        if (uint160(signer) <= 255 || signer == address(this)) return;
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
         deal(address(this), value);
