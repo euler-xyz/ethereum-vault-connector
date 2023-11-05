@@ -209,19 +209,19 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
         if (uint160(msg.sender) <= 10) return "";
         if (onBehalfOfAccount == address(0)) return "";
-        if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this)) return "";
+        if (uint160(targetCollateral) <= 10) return "";
+        if (targetCollateral == address(this)) return "";
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);
-        accountCollaterals[onBehalfOfAccount].insert(targetContract);
+        accountCollaterals[onBehalfOfAccount].insert(targetCollateral);
 
         uint8 numElementsCache = accountControllers[onBehalfOfAccount]
             .numElements;
@@ -231,7 +231,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
         result = super.impersonate(
-            targetContract,
+            targetCollateral,
             onBehalfOfAccount,
             value,
             data

@@ -252,13 +252,13 @@ interface ICVC {
     /// @notice For a given account, calls into one of the enabled collateral vaults from the currently enabled controller vault as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks are performed after the call.
     /// @dev This function can be used to interact with any contract while checks deferred as long as the contract is enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
-    /// @param targetContract The collateral address to be called.
+    /// @param targetCollateral The collateral address to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on behalf.
     /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data

@@ -658,12 +658,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
     /// @inheritdoc ICVC
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
-        if (address(this) == targetContract) {
+        if (address(this) == targetCollateral) {
             revert CVC_InvalidAddress();
         }
 
@@ -674,7 +674,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         bool success;
         (success, result) = impersonateInternal(
-            targetContract,
+            targetCollateral,
             onBehalfOfAccount,
             value,
             data
@@ -933,8 +933,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         // set the onBehalfOfAccount in the execution context for the duration of the external call.
         // considering that the operatorAuthenticated is only meant to be observable by external
         // contracts, it is sufficient to set it here rather than in the onlyOwner and onlyOwnerOrOperator
-        // modifiers. 
-        // apart from the usual scenario (when an owner operates on behalf of its account), 
+        // modifiers.
+        // apart from the usual scenario (when an owner operates on behalf of its account),
         // the operatorAuthenticated should be cleared when about to execute the permit self-call or a callback
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) ||
@@ -979,7 +979,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     function impersonateInternal(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
@@ -989,12 +989,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         onlyController(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
-        if (!accountCollaterals[onBehalfOfAccount].contains(targetContract)) {
+        if (!accountCollaterals[onBehalfOfAccount].contains(targetCollateral)) {
             revert CVC_NotAuthorized();
         }
 
         (success, result) = callWithContextInternal(
-            targetContract,
+            targetCollateral,
             onBehalfOfAccount,
             value,
             data

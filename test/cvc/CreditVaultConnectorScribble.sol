@@ -109,15 +109,15 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetContract);
-    /// #if_succeeds "the target cannot be this contract" targetContract != address(this);
+    /// #if_succeeds "the target collateral be this contract" targetCollateral != address(this);
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) public payable virtual override returns (bytes memory result) {
         return
-            super.impersonate(targetContract, onBehalfOfAccount, value, data);
+            super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -221,14 +221,14 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeeds "impersonate reentrancy guard must be locked" executionContext.isImpersonationInProgress();
     function impersonateInternal(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) internal virtual override returns (bool success, bytes memory result) {
         return
             super.impersonateInternal(
-                targetContract,
+                targetCollateral,
                 onBehalfOfAccount,
                 value,
                 data
