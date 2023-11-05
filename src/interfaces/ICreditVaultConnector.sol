@@ -304,12 +304,12 @@ interface ICVC {
     function requireAccountStatusCheck(address account) external payable;
 
     /// @notice Immediately checks the status of an account and reverts if it is not valid.
-    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account status check was previously deferred, it is removed from the set.
+    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account status check was previously deferred, it is removed from the set. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheckNow(address account) external payable;
 
     /// @notice Immediately checks the status of all the accounts for which the checks were deferred and reverts if any of them is not valid.
-    /// @dev Account status checks are performed on the fly regardless of the current execution context state. The deferred accounts set is cleared.
+    /// @dev Account status checks are performed on the fly regardless of the current execution context state. The deferred accounts set is cleared. If controller is not selected for a given, the account is always considered valid.
     function requireAllAccountsStatusCheckNow() external payable;
 
     /// @notice Forgives previously deferred account status check.
