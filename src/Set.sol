@@ -2,23 +2,32 @@
 
 pragma solidity ^0.8.20;
 
-// the stamp field is used to keep the storage slot non-zero when the element is removed.
-// if used, it allows for cheaper SSTORE when an element is inserted.
+/// @title ElementStorage
+/// @notice This struct is used to store the value and stamp of an element.
+/// @dev The stamp field is used to keep the storage slot non-zero when the element is removed.
+/// @dev It allows for cheaper SSTORE when an element is inserted.
 struct ElementStorage {
+    /// @notice The value of the element.
     address value;
+    /// @notice The stamp of the element.
     uint96 stamp;
 }
 
-// to optimize the gas consuption, firstElement is stored in the same storage slot as
-// the numElements so that for sets with one element, only one storage slot has to be
-// read/written. to keep the elements array indexing consistent and because the first
-// element is stored outside of the array, the elements[0] is not utilized.
-// the stamp field is used to keep the storage slot non-zero when the element is removed.
-// it allows for cheaper SSTORE when an element is inserted.
+/// @title SetStorage
+/// @notice This struct is used to store the set data.
+/// @dev To optimize the gas consuption, firstElement is stored in the same storage slot as the numElements
+/// @dev so that for sets with one element, only one storage slot has to be read/written. To keep the elements
+/// @dev array indexing consistent and because the first element is stored outside of the array, the elements[0]
+/// @dev is not utilized. The stamp field is used to keep the storage slot non-zero when the element is removed.
+/// @dev It allows for cheaper SSTORE when an element is inserted.
 struct SetStorage {
+    /// @notice The number of elements in the set.
     uint8 numElements;
+    /// @notice The first element in the set.
     address firstElement;
+    /// @notice The stamp of the set.
     uint88 stamp;
+    /// @notice The array of elements in the set. Stores the elements starting from index 1.
     ElementStorage[2 ** 8] elements;
 }
 

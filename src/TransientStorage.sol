@@ -7,7 +7,7 @@ import "./Set.sol";
 
 abstract contract TransientStorage {
     using Set for SetStorage;
-    
+
     enum SetType {
         Account,
         Vault

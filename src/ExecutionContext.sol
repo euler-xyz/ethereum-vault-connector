@@ -27,7 +27,7 @@ library ExecutionContext {
     uint internal constant BATCH_DEPTH_MAX = 9;
     uint internal constant STAMP_DUMMY_VALUE = 1;
 
-    // None of the functions below modifies the state. All the functions operate on the copy 
+    // None of the functions below modifies the state. All the functions operate on the copy
     // of the execution context and return its modified value as a result. In order to update
     // one should use the result of the function call as a new execution context value.
     // i.e. the following call: executionContext.setChecksInProgress() returns the new execution

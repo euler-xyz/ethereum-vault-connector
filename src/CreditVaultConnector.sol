@@ -45,10 +45,10 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
-    // CVC implements controller isolation, meaning that unless in transient state, only one controller per account can 
-    // be enabled. However, this can lead to a suboptimal user experience. In the event a user wants to have multiple 
-    // controllers enabled, a separate wallet must be created and funded. Although there is nothing wrong with having 
-    // many accounts within the same wallet, this can be a bad experience. In order to improve on this, CVC supports 
+    // CVC implements controller isolation, meaning that unless in transient state, only one controller per account can
+    // be enabled. However, this can lead to a suboptimal user experience. In the event a user wants to have multiple
+    // controllers enabled, a separate wallet must be created and funded. Although there is nothing wrong with having
+    // many accounts within the same wallet, this can be a bad experience. In order to improve on this, CVC supports
     // the concept of an owner that owns 256 accounts within CVC.
 
     // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
@@ -60,9 +60,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     // account/152 -> prefix/152
     // To get an address prefix for the account, it's enough to take the account address and right shift it by 8 bits.
 
-    // Yes, this reduces the security of addresses by 8 bits, but creating multiple addresses in the wallet also reduces 
-    // security: if somebody is trying to brute-force one of user's N>1 private keys, they have N times as many chances 
-    // of succeeding per guess. It has to be admitted that the CVC model is weaker because finding a private key for 
+    // Yes, this reduces the security of addresses by 8 bits, but creating multiple addresses in the wallet also reduces
+    // security: if somebody is trying to brute-force one of user's N>1 private keys, they have N times as many chances
+    // of succeeding per guess. It has to be admitted that the CVC model is weaker because finding a private key for
     // an owner gives access to all accounts, but there is still a very comfortable security margin.
 
     mapping(uint152 addressPrefix => address owner) internal ownerLookup;
