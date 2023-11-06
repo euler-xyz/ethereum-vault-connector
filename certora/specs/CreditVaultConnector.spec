@@ -63,3 +63,10 @@ methods {
 
 /// After a call the execution context is zeroed out
 invariant executionContextIsCleared() getExecutionContextIgnoringStamp() == 0;
+
+rule sanity(method f) {
+    env e; calldataarg args;
+
+    f(e,args);
+    assert false;
+}
