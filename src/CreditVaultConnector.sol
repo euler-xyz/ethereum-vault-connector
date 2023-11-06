@@ -324,8 +324,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         }
 
         if (
-            operatorLookup[addressPrefix][operator] != accountOperatorAuthorized
+            operatorLookup[addressPrefix][operator] == accountOperatorAuthorized
         ) {
+            revert CVC_InvalidOperatorStatus();
+        } else {
             operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
 
             emit OperatorStatus(
@@ -377,7 +379,9 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             ? oldAccountOperatorAuthorized | bitMask
             : oldAccountOperatorAuthorized & ~bitMask;
 
-        if (oldAccountOperatorAuthorized != newAccountOperatorAuthorized) {
+        if (oldAccountOperatorAuthorized == newAccountOperatorAuthorized) {
+            revert CVC_InvalidOperatorStatus();
+        } else {
             operatorLookup[addressPrefix][
                 operator
             ] = newAccountOperatorAuthorized;

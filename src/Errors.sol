@@ -8,6 +8,7 @@ contract Errors {
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();
     error CVC_OnBehalfOfAccountNotAuthenticated();
+    error CVC_InvalidOperatorStatus();
     error CVC_InvalidNonce();
     error CVC_InvalidAddress();
     error CVC_InvalidTimestamp();
