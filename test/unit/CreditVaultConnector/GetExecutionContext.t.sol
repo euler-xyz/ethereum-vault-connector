@@ -22,9 +22,7 @@ contract GetExecutionContextTest is Test {
 
         address controller = address(new Vault(cvc));
 
-        vm.expectRevert(
-            CreditVaultConnector.CVC_OnBehalfOfAccountNotAuthenticated.selector
-        );
+        vm.expectRevert(Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector);
         cvc.getCurrentOnBehalfOfAccount(controller);
 
         uint context = cvc.getRawExecutionContext();

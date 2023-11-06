@@ -107,7 +107,7 @@ contract CallbackTest is Test {
         cvc.setChecksLock(true);
 
         vm.deal(address(this), seed);
-        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.callback{value: seed}(alice, seed, "");
     }
 
@@ -120,9 +120,7 @@ contract CallbackTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.deal(address(this), seed);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-        );
+        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.callback{value: seed}(alice, seed, "");
     }
 
@@ -136,7 +134,7 @@ contract CallbackTest is Test {
         // msg.sender is the CVC
         vm.deal(address(cvc), seed);
         vm.prank(address(cvc));
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.callback{value: seed}(alice, seed, "");
     }
 
@@ -149,7 +147,7 @@ contract CallbackTest is Test {
 
         // reverts if value exceeds balance
         vm.deal(address(this), seed);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidValue.selector);
+        vm.expectRevert(Errors.CVC_InvalidValue.selector);
         cvc.callback{value: seed - 1}(alice, seed, "");
 
         // succeeds if value does not exceed balance
@@ -166,7 +164,7 @@ contract CallbackTest is Test {
             this.revertEmptyTest.selector
         );
 
-        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
+        vm.expectRevert(Errors.CVC_EmptyError.selector);
         cvc.callback(alice, 0, data);
     }
 }

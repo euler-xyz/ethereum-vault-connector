@@ -214,7 +214,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         uint value,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
-        if (uint160(msg.sender) <= 10) return "";
+        if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
         if (targetCollateral == address(this)) return "";
@@ -392,9 +392,7 @@ contract CreditVaultConnectorInvariants is Test {
     }
 
     function invariant_ExecutionContext() external {
-        vm.expectRevert(
-            CreditVaultConnector.CVC_OnBehalfOfAccountNotAuthenticated.selector
-        );
+        vm.expectRevert(Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector);
         cvc.getCurrentOnBehalfOfAccount(address(0));
 
         assertEq(cvc.getRawExecutionContext(), 1 << 200);

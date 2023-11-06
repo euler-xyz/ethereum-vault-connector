@@ -29,9 +29,7 @@ contract SetOperatorTest is Test {
         vm.assume(!cvc.haveCommonOwner(alice, operator));
 
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_AccountOwnerNotRegistered.selector
-        );
+        vm.expectRevert(Errors.CVC_AccountOwnerNotRegistered.selector);
         cvc.getAccountOwner(alice);
 
         assertEq(cvc.getOperator(addressPrefix, operator), 0);
@@ -161,9 +159,7 @@ contract SetOperatorTest is Test {
             assertEq(cvc.isAccountOperatorAuthorized(account, operator), false);
 
             if (i == 0) {
-                vm.expectRevert(
-                    CreditVaultConnector.CVC_AccountOwnerNotRegistered.selector
-                );
+                vm.expectRevert(Errors.CVC_AccountOwnerNotRegistered.selector);
                 cvc.getAccountOwner(account);
             } else {
                 assertEq(cvc.getAccountOwner(account), alice);
@@ -187,7 +183,7 @@ contract SetOperatorTest is Test {
 
             // the operator cannot call setOperator()
             vm.prank(operator);
-            vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+            vm.expectRevert(Errors.CVC_NotAuthorized.selector);
             cvc.setOperator(addressPrefix, operator, seed);
 
             // but the operator can deauthorize itself calling setAccountOperator()
@@ -214,7 +210,7 @@ contract SetOperatorTest is Test {
 
         // fails if address prefix does not belong to an owner
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setOperator(addressPrefix + 1, operator, accountOperatorAuthorized);
 
         // succeeds if address prefix belongs to an owner
@@ -223,12 +219,12 @@ contract SetOperatorTest is Test {
 
         // fails if owner not consistent
         vm.prank(address(uint160(uint160(alice) ^ 1)));
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
 
         // reverts if sender is an operator
         vm.prank(operator);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setOperator(addressPrefix, operator, accountOperatorAuthorized);
     }
 
@@ -247,7 +243,7 @@ contract SetOperatorTest is Test {
         address account = address(uint160(uint160(alice) ^ 256));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(account, operator, true);
 
         // succeeds if sender is authorized
@@ -257,12 +253,12 @@ contract SetOperatorTest is Test {
 
         // reverts if sender is not a registered owner nor operator
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(account, operator, true);
 
         // reverts if sender is not a registered owner nor operator
         vm.prank(address(uint160(uint160(operator) ^ 1)));
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(account, operator, true);
     }
 
@@ -290,18 +286,18 @@ contract SetOperatorTest is Test {
 
         // operator cannot change authorization status for any other operator nor account
         vm.prank(operator);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(address(uint160(alice) ^ 1), operator, true);
 
         vm.prank(operator);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(alice, address(uint160(operator) ^ 1), true);
 
         vm.prank(alice);
         cvc.setAccountOperator(alice, address(uint160(operator) ^ 1), true);
 
         vm.prank(operator);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setAccountOperator(alice, address(uint160(operator) ^ 1), false);
 
         // operator can deauthorize itself
@@ -319,15 +315,15 @@ contract SetOperatorTest is Test {
         uint152 addressPrefix = cvc.getAddressPrefix(alice);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.setOperator(addressPrefix, address(0), 0);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.setAccountOperator(alice, address(0), true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.setOperator(
             addressPrefix,
             address(uint160(alice) ^ subAccountId),
@@ -335,7 +331,7 @@ contract SetOperatorTest is Test {
         );
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.setAccountOperator(
             alice,
             address(uint160(alice) ^ subAccountId),

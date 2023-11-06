@@ -93,9 +93,7 @@ contract AccountStatusTest is Test {
         cvc.setChecksLock(true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.requireAccountStatusCheck(account);
 
@@ -119,7 +117,7 @@ contract AccountStatusTest is Test {
             cvc.enableController(account, controller);
 
             VaultMalicious(controller).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
@@ -230,9 +228,7 @@ contract AccountStatusTest is Test {
         cvc.setChecksLock(true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.requireAccountStatusCheckNow(account);
 
@@ -256,7 +252,7 @@ contract AccountStatusTest is Test {
             cvc.enableController(account, controller);
 
             VaultMalicious(controller).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
@@ -370,9 +366,7 @@ contract AccountStatusTest is Test {
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_ChecksReentrancy.selector
-                )
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
             );
         cvc.requireAllAccountsStatusCheckNow();
     }
@@ -396,7 +390,7 @@ contract AccountStatusTest is Test {
             cvc.enableController(accounts[i], controllers[i]);
 
             VaultMalicious(controllers[i]).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
         }
 
@@ -467,9 +461,7 @@ contract AccountStatusTest is Test {
 
         vm.prank(controller);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.forgiveAccountStatusCheck(account);
 
@@ -497,9 +489,7 @@ contract AccountStatusTest is Test {
             assertTrue(cvc.isAccountStatusCheckDeferred(account));
 
             // the check does not get forgiven
-            vm.expectRevert(
-                CreditVaultConnector.CVC_ControllerViolation.selector
-            );
+            vm.expectRevert(Errors.CVC_ControllerViolation.selector);
             cvc.forgiveAccountStatusCheck(account);
 
             cvc.reset();
@@ -530,9 +520,7 @@ contract AccountStatusTest is Test {
 
             assertTrue(cvc.isAccountStatusCheckDeferred(account));
             vm.prank(controller_1);
-            vm.expectRevert(
-                CreditVaultConnector.CVC_ControllerViolation.selector
-            );
+            vm.expectRevert(Errors.CVC_ControllerViolation.selector);
             cvc.forgiveAccountStatusCheck(account);
 
             cvc.reset();
@@ -559,7 +547,7 @@ contract AccountStatusTest is Test {
 
             assertTrue(cvc.isAccountStatusCheckDeferred(account));
             vm.prank(address(uint160(controller) + 1));
-            vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+            vm.expectRevert(Errors.CVC_NotAuthorized.selector);
             cvc.forgiveAccountStatusCheck(account);
 
             cvc.reset();

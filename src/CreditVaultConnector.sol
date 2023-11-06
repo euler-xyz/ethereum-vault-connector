@@ -3,12 +3,14 @@
 pragma solidity ^0.8.20;
 
 import "./Set.sol";
+import "./Events.sol";
+import "./Errors.sol";
 import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 import "./interfaces/IERC1271.sol";
 
-contract CreditVaultConnector is TransientStorage, ICVC {
+contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
@@ -63,56 +65,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
-    //                                        EVENTS                                             //
+    //                                CONSTRUCTOR, FALLBACKS                                     //
     ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
-    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
-    event OperatorStatus(
-        uint152 indexed addressPrefix,
-        address indexed operator,
-        uint accountOperatorAuthorized
-    );
-    event CollateralStatus(
-        address indexed account,
-        address indexed collateral,
-        bool enabled
-    );
-    event ControllerStatus(
-        address indexed account,
-        address indexed controller,
-        bool enabled
-    );
-    event CallWithContext(
-        address indexed caller,
-        address indexed targetContract,
-        address indexed onBehalfOfAccount,
-        bytes4 selector
-    );
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //                                         ERRORS                                            //
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    error CVC_NotAuthorized();
-    error CVC_AccountOwnerNotRegistered();
-    error CVC_OnBehalfOfAccountNotAuthenticated();
-    error CVC_InvalidNonce();
-    error CVC_InvalidAddress();
-    error CVC_InvalidTimestamp();
-    error CVC_InvalidValue();
-    error CVC_InvalidData();
-    error CVC_ChecksReentrancy();
-    error CVC_ImpersonateReentrancy();
-    error CVC_ControllerViolation();
-    error CVC_SimulationBatchNested();
-    error CVC_RevertedBatchResult(
-        BatchItemResult[] batchItemsResult,
-        BatchItemResult[] accountsStatusResult,
-        BatchItemResult[] vaultsStatusResult
-    );
-    error CVC_BatchPanic();
-    error CVC_EmptyError();
 
     constructor() {
         CACHED_CHAIN_ID = block.chainid;

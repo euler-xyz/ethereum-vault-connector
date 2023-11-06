@@ -156,9 +156,7 @@ contract AccountAndVaultStatusTest is Test {
         cvc.setChecksLock(true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         vm.prank(vault);
         cvc.requireAccountAndVaultStatusCheck(accounts[index]);
@@ -191,7 +189,7 @@ contract AccountAndVaultStatusTest is Test {
             cvc.enableController(accounts[i], controllers[i]);
 
             VaultMalicious(controllers[i]).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation

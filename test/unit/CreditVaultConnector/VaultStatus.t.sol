@@ -101,9 +101,7 @@ contract VaultStatusTest is Test {
 
         vm.prank(vaults[index]);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.requireVaultStatusCheck();
 
@@ -122,7 +120,7 @@ contract VaultStatusTest is Test {
             vaults[i] = address(new VaultMalicious(cvc));
 
             VaultMalicious(vaults[i]).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             vm.prank(vaults[i]);
@@ -228,9 +226,7 @@ contract VaultStatusTest is Test {
             cvc.setChecksLock(true);
             vm.prank(vaults[i]);
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_ChecksReentrancy.selector
-                )
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
             );
             cvc.requireVaultStatusCheckNow();
 
@@ -254,7 +250,7 @@ contract VaultStatusTest is Test {
             cvc.requireVaultStatusCheck();
 
             VaultMalicious(vault).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
@@ -360,9 +356,7 @@ contract VaultStatusTest is Test {
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_ChecksReentrancy.selector
-                )
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
             );
         cvc.requireAllVaultsStatusCheckNow();
     }
@@ -382,7 +376,7 @@ contract VaultStatusTest is Test {
             cvc.requireVaultStatusCheck();
 
             VaultMalicious(vaults[i]).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
         }
 
@@ -416,9 +410,7 @@ contract VaultStatusTest is Test {
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_ChecksReentrancy.selector
-                )
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
             );
         cvc.forgiveVaultStatusCheck();
     }
