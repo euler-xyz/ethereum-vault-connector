@@ -4,6 +4,9 @@ pragma solidity ^0.8.20;
 
 import "./interfaces/ICreditVaultConnector.sol";
 
+/// @title Errors
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This contract implements the error messages for the Credit Vault Connector.
 contract Errors {
     error CVC_NotAuthorized();
     error CVC_AccountOwnerNotRegistered();

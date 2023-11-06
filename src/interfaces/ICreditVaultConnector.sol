@@ -2,6 +2,9 @@
 
 pragma solidity ^0.8.20;
 
+/// @title ICVC
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This interface defines the methods for the Credit Vault Connector.
 interface ICVC {
     /// @notice A struct representing a batch item.
     /// @dev Each batch item represents a single operation to be performed within a checks deferred context.

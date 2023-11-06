@@ -10,6 +10,9 @@ import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 import "./interfaces/IERC1271.sol";
 
+/// @title CreditVaultConnector
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This contract implements the Credit Vault Connector.
 contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     using ExecutionContext for EC;
     using Set for SetStorage;

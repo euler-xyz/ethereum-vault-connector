@@ -14,6 +14,10 @@ struct SetStorage {
     ElementStorage[2 ** 8] elements;
 }
 
+/// @title Set
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This library provides functions for managing sets of addresses.
+/// @dev The maximum number of elements in the set is defined by the constant MAX_ELEMENTS.
 library Set {
     error TooManyElements();
 
