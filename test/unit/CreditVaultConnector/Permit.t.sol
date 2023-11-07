@@ -649,6 +649,43 @@ contract PermitTest is Test {
         assertTrue(cvc.fallbackCalled());
     }
 
+    function test_RevertIfSignerIsNotContractERC1271_Permit(
+        address signer,
+        uint nonceNamespace,
+        uint nonce,
+        uint deadline,
+        bytes memory data,
+        bytes calldata signature,
+        uint16 value
+    ) public {
+        vm.assume(
+            !cvc.haveCommonOwner(signer, address(0)) && signer != address(cvc)
+        );
+        vm.assume(nonce > 0 && nonce < type(uint).max);
+
+        uint152 addressPrefix = cvc.getAddressPrefix(signer);
+        data = abi.encode(keccak256(data));
+
+        vm.warp(deadline);
+        vm.deal(address(this), type(uint128).max);
+
+        if (nonce > 1) {
+            vm.prank(signer);
+            cvc.setNonce(addressPrefix, nonceNamespace, nonce - 1);
+        }
+
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
+        cvc.permit{value: address(this).balance}(
+            signer,
+            nonceNamespace,
+            nonce,
+            deadline,
+            value,
+            data,
+            signature
+        );
+    }
+
     function test_RevertIfInvalidECDSASignature_Permit(
         uint privateKey,
         uint128 deadline

@@ -1205,6 +1205,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         bytes32 hash,
         bytes memory signature
     ) internal view returns (bool isValid) {
+        if (signer.code.length == 0) return false;
+
         (bool success, bytes memory result) = signer.staticcall(
             abi.encodeCall(IERC1271.isValidSignature, (hash, signature))
         );
