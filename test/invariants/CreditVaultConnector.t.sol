@@ -89,17 +89,18 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint accountOperatorAuthorized
+        uint operatorBitField
     ) public payable override {
         if (msg.sender == address(this)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        if (operatorLookup[addressPrefix][operator] == operatorBitField) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
         setAccountOwnerInternal(
             address(uint160(addressPrefix) << 8),
             msg.sender
         );
-        super.setOperator(addressPrefix, operator, accountOperatorAuthorized);
+        super.setOperator(addressPrefix, operator, operatorBitField);
     }
 
     function setAccountOperator(
@@ -111,6 +112,9 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (account == address(0)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        if (
+            isAccountOperatorAuthorizedInternal(account, operator) == authorized
+        ) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
         super.setAccountOperator(account, operator, authorized);

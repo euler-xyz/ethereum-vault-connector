@@ -1555,7 +1555,7 @@ contract PermitTest is Test {
             ICVC.setOperator.selector,
             addressPrefixAlice,
             otherOperator,
-            3
+            2
         );
 
         signature = signerECDSA.signPermit(
@@ -1599,7 +1599,7 @@ contract PermitTest is Test {
             ICVC.setOperator.selector,
             addressPrefixBob,
             otherOperator,
-            3
+            2
         );
 
         signature = bytes("bob's signature");

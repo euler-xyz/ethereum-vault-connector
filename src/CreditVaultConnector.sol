@@ -1035,8 +1035,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         isValid =
             success &&
             result.length == 32 &&
-            abi.decode(result, (bytes4)) ==
-            ICreditVault.checkAccountStatus.selector;
+            abi.decode(result, (bytes32)) ==
+            bytes32(ICreditVault.checkAccountStatus.selector);
     }
 
     function requireAccountStatusCheckInternal(
@@ -1062,8 +1062,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         isValid =
             success &&
             result.length == 32 &&
-            abi.decode(result, (bytes4)) ==
-            ICreditVault.checkVaultStatus.selector;
+            abi.decode(result, (bytes32)) ==
+            bytes32(ICreditVault.checkVaultStatus.selector);
     }
 
     function requireVaultStatusCheckInternal(address vault) internal virtual {
@@ -1212,7 +1212,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         isValid =
             success &&
             result.length == 32 &&
-            abi.decode(result, (bytes4)) == IERC1271.isValidSignature.selector;
+            abi.decode(result, (bytes32)) ==
+            bytes32(IERC1271.isValidSignature.selector);
     }
 
     function calculateDomainSeparator() internal view returns (bytes32) {
