@@ -4,8 +4,20 @@ pragma solidity ^0.8.0;
 
 import "../../src/ExecutionContext.sol";
 
-
 contract ExecutionContextHarness {
+    uint public constant BATCH_DEPTH_MASK = ExecutionContext.BATCH_DEPTH_MASK;
+    uint public constant ON_BEHALF_OF_ACCOUNT_MASK = ExecutionContext.ON_BEHALF_OF_ACCOUNT_MASK;
+    uint public constant CHECKS_LOCK_MASK = ExecutionContext.CHECKS_LOCK_MASK;
+    uint public constant IMPERSONATE_LOCK_MASK = ExecutionContext.IMPERSONATE_LOCK_MASK;
+    uint public constant OPERATOR_AUTHENTICATED_MASK = ExecutionContext.OPERATOR_AUTHENTICATED_MASK;
+    uint public constant PERMIT_MASK = ExecutionContext.PERMIT_MASK;
+    uint public constant SIMULATION_MASK = ExecutionContext.SIMULATION_MASK;
+    uint public constant STAMP_MASK = ExecutionContext.STAMP_MASK;
+    uint public constant ON_BEHALF_OF_ACCOUNT_OFFSET = ExecutionContext.ON_BEHALF_OF_ACCOUNT_OFFSET;
+    uint public constant STAMP_OFFSET = ExecutionContext.STAMP_OFFSET;
+    uint public constant BATCH_DEPTH_INIT = ExecutionContext.BATCH_DEPTH_INIT;
+    uint public constant BATCH_DEPTH_MAX = ExecutionContext.BATCH_DEPTH_MAX;
+    uint public constant STAMP_DUMMY_VALUE = ExecutionContext.STAMP_DUMMY_VALUE;
 
     function isEqual(
         EC context1,
