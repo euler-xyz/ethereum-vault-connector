@@ -3,13 +3,13 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../cvc/CreditVaultConnectorHarness.sol";
+import "../../evc/EthereumVaultConnectorHarness.sol";
 
 contract VaultStatusTest is Test {
-    CreditVaultConnectorHarness internal cvc;
+    EthereumVaultConnectorHarness internal evc;
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHarness();
+        evc = new EthereumVaultConnectorHarness();
     }
 
     function test_RequireVaultStatusCheck(
@@ -19,7 +19,7 @@ contract VaultStatusTest is Test {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new Vault(cvc));
+            address vault = address(new Vault(evc));
 
             // check all the options: vault state is ok, vault state is violated with
             // vault returning false and reverting
@@ -39,9 +39,9 @@ contract VaultStatusTest is Test {
                         : abi.encode(bytes4(uint32(1)))
                 );
             }
-            cvc.requireVaultStatusCheck();
-            cvc.verifyVaultStatusChecks();
-            cvc.clearExpectedChecks();
+            evc.requireVaultStatusCheck();
+            evc.verifyVaultStatusChecks();
+            evc.clearExpectedChecks();
         }
     }
 
@@ -52,7 +52,7 @@ contract VaultStatusTest is Test {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new Vault(cvc));
+            address vault = address(new Vault(evc));
 
             // check all the options: vault state is ok, vault state is violated with
             // vault returning false and reverting
@@ -65,22 +65,22 @@ contract VaultStatusTest is Test {
             );
 
             Vault(vault).setVaultStatusState(1);
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(vault);
 
             // even though the vault status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the vaults to the set
             // so that the checks can be performed later
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
 
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // checks no longer deferred
-                cvc.setCallDepth(0);
+                evc.setCallDepth(0);
 
                 vm.prank(vault);
                 vm.expectRevert(bytes("vault status violation"));
-                cvc.requireVaultStatusCheck();
+                evc.requireVaultStatusCheck();
             }
         }
     }
@@ -94,20 +94,20 @@ contract VaultStatusTest is Test {
 
         address[] memory vaults = new address[](vaultsNumber);
         for (uint i = 0; i < vaultsNumber; i++) {
-            vaults[i] = address(new Vault(cvc));
+            vaults[i] = address(new Vault(evc));
         }
 
-        cvc.setChecksLock(true);
+        evc.setChecksLock(true);
 
         vm.prank(vaults[index]);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+            abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
         );
-        cvc.requireVaultStatusCheck();
+        evc.requireVaultStatusCheck();
 
-        cvc.setChecksLock(false);
+        evc.setChecksLock(false);
         vm.prank(vaults[index]);
-        cvc.requireVaultStatusCheck();
+        evc.requireVaultStatusCheck();
     }
 
     function test_AcquireChecksLock_RequireVaultStatusChecks(
@@ -117,16 +117,16 @@ contract VaultStatusTest is Test {
 
         address[] memory vaults = new address[](numberOfVaults);
         for (uint i = 0; i < numberOfVaults; i++) {
-            vaults[i] = address(new VaultMalicious(cvc));
+            vaults[i] = address(new VaultMalicious(evc));
 
             VaultMalicious(vaults[i]).setExpectedErrorSelector(
-                Errors.CVC_ChecksReentrancy.selector
+                Errors.EVC_ChecksReentrancy.selector
             );
 
             vm.prank(vaults[i]);
-            // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
+            // function will revert with EVC_VaultStatusViolation according to VaultMalicious implementation
             vm.expectRevert(bytes("malicious vault"));
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
         }
     }
 
@@ -138,7 +138,7 @@ contract VaultStatusTest is Test {
 
         address[] memory vaults = new address[](vaultsNumber);
         for (uint i = 0; i < vaultsNumber; i++) {
-            vaults[i] = address(new Vault(cvc));
+            vaults[i] = address(new Vault(evc));
             address vault = vaults[i];
 
             // check all the options: vault state is ok, vault state is violated with
@@ -153,15 +153,15 @@ contract VaultStatusTest is Test {
 
             // first, schedule the check to be performed later to prove that after being peformed on the fly
             // vault is no longer contained in the set to be performed later
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(vault);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
 
             Vault(vault).clearChecks();
-            cvc.clearExpectedChecks();
+            evc.clearExpectedChecks();
 
-            assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+            assertTrue(evc.isVaultStatusCheckDeferred(vault));
             vm.prank(vault);
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(
@@ -170,27 +170,27 @@ contract VaultStatusTest is Test {
                         : abi.encode(bytes4(uint32(1)))
                 );
             }
-            cvc.requireVaultStatusCheckNow();
+            evc.requireVaultStatusCheckNow();
 
             if (allStatusesValid || uint160(vault) % 3 == 0) {
-                assertFalse(cvc.isVaultStatusCheckDeferred(vault));
+                assertFalse(evc.isVaultStatusCheckDeferred(vault));
             } else {
-                assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+                assertTrue(evc.isVaultStatusCheckDeferred(vault));
             }
-            cvc.verifyVaultStatusChecks();
+            evc.verifyVaultStatusChecks();
         }
 
         // schedule the checks to be performed later to prove that after being peformed on the fly
         // vaults are no longer contained in the set to be performed later
-        cvc.setCallDepth(1);
+        evc.setCallDepth(1);
         for (uint i = 0; i < vaultsNumber; i++) {
             address vault = vaults[i];
             vm.prank(vault);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
             Vault(vault).clearChecks();
-            assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+            assertTrue(evc.isVaultStatusCheckDeferred(vault));
         }
-        cvc.clearExpectedChecks();
+        evc.clearExpectedChecks();
 
         for (uint i = 0; i < vaultsNumber; i++) {
             address vault = vaults[i];
@@ -203,15 +203,15 @@ contract VaultStatusTest is Test {
                         : abi.encode(bytes4(uint32(1)))
                 );
             }
-            cvc.requireVaultStatusCheckNow();
+            evc.requireVaultStatusCheckNow();
 
             if (allStatusesValid || uint160(vault) % 3 == 0) {
-                assertFalse(cvc.isVaultStatusCheckDeferred(vault));
+                assertFalse(evc.isVaultStatusCheckDeferred(vault));
             } else {
-                assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+                assertTrue(evc.isVaultStatusCheckDeferred(vault));
             }
         }
-        cvc.verifyVaultStatusChecks();
+        evc.verifyVaultStatusChecks();
     }
 
     function test_RevertIfChecksReentrancy_RequireVaultStatusCheckNow(
@@ -221,18 +221,18 @@ contract VaultStatusTest is Test {
 
         address[] memory vaults = new address[](numberOfVaults);
         for (uint i = 0; i < numberOfVaults; i++) {
-            vaults[i] = address(new Vault(cvc));
+            vaults[i] = address(new Vault(evc));
 
-            cvc.setChecksLock(true);
+            evc.setChecksLock(true);
             vm.prank(vaults[i]);
             vm.expectRevert(
-                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+                abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
             );
-            cvc.requireVaultStatusCheckNow();
+            evc.requireVaultStatusCheckNow();
 
-            cvc.setChecksLock(false);
+            evc.setChecksLock(false);
             vm.prank(vaults[i]);
-            cvc.requireVaultStatusCheckNow();
+            evc.requireVaultStatusCheckNow();
         }
     }
 
@@ -242,21 +242,21 @@ contract VaultStatusTest is Test {
         vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < numberOfVaults; i++) {
-            address vault = address(new VaultMalicious(cvc));
+            address vault = address(new VaultMalicious(evc));
 
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(vault);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
 
             VaultMalicious(vault).setExpectedErrorSelector(
-                Errors.CVC_ChecksReentrancy.selector
+                Errors.EVC_ChecksReentrancy.selector
             );
 
-            // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
+            // function will revert with EVC_VaultStatusViolation according to VaultMalicious implementation
             vm.prank(vault);
             vm.expectRevert(bytes("malicious vault"));
-            cvc.requireVaultStatusCheckNow();
+            evc.requireVaultStatusCheckNow();
         }
     }
 
@@ -268,7 +268,7 @@ contract VaultStatusTest is Test {
 
         address[] memory vaults = new address[](numberOfVaults);
         for (uint i = 0; i < numberOfVaults; i++) {
-            vaults[i] = address(new Vault(cvc));
+            vaults[i] = address(new Vault(evc));
         }
 
         uint invalidVaultsCounter;
@@ -277,8 +277,8 @@ contract VaultStatusTest is Test {
         for (uint i = 0; i < numberOfVaults; i++) {
             address vault = vaults[i];
 
-            cvc.reset();
-            cvc.setCallDepth(0);
+            evc.reset();
+            evc.setCallDepth(0);
 
             // check all the options: vault state is ok, vault state is violated with
             // vault returning false and reverting
@@ -290,15 +290,15 @@ contract VaultStatusTest is Test {
                     : 2
             );
 
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(vault);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
 
             Vault(vault).clearChecks();
-            cvc.clearExpectedChecks();
+            evc.clearExpectedChecks();
 
-            assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+            assertTrue(evc.isVaultStatusCheckDeferred(vault));
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // for later check
                 invalidVaults[invalidVaultsCounter++] = vault;
@@ -309,28 +309,28 @@ contract VaultStatusTest is Test {
                         : abi.encode(bytes4(uint32(1)))
                 );
             }
-            cvc.requireAllVaultsStatusCheckNow();
+            evc.requireAllVaultsStatusCheckNow();
 
             if (allStatusesValid || uint160(vault) % 3 == 0) {
-                assertFalse(cvc.isVaultStatusCheckDeferred(vault));
+                assertFalse(evc.isVaultStatusCheckDeferred(vault));
             } else {
-                assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+                assertTrue(evc.isVaultStatusCheckDeferred(vault));
             }
-            cvc.verifyVaultStatusChecks();
+            evc.verifyVaultStatusChecks();
         }
 
-        cvc.reset();
+        evc.reset();
 
-        cvc.setCallDepth(1);
+        evc.setCallDepth(1);
         for (uint i = 0; i < vaults.length; ++i) {
             vm.prank(vaults[i]);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
             Vault(vaults[i]).clearChecks();
         }
-        cvc.clearExpectedChecks();
+        evc.clearExpectedChecks();
 
         for (uint i = 0; i < vaults.length; ++i) {
-            assertTrue(cvc.isVaultStatusCheckDeferred(vaults[i]));
+            assertTrue(evc.isVaultStatusCheckDeferred(vaults[i]));
         }
         if (invalidVaultsCounter > 0) {
             vm.expectRevert(
@@ -339,26 +339,26 @@ contract VaultStatusTest is Test {
                     : abi.encode(bytes4(uint32(1)))
             );
         }
-        cvc.requireAllVaultsStatusCheckNow();
+        evc.requireAllVaultsStatusCheckNow();
         for (uint i = 0; i < vaults.length; ++i) {
             assertEq(
-                cvc.isVaultStatusCheckDeferred(vaults[i]),
+                evc.isVaultStatusCheckDeferred(vaults[i]),
                 invalidVaultsCounter > 0
             );
         }
-        cvc.verifyVaultStatusChecks();
+        evc.verifyVaultStatusChecks();
     }
 
     function test_RevertIfChecksReentrancy_RequireAllVaultsStatusCheckNow(
         bool locked
     ) external {
-        cvc.setChecksLock(locked);
+        evc.setChecksLock(locked);
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+                abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
             );
-        cvc.requireAllVaultsStatusCheckNow();
+        evc.requireAllVaultsStatusCheckNow();
     }
 
     function test_AcquireChecksLock_RequireAllVaultsStatusChecksNow(
@@ -368,50 +368,50 @@ contract VaultStatusTest is Test {
 
         address[] memory vaults = new address[](numberOfVaults);
         for (uint i = 0; i < numberOfVaults; i++) {
-            vaults[i] = address(new VaultMalicious(cvc));
+            vaults[i] = address(new VaultMalicious(evc));
 
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(vaults[i]);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
 
             VaultMalicious(vaults[i]).setExpectedErrorSelector(
-                Errors.CVC_ChecksReentrancy.selector
+                Errors.EVC_ChecksReentrancy.selector
             );
         }
 
         vm.expectRevert(bytes("malicious vault"));
-        cvc.requireAllVaultsStatusCheckNow();
+        evc.requireAllVaultsStatusCheckNow();
     }
 
     function test_ForgiveVaultStatusCheck(uint8 vaultsNumber) external {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = address(new Vault(cvc));
+            address vault = address(new Vault(evc));
 
             // vault status check will be scheduled for later due to deferred state
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(vault);
-            cvc.requireVaultStatusCheck();
+            evc.requireVaultStatusCheck();
 
-            assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+            assertTrue(evc.isVaultStatusCheckDeferred(vault));
             vm.prank(vault);
-            cvc.forgiveVaultStatusCheck();
-            assertFalse(cvc.isVaultStatusCheckDeferred(vault));
+            evc.forgiveVaultStatusCheck();
+            assertFalse(evc.isVaultStatusCheckDeferred(vault));
         }
     }
 
     function test_RevertIfChecksReentrancy_ForgiveVaultStatusCheck(
         bool locked
     ) external {
-        cvc.setChecksLock(locked);
+        evc.setChecksLock(locked);
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+                abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
             );
-        cvc.forgiveVaultStatusCheck();
+        evc.forgiveVaultStatusCheck();
     }
 }

@@ -4,13 +4,13 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../src/interfaces/IERC1271.sol";
-import "../cvc/CreditVaultConnectorScribble.sol";
+import "../evc/EthereumVaultConnectorScribble.sol";
 
-contract VaultMock is ICreditVault {
-    ICVC public immutable cvc;
+contract VaultMock is IVault {
+    IEVC public immutable evc;
 
-    constructor(ICVC _cvc) {
-        cvc = _cvc;
+    constructor(IEVC _evc) {
+        evc = _evc;
     }
 
     function disableController(address account) public override {}
@@ -27,8 +27,8 @@ contract VaultMock is ICreditVault {
     }
 
     fallback(bytes calldata) external payable returns (bytes memory) {
-        cvc.requireAccountStatusCheck(address(0));
-        cvc.requireVaultStatusCheck();
+        evc.requireAccountStatusCheck(address(0));
+        evc.requireVaultStatusCheck();
         return "";
     }
 
@@ -44,7 +44,7 @@ contract SignerMock {
     }
 }
 
-contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
+contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     using Set for SetStorage;
 
     address internal vaultMock;
@@ -52,7 +52,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     address[] public touchedAccounts;
 
     constructor() {
-        vaultMock = address(new VaultMock(ICVC(address(this))));
+        vaultMock = address(new VaultMock(IEVC(address(this))));
         signerMock = address(new SignerMock());
     }
 
@@ -386,25 +386,25 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 }
 
-contract CreditVaultConnectorInvariants is Test {
-    CreditVaultConnectorHandler internal cvc;
+contract EthereumVaultConnectorInvariants is Test {
+    EthereumVaultConnectorHandler internal evc;
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHandler();
+        evc = new EthereumVaultConnectorHandler();
 
-        targetContract(address(cvc));
+        targetContract(address(evc));
     }
 
     function invariant_ExecutionContext() external {
-        vm.expectRevert(Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector);
-        cvc.getCurrentOnBehalfOfAccount(address(0));
+        vm.expectRevert(Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector);
+        evc.getCurrentOnBehalfOfAccount(address(0));
 
-        assertEq(cvc.getRawExecutionContext(), 1 << 200);
-        assertEq(cvc.getCurrentCallDepth(), 0);
-        assertEq(cvc.areChecksInProgress(), false);
-        assertEq(cvc.isImpersonationInProgress(), false);
-        assertEq(cvc.isOperatorAuthenticated(), false);
-        assertEq(cvc.isSimulationInProgress(), false);
+        assertEq(evc.getRawExecutionContext(), 1 << 200);
+        assertEq(evc.getCurrentCallDepth(), 0);
+        assertEq(evc.areChecksInProgress(), false);
+        assertEq(evc.isImpersonationInProgress(), false);
+        assertEq(evc.isOperatorAuthenticated(), false);
+        assertEq(evc.isSimulationInProgress(), false);
     }
 
     function invariant_AccountAndVaultStatusChecks() external {
@@ -413,7 +413,7 @@ contract CreditVaultConnectorInvariants is Test {
             address[] memory accountStatusChecks,
             uint8 vaultStatusChecksNumElements,
             address[] memory vaultStatusChecks
-        ) = cvc.exposeAccountAndVaultStatusCheck();
+        ) = evc.exposeAccountAndVaultStatusCheck();
 
         assertTrue(accountStatusChecksNumElements == 0);
         for (uint i = 0; i < accountStatusChecks.length; i++) {
@@ -427,13 +427,13 @@ contract CreditVaultConnectorInvariants is Test {
     }
 
     function invariant_ControllersCollaterals() external {
-        address[] memory touchedAccounts = cvc.getTouchedAccounts();
+        address[] memory touchedAccounts = evc.getTouchedAccounts();
         for (uint i = 0; i < touchedAccounts.length; i++) {
             // controllers
             (
                 uint8 accountControllersNumElements,
                 address[] memory accountControllersArray
-            ) = cvc.exposeAccountControllers(touchedAccounts[i]);
+            ) = evc.exposeAccountControllers(touchedAccounts[i]);
 
             assertTrue(
                 accountControllersNumElements == 0 ||
@@ -454,7 +454,7 @@ contract CreditVaultConnectorInvariants is Test {
             (
                 uint8 accountCollateralsNumCollaterals,
                 address[] memory accountCollateralsArray
-            ) = cvc.exposeAccountCollaterals(touchedAccounts[i]);
+            ) = evc.exposeAccountCollaterals(touchedAccounts[i]);
 
             assertTrue(accountCollateralsNumCollaterals <= Set.MAX_ELEMENTS);
             for (uint j = 0; j < accountCollateralsNumCollaterals; j++) {

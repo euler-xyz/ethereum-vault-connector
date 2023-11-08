@@ -3,11 +3,11 @@
 pragma solidity ^0.8.20;
 
 import "./Target.sol";
-import "../../../src/interfaces/ICreditVault.sol";
+import "../../../src/interfaces/IVault.sol";
 
 // mock vault contract that implements required interface and helps with status checks verification
-contract Vault is ICreditVault, Target {
-    ICVC public immutable cvc;
+contract Vault is IVault, Target {
+    IEVC public immutable evc;
 
     uint internal vaultStatusState;
     uint internal accountStatusState;
@@ -15,8 +15,8 @@ contract Vault is ICreditVault, Target {
     bool[] internal vaultStatusChecked;
     address[] internal accountStatusChecked;
 
-    constructor(ICVC _cvc) {
-        cvc = _cvc;
+    constructor(IEVC _evc) {
+        evc = _evc;
     }
 
     function reset() external {
@@ -60,7 +60,7 @@ contract Vault is ICreditVault, Target {
     }
 
     function disableController(address account) external virtual override {
-        cvc.disableController(account);
+        evc.disableController(account);
     }
 
     function checkVaultStatus()
@@ -69,17 +69,17 @@ contract Vault is ICreditVault, Target {
         override
         returns (bytes4 magicValue)
     {
-        try cvc.getCurrentOnBehalfOfAccount(address(0)) {
+        try evc.getCurrentOnBehalfOfAccount(address(0)) {
             revert("cvs/on-behalf-of-account");
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
+                Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cvs/on-behalf-of-account-2");
             }
         }
-        require(cvc.areChecksInProgress(), "cvs/checks-not-in-progress");
+        require(evc.areChecksInProgress(), "cvs/checks-not-in-progress");
 
         if (vaultStatusState == 0) {
             return 0x4b3d1223;
@@ -94,17 +94,17 @@ contract Vault is ICreditVault, Target {
         address,
         address[] memory
     ) external virtual override returns (bytes4 magicValue) {
-        try cvc.getCurrentOnBehalfOfAccount(address(0)) {
+        try evc.getCurrentOnBehalfOfAccount(address(0)) {
             revert("cas/on-behalf-of-account");
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
+                Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cas/on-behalf-of-account-2");
             }
         }
-        require(cvc.areChecksInProgress(), "cas/checks-not-in-progress");
+        require(evc.areChecksInProgress(), "cas/checks-not-in-progress");
 
         if (accountStatusState == 0) {
             return 0xb168c58f;
@@ -116,8 +116,8 @@ contract Vault is ICreditVault, Target {
     }
 
     function requireChecks(address account) external payable {
-        cvc.requireAccountStatusCheck(account);
-        cvc.requireVaultStatusCheck();
+        evc.requireAccountStatusCheck(account);
+        evc.requireVaultStatusCheck();
     }
 
     function requireChecksWithSimulationCheck(
@@ -125,12 +125,12 @@ contract Vault is ICreditVault, Target {
         bool expectedSimulationInProgress
     ) external payable {
         require(
-            cvc.isSimulationInProgress() == expectedSimulationInProgress,
+            evc.isSimulationInProgress() == expectedSimulationInProgress,
             "requireChecksWithSimulationCheck/simulation"
         );
 
-        cvc.requireAccountStatusCheck(account);
-        cvc.requireVaultStatusCheck();
+        evc.requireAccountStatusCheck(account);
+        evc.requireVaultStatusCheck();
     }
 
     function call(address target, bytes memory data) external payable virtual {
@@ -142,15 +142,15 @@ contract Vault is ICreditVault, Target {
 contract VaultMalicious is Vault {
     bytes4 internal expectedErrorSelector;
 
-    constructor(ICVC _cvc) Vault(_cvc) {}
+    constructor(IEVC _evc) Vault(_evc) {}
 
     function setExpectedErrorSelector(bytes4 selector) external {
         expectedErrorSelector = selector;
     }
 
     function callBatch() external payable {
-        (bool success, bytes memory result) = address(cvc).call(
-            abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
+        (bool success, bytes memory result) = address(evc).call(
+            abi.encodeWithSelector(evc.batch.selector, new IEVC.BatchItem[](0))
         );
 
         require(!success, "callBatch/succeeded");
@@ -159,24 +159,24 @@ contract VaultMalicious is Vault {
     }
 
     function checkVaultStatus() external virtual override returns (bytes4) {
-        try cvc.getCurrentOnBehalfOfAccount(address(0)) {
+        try evc.getCurrentOnBehalfOfAccount(address(0)) {
             revert("cvs/on-behalf-of-account");
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
+                Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cvs/on-behalf-of-account-2");
             }
         }
-        require(cvc.areChecksInProgress(), "cvs/checks-not-in-progress");
+        require(evc.areChecksInProgress(), "cvs/checks-not-in-progress");
 
         if (expectedErrorSelector == 0) {
             return this.checkVaultStatus.selector;
         }
 
-        (bool success, bytes memory result) = address(cvc).call(
-            abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
+        (bool success, bytes memory result) = address(evc).call(
+            abi.encodeWithSelector(evc.batch.selector, new IEVC.BatchItem[](0))
         );
 
         if (success || bytes4(result) != expectedErrorSelector) {
@@ -190,24 +190,24 @@ contract VaultMalicious is Vault {
         address,
         address[] memory
     ) external override returns (bytes4) {
-        try cvc.getCurrentOnBehalfOfAccount(address(0)) {
+        try evc.getCurrentOnBehalfOfAccount(address(0)) {
             revert("cas/on-behalf-of-account");
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
+                Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cas/on-behalf-of-account-2");
             }
         }
-        require(cvc.areChecksInProgress(), "cas/checks-not-in-progress");
+        require(evc.areChecksInProgress(), "cas/checks-not-in-progress");
 
         if (expectedErrorSelector == 0) {
             return this.checkAccountStatus.selector;
         }
 
-        (bool success, bytes memory result) = address(cvc).call(
-            abi.encodeWithSelector(cvc.batch.selector, new ICVC.BatchItem[](0))
+        (bool success, bytes memory result) = address(evc).call(
+            abi.encodeWithSelector(evc.batch.selector, new IEVC.BatchItem[](0))
         );
 
         if (success || bytes4(result) != expectedErrorSelector) {

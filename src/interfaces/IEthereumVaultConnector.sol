@@ -2,10 +2,10 @@
 
 pragma solidity ^0.8.20;
 
-/// @title ICVC
+/// @title IEVC
 /// @author Euler Labs (https://www.eulerlabs.com/)
-/// @notice This interface defines the methods for the Credit Vault Connector.
-interface ICVC {
+/// @notice This interface defines the methods for the Ethereum Vault Connector.
+interface IEVC {
     /// @notice A struct representing a batch item.
     /// @dev Each batch item represents a single operation to be performed within a checks deferred context.
     struct BatchItem {
@@ -13,7 +13,7 @@ interface ICVC {
         address targetContract;
         /// @notice The account on behalf of which the operation is to be performed. msg.sender must be authorized to act on behalf.
         address onBehalfOfAccount;
-        /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
+        /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the EVC contract will be forwarded.
         uint256 value;
         /// @notice The encoded data which is called on the target contract.
         bytes data;
@@ -79,7 +79,7 @@ interface ICVC {
     function getAddressPrefix(address account) external pure returns (uint152);
 
     /// @notice Returns the owner for the specified account.
-    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the CVC that requires authentication of an owner.
+    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial interaction with the EVC that requires authentication of an owner.
     /// @param account The address of the account whose owner is being retrieved.
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
@@ -205,14 +205,14 @@ interface ICVC {
     /// @param account The address for which the calling controller is being disabled.
     function disableController(address account) external payable;
 
-    /// @notice Executes signed arbitrary data by self-calling into the CVC.
-    /// @dev Low-level call function is used to execute the arbitrary data signed by the owner or the operator on the CVC contract. During that call, CVC becomes msg.sender.
+    /// @notice Executes signed arbitrary data by self-calling into the EVC.
+    /// @dev Low-level call function is used to execute the arbitrary data signed by the owner or the operator on the EVC contract. During that call, EVC becomes msg.sender.
     /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271). It's also the owner or the operator of all the accounts for which authentication will be needed during the execution of the arbitrary data call.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
     /// @param nonce The nonce for the given account and nonce namespace.
     /// @param deadline The timestamp after which the permit is considered expired.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
-    /// @param data The encoded data which is self-called on the CVC contract.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the EVC contract will be forwarded.
+    /// @param data The encoded data which is self-called on the EVC contract.
     /// @param signature The signature of the data signed by the signer.
     function permit(
         address signer,
@@ -228,7 +228,7 @@ interface ICVC {
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks are performed after the call.
     /// @dev This function can be used to defer account and vault status checks by providing calldata and the context with which the msg.sender will be called back.
     /// @param onBehalfOfAccount The address of the account which will be set in the context. It assumes the msg.sender has authenticated the account themselves.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the EVC contract will be forwarded.
     /// @param data The encoded data which is called on the msg.sender
     /// @return result The result of the call.
     function callback(
@@ -242,7 +242,7 @@ interface ICVC {
     /// @dev This function can be used to interact with any contract while checks deferred. Only the owner or an operator of the account can call this function.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on behalf.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the EVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
     function call(
@@ -257,7 +257,7 @@ interface ICVC {
     /// @dev This function can be used to interact with any contract while checks deferred as long as the contract is enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
     /// @param targetCollateral The collateral address to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on behalf.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the EVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
     function impersonate(

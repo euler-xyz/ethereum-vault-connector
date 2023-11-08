@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../cvc/CreditVaultConnectorHarness.sol";
+import "../../evc/EthereumVaultConnectorHarness.sol";
 
-contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
+contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
     using Set for SetStorage;
 
     function handlerCall(
@@ -22,7 +22,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 }
 
 contract CallTest is Test {
-    CreditVaultConnectorHandler internal cvc;
+    EthereumVaultConnectorHandler internal evc;
 
     event CallWithContext(
         address indexed caller,
@@ -32,18 +32,18 @@ contract CallTest is Test {
     );
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHandler();
+        evc = new EthereumVaultConnectorHandler();
     }
 
     function test_Call(address alice, uint96 seed) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(evc));
 
         address account;
         if (seed % 2 == 0) {
             // in this case the account is not alice's sub-account thus alice must be an operator
             account = address(uint160(alice) ^ 256);
             vm.prank(account);
-            cvc.setAccountOperator(account, alice, true);
+            evc.setAccountOperator(account, alice, true);
         } else {
             // in this case the account is alice's sub-account
             account = address(uint160(alice) ^ (seed % 256));
@@ -51,29 +51,37 @@ contract CallTest is Test {
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
+        address nestedTargetContract = address(new TargetWithNesting());
+        address controller = address(new Vault(evc));
         vm.assume(
-            targetContract != address(cvc) &&
-                !cvc.haveCommonOwner(targetContract, alice) &&
-                !cvc.haveCommonOwner(targetContract, account)
+            targetContract != alice &&
+                targetContract != address(evc) &&
+                !evc.haveCommonOwner(targetContract, alice) &&
+                !evc.haveCommonOwner(targetContract, account)
         );
-        address controller = address(new Vault(cvc));
+        vm.assume(
+            nestedTargetContract != alice &&
+                nestedTargetContract != address(evc) &&
+                !evc.haveCommonOwner(nestedTargetContract, alice) &&
+                !evc.haveCommonOwner(nestedTargetContract, account)
+        );
 
         vm.prank(alice);
-        cvc.enableController(account, controller);
-        cvc.reset();
+        evc.enableController(account, controller);
+        evc.reset();
         Vault(controller).reset();
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             account,
             seed % 2 == 0
         );
 
         vm.deal(alice, seed);
-        vm.expectEmit(true, true, true, true, address(cvc));
+        vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(
             alice,
             targetContract,
@@ -81,7 +89,7 @@ contract CallTest is Test {
             Target.callTest.selector
         );
         vm.prank(alice);
-        bytes memory result = cvc.handlerCall{value: seed}(
+        bytes memory result = evc.handlerCall{value: seed}(
             targetContract,
             account,
             seed,
@@ -89,15 +97,14 @@ contract CallTest is Test {
         );
         assertEq(abi.decode(result, (uint)), seed);
 
-        cvc.reset();
+        evc.reset();
         Vault(controller).reset();
 
         // on behalf of account should be correct in a nested call as well
-        address nestedTargetContract = address(new TargetWithNesting());
         data = abi.encodeWithSelector(
             TargetWithNesting(nestedTargetContract).nestedCallTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             targetContract,
             seed,
             account,
@@ -105,14 +112,14 @@ contract CallTest is Test {
         );
 
         vm.deal(alice, seed);
-        vm.expectEmit(true, true, true, true, address(cvc));
+        vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(
             alice,
             nestedTargetContract,
             account,
             TargetWithNesting.nestedCallTest.selector
         );
-        vm.expectEmit(true, true, true, true, address(cvc));
+        vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(
             nestedTargetContract,
             targetContract,
@@ -120,7 +127,7 @@ contract CallTest is Test {
             Target.callTest.selector
         );
         vm.prank(alice);
-        result = cvc.handlerCall{value: seed}(
+        result = evc.handlerCall{value: seed}(
             nestedTargetContract,
             account,
             seed,
@@ -130,13 +137,13 @@ contract CallTest is Test {
     }
 
     function test_RevertIfDepthExceeded_Call(address alice) external {
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(evc));
 
-        cvc.setCallDepth(10);
+        evc.setCallDepth(10);
 
         vm.prank(alice);
         vm.expectRevert(ExecutionContext.CallDepthViolation.selector);
-        cvc.call(address(0), alice, 0, "");
+        evc.call(address(0), alice, 0, "");
     }
 
     function test_RevertIfNotOwnerOrOperator_Call(
@@ -144,17 +151,17 @@ contract CallTest is Test {
         address bob,
         uint seed
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
-        vm.assume(!cvc.haveCommonOwner(alice, bob));
+        vm.assume(alice != address(0) && alice != address(evc));
+        vm.assume(!evc.haveCommonOwner(alice, bob));
         vm.assume(bob != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             alice,
             false
@@ -162,25 +169,25 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
-        cvc.call{value: seed}(targetContract, bob, seed, data);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call{value: seed}(targetContract, bob, seed, data);
     }
 
     function test_RevertIfChecksReentrancy_Call(
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != address(evc));
 
-        cvc.setChecksLock(true);
+        evc.setChecksLock(true);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             alice,
             false
@@ -188,25 +195,25 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
-        cvc.call{value: seed}(targetContract, alice, seed, data);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
     function test_RevertIfImpersonateReentrancy_Call(
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != address(evc));
 
-        cvc.setImpersonateLock(true);
+        evc.setImpersonateLock(true);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             alice,
             false
@@ -214,8 +221,8 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
-        cvc.call{value: seed}(targetContract, alice, seed, data);
+        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
     function test_RevertIfTargetContractInvalid_Call(
@@ -226,13 +233,13 @@ contract CallTest is Test {
         setUp();
 
         vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        // target contract is the CVC
-        address targetContract = address(cvc);
+        // target contract is the EVC
+        address targetContract = address(evc);
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
+            address(evc),
             targetContract,
             seed,
             alice,
@@ -241,30 +248,30 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
-        cvc.call{value: seed}(targetContract, alice, seed, data);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.call{value: seed}(targetContract, alice, seed, data);
 
         // target contract is the msg.sender
         targetContract = address(this);
         data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             address(this),
             false
         );
 
         vm.deal(address(this), seed);
-        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
-        cvc.call{value: seed}(targetContract, address(this), seed, data);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.call{value: seed}(targetContract, address(this), seed, data);
 
         // target contract is the ERC1820 registry
         targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
         data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             alice,
             false
@@ -272,24 +279,24 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
-        cvc.call{value: seed}(targetContract, alice, seed, data);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
     function test_RevertIfValueExceedsBalance_Call(
         address alice,
         uint128 seed
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 0);
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             alice,
             false
@@ -298,12 +305,12 @@ contract CallTest is Test {
         // reverts if value exceeds balance
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_InvalidValue.selector);
-        cvc.call{value: seed - 1}(targetContract, alice, seed, data);
+        vm.expectRevert(Errors.EVC_InvalidValue.selector);
+        evc.call{value: seed - 1}(targetContract, alice, seed, data);
 
         // succeeds if value does not exceed balance
         vm.prank(alice);
-        cvc.call{value: seed}(targetContract, alice, seed, data);
+        evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
     function test_RevertIfInternalCallIsUnsuccessful_Call(
@@ -313,17 +320,17 @@ contract CallTest is Test {
         setUp();
 
         vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).revertEmptyTest.selector
         );
 
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_EmptyError.selector);
-        cvc.call(targetContract, alice, 0, data);
+        vm.expectRevert(Errors.EVC_EmptyError.selector);
+        evc.call(targetContract, alice, 0, data);
     }
 }

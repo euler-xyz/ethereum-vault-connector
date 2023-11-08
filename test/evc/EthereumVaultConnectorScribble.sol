@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import "../../src/CreditVaultConnector.sol";
+import "../../src/EthereumVaultConnector.sol";
 
 /// #if_succeeds "call depth doesn't change" old(executionContext.getCallDepth()) == executionContext.getCallDepth();
 /// #if_succeeds "on behalf account state doesn't change" old(executionContext.getOnBehalfOfAccount()) == executionContext.getOnBehalfOfAccount();
@@ -20,14 +20,14 @@ import "../../src/CreditVaultConnector.sol";
 /// #if_succeeds "each account has at most 1 controller" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in ownerLookup) forall(uint256 j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 /// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
 /// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
-contract CreditVaultConnectorScribble is CreditVaultConnector {
+contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
-    /// #if_succeeds "collateral cannot be CVC" vault != address(this);
+    /// #if_succeeds "collateral cannot be EVC" vault != address(this);
     function enableCollateral(
         address account,
         address vault
@@ -48,7 +48,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
-    /// #if_succeeds "controller cannot be CVC" vault != address(this);
+    /// #if_succeeds "controller cannot be EVC" vault != address(this);
     function enableController(
         address account,
         address vault
@@ -87,7 +87,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the caller cannot be CVC" msg.sender != address(this);
+    /// #if_succeeds "the caller cannot be EVC" msg.sender != address(this);
     function callback(
         address onBehalfOfAccount,
         uint256 value,

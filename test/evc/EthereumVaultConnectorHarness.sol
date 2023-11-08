@@ -2,12 +2,12 @@
 
 pragma solidity ^0.8.20;
 
-import "./CreditVaultConnectorScribble.sol";
+import "./EthereumVaultConnectorScribble.sol";
 import "../utils/mocks/Vault.sol";
 
-// helper contract that allows to set CVC's internal state and overrides original
-// CVC functions in order to verify the account and vault checks
-contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
+// helper contract that allows to set EVC's internal state and overrides original
+// EVC functions in order to verify the account and vault checks
+contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
     using ExecutionContext for EC;
     using Set for SetStorage;
 

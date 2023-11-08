@@ -2,18 +2,18 @@
 
 pragma solidity ^0.8.20;
 
-import "../../../src/CreditVaultConnector.sol";
+import "../../../src/EthereumVaultConnector.sol";
 
-// mock target contract that allows to test call(), callback() and impersonate() functions of the CVC
+// mock target contract that allows to test call(), callback() and impersonate() functions of the EVC
 contract Target {
     function callTest(
-        address cvc,
+        address evc,
         address msgSender,
         uint value,
         address onBehalfOfAccount,
         bool operatorAuthenticated
     ) external payable returns (uint) {
-        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+        try IEVC(evc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
             bool
         ) {
@@ -30,33 +30,33 @@ contract Target {
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
         require(
-            ICVC(cvc).getCurrentCallDepth() > 0,
+            IEVC(evc).getCurrentCallDepth() > 0,
             "ct/invalid-checks-deferred"
         );
-        require(!ICVC(cvc).areChecksInProgress(), "ct/checks-lock");
-        require(!ICVC(cvc).isImpersonationInProgress(), "ct/impersonate-lock");
+        require(!IEVC(evc).areChecksInProgress(), "ct/checks-lock");
+        require(!IEVC(evc).isImpersonationInProgress(), "ct/impersonate-lock");
         require(
             operatorAuthenticated
-                ? ICVC(cvc).isOperatorAuthenticated()
-                : !ICVC(cvc).isOperatorAuthenticated(),
+                ? IEVC(evc).isOperatorAuthenticated()
+                : !IEVC(evc).isOperatorAuthenticated(),
             "ct/operator-authenticated"
         );
 
-        ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
+        IEVC(evc).requireAccountStatusCheck(onBehalfOfAccount);
         require(
-            ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
+            IEVC(evc).isAccountStatusCheckDeferred(onBehalfOfAccount),
             "ct/account-status-checks-not-deferred"
         );
         return msg.value;
     }
 
     function impersonateTest(
-        address cvc,
+        address evc,
         address msgSender,
         uint value,
         address onBehalfOfAccount
     ) external payable returns (uint) {
-        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+        try IEVC(evc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
             bool
         ) {
@@ -73,15 +73,15 @@ contract Target {
         require(msg.sender == msgSender, "it/invalid-sender");
         require(msg.value == value, "it/invalid-msg-value");
         require(
-            ICVC(cvc).getCurrentCallDepth() > 0,
+            IEVC(evc).getCurrentCallDepth() > 0,
             "it/invalid-checks-deferred"
         );
-        require(!ICVC(cvc).areChecksInProgress(), "it/checks-lock");
-        require(ICVC(cvc).isImpersonationInProgress(), "it/impersonate-lock");
+        require(!IEVC(evc).areChecksInProgress(), "it/checks-lock");
+        require(IEVC(evc).isImpersonationInProgress(), "it/impersonate-lock");
 
-        ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
+        IEVC(evc).requireAccountStatusCheck(onBehalfOfAccount);
         require(
-            ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
+            IEVC(evc).isAccountStatusCheckDeferred(onBehalfOfAccount),
             "it/account-status-checks-not-deferred"
         );
 
@@ -89,12 +89,12 @@ contract Target {
     }
 
     function callbackTest(
-        address cvc,
+        address evc,
         address msgSender,
         uint value,
         address onBehalfOfAccount
     ) external payable returns (uint) {
-        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+        try IEVC(evc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
             bool
         ) {
@@ -111,20 +111,20 @@ contract Target {
         require(msg.sender == msgSender, "cbt/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
         require(
-            ICVC(cvc).getCurrentCallDepth() > 0,
+            IEVC(evc).getCurrentCallDepth() > 0,
             "cbt/invalid-checks-deferred"
         );
 
-        require(!ICVC(cvc).areChecksInProgress(), "cbt/impersonate-lock");
-        require(!ICVC(cvc).isImpersonationInProgress(), "cbt/impersonate-lock");
+        require(!IEVC(evc).areChecksInProgress(), "cbt/impersonate-lock");
+        require(!IEVC(evc).isImpersonationInProgress(), "cbt/impersonate-lock");
         require(
-            !ICVC(cvc).isOperatorAuthenticated(),
+            !IEVC(evc).isOperatorAuthenticated(),
             "cbt/operator-authenticated"
         );
 
-        ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
+        IEVC(evc).requireAccountStatusCheck(onBehalfOfAccount);
         require(
-            ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
+            IEVC(evc).isAccountStatusCheckDeferred(onBehalfOfAccount),
             "cbt/account-status-checks-not-deferred"
         );
         return msg.value;
@@ -137,14 +137,14 @@ contract Target {
 
 contract TargetWithNesting {
     function nestedCallTest(
-        address cvc,
+        address evc,
         address msgSender,
         address targetContract,
         uint value,
         address onBehalfOfAccount,
         bool operatorAuthenticated
     ) external payable returns (uint) {
-        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+        try IEVC(evc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
             bool
         ) {
@@ -161,26 +161,26 @@ contract TargetWithNesting {
         require(msg.sender == msgSender, "nct/invalid-sender");
         require(msg.value == value, "nct/invalid-msg-value");
         require(
-            ICVC(cvc).getCurrentCallDepth() > 0,
+            IEVC(evc).getCurrentCallDepth() > 0,
             "nct/invalid-checks-deferred"
         );
-        require(!ICVC(cvc).areChecksInProgress(), "nct/checks-lock");
-        require(!ICVC(cvc).isImpersonationInProgress(), "nct/impersonate-lock");
+        require(!IEVC(evc).areChecksInProgress(), "nct/checks-lock");
+        require(!IEVC(evc).isImpersonationInProgress(), "nct/impersonate-lock");
         require(
             operatorAuthenticated
-                ? ICVC(cvc).isOperatorAuthenticated()
-                : !ICVC(cvc).isOperatorAuthenticated(),
+                ? IEVC(evc).isOperatorAuthenticated()
+                : !IEVC(evc).isOperatorAuthenticated(),
             "nct/operator-authenticated"
         );
 
-        bytes memory result = ICVC(cvc).call(
+        bytes memory result = IEVC(evc).call(
             targetContract,
             address(this),
             0,
             abi.encodeWithSelector(
                 Target.callTest.selector,
-                cvc,
-                cvc,
+                evc,
+                evc,
                 0,
                 address(this),
                 false,
@@ -189,7 +189,7 @@ contract TargetWithNesting {
         );
         require(abi.decode(result, (uint)) == 0, "nct/result");
 
-        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+        try IEVC(evc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
             bool
         ) {
@@ -204,17 +204,17 @@ contract TargetWithNesting {
             );
         }
         require(
-            ICVC(cvc).getCurrentCallDepth() > 0,
+            IEVC(evc).getCurrentCallDepth() > 0,
             "nct/invalid-checks-deferred-2"
         );
         require(
-            !ICVC(cvc).isImpersonationInProgress(),
+            !IEVC(evc).isImpersonationInProgress(),
             "nct/impersonate-lock-2"
         );
         require(
             operatorAuthenticated
-                ? ICVC(cvc).isOperatorAuthenticated()
-                : !ICVC(cvc).isOperatorAuthenticated(),
+                ? IEVC(evc).isOperatorAuthenticated()
+                : !IEVC(evc).isOperatorAuthenticated(),
             "nct/operator-authenticated-2"
         );
 

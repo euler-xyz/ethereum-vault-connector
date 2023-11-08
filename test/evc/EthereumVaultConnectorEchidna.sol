@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.20;
 
-import "./CreditVaultConnectorScribble.sol";
+import "./EthereumVaultConnectorScribble.sol";
 
-contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
+contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
@@ -23,7 +23,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             // calculate a phantom address from the address prefix which can be used as an input to internal functions
             address account = address(uint160(addressPrefix) << 8);
 
-            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
             address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
@@ -35,10 +35,10 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
                 } else if (owner != msgSender) {
-                    revert CVC_NotAuthorized();
+                    revert EVC_NotAuthorized();
                 }
             } else {
-                revert CVC_NotAuthorized();
+                revert EVC_NotAuthorized();
             }
         }
 
@@ -49,7 +49,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         assert(address(this) == msg.sender ? inPermit : true);
 
         {
-            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
             address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
@@ -61,12 +61,12 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
                 } else if (owner != msgSender) {
-                    revert CVC_NotAuthorized();
+                    revert EVC_NotAuthorized();
                 }
             } else if (
                 !isAccountOperatorAuthorizedInternal(account, msgSender)
             ) {
-                revert CVC_NotAuthorized();
+                revert EVC_NotAuthorized();
             }
         }
 
@@ -77,7 +77,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         EC contextCache = executionContext;
 
         if (contextCache.areChecksInProgress()) {
-            revert CVC_ChecksReentrancy();
+            revert EVC_ChecksReentrancy();
         }
 
         executionContext = contextCache
@@ -130,7 +130,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     ) public payable override nonReentrant returns (bytes memory result) {
         // copied function body with inserted assertion
         if (address(this) == msg.sender) {
-            revert CVC_NotAuthorized();
+            revert EVC_NotAuthorized();
         }
 
         EC contextCache = executionContext;
@@ -173,7 +173,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     ) public payable override nonReentrant returns (bytes memory result) {
         // copied function body with inserted assertion
         if (address(this) == targetContract || address(this) == msg.sender) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         EC contextCache = executionContext;
@@ -214,7 +214,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
         if (address(this) == targetCollateral) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         EC contextCache = executionContext;
@@ -295,7 +295,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
         EC contextCache = executionContext;
 
-        // CVC can only be msg.sender after the self-call in the permit() function. in that case,
+        // EVC can only be msg.sender after the self-call in the permit() function. in that case,
         // the "true" sender address (that is the permit message signer) is taken from the execution context
         address msgSender = address(this) == msg.sender
             ? contextCache.getOnBehalfOfAccount()

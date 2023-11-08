@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../cvc/CreditVaultConnectorHarness.sol";
+import "../../evc/EthereumVaultConnectorHarness.sol";
 
-contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
+contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
@@ -37,7 +37,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 }
 
 contract ControllersManagementTest is Test {
-    CreditVaultConnectorHandler internal cvc;
+    EthereumVaultConnectorHandler internal evc;
 
     event ControllerStatus(
         address indexed account,
@@ -46,7 +46,7 @@ contract ControllersManagementTest is Test {
     );
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHandler();
+        evc = new EthereumVaultConnectorHandler();
     }
 
     function test_ControllersManagement(
@@ -54,7 +54,7 @@ contract ControllersManagementTest is Test {
         uint8 subAccountId,
         uint seed
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 1000);
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
@@ -63,69 +63,69 @@ contract ControllersManagementTest is Test {
         address msgSender = alice;
         if (
             seed % 2 == 0 &&
-            !cvc.haveCommonOwner(account, address(uint160(seed)))
+            !evc.haveCommonOwner(account, address(uint160(seed)))
         ) {
             msgSender = address(uint160(uint(keccak256(abi.encode(seed)))));
             vm.prank(alice);
-            cvc.setAccountOperator(account, msgSender, true);
+            evc.setAccountOperator(account, msgSender, true);
         }
 
         // enabling controller
-        address vault = address(new Vault(cvc));
+        address vault = address(new Vault(evc));
 
-        assertFalse(cvc.isControllerEnabled(account, vault));
-        address[] memory controllersPre = cvc.getControllers(account);
+        assertFalse(evc.isControllerEnabled(account, vault));
+        address[] memory controllersPre = evc.getControllers(account);
 
-        vm.expectEmit(true, true, false, true, address(cvc));
+        vm.expectEmit(true, true, false, true, address(evc));
         emit ControllerStatus(account, vault, true);
         vm.prank(msgSender);
-        cvc.handlerEnableController(account, vault);
+        evc.handlerEnableController(account, vault);
 
-        address[] memory controllersPost = cvc.getControllers(account);
+        address[] memory controllersPost = evc.getControllers(account);
         assertEq(controllersPost.length, controllersPre.length + 1);
         assertEq(controllersPost[controllersPost.length - 1], vault);
-        assertTrue(cvc.isControllerEnabled(account, vault));
+        assertTrue(evc.isControllerEnabled(account, vault));
 
         // enabling the same controller again should succeed (duplicate will not be added and the event won't be emitted)
-        assertTrue(cvc.isControllerEnabled(account, vault));
-        controllersPre = cvc.getControllers(account);
+        assertTrue(evc.isControllerEnabled(account, vault));
+        controllersPre = evc.getControllers(account);
 
         vm.prank(msgSender);
-        cvc.handlerEnableController(account, vault);
+        evc.handlerEnableController(account, vault);
 
-        controllersPost = cvc.getControllers(account);
+        controllersPost = evc.getControllers(account);
 
         assertEq(controllersPost.length, controllersPre.length);
         assertEq(controllersPost[0], controllersPre[0]);
-        assertTrue(cvc.isControllerEnabled(account, vault));
+        assertTrue(evc.isControllerEnabled(account, vault));
 
         // trying to enable second controller will throw on the account status check
-        address otherVault = address(new Vault(cvc));
+        address otherVault = address(new Vault(evc));
 
         vm.prank(msgSender);
-        vm.expectRevert(Errors.CVC_ControllerViolation.selector);
-        cvc.handlerEnableController(account, otherVault);
+        vm.expectRevert(Errors.EVC_ControllerViolation.selector);
+        evc.handlerEnableController(account, otherVault);
 
         // only the controller vault can disable itself
-        assertTrue(cvc.isControllerEnabled(account, vault));
-        controllersPre = cvc.getControllers(account);
+        assertTrue(evc.isControllerEnabled(account, vault));
+        controllersPre = evc.getControllers(account);
 
         vm.prank(msgSender);
-        vm.expectEmit(true, true, false, true, address(cvc));
+        vm.expectEmit(true, true, false, true, address(evc));
         emit ControllerStatus(account, vault, false);
         Vault(vault).call(
-            address(cvc),
+            address(evc),
             abi.encodeWithSelector(
-                cvc.handlerDisableController.selector,
+                evc.handlerDisableController.selector,
                 account
             )
         );
 
-        controllersPost = cvc.getControllers(account);
+        controllersPost = evc.getControllers(account);
 
         assertEq(controllersPost.length, controllersPre.length - 1);
         assertEq(controllersPost.length, 0);
-        assertFalse(cvc.isControllerEnabled(account, vault));
+        assertFalse(evc.isControllerEnabled(account, vault));
     }
 
     function test_RevertIfNotOwnerOrNotOperator_EnableController(
@@ -134,130 +134,130 @@ contract ControllersManagementTest is Test {
     ) public {
         vm.assume(
             alice != address(0) &&
-                alice != address(cvc) &&
+                alice != address(evc) &&
                 bob != address(0) &&
-                bob != address(cvc)
+                bob != address(evc)
         );
-        vm.assume(!cvc.haveCommonOwner(alice, bob));
+        vm.assume(!evc.haveCommonOwner(alice, bob));
 
-        address vault = address(new Vault(cvc));
+        address vault = address(new Vault(evc));
 
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
-        cvc.handlerEnableController(bob, vault);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
-        cvc.setAccountOperator(bob, alice, true);
+        evc.setAccountOperator(bob, alice, true);
 
         vm.prank(alice);
-        cvc.handlerEnableController(bob, vault);
+        evc.handlerEnableController(bob, vault);
     }
 
     function test_RevertIfProgressReentrancy_ControllersManagement(
         address alice
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        address vault = address(new Vault(cvc));
+        address vault = address(new Vault(evc));
 
-        cvc.setChecksLock(true);
-
-        vm.prank(alice);
-        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
-        cvc.enableController(alice, vault);
-
-        cvc.setChecksLock(false);
+        evc.setChecksLock(true);
 
         vm.prank(alice);
-        cvc.enableController(alice, vault);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.enableController(alice, vault);
 
-        cvc.setChecksLock(true);
+        evc.setChecksLock(false);
+
+        vm.prank(alice);
+        evc.enableController(alice, vault);
+
+        evc.setChecksLock(true);
 
         vm.prank(vault);
-        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
-        cvc.disableController(alice);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.disableController(alice);
 
-        cvc.setChecksLock(false);
+        evc.setChecksLock(false);
 
         vm.prank(vault);
-        cvc.disableController(alice);
+        evc.disableController(alice);
     }
 
     function test_RevertIfImpersonateReentrancy_ControllersManagement(
         address alice
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        address vault = address(new Vault(cvc));
+        address vault = address(new Vault(evc));
 
-        cvc.setImpersonateLock(true);
-
-        vm.prank(alice);
-        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
-        cvc.enableController(alice, vault);
-
-        cvc.setImpersonateLock(false);
+        evc.setImpersonateLock(true);
 
         vm.prank(alice);
-        cvc.enableController(alice, vault);
+        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        evc.enableController(alice, vault);
 
-        cvc.setImpersonateLock(true);
+        evc.setImpersonateLock(false);
+
+        vm.prank(alice);
+        evc.enableController(alice, vault);
+
+        evc.setImpersonateLock(true);
 
         vm.prank(vault);
-        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
-        cvc.disableController(alice);
+        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        evc.disableController(alice);
 
-        cvc.setImpersonateLock(false);
+        evc.setImpersonateLock(false);
 
         vm.prank(vault);
-        cvc.disableController(alice);
+        evc.disableController(alice);
     }
 
     function test_RevertIfInvalidVault_ControllersManagement(
         address alice
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
         vm.prank(alice);
-        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
-        cvc.enableController(alice, address(cvc));
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.enableController(alice, address(evc));
     }
 
     function test_RevertIfAccountStatusViolated_ControllersManagement(
         address alice
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        address vault = address(new Vault(cvc));
+        address vault = address(new Vault(evc));
 
         Vault(vault).setAccountStatusState(1); // account status is violated
 
         vm.prank(alice);
         vm.expectRevert("account status violation");
-        cvc.handlerEnableController(alice, vault);
+        evc.handlerEnableController(alice, vault);
 
         vm.prank(alice);
         // succeeds as there's no controller to perform the account status check
         Vault(vault).call(
-            address(cvc),
-            abi.encodeWithSelector(cvc.handlerDisableController.selector, alice)
+            address(evc),
+            abi.encodeWithSelector(evc.handlerDisableController.selector, alice)
         );
 
         Vault(vault).setAccountStatusState(1); // account status is still violated
 
         vm.prank(alice);
         // succeeds as there's no controller to perform the account status check
-        cvc.enableCollateral(alice, vault);
+        evc.enableCollateral(alice, vault);
 
         Vault(vault).setAccountStatusState(0); // account status is no longer violated in order to enable controller
 
         vm.prank(alice);
-        cvc.handlerEnableController(alice, vault);
+        evc.handlerEnableController(alice, vault);
 
         Vault(vault).setAccountStatusState(1); // account status is violated again
 
         vm.prank(alice);
         // it won't succeed as this time we have a controller so the account status check is performed
         vm.expectRevert("account status violation");
-        cvc.enableCollateral(alice, vault);
+        evc.enableCollateral(alice, vault);
     }
 }

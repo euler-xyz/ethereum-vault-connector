@@ -3,7 +3,7 @@ testMode: "assertion"
 #testLimit: 1000
 solcArgs: "optimize-runs=10000"
 deployContracts: [
-  ["0xdead", "CreditVaultConnectorEchidna"],
+  ["0xdead", "EthereumVaultConnectorEchidna"],
   ["0xbeef", "VaultEchidna"],
   ["0xbeefbeef", "TargetEchidna"],
   ["0xbeefbeefbeef", "SignerEchidna"]

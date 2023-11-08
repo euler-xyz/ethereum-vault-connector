@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 /// @title Events
 /// @author Euler Labs (https://www.eulerlabs.com/)
-/// @notice This contract implements the events for the Credit Vault Connector.
+/// @notice This contract implements the events for the Ethereum Vault Connector.
 contract Events {
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
     event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);

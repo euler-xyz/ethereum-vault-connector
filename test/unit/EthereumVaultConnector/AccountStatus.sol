@@ -3,13 +3,13 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../cvc/CreditVaultConnectorHarness.sol";
+import "../../evc/EthereumVaultConnectorHarness.sol";
 
 contract AccountStatusTest is Test {
-    CreditVaultConnectorHarness internal cvc;
+    EthereumVaultConnectorHarness internal evc;
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHarness();
+        evc = new EthereumVaultConnectorHarness();
     }
 
     function test_RequireAccountStatusCheck(
@@ -23,12 +23,12 @@ contract AccountStatusTest is Test {
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            address controller = address(new Vault(cvc));
+            address controller = address(new Vault(evc));
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
             Vault(controller).clearChecks();
-            cvc.clearExpectedChecks();
+            evc.clearExpectedChecks();
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
@@ -48,11 +48,11 @@ contract AccountStatusTest is Test {
                 );
             }
 
-            cvc.requireAccountStatusCheck(account);
+            evc.requireAccountStatusCheck(account);
 
-            cvc.verifyAccountStatusChecks();
+            evc.verifyAccountStatusChecks();
             Vault(controller).clearChecks();
-            cvc.clearExpectedChecks();
+            evc.clearExpectedChecks();
         }
     }
 
@@ -63,42 +63,42 @@ contract AccountStatusTest is Test {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
 
         for (uint i = 0; i < numberOfAccounts; i++) {
-            cvc.setCallDepth(0);
+            evc.setCallDepth(0);
 
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            address controller = address(new Vault(cvc));
+            address controller = address(new Vault(evc));
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
             Vault(controller).setAccountStatusState(1);
 
             // account status check will be scheduled for later due to deferred state
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             // even though the account status state was set to 1 which should revert,
             // it doesn't because in checks deferral we only add the accounts to the set
             // so that the checks can be performed later
-            assertFalse(cvc.isAccountStatusCheckDeferred(account));
-            cvc.requireAccountStatusCheck(account);
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
-            cvc.reset();
+            assertFalse(evc.isAccountStatusCheckDeferred(account));
+            evc.requireAccountStatusCheck(account);
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
+            evc.reset();
         }
     }
 
     function test_RevertIfChecksReentrancy_RequireAccountStatusCheck(
         address account
     ) external {
-        cvc.setChecksLock(true);
+        evc.setChecksLock(true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+            abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
         );
-        cvc.requireAccountStatusCheck(account);
+        evc.requireAccountStatusCheck(account);
 
-        cvc.setChecksLock(false);
-        cvc.requireAccountStatusCheck(account);
+        evc.setChecksLock(false);
+        evc.requireAccountStatusCheck(account);
     }
 
     function test_AcquireChecksLock_RequireAccountStatusChecks(
@@ -111,18 +111,18 @@ contract AccountStatusTest is Test {
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            address controller = address(new VaultMalicious(cvc));
+            address controller = address(new VaultMalicious(evc));
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
 
             VaultMalicious(controller).setExpectedErrorSelector(
-                Errors.CVC_ChecksReentrancy.selector
+                Errors.EVC_ChecksReentrancy.selector
             );
 
-            // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
+            // function will revert with EVC_AccountStatusViolation according to VaultMalicious implementation
             vm.expectRevert(bytes("malicious vault"));
-            cvc.requireAccountStatusCheck(account);
+            evc.requireAccountStatusCheck(account);
         }
     }
 
@@ -139,17 +139,17 @@ contract AccountStatusTest is Test {
             accounts[i] = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            controllers[i] = address(new Vault(cvc));
+            controllers[i] = address(new Vault(evc));
         }
 
         for (uint i = 0; i < numberOfAccounts; i++) {
             address account = accounts[i];
             address controller = controllers[i];
 
-            cvc.setCallDepth(0);
+            evc.setCallDepth(0);
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
@@ -163,13 +163,13 @@ contract AccountStatusTest is Test {
 
             // first, schedule the check to be performed later to prove that after being peformed on the fly
             // account is no longer contained in the set to be performed later
-            cvc.setCallDepth(1);
-            cvc.requireAccountStatusCheck(account);
+            evc.setCallDepth(1);
+            evc.requireAccountStatusCheck(account);
 
             Vault(controller).clearChecks();
-            cvc.clearExpectedChecks();
+            evc.clearExpectedChecks();
 
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
                 vm.expectRevert(
                     uint160(account) % 3 == 1
@@ -177,29 +177,29 @@ contract AccountStatusTest is Test {
                         : abi.encode(bytes4(uint32(2)))
                 );
             }
-            cvc.requireAccountStatusCheckNow(account);
+            evc.requireAccountStatusCheckNow(account);
 
             if (allStatusesValid || uint160(account) % 3 == 0) {
-                assertFalse(cvc.isAccountStatusCheckDeferred(account));
+                assertFalse(evc.isAccountStatusCheckDeferred(account));
             } else {
-                assertTrue(cvc.isAccountStatusCheckDeferred(account));
+                assertTrue(evc.isAccountStatusCheckDeferred(account));
             }
-            cvc.verifyAccountStatusChecks();
+            evc.verifyAccountStatusChecks();
 
-            cvc.reset();
+            evc.reset();
         }
 
         // schedule the checks to be performed later to prove that after being peformed on the fly
         // accounts are no longer contained in the set to be performed later
-        cvc.setCallDepth(1);
+        evc.setCallDepth(1);
 
         for (uint i = 0; i < numberOfAccounts; ++i) {
-            cvc.requireAccountStatusCheck(accounts[i]);
+            evc.requireAccountStatusCheck(accounts[i]);
             Vault(controllers[i]).clearChecks();
 
-            assertTrue(cvc.isAccountStatusCheckDeferred(accounts[i]));
+            assertTrue(evc.isAccountStatusCheckDeferred(accounts[i]));
         }
-        cvc.clearExpectedChecks();
+        evc.clearExpectedChecks();
 
         for (uint i = 0; i < numberOfAccounts; ++i) {
             address account = accounts[i];
@@ -211,29 +211,29 @@ contract AccountStatusTest is Test {
                         : abi.encode(bytes4(uint32(2)))
                 );
             }
-            cvc.requireAccountStatusCheckNow(account);
+            evc.requireAccountStatusCheckNow(account);
 
             if (allStatusesValid || uint160(account) % 3 == 0) {
-                assertFalse(cvc.isAccountStatusCheckDeferred(account));
+                assertFalse(evc.isAccountStatusCheckDeferred(account));
             } else {
-                assertTrue(cvc.isAccountStatusCheckDeferred(account));
+                assertTrue(evc.isAccountStatusCheckDeferred(account));
             }
         }
-        cvc.verifyAccountStatusChecks();
+        evc.verifyAccountStatusChecks();
     }
 
     function test_RevertIfChecksReentrancy_RequireAccountStatusCheckNow(
         address account
     ) external {
-        cvc.setChecksLock(true);
+        evc.setChecksLock(true);
 
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+            abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
         );
-        cvc.requireAccountStatusCheckNow(account);
+        evc.requireAccountStatusCheckNow(account);
 
-        cvc.setChecksLock(false);
-        cvc.requireAccountStatusCheckNow(account);
+        evc.setChecksLock(false);
+        evc.requireAccountStatusCheckNow(account);
     }
 
     function test_AcquireChecksLock_RequireAccountStatusChecksNow(
@@ -246,18 +246,18 @@ contract AccountStatusTest is Test {
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            address controller = address(new VaultMalicious(cvc));
+            address controller = address(new VaultMalicious(evc));
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
 
             VaultMalicious(controller).setExpectedErrorSelector(
-                Errors.CVC_ChecksReentrancy.selector
+                Errors.EVC_ChecksReentrancy.selector
             );
 
-            // function will revert with CVC_AccountStatusViolation according to VaultMalicious implementation
+            // function will revert with EVC_AccountStatusViolation according to VaultMalicious implementation
             vm.expectRevert(bytes("malicious vault"));
-            cvc.requireAccountStatusCheckNow(account);
+            evc.requireAccountStatusCheckNow(account);
         }
     }
 
@@ -274,7 +274,7 @@ contract AccountStatusTest is Test {
             accounts[i] = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            controllers[i] = address(new Vault(cvc));
+            controllers[i] = address(new Vault(evc));
         }
 
         uint invalidAccountsCounter;
@@ -284,11 +284,11 @@ contract AccountStatusTest is Test {
             address account = accounts[i];
             address controller = controllers[i];
 
-            cvc.reset();
-            cvc.setCallDepth(0);
+            evc.reset();
+            evc.setCallDepth(0);
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
@@ -300,13 +300,13 @@ contract AccountStatusTest is Test {
                     : 2
             );
 
-            cvc.setCallDepth(1);
-            cvc.requireAccountStatusCheck(account);
+            evc.setCallDepth(1);
+            evc.requireAccountStatusCheck(account);
 
             Vault(controller).clearChecks();
-            cvc.clearExpectedChecks();
+            evc.clearExpectedChecks();
 
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
                 // for later check
                 invalidAccounts[invalidAccountsCounter++] = account;
@@ -317,30 +317,30 @@ contract AccountStatusTest is Test {
                         : abi.encode(bytes4(uint32(2)))
                 );
             }
-            cvc.requireAllAccountsStatusCheckNow();
+            evc.requireAllAccountsStatusCheckNow();
 
             if (allStatusesValid || uint160(account) % 3 == 0) {
-                assertFalse(cvc.isAccountStatusCheckDeferred(account));
+                assertFalse(evc.isAccountStatusCheckDeferred(account));
             } else {
-                assertTrue(cvc.isAccountStatusCheckDeferred(account));
+                assertTrue(evc.isAccountStatusCheckDeferred(account));
             }
-            cvc.verifyAccountStatusChecks();
+            evc.verifyAccountStatusChecks();
         }
 
-        cvc.reset();
+        evc.reset();
 
-        cvc.setCallDepth(1);
+        evc.setCallDepth(1);
         for (uint i = 0; i < accounts.length; ++i) {
-            cvc.requireAccountStatusCheck(accounts[i]);
+            evc.requireAccountStatusCheck(accounts[i]);
         }
 
         for (uint i = 0; i < controllers.length; ++i) {
             Vault(controllers[i]).clearChecks();
         }
-        cvc.clearExpectedChecks();
+        evc.clearExpectedChecks();
 
         for (uint i = 0; i < accounts.length; ++i) {
-            assertTrue(cvc.isAccountStatusCheckDeferred(accounts[i]));
+            assertTrue(evc.isAccountStatusCheckDeferred(accounts[i]));
         }
         if (invalidAccountsCounter > 0) {
             vm.expectRevert(
@@ -349,26 +349,26 @@ contract AccountStatusTest is Test {
                     : abi.encode(bytes4(uint32(2)))
             );
         }
-        cvc.requireAllAccountsStatusCheckNow();
+        evc.requireAllAccountsStatusCheckNow();
         for (uint i = 0; i < accounts.length; ++i) {
             assertEq(
-                cvc.isAccountStatusCheckDeferred(accounts[i]),
+                evc.isAccountStatusCheckDeferred(accounts[i]),
                 invalidAccountsCounter > 0
             );
         }
-        cvc.verifyAccountStatusChecks();
+        evc.verifyAccountStatusChecks();
     }
 
     function test_RevertIfChecksReentrancy_RequireAllAccountsStatusCheckNow(
         bool locked
     ) external {
-        cvc.setChecksLock(locked);
+        evc.setChecksLock(locked);
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+                abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
             );
-        cvc.requireAllAccountsStatusCheckNow();
+        evc.requireAllAccountsStatusCheckNow();
     }
 
     function test_AcquireChecksLock_RequireAllAccountsStatusChecksNow(
@@ -384,23 +384,23 @@ contract AccountStatusTest is Test {
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
 
-            controllers[i] = address(new VaultMalicious(cvc));
+            controllers[i] = address(new VaultMalicious(evc));
 
             vm.prank(accounts[i]);
-            cvc.enableController(accounts[i], controllers[i]);
+            evc.enableController(accounts[i], controllers[i]);
 
             VaultMalicious(controllers[i]).setExpectedErrorSelector(
-                Errors.CVC_ChecksReentrancy.selector
+                Errors.EVC_ChecksReentrancy.selector
             );
         }
 
-        cvc.setCallDepth(1);
+        evc.setCallDepth(1);
         for (uint i = 0; i < accounts.length; ++i) {
-            cvc.requireAccountStatusCheck(accounts[i]);
+            evc.requireAccountStatusCheck(accounts[i]);
         }
 
         vm.expectRevert(bytes("malicious vault"));
-        cvc.requireAllAccountsStatusCheckNow();
+        evc.requireAllAccountsStatusCheckNow();
     }
 
     function test_ForgiveAccountStatusCheck(
@@ -416,58 +416,58 @@ contract AccountStatusTest is Test {
             );
         }
 
-        address controller = address(new Vault(cvc));
+        address controller = address(new Vault(evc));
         for (uint i = 0; i < numberOfAccounts; i++) {
             address account = accounts[i];
 
             // account status check will be scheduled for later due to deferred state
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
 
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
             vm.prank(controller);
-            cvc.forgiveAccountStatusCheck(account);
-            assertFalse(cvc.isAccountStatusCheckDeferred(account));
+            evc.forgiveAccountStatusCheck(account);
+            assertFalse(evc.isAccountStatusCheckDeferred(account));
 
-            cvc.reset();
+            evc.reset();
         }
 
-        cvc.setCallDepth(1);
+        evc.setCallDepth(1);
 
         for (uint i = 0; i < accounts.length; ++i) {
-            assertFalse(cvc.isAccountStatusCheckDeferred(accounts[i]));
-            cvc.requireAccountStatusCheck(accounts[i]);
-            assertTrue(cvc.isAccountStatusCheckDeferred(accounts[i]));
+            assertFalse(evc.isAccountStatusCheckDeferred(accounts[i]));
+            evc.requireAccountStatusCheck(accounts[i]);
+            assertTrue(evc.isAccountStatusCheckDeferred(accounts[i]));
         }
 
         for (uint i = 0; i < accounts.length; ++i) {
             vm.prank(controller);
-            cvc.forgiveAccountStatusCheck(accounts[i]);
-            assertFalse(cvc.isAccountStatusCheckDeferred(accounts[i]));
+            evc.forgiveAccountStatusCheck(accounts[i]);
+            assertFalse(evc.isAccountStatusCheckDeferred(accounts[i]));
         }
     }
 
     function test_RevertIfChecksReentrancy_ForgiveAccountStatusCheckNow(
         address account
     ) external {
-        address controller = address(new Vault(cvc));
+        address controller = address(new Vault(evc));
 
         vm.prank(account);
-        cvc.enableController(account, controller);
+        evc.enableController(account, controller);
 
-        cvc.setChecksLock(true);
+        evc.setChecksLock(true);
 
         vm.prank(controller);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+            abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
         );
-        cvc.forgiveAccountStatusCheck(account);
+        evc.forgiveAccountStatusCheck(account);
 
-        cvc.setChecksLock(false);
+        evc.setChecksLock(false);
         vm.prank(controller);
-        cvc.forgiveAccountStatusCheck(account);
+        evc.forgiveAccountStatusCheck(account);
     }
 
     function test_RevertIfNoControllerEnabled_ForgiveAccountStatusCheck(
@@ -482,17 +482,17 @@ contract AccountStatusTest is Test {
             );
 
             // account status check will be scheduled for later due to deferred state
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
-            assertFalse(cvc.isAccountStatusCheckDeferred(account));
-            cvc.requireAccountStatusCheck(account);
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            assertFalse(evc.isAccountStatusCheckDeferred(account));
+            evc.requireAccountStatusCheck(account);
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
 
             // the check does not get forgiven
-            vm.expectRevert(Errors.CVC_ControllerViolation.selector);
-            cvc.forgiveAccountStatusCheck(account);
+            vm.expectRevert(Errors.EVC_ControllerViolation.selector);
+            evc.forgiveAccountStatusCheck(account);
 
-            cvc.reset();
+            evc.reset();
         }
     }
 
@@ -501,8 +501,8 @@ contract AccountStatusTest is Test {
         bytes memory seed
     ) external {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
-        address controller_1 = address(new Vault(cvc));
-        address controller_2 = address(new Vault(cvc));
+        address controller_1 = address(new Vault(evc));
+        address controller_2 = address(new Vault(evc));
 
         for (uint i = 0; i < numberOfAccounts; i++) {
             address account = address(
@@ -510,20 +510,20 @@ contract AccountStatusTest is Test {
             );
 
             // account status check will be scheduled for later due to deferred state
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(account);
-            cvc.enableController(account, controller_1);
+            evc.enableController(account, controller_1);
 
             vm.prank(account);
-            cvc.enableController(account, controller_2);
+            evc.enableController(account, controller_2);
 
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
             vm.prank(controller_1);
-            vm.expectRevert(Errors.CVC_ControllerViolation.selector);
-            cvc.forgiveAccountStatusCheck(account);
+            vm.expectRevert(Errors.EVC_ControllerViolation.selector);
+            evc.forgiveAccountStatusCheck(account);
 
-            cvc.reset();
+            evc.reset();
         }
     }
 
@@ -533,24 +533,24 @@ contract AccountStatusTest is Test {
     ) external {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= Set.MAX_ELEMENTS);
 
-        address controller = address(new Vault(cvc));
+        address controller = address(new Vault(evc));
         for (uint i = 0; i < numberOfAccounts; i++) {
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
 
             // account status check will be scheduled for later due to deferred state
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
             vm.prank(account);
-            cvc.enableController(account, controller);
+            evc.enableController(account, controller);
 
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
             vm.prank(address(uint160(controller) + 1));
-            vm.expectRevert(Errors.CVC_NotAuthorized.selector);
-            cvc.forgiveAccountStatusCheck(account);
+            vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+            evc.forgiveAccountStatusCheck(account);
 
-            cvc.reset();
+            evc.reset();
         }
     }
 }
