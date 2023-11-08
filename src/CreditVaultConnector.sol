@@ -571,14 +571,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc ICVC
@@ -607,14 +600,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc ICVC
@@ -645,14 +631,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc ICVC
@@ -664,14 +643,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
         batchInternal(items);
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     // Simulations
@@ -1109,6 +1081,17 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
                 ++i;
             }
         }
+    }
+
+    function restoreExecutionContext(EC contextCache) internal virtual {
+        if (!contextCache.areChecksDeferred()) {
+            executionContext = contextCache.setChecksInProgress();
+
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
+        }
+
+        executionContext = contextCache;
     }
 
     // Permit-related functions
