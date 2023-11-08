@@ -211,7 +211,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         uint value,
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
-        if (address(this) == targetContract) {
+        if (address(this) == targetContract || msg.sender == targetContract) {
             revert CVC_InvalidAddress();
         }
 

@@ -97,7 +97,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
+    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry nor itself" targetContract != address(this) && targetContract != ERC1820_REGISTRY && targetContract != msg.sender;
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -109,7 +109,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetContract);
-    /// #if_succeeds "the target cannot be this contract" targetContract != address(this);
+    /// #if_succeeds "the target can neither be this contract not itself" targetContract != address(this) && targetContract != msg.sender;
     function impersonate(
         address targetContract,
         address onBehalfOfAccount,

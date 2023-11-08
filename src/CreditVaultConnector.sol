@@ -659,7 +659,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         uint value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
-        if (address(this) == targetContract) {
+        if (address(this) == targetContract || msg.sender == targetContract) {
             revert CVC_InvalidAddress();
         }
 
