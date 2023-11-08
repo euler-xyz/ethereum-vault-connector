@@ -106,8 +106,8 @@ methods {
 //    assert(false);
 //}
 
+/// check that bitmasks are pairwise disjoint
 rule check_bitmasks_disjoint() {
-    // check that bitmasks are pairwise disjoint
     assert(BATCH_DEPTH_MASK() & ON_BEHALF_OF_ACCOUNT_MASK() == 0);
     assert(BATCH_DEPTH_MASK() & CHECKS_LOCK_MASK() == 0);
     assert(BATCH_DEPTH_MASK() & IMPERSONATE_LOCK_MASK() == 0);
@@ -144,8 +144,8 @@ rule check_bitmasks_disjoint() {
     assert(SIMULATION_MASK() & STAMP_MASK() == 0);
 }
 
+/// check that the bitmasks cover all the bits
 rule check_bitmasks_coverall() {
-    // check that the bitmasks cover all the bits
     assert(
         BATCH_DEPTH_MASK() |
         ON_BEHALF_OF_ACCOUNT_MASK() |
@@ -157,3 +157,14 @@ rule check_bitmasks_coverall() {
         STAMP_MASK() == ~require_uint256(0)
     );
 }
+
+/// check that the offsets are right
+rule check_bitmasks_offsets() {
+    assert(BATCH_DEPTH_MASK() <= (1 << ON_BEHALF_OF_ACCOUNT_OFFSET()));
+    assert(ON_BEHALF_OF_ACCOUNT_MASK() & require_uint256((1 << ON_BEHALF_OF_ACCOUNT_OFFSET()) - 1) == 0);
+    assert(STAMP_MASK() & require_uint256((1 << STAMP_OFFSET()) - 1) == 0);
+}
+
+/// check that batch depth zero means we are not in a batch
+invariant check_batch_zero_is_not_in_batch(uint ec)
+    getBatchDepth(ec) != 0 <=> isInBatch(ec);
