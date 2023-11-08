@@ -100,10 +100,10 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
     function permit(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint vaule,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 vaule,
         bytes calldata data,
         bytes calldata signature
     ) public payable override nonReentrant {
@@ -125,7 +125,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
 
     function callback(
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
         // copied function body with inserted assertion
@@ -168,7 +168,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     function call(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
         // copied function body with inserted assertion
@@ -210,7 +210,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     function impersonate(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
         if (address(this) == targetCollateral) {
@@ -282,7 +282,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         // copied function body with inserted assertion
@@ -319,7 +319,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         }
 
         (success, result) = targetContract.call{
-            value: value == type(uint).max ? address(this).balance : value
+            value: value == type(uint256).max ? address(this).balance : value
         }(data);
 
         // verify if cached context value can be reused

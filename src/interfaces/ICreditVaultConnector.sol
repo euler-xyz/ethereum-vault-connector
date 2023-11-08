@@ -13,8 +13,8 @@ interface ICVC {
         address targetContract;
         /// @notice The account on behalf of which the operation is to be performed. msg.sender must be authorized to act on behalf.
         address onBehalfOfAccount;
-        /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
-        uint value;
+        /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
+        uint256 value;
         /// @notice The encoded data which is called on the target contract.
         bytes data;
     }
@@ -31,11 +31,11 @@ interface ICVC {
     /// @notice Returns current raw execution context.
     /// @dev When checks in progress, on behalf of account is always address(0).
     /// @return context Current raw execution context.
-    function getRawExecutionContext() external view returns (uint context);
+    function getRawExecutionContext() external view returns (uint256 context);
 
     /// @notice Returns the current call depth.
     /// @return The current call depth.
-    function getCurrentCallDepth() external view returns (uint);
+    function getCurrentCallDepth() external view returns (uint256);
 
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
     /// @dev When checks in progress, on behalf of account is always address(0).
@@ -91,8 +91,8 @@ interface ICVC {
     /// @return nonce The current nonce for the given address prefix and nonce namespace.
     function getNonce(
         uint152 addressPrefix,
-        uint nonceNamespace
-    ) external view returns (uint nonce);
+        uint256 nonceNamespace
+    ) external view returns (uint256 nonce);
 
     /// @notice Returns the bit field for a given address prefix and operator.
     /// @dev The bit field is used to store information about authorized operators for a given address prefix. Each bit in the bit field corresponds to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
@@ -102,7 +102,7 @@ interface ICVC {
     function getOperator(
         uint152 addressPrefix,
         address operator
-    ) external view returns (uint accountOperatorAuthorized);
+    ) external view returns (uint256 accountOperatorAuthorized);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
@@ -114,14 +114,14 @@ interface ICVC {
     ) external view returns (bool authorized);
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
-    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint256).max.
     /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
     /// @param nonce The new nonce for the given address prefix and nonce namespace.
     function setNonce(
         uint152 addressPrefix,
-        uint nonceNamespace,
-        uint nonce
+        uint256 nonceNamespace,
+        uint256 nonce
     ) external payable;
 
     /// @notice Sets the bit field for a given address prefix and operator.
@@ -132,7 +132,7 @@ interface ICVC {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint accountOperatorAuthorized
+        uint256 accountOperatorAuthorized
     ) external payable;
 
     /// @notice Authorizes or deauthorizes an operator for the account.
@@ -211,15 +211,15 @@ interface ICVC {
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
     /// @param nonce The nonce for the given account and nonce namespace.
     /// @param deadline The timestamp after which the permit is considered expired.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is self-called on the CVC contract.
     /// @param signature The signature of the data signed by the signer.
     function permit(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint value,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 value,
         bytes calldata data,
         bytes calldata signature
     ) external payable;
@@ -228,12 +228,12 @@ interface ICVC {
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks are performed after the call.
     /// @dev This function can be used to defer account and vault status checks by providing calldata and the context with which the msg.sender will be called back.
     /// @param onBehalfOfAccount The address of the account which will be set in the context. It assumes the msg.sender has authenticated the account themselves.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is called on the msg.sender
     /// @return result The result of the call.
     function callback(
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) external payable returns (bytes memory result);
 
@@ -242,13 +242,13 @@ interface ICVC {
     /// @dev This function can be used to interact with any contract while checks deferred. Only the owner or an operator of the account can call this function.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on behalf.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
     function call(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) external payable returns (bytes memory result);
 
@@ -257,13 +257,13 @@ interface ICVC {
     /// @dev This function can be used to interact with any contract while checks deferred as long as the contract is enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
     /// @param targetCollateral The collateral address to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on behalf.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
+    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
     function impersonate(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) external payable returns (bytes memory result);
 

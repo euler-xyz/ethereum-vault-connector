@@ -26,7 +26,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     bytes32 public constant PERMIT_TYPEHASH =
         keccak256(
-            "Permit(address signer,uint nonceNamespace,uint nonce,uint deadline,uint value,bytes data)"
+            "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
         );
 
     bytes32 internal constant TYPE_HASH =
@@ -52,7 +52,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
-    // addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address.
+    // addresses, the account ID is treated as a uint256 and XORed (exclusive ORed) with the Ethereum address.
     // In order to record the owner of a group of 256 accounts, the CVC uses a definition of a address prefix.
     // An address prefix is a part of an address having the first 19 bytes common with any of the 256 account
     // addresses belonging to the same group.
@@ -61,10 +61,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     mapping(uint152 addressPrefix => address owner) internal ownerLookup;
 
-    mapping(uint152 addressPrefix => mapping(uint nonceNamespace => uint nonce))
+    mapping(uint152 addressPrefix => mapping(uint256 nonceNamespace => uint256 nonce))
         internal nonceLookup;
 
-    mapping(uint152 addressPrefix => mapping(address operator => uint accountOperatorAuthorized))
+    mapping(uint152 addressPrefix => mapping(address operator => uint256 accountOperatorAuthorized))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +144,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     /// @notice A modifier checks whether msg.sender is the only controller for the account.
     modifier onlyController(address account) {
         {
-            uint numOfControllers = accountControllers[account].numElements;
+            uint256 numOfControllers = accountControllers[account].numElements;
             address controller = accountControllers[account].firstElement;
 
             if (numOfControllers != 1) {
@@ -200,12 +200,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     // Execution internals
 
     /// @inheritdoc ICVC
-    function getRawExecutionContext() external view returns (uint context) {
+    function getRawExecutionContext() external view returns (uint256 context) {
         context = EC.unwrap(executionContext);
     }
 
     /// @inheritdoc ICVC
-    function getCurrentCallDepth() external view returns (uint) {
+    function getCurrentCallDepth() external view returns (uint256) {
         return executionContext.getCallDepth();
     }
 
@@ -272,8 +272,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function getNonce(
         uint152 addressPrefix,
-        uint nonceNamespace
-    ) external view returns (uint) {
+        uint256 nonceNamespace
+    ) external view returns (uint256) {
         return nonceLookup[addressPrefix][nonceNamespace];
     }
 
@@ -281,7 +281,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function getOperator(
         uint152 addressPrefix,
         address operator
-    ) external view returns (uint accountOperatorAuthorized) {
+    ) external view returns (uint256 accountOperatorAuthorized) {
         return operatorLookup[addressPrefix][operator];
     }
 
@@ -296,8 +296,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function setNonce(
         uint152 addressPrefix,
-        uint nonceNamespace,
-        uint nonce
+        uint256 nonceNamespace,
+        uint256 nonce
     ) public payable virtual onlyOwner(addressPrefix) {
         if (nonceLookup[addressPrefix][nonceNamespace] >= nonce) {
             revert CVC_InvalidNonce();
@@ -311,7 +311,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint accountOperatorAuthorized
+        uint256 accountOperatorAuthorized
     ) public payable virtual onlyOwner(addressPrefix) {
         // if CVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
@@ -374,11 +374,11 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         }
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
-        uint bitMask = 1 << (uint160(owner) ^ uint160(account));
-        uint oldAccountOperatorAuthorized = operatorLookup[addressPrefix][
+        uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
+        uint256 oldAccountOperatorAuthorized = operatorLookup[addressPrefix][
             operator
         ];
-        uint newAccountOperatorAuthorized = authorized
+        uint256 newAccountOperatorAuthorized = authorized
             ? oldAccountOperatorAuthorized | bitMask
             : oldAccountOperatorAuthorized & ~bitMask;
 
@@ -483,10 +483,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function permit(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint value,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 value,
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual nonReentrant {
@@ -547,7 +547,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function callback(
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
         // cannot be called within the self-call of the permit()
@@ -585,7 +585,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function call(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
         if (address(this) == targetContract || msg.sender == targetContract) {
@@ -621,7 +621,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function impersonate(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
         if (address(this) == targetCollateral) {
@@ -863,16 +863,16 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) internal virtual returns (bool success, bytes memory result) {
         if (
             value > 0 &&
-            value != type(uint).max &&
+            value != type(uint256).max &&
             value > address(this).balance
         ) {
             revert CVC_InvalidValue();
-        } else if (value == type(uint).max) {
+        } else if (value == type(uint256).max) {
             value = address(this).balance;
         }
 
@@ -919,7 +919,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function callInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     )
         internal
@@ -942,7 +942,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function impersonateInternal(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     )
         internal
@@ -980,9 +980,9 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     }
 
     function batchInternal(BatchItem[] calldata items) internal {
-        uint length = items.length;
+        uint256 length = items.length;
 
-        for (uint i; i < length; ) {
+        for (uint256 i; i < length; ) {
             (bool success, bytes memory result) = callBatchItemInternal(
                 items[i]
             );
@@ -1000,10 +1000,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function batchInternalWithResult(
         BatchItem[] calldata items
     ) internal returns (BatchItemResult[] memory batchItemsResult) {
-        uint length = items.length;
+        uint256 length = items.length;
         batchItemsResult = new BatchItemResult[](length);
 
-        for (uint i; i < length; ) {
+        for (uint256 i; i < length; ) {
             (
                 batchItemsResult[i].success,
                 batchItemsResult[i].result
@@ -1018,7 +1018,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function checkAccountStatusInternal(
         address account
     ) internal virtual returns (bool isValid, bytes memory result) {
-        uint numOfControllers = accountControllers[account].numElements;
+        uint256 numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
 
         if (numOfControllers == 0) return (true, "");
@@ -1095,10 +1095,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
                 checkVaultStatusInternal
             );
 
-        uint length = callbackResult.length;
+        uint256 length = callbackResult.length;
         checksResult = new BatchItemResult[](length);
 
-        for (uint i; i < length; ) {
+        for (uint256 i; i < length; ) {
             (bool isValid, bytes memory result) = abi.decode(
                 callbackResult[i],
                 (bool, bytes)
@@ -1124,10 +1124,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     function getPermitHash(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint value,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 value,
         bytes calldata data
     ) internal view returns (bytes32 permitHash) {
         bytes32 domainSeparator = block.chainid == CACHED_CHAIN_ID
@@ -1265,7 +1265,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         if (owner == address(0)) return false;
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
-        uint bitMask = 1 << (uint160(owner) ^ uint160(account));
+        uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
 
         return operatorLookup[addressPrefix][operator] & bitMask != 0;
     }

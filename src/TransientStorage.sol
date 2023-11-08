@@ -29,7 +29,7 @@ abstract contract TransientStorage {
         accountStatusChecks.stamp = DUMMY_STAMP;
         vaultStatusChecks.stamp = DUMMY_STAMP;
 
-        for (uint i = 1; i < Set.MAX_ELEMENTS; ) {
+        for (uint256 i = 1; i < Set.MAX_ELEMENTS; ) {
             accountStatusChecks.elements[i].stamp = DUMMY_STAMP;
             vaultStatusChecks.elements[i].stamp = DUMMY_STAMP;
 

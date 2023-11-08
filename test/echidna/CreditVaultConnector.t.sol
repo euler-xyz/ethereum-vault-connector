@@ -43,7 +43,7 @@ contract VaultEchidna is ICreditVault {
         // try to reenter the CVC
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
         try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -110,7 +110,7 @@ contract VaultEchidna is ICreditVault {
         address account = address(1);
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
         try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -180,7 +180,7 @@ contract VaultEchidna is ICreditVault {
         address account = address(2);
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint nextNonce = cvc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = cvc.getNonce(prefix, 0) + 1;
         hevm.prank(account);
         try cvc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -339,7 +339,7 @@ contract EchidnaTest {
         if (items.length > 0) {
             ICVC.BatchItem[] memory _items = new ICVC.BatchItem[](1);
 
-            for (uint i; i < items.length; ++i) {
+            for (uint256 i; i < items.length; ++i) {
                 if (
                     items[i].onBehalfOfAccount == address(0) ||
                     items[i].onBehalfOfAccount == address(cvc)

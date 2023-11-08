@@ -21,7 +21,7 @@ struct SetStorage {
 library Set {
     error TooManyElements();
 
-    uint public constant MAX_ELEMENTS = 20;
+    uint256 public constant MAX_ELEMENTS = 20;
 
     /// @notice Inserts an element and returns whether the operation was successful or not.
     /// @param setStorage The set storage to which the element will be inserted.
@@ -32,7 +32,7 @@ library Set {
         address element
     ) internal returns (bool wasInserted) {
         address firstElement = setStorage.firstElement;
-        uint numElements = setStorage.numElements;
+        uint256 numElements = setStorage.numElements;
 
         if (numElements == 0) {
             // gas optimization:
@@ -46,7 +46,7 @@ library Set {
 
         if (firstElement == element) return false;
 
-        for (uint i = 1; i < numElements; ) {
+        for (uint256 i = 1; i < numElements; ) {
             if (setStorage.elements[i].value == element) return false;
 
             unchecked {
@@ -74,11 +74,11 @@ library Set {
         address element
     ) internal returns (bool) {
         address firstElement = setStorage.firstElement;
-        uint numElements = setStorage.numElements;
+        uint256 numElements = setStorage.numElements;
 
         if (numElements == 0) return false;
 
-        uint searchIndex;
+        uint256 searchIndex;
         if (firstElement != element) {
             for (searchIndex = 1; searchIndex < numElements; ) {
                 if (setStorage.elements[searchIndex].value == element) {
@@ -99,7 +99,7 @@ library Set {
             return true;
         }
 
-        uint lastIndex;
+        uint256 lastIndex;
         unchecked {
             lastIndex = numElements - 1;
         }
@@ -131,14 +131,14 @@ library Set {
         SetStorage storage setStorage
     ) internal view returns (address[] memory) {
         address firstElement = setStorage.firstElement;
-        uint numElements = setStorage.numElements;
+        uint256 numElements = setStorage.numElements;
         address[] memory output = new address[](numElements);
 
         if (numElements == 0) return output;
 
         output[0] = firstElement;
 
-        for (uint i = 1; i < numElements; ) {
+        for (uint256 i = 1; i < numElements; ) {
             output[i] = setStorage.elements[i].value;
 
             unchecked {
@@ -158,12 +158,12 @@ library Set {
         address element
     ) internal view returns (bool found) {
         address firstElement = setStorage.firstElement;
-        uint numElements = setStorage.numElements;
+        uint256 numElements = setStorage.numElements;
 
         if (numElements == 0) return false;
         if (firstElement == element) return true;
 
-        for (uint i = 1; i < numElements; ) {
+        for (uint256 i = 1; i < numElements; ) {
             if (setStorage.elements[i].value == element) return true;
 
             unchecked {
@@ -180,14 +180,14 @@ library Set {
         SetStorage storage setStorage,
         function(address) callback
     ) internal {
-        uint numElements = setStorage.numElements;
+        uint256 numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
 
         if (numElements == 0) return;
 
         setStorage.numElements = 0;
 
-        for (uint i; i < numElements; ) {
+        for (uint256 i; i < numElements; ) {
             address element;
             if (i == 0) {
                 element = firstElement;
@@ -214,7 +214,7 @@ library Set {
         SetStorage storage setStorage,
         function(address) returns (bool, bytes memory) callback
     ) internal returns (bytes[] memory) {
-        uint numElements = setStorage.numElements;
+        uint256 numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
         bytes[] memory result = new bytes[](numElements);
 
@@ -222,7 +222,7 @@ library Set {
 
         setStorage.numElements = 0;
 
-        for (uint i; i < numElements; ) {
+        for (uint256 i; i < numElements; ) {
             address element;
             if (i == 0) {
                 element = firstElement;

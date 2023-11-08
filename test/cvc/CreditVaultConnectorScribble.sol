@@ -13,11 +13,11 @@ import "../../src/CreditVaultConnector.sol";
 /// #if_succeeds "on behalf of account is zero when checks in progress" executionContext.areChecksInProgress() ==> executionContext.getOnBehalfOfAccount() == address(0);
 /// #if_succeeds "account status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
 /// #if_succeeds "account status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
-/// #if_succeeds "account status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "account status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...20) accountStatusChecks.elements[i].value == address(0);
 /// #if_succeeds "vault status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
 /// #if_succeeds "vault status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
-/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint i in 0...20) vaultStatusChecks.elements[i].value == address(0);
-/// #if_succeeds "each account has at most 1 controller" !old(executionContext.areChecksDeferred()) ==> forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
+/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...20) vaultStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "each account has at most 1 controller" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in ownerLookup) forall(uint256 j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 /// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
 /// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
 contract CreditVaultConnectorScribble is CreditVaultConnector {
@@ -68,10 +68,10 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     function permit(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint value,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 value,
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual override {
@@ -90,7 +90,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "the caller cannot be CVC" msg.sender != address(this);
     function callback(
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable virtual override returns (bytes memory result) {
         return super.callback(onBehalfOfAccount, value, data);
@@ -101,7 +101,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     function call(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable virtual override returns (bytes memory result) {
         return super.call(targetContract, onBehalfOfAccount, value, data);
@@ -113,7 +113,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     function impersonate(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable virtual override returns (bytes memory result) {
         return
@@ -207,7 +207,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) internal virtual override returns (bool success, bytes memory result) {
         return
@@ -223,7 +223,7 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     function impersonateInternal(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) internal virtual override returns (bool success, bytes memory result) {
         return

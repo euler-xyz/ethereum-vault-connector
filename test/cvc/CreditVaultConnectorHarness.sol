@@ -60,7 +60,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     function setCallDepth(uint8 depth) external {
         if (isFuzzSender()) return;
         executionContext = EC.wrap(
-            (EC.unwrap(executionContext) & ~uint(0xff)) | depth
+            (EC.unwrap(executionContext) & ~uint256(0xff)) | depth
         );
     }
 
@@ -72,7 +72,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         } else {
             executionContext = EC.wrap(
                 EC.unwrap(executionContext) &
-                    ~uint(0xFF000000000000000000000000000000000000000000)
+                    ~uint256(0xFF000000000000000000000000000000000000000000)
             );
         }
     }
@@ -85,7 +85,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         } else {
             executionContext = EC.wrap(
                 EC.unwrap(executionContext) &
-                    ~uint(0xFF00000000000000000000000000000000000000000000)
+                    ~uint256(0xFF00000000000000000000000000000000000000000000)
             );
         }
     }
@@ -108,7 +108,9 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         } else {
             executionContext = EC.wrap(
                 EC.unwrap(executionContext) &
-                    ~uint(0xFF000000000000000000000000000000000000000000000000)
+                    ~uint256(
+                        0xFF000000000000000000000000000000000000000000000000
+                    )
             );
         }
     }
@@ -138,7 +140,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
         super.requireAllAccountsStatusCheckNow();
 
-        for (uint i = 0; i < accounts.length; ++i) {
+        for (uint256 i = 0; i < accounts.length; ++i) {
             expectedAccountsChecked.push(accounts[i]);
         }
     }
@@ -183,7 +185,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     }
 
     function verifyVaultStatusChecks() public view {
-        for (uint i = 0; i < expectedVaultsChecked.length; ++i) {
+        for (uint256 i = 0; i < expectedVaultsChecked.length; ++i) {
             require(
                 Vault(expectedVaultsChecked[i])
                     .getVaultStatusChecked()
@@ -194,7 +196,7 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
     }
 
     function verifyAccountStatusChecks() public view {
-        for (uint i = 0; i < expectedAccountsChecked.length; ++i) {
+        for (uint256 i = 0; i < expectedAccountsChecked.length; ++i) {
             address[] memory controllers = accountControllers[
                 expectedAccountsChecked[i]
             ].get();
@@ -209,8 +211,8 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
             address[] memory accounts = Vault(controllers[0])
                 .getAccountStatusChecked();
 
-            uint counter = 0;
-            for (uint j = 0; j < accounts.length; ++j) {
+            uint256 counter = 0;
+            for (uint256 j = 0; j < accounts.length; ++j) {
                 if (accounts[j] == expectedAccountsChecked[i]) counter++;
             }
 
