@@ -12,6 +12,91 @@ methods {
     function BATCH_DEPTH_INIT() external returns (uint) envfree;
     function BATCH_DEPTH_MAX() external returns (uint) envfree;
     function STAMP_DUMMY_VALUE() external returns (uint) envfree;
+
+    function isEqual(
+        ExecutionContextHarness.EC context1,
+        ExecutionContextHarness.EC context2
+    ) external returns (bool) envfree;
+
+    function getBatchDepth(ExecutionContextHarness.EC context) external returns (uint8) envfree;
+
+    function isInBatch(ExecutionContextHarness.EC context) external returns (bool) envfree;
+
+    function isBatchDepthExceeded(
+        ExecutionContextHarness.EC context
+    ) external returns (bool) envfree;
+
+    function setBatchDepth(
+        ExecutionContextHarness.EC context,
+        uint8 batchDepth
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function getOnBehalfOfAccount(
+        ExecutionContextHarness.EC context
+    ) external returns (address) envfree;
+
+    function setOnBehalfOfAccount(
+        ExecutionContextHarness.EC context,
+        address account
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function areChecksInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (bool) envfree;
+
+    function setChecksInProgress(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
+
+    function clearChecksInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function isImpersonationInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (bool) envfree;
+
+    function setImpersonationInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function clearImpersonationInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function isOperatorAuthenticated(
+        ExecutionContextHarness.EC context
+    ) external returns (bool) envfree;
+
+    function setOperatorAuthenticated(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function clearOperatorAuthenticated(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function isPermitInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (bool) envfree;
+
+    function setPermitInProgress(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
+
+    function clearPermitInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function isSimulationInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (bool) envfree;
+
+    function setSimulationInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function clearSimulationInProgress(
+        ExecutionContextHarness.EC context
+    ) external returns (ExecutionContextHarness.EC) envfree;
+
+    function initialize() external returns (ExecutionContextHarness.EC) envfree;
 }
 
 //rule sanity(method f) {
