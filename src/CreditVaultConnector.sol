@@ -610,7 +610,9 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         uint value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
-        if (address(this) == targetCollateral) {
+        if (
+            address(this) == targetCollateral || msg.sender == targetCollateral
+        ) {
             revert CVC_InvalidAddress();
         }
 

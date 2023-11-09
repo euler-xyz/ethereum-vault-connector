@@ -184,7 +184,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this)) return "";
+        if (targetContract == address(this) || targetContract == msg.sender)
+            return "";
         setup(onBehalfOfAccount, targetContract);
         deal(address(this), value);
 
@@ -221,7 +222,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
-        if (targetCollateral == address(this)) return "";
+        if (targetCollateral == address(this) || targetCollateral == msg.sender)
+            return "";
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);
