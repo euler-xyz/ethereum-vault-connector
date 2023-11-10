@@ -11,7 +11,7 @@ interface IVault {
     /// @param account The address for which the controller is being disabled.
     function disableController(address account) external;
 
-    /// @notice Checks the status of an account and returns whether it is valid or not.
+    /// @notice Checks the status of an account.
     /// @param account The address of the account to be checked.
     /// @return magicValue Must return the bytes4 magic value 0xb168c58f (which is a selector of this function) when account status is valid, or revert otherwise.
     function checkAccountStatus(
@@ -19,7 +19,7 @@ interface IVault {
         address[] calldata collaterals
     ) external returns (bytes4 magicValue);
 
-    /// @notice Checks the status of the vault and returns whether it is valid or not.
+    /// @notice Checks the status of the vault.
     /// @return magicValue Must return the bytes4 magic value 0x4b3d1223 (which is a selector of this function) when account status is valid, or revert otherwise.
     function checkVaultStatus() external returns (bytes4 magicValue);
 }

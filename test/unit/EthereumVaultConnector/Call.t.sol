@@ -156,7 +156,7 @@ contract CallTest is Test {
         vm.assume(bob != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(evc));
+        vm.assume(targetContract != alice && targetContract != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
@@ -180,7 +180,7 @@ contract CallTest is Test {
         vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(evc));
+        vm.assume(targetContract != alice && targetContract != address(evc));
 
         evc.setChecksLock(true);
 
@@ -206,7 +206,7 @@ contract CallTest is Test {
         vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(evc));
+        vm.assume(targetContract != alice && targetContract != address(evc));
 
         evc.setImpersonateLock(true);
 
@@ -291,7 +291,7 @@ contract CallTest is Test {
         vm.assume(seed > 0);
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(evc));
+        vm.assume(targetContract != alice && targetContract != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
@@ -323,7 +323,7 @@ contract CallTest is Test {
         vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(evc));
+        vm.assume(targetContract != alice && targetContract != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).revertEmptyTest.selector
