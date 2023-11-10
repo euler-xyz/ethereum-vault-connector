@@ -37,6 +37,13 @@ library ExecutionContext {
 
     error CallDepthViolation();
 
+    // None of the functions below modifies the state. All the functions operate on the copy
+    // of the execution context and return its modified value as a result. In order to update
+    // one should use the result of the function call as a new execution context value.
+    // i.e. the following call: executionContext.setChecksInProgress() returns the new execution
+    // context value that should be written to the executionContext storage pointer:
+    // executionContext = executionContext.setChecksInProgress();
+
     function areChecksDeferred(EC context) internal pure returns (bool result) {
         result = EC.unwrap(context) & CALL_DEPTH_MASK != 0;
     }

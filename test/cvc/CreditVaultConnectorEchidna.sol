@@ -152,17 +152,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-
-            // verify if cached context value can be reused
-            assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     function call(
@@ -194,17 +184,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-
-            // verify if cached context value can be reused
-            assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     function impersonate(
@@ -213,7 +193,9 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         uint256 value,
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
-        if (address(this) == targetCollateral) {
+        if (
+            address(this) == targetCollateral || msg.sender == targetCollateral
+        ) {
             revert CVC_InvalidAddress();
         }
 
@@ -241,17 +223,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-
-            // verify if cached context value can be reused
-            assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     function batch(
@@ -266,17 +238,7 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
         // verify if cached context value can be reused
         assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account);
-            checkStatusAll(SetType.Vault);
-
-            // verify if cached context value can be reused
-            assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     function callWithContextInternal(
@@ -343,6 +305,21 @@ contract CreditVaultConnectorEchidna is CreditVaultConnectorScribble {
                         .setOperatorAuthenticated()
                 )
             );
+        }
+
+        executionContext = contextCache;
+    }
+
+    function restoreExecutionContext(EC contextCache) internal override {
+        // copied function body with inserted assertion
+        if (!contextCache.areChecksDeferred()) {
+            executionContext = contextCache.setChecksInProgress();
+
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
+
+            // verify if cached context value can be reused
+            assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
         }
 
         executionContext = contextCache;

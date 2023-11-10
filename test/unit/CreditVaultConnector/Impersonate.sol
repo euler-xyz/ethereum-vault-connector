@@ -133,8 +133,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        vm.deal(alice, seed);
-        vm.prank(alice);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.impersonate{value: seed}(collateral, alice, seed, data);
     }
@@ -165,8 +165,8 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        vm.deal(alice, seed);
-        vm.prank(alice);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.impersonate{value: seed}(collateral, alice, seed, data);
     }
@@ -191,10 +191,24 @@ contract ImpersonateTest is Test {
             alice
         );
 
-        vm.deal(alice, seed);
-        vm.prank(alice);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.impersonate{value: seed}(address(cvc), alice, seed, data);
+
+        // target contract is the controller itself
+        data = abi.encodeWithSelector(
+            Target(address(controller)).impersonateTest.selector,
+            address(cvc),
+            address(cvc),
+            seed,
+            alice
+        );
+
+        vm.deal(controller, seed);
+        vm.prank(controller);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
+        cvc.impersonate{value: seed}(controller, alice, seed, data);
     }
 
     function test_RevertIfNoControllerEnabled_Impersonate(

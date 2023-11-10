@@ -51,12 +51,18 @@ contract CallTest is Test {
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
+        address nestedTargetContract = address(new TargetWithNesting());
+        address controller = address(new Vault(cvc));
         vm.assume(
             targetContract != address(cvc) &&
                 !cvc.haveCommonOwner(targetContract, alice) &&
                 !cvc.haveCommonOwner(targetContract, account)
         );
-        address controller = address(new Vault(cvc));
+        vm.assume(
+            nestedTargetContract != address(cvc) &&
+                !cvc.haveCommonOwner(nestedTargetContract, alice) &&
+                !cvc.haveCommonOwner(nestedTargetContract, account)
+        );
 
         vm.prank(alice);
         cvc.enableController(account, controller);
@@ -93,7 +99,6 @@ contract CallTest is Test {
         Vault(controller).reset();
 
         // on behalf of account should be correct in a nested call as well
-        address nestedTargetContract = address(new TargetWithNesting());
         data = abi.encodeWithSelector(
             TargetWithNesting(nestedTargetContract).nestedCallTest.selector,
             address(cvc),
@@ -149,7 +154,7 @@ contract CallTest is Test {
         vm.assume(bob != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
@@ -173,7 +178,7 @@ contract CallTest is Test {
         vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         cvc.setChecksLock(true);
 
@@ -199,7 +204,7 @@ contract CallTest is Test {
         vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         cvc.setImpersonateLock(true);
 
@@ -284,7 +289,7 @@ contract CallTest is Test {
         vm.assume(seed > 0);
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
@@ -316,7 +321,7 @@ contract CallTest is Test {
         vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).revertEmptyTest.selector
