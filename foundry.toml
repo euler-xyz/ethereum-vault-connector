@@ -25,6 +25,21 @@ depth = 20
 runs = 1000
 
 
+[profile.default.fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+multiline_func_header = "params_first"
+quote_style = "double"
+number_underscore = "preserve"
+override_spacing = true
+wrap_comments = true
+ignore = [
+    "test/evc/EthereumVaultConnectorScribble.sol"
+]
+
+
 [profile.smt.model_checker]
 engine = "chc"
 timeout = 100_000

@@ -8,14 +8,13 @@ import "../../src/EthereumVaultConnector.sol";
 contract EVCHarness is EthereumVaultConnector {
     function permitHash(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint value,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 value,
         bytes calldata data
     ) external view returns (bytes32) {
-        return
-            getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        return getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
     }
 
     function getIsValidERC1271Signature(
@@ -39,10 +38,10 @@ contract EVCGas is Test {
 
     function testGas_getPermitHash(
         address signer,
-        uint nonceNamespace,
-        uint nonce,
-        uint deadline,
-        uint value,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint256 value,
         bytes calldata data
     ) public view {
         evc.permitHash(signer, nonceNamespace, nonce, deadline, value, data);
@@ -52,21 +51,13 @@ contract EVCGas is Test {
         evc.haveCommonOwner(a, b);
     }
 
-    function testGas_isValidSignature_eoa(
-        address signer,
-        bytes32 hash,
-        bytes memory signature
-    ) public {
+    function testGas_isValidSignature_eoa(address signer, bytes32 hash, bytes memory signature) public {
         vm.assume(!evc.haveCommonOwner(signer, address(0)));
         vm.assume(signature.length < 100);
         evc.getIsValidERC1271Signature(signer, hash, signature);
     }
 
-    function testGas_isValidSignature_contract(
-        address signer,
-        bytes32 hash,
-        bytes memory signature
-    ) public {
+    function testGas_isValidSignature_contract(address signer, bytes32 hash, bytes memory signature) public {
         vm.assume(signer != address(evc) && uint160(signer) > 1000);
         vm.assume(signature.length < 100);
         vm.etch(signer, "ff");

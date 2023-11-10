@@ -11,10 +11,12 @@ For more information refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPEC
 ```
 .
 ├── interfaces
-│   ├── IVault.sol
+│   ├── IERC1271.sol
 │   ├── IEthereumVaultConnector.sol
-│   └── IERC1271.sol
+│   └── IVault.sol
+├── Errors.sol
 ├── EthereumVaultConnector.sol
+├── Events.sol
 ├── ExecutionContext.sol
 ├── Set.sol
 └── TransientStorage.sol

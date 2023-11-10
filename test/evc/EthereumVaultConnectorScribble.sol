@@ -28,20 +28,14 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     /// #if_succeeds "collateral cannot be EVC" vault != address(this);
-    function enableCollateral(
-        address account,
-        address vault
-    ) public payable virtual override {
+    function enableCollateral(address account, address vault) public payable virtual override {
         super.enableCollateral(account, vault);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
-    function disableCollateral(
-        address account,
-        address vault
-    ) public payable virtual override {
+    function disableCollateral(address account, address vault) public payable virtual override {
         super.disableCollateral(account, vault);
     }
 
@@ -49,19 +43,14 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
     /// #if_succeeds "controller cannot be EVC" vault != address(this);
-    function enableController(
-        address account,
-        address vault
-    ) public payable virtual override {
+    function enableController(address account, address vault) public payable virtual override {
         super.enableController(account, vault);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountControllers[account].contains(msg.sender);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountControllers[account].numElements == accountControllers[account].get().length;
-    function disableController(
-        address account
-    ) public payable virtual override {
+    function disableController(address account) public payable virtual override {
         super.disableController(account);
     }
 
@@ -75,15 +64,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual override {
-        super.permit(
-            signer,
-            nonceNamespace,
-            nonce,
-            deadline,
-            value,
-            data,
-            signature
-        );
+        super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -116,8 +97,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         uint256 value,
         bytes calldata data
     ) public payable virtual override returns (bytes memory result) {
-        return
-            super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
+        return super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -129,44 +109,31 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "this function must always revert" false;
-    function batchRevert(
-        BatchItem[] calldata items
-    ) public payable virtual override {
+    function batchRevert(BatchItem[] calldata items) public payable virtual override {
         super.batchRevert(items);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> accountStatusChecks.contains(account);
-    function requireAccountStatusCheck(
-        address account
-    ) public payable virtual override {
+    function requireAccountStatusCheck(address account) public payable virtual override {
         super.requireAccountStatusCheck(account);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is never added to the set or it's removed if previously present" !accountStatusChecks.contains(account);
-    function requireAccountStatusCheckNow(
-        address account
-    ) public payable virtual override {
+    function requireAccountStatusCheckNow(address account) public payable virtual override {
         super.requireAccountStatusCheckNow(account);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "the set is empty after calling this" accountStatusChecks.numElements == 0;
-    function requireAllAccountsStatusCheckNow()
-        public
-        payable
-        virtual
-        override
-    {
+    function requireAllAccountsStatusCheckNow() public payable virtual override {
         super.requireAllAccountsStatusCheckNow();
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is never present in the set after calling this" !accountStatusChecks.contains(account);
-    function forgiveAccountStatusCheck(
-        address account
-    ) public payable virtual override {
+    function forgiveAccountStatusCheck(address account) public payable virtual override {
         super.forgiveAccountStatusCheck(account);
     }
 
@@ -197,9 +164,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> accountStatusChecks.contains(account);
     /// #if_succeeds "vault is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> vaultStatusChecks.contains(msg.sender);
-    function requireAccountAndVaultStatusCheck(
-        address account
-    ) public payable virtual override {
+    function requireAccountAndVaultStatusCheck(address account) public payable virtual override {
         super.requireAccountAndVaultStatusCheck(account);
     }
 
@@ -210,13 +175,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         uint256 value,
         bytes calldata data
     ) internal virtual override returns (bool success, bytes memory result) {
-        return
-            super.callWithContextInternal(
-                targetContract,
-                onBehalfOfAccount,
-                value,
-                data
-            );
+        return super.callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
     }
 
     /// #if_succeeds "impersonate reentrancy guard must be locked" executionContext.isImpersonationInProgress();
@@ -226,19 +185,11 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         uint256 value,
         bytes calldata data
     ) internal virtual override returns (bool success, bytes memory result) {
-        return
-            super.impersonateInternal(
-                targetCollateral,
-                onBehalfOfAccount,
-                value,
-                data
-            );
+        return super.impersonateInternal(targetCollateral, onBehalfOfAccount, value, data);
     }
 
     /// #if_succeeds "must have at most one controller" accountControllers[account].numElements <= 1;
-    function checkAccountStatusInternal(
-        address account
-    ) internal override returns (bool isValid, bytes memory data) {
+    function checkAccountStatusInternal(address account) internal override returns (bool isValid, bytes memory data) {
         return super.checkAccountStatusInternal(account);
     }
 
@@ -254,9 +205,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
     /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
     /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
-    function checkStatusAllWithResult(
-        SetType setType
-    ) internal override returns (BatchItemResult[] memory result) {
+    function checkStatusAllWithResult(SetType setType) internal override returns (BatchItemResult[] memory result) {
         return super.checkStatusAllWithResult(setType);
     }
 }

@@ -8,21 +8,16 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 contract SetNonceTest is Test {
     EthereumVaultConnectorHarness internal evc;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
 
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
     }
 
-    function test_SetNonce(
-        address alice,
-        uint nonceNamespace,
-        uint nonce,
-        uint8 iterations
-    ) public {
+    function test_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce, uint8 iterations) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(iterations > 0 && iterations < 5);
-        vm.assume(nonce > 0 && nonce <= type(uint).max - 256 * iterations);
+        vm.assume(nonce > 0 && nonce <= type(uint256).max - 256 * iterations);
 
         uint152 addressPrefix = evc.getAddressPrefix(alice);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), 0);
@@ -37,15 +32,15 @@ contract SetNonceTest is Test {
     function test_RevertIfSenderNotOwner_SetNonce(
         address alice,
         address operator,
-        uint nonceNamespace,
-        uint nonce
+        uint256 nonceNamespace,
+        uint256 nonce
     ) public {
         uint152 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(addressPrefix != type(uint152).max);
         vm.assume(operator != address(0));
         vm.assume(!evc.haveCommonOwner(alice, operator));
-        vm.assume(nonce > 0 && nonce < type(uint).max);
+        vm.assume(nonce > 0 && nonce < type(uint256).max);
 
         // fails if address prefix does not belong to an owner
         vm.prank(alice);
@@ -70,11 +65,7 @@ contract SetNonceTest is Test {
         evc.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
-    function test_RevertIfInvalidNonce_SetNonce(
-        address alice,
-        uint nonceNamespace,
-        uint nonce
-    ) public {
+    function test_RevertIfInvalidNonce_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(nonce > 0);
 

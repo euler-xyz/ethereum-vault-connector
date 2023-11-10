@@ -12,10 +12,7 @@ interface IHevm {
 }
 
 contract SignerEchidna {
-    function isValidSignature(
-        bytes32,
-        bytes memory
-    ) external pure returns (bytes4 magicValue) {
+    function isValidSignature(bytes32, bytes memory) external pure returns (bytes4 magicValue) {
         return IERC1271.isValidSignature.selector;
     }
 }
@@ -25,21 +22,15 @@ contract TargetEchidna {
 }
 
 contract VaultEchidna is IVault {
-    IHevm internal constant hevm =
-        IHevm(address(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D));
-    EthereumVaultConnectorEchidna internal constant evc =
-        EthereumVaultConnectorEchidna(payable(address(0xdead)));
-    TargetEchidna internal immutable targetEchidna =
-        TargetEchidna(payable(address(0xbeefbeef)));
+    IHevm internal constant hevm = IHevm(address(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D));
+    EthereumVaultConnectorEchidna internal constant evc = EthereumVaultConnectorEchidna(payable(address(0xdead)));
+    TargetEchidna internal immutable targetEchidna = TargetEchidna(payable(address(0xbeefbeef)));
 
     function disableController(address account) external {
         evc.disableController(account);
     }
 
-    function checkAccountStatus(
-        address account,
-        address[] calldata
-    ) public returns (bytes4) {
+    function checkAccountStatus(address account, address[] calldata) public returns (bytes4) {
         // try to reenter the EVC
 
         uint152 prefix = uint152(uint160(account) >> 8);
@@ -245,14 +236,10 @@ contract VaultEchidna is IVault {
 }
 
 contract EchidnaTest {
-    IHevm internal constant hevm =
-        IHevm(address(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D));
-    EthereumVaultConnectorEchidna internal immutable evc =
-        EthereumVaultConnectorEchidna(payable(address(0xdead)));
-    VaultEchidna internal immutable vaultEchidna =
-        VaultEchidna(payable(address(0xbeef)));
-    SignerEchidna internal immutable signerEchidna =
-        SignerEchidna(address(0xbeefbeefbeef));
+    IHevm internal constant hevm = IHevm(address(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D));
+    EthereumVaultConnectorEchidna internal immutable evc = EthereumVaultConnectorEchidna(payable(address(0xdead)));
+    VaultEchidna internal immutable vaultEchidna = VaultEchidna(payable(address(0xbeef)));
+    SignerEchidna internal immutable signerEchidna = SignerEchidna(address(0xbeefbeefbeef));
 
     function enableCollateral(address account, address vault) public payable {
         if (account == address(0) || account == address(evc)) return;
@@ -280,10 +267,7 @@ contract EchidnaTest {
         evc.disableController(account);
     }
 
-    function permit(
-        bytes calldata data,
-        bytes calldata signature
-    ) public payable {
+    function permit(bytes calldata data, bytes calldata signature) public payable {
         evc.permit(
             address(signerEchidna),
             0,
@@ -295,35 +279,20 @@ contract EchidnaTest {
         );
     }
 
-    function callback(
-        address onBehalfOfAccount,
-        bytes calldata data
-    ) public payable {
-        if (
-            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)
-        ) return;
+    function callback(address onBehalfOfAccount, bytes calldata data) public payable {
+        if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
         hevm.prank(address(vaultEchidna));
         evc.callback(onBehalfOfAccount, 0, data);
     }
 
-    function call(
-        address onBehalfOfAccount,
-        bytes calldata data
-    ) public payable {
-        if (
-            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)
-        ) return;
+    function call(address onBehalfOfAccount, bytes calldata data) public payable {
+        if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
         hevm.prank(onBehalfOfAccount);
         evc.call(address(vaultEchidna), onBehalfOfAccount, 0, data);
     }
 
-    function impersonate(
-        address onBehalfOfAccount,
-        bytes calldata data
-    ) public payable {
-        if (
-            onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)
-        ) return;
+    function impersonate(address onBehalfOfAccount, bytes calldata data) public payable {
+        if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
 
         hevm.prank(onBehalfOfAccount);
         evc.enableCollateral(onBehalfOfAccount, address(vaultEchidna));
@@ -340,10 +309,7 @@ contract EchidnaTest {
             IEVC.BatchItem[] memory _items = new IEVC.BatchItem[](1);
 
             for (uint256 i; i < items.length; ++i) {
-                if (
-                    items[i].onBehalfOfAccount == address(0) ||
-                    items[i].onBehalfOfAccount == address(evc)
-                ) return;
+                if (items[i].onBehalfOfAccount == address(0) || items[i].onBehalfOfAccount == address(evc)) return;
             }
 
             _items[0].targetContract = address(vaultEchidna);
