@@ -1128,6 +1128,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             )
         );
 
+        // This code overwrites the two most significant bytes of the free memory pointer, 
+        // and restores them to 0 after
         assembly ("memory-safe") {
             mstore(0x00, "\x19\x01")
             mstore(0x02, domainSeparator)
