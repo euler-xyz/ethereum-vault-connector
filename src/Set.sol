@@ -2,15 +2,32 @@
 
 pragma solidity ^0.8.20;
 
+/// @title ElementStorage
+/// @notice This struct is used to store the value and stamp of an element.
+/// @dev The stamp field is used to keep the storage slot non-zero when the element is removed.
+/// @dev It allows for cheaper SSTORE when an element is inserted.
 struct ElementStorage {
+    /// @notice The value of the element.
     address value;
+    /// @notice The stamp of the element.
     uint96 stamp;
 }
 
+/// @title SetStorage
+/// @notice This struct is used to store the set data.
+/// @dev To optimize the gas consuption, firstElement is stored in the same storage slot as the numElements
+/// @dev so that for sets with one element, only one storage slot has to be read/written. To keep the elements
+/// @dev array indexing consistent and because the first element is stored outside of the array, the elements[0]
+/// @dev is not utilized. The stamp field is used to keep the storage slot non-zero when the element is removed.
+/// @dev It allows for cheaper SSTORE when an element is inserted.
 struct SetStorage {
+    /// @notice The number of elements in the set.
     uint8 numElements;
+    /// @notice The first element in the set.
     address firstElement;
+    /// @notice The stamp of the set.
     uint88 stamp;
+    /// @notice The array of elements in the set. Stores the elements starting from index 1.
     ElementStorage[2 ** 8] elements;
 }
 
@@ -21,26 +38,44 @@ struct SetStorage {
 library Set {
     error TooManyElements();
 
-    uint public constant MAX_ELEMENTS = 20;
+    uint8 public constant DUMMY_STAMP = 1;
+    uint8 public constant MAX_ELEMENTS = 20;
 
-    /// @notice Inserts an element and returns whether the operation was successful or not.
+    /// @notice Initializes the stamp field of the SetStorage and its elements to DUMMY_STAMP.
+    /// @dev The stamp field is used to keep the storage slot non-zero when the element is removed. It allows for cheaper SSTORE when an element is inserted.
+    /// @param setStorage The set storage whose stamp fields will be initialized.
+    function initializeStamps(SetStorage storage setStorage) internal {
+        setStorage.stamp = DUMMY_STAMP;
+
+        for (uint i = 1; i < MAX_ELEMENTS; ) {
+            setStorage.elements[i].stamp = DUMMY_STAMP;
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Inserts an element and returns information whether the element was inserted or not.
+    /// @dev Reverts if the set is full but the element is not in the set storage.
     /// @param setStorage The set storage to which the element will be inserted.
     /// @param element The address of the element to be inserted.
-    /// @return wasInserted A boolean value that indicates whether the element was inserted or not. If the element was already in the set storage, it returns false.
+    /// @return A boolean value that indicates whether the element was inserted or not. If the element was already in the set storage, it returns false.
     function insert(
         SetStorage storage setStorage,
         address element
-    ) internal returns (bool wasInserted) {
+    ) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint numElements = setStorage.numElements;
 
         if (numElements == 0) {
             // gas optimization:
             // on the first element insertion, set the stamp to non-zero value
-            // to keep the storage slot dirty when the element is removed
+            // to keep the storage slot non-zero when the element is removed.
+            // when a new element is inserted after the removal, it should be cheaper
             setStorage.numElements = 1;
             setStorage.firstElement = element;
-            setStorage.stamp = 1;
+            setStorage.stamp = DUMMY_STAMP;
             return true;
         }
 
@@ -65,10 +100,10 @@ library Set {
         return true;
     }
 
-    /// @notice Removes an element and returns whether the operation was successful or not.
+    /// @notice Removes an element and returns information whether the element was removed or not.
     /// @param setStorage The set storage from which the element will be removed.
     /// @param element The address of the element to be removed.
-    /// @return  A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
+    /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
     function remove(
         SetStorage storage setStorage,
         address element
@@ -95,7 +130,7 @@ library Set {
         if (numElements == 1) {
             setStorage.numElements = 0;
             setStorage.firstElement = address(0);
-            setStorage.stamp = 1;
+            setStorage.stamp = DUMMY_STAMP;
             return true;
         }
 
@@ -152,11 +187,11 @@ library Set {
     /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the result.
     /// @param setStorage The set storage to be searched.
     /// @param element The address of the element to be checked.
-    /// @return found A boolean value that indicates whether the set storage includes the element or not.
+    /// @return A boolean value that indicates whether the set storage includes the element or not.
     function contains(
         SetStorage storage setStorage,
         address element
-    ) internal view returns (bool found) {
+    ) internal view returns (bool) {
         address firstElement = setStorage.firstElement;
         uint numElements = setStorage.numElements;
 

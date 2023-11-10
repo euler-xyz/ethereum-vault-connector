@@ -38,7 +38,7 @@ interface ICVC {
     function getCurrentCallDepth() external view returns (uint);
 
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the controllerToCheck is an enabled controller for that account.
-    /// @dev When checks in progress, on behalf of account is always address(0).
+    /// @dev When checks in progress, on behalf of account is always address(0). When address is zero, the function reverts to protect the consumer from ever relying on the on behalf of account address which is in its default state.
     /// @param controllerToCheck The address of the controller for which it is checked whether it is an enabled controller for the account on behalf of which the operation is being executed at the moment.
     /// @return onBehalfOfAccount An account that has been authenticated and on behalf of which the operation is being executed at the moment.
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck is address(0).
@@ -84,11 +84,11 @@ interface ICVC {
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the nonce for a given address prefix and nonce namespace.
-    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner.
+    /// @notice Returns the last consumed nonce for a given address prefix and nonce namespace.
+    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in a non-sequential manner. A valid nonce value for the permit purposes is considered to be the last consumed nonce value plus one.
     /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
-    /// @return nonce The current nonce for the given address prefix and nonce namespace.
+    /// @return nonce The last consumed nonce for the given address prefix and nonce namespace.
     function getNonce(
         uint152 addressPrefix,
         uint nonceNamespace
@@ -114,7 +114,7 @@ interface ICVC {
     ) external view returns (bool authorized);
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
-    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which enables possibility to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in a non-sequential manner. To invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit messages for a given nonce namespace, set the nonce to type(uint).max.
     /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
     /// @param nonce The new nonce for the given address prefix and nonce namespace.
@@ -209,7 +209,7 @@ interface ICVC {
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner or the operator on the CVC contract. During that call, CVC becomes msg.sender.
     /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271). It's also the owner or the operator of all the accounts for which authentication will be needed during the execution of the arbitrary data call.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
-    /// @param nonce The nonce for the given account and nonce namespace.
+    /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the last consumed nonce value plus one.
     /// @param deadline The timestamp after which the permit is considered expired.
     /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is self-called on the CVC contract.
@@ -316,7 +316,7 @@ interface ICVC {
     function requireAllAccountsStatusCheckNow() external payable;
 
     /// @notice Forgives previously deferred account status check.
-    /// @dev Account address is removed from the set of addresses for which status checks are deferred. This function can only be called by the currently enabled controller of a given account.
+    /// @dev Account address is removed from the set of addresses for which status checks are deferred. This function can only be called by the currently enabled controller of a given account. Depending on the vault implementation, may be needed in the liquidation flow.
     /// @param account The address of the account for which the status check is forgiven.
     function forgiveAccountStatusCheck(address account) external payable;
 

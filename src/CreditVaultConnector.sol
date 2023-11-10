@@ -50,6 +50,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
+    // CVC implements controller isolation, meaning that unless in transient state, only one controller per account can
+    // be enabled. However, this can lead to a suboptimal user experience. In the event a user wants to have multiple
+    // controllers enabled, a separate wallet must be created and funded. Although there is nothing wrong with having
+    // many accounts within the same wallet, this can be a bad experience. In order to improve on this, CVC supports
+    // the concept of an owner that owns 256 accounts within CVC.
+
     // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
     // addresses, the account ID is treated as a uint and XORed (exclusive ORed) with the Ethereum address.
@@ -59,12 +65,17 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     // account/152 -> prefix/152
     // To get an address prefix for the account, it's enough to take the account address and right shift it by 8 bits.
 
+    // Yes, this reduces the security of addresses by 8 bits, but creating multiple addresses in the wallet also reduces
+    // security: if somebody is trying to brute-force one of user's N>1 private keys, they have N times as many chances
+    // of succeeding per guess. It has to be admitted that the CVC model is weaker because finding a private key for
+    // an owner gives access to all accounts, but there is still a very comfortable security margin.
+
     mapping(uint152 addressPrefix => address owner) internal ownerLookup;
 
     mapping(uint152 addressPrefix => mapping(uint nonceNamespace => uint nonce))
         internal nonceLookup;
 
-    mapping(uint152 addressPrefix => mapping(address operator => uint accountOperatorAuthorized))
+    mapping(uint152 addressPrefix => mapping(address operator => uint operatorBitField))
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,7 +292,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function getOperator(
         uint152 addressPrefix,
         address operator
-    ) external view returns (uint accountOperatorAuthorized) {
+    ) external view returns (uint) {
         return operatorLookup[addressPrefix][operator];
     }
 
@@ -289,7 +300,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function isAccountOperatorAuthorized(
         address account,
         address operator
-    ) external view returns (bool authorized) {
+    ) external view returns (bool) {
         return isAccountOperatorAuthorizedInternal(account, operator);
     }
 
@@ -311,7 +322,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint accountOperatorAuthorized
+        uint operatorBitField
     ) public payable virtual onlyOwner(addressPrefix) {
         // if CVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
@@ -326,18 +337,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             revert CVC_InvalidAddress();
         }
 
-        if (
-            operatorLookup[addressPrefix][operator] == accountOperatorAuthorized
-        ) {
+        if (operatorLookup[addressPrefix][operator] == operatorBitField) {
             revert CVC_InvalidOperatorStatus();
         } else {
-            operatorLookup[addressPrefix][operator] = accountOperatorAuthorized;
+            operatorLookup[addressPrefix][operator] = operatorBitField;
 
-            emit OperatorStatus(
-                addressPrefix,
-                operator,
-                accountOperatorAuthorized
-            );
+            emit OperatorStatus(addressPrefix, operator, operatorBitField);
         }
     }
 
@@ -375,25 +380,17 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
         uint bitMask = 1 << (uint160(owner) ^ uint160(account));
-        uint oldAccountOperatorAuthorized = operatorLookup[addressPrefix][
-            operator
-        ];
-        uint newAccountOperatorAuthorized = authorized
-            ? oldAccountOperatorAuthorized | bitMask
-            : oldAccountOperatorAuthorized & ~bitMask;
+        uint oldOperatorBitField = operatorLookup[addressPrefix][operator];
+        uint newOperatorBitField = authorized
+            ? oldOperatorBitField | bitMask
+            : oldOperatorBitField & ~bitMask;
 
-        if (oldAccountOperatorAuthorized == newAccountOperatorAuthorized) {
+        if (oldOperatorBitField == newOperatorBitField) {
             revert CVC_InvalidOperatorStatus();
         } else {
-            operatorLookup[addressPrefix][
-                operator
-            ] = newAccountOperatorAuthorized;
+            operatorLookup[addressPrefix][operator] = newOperatorBitField;
 
-            emit OperatorStatus(
-                addressPrefix,
-                operator,
-                newAccountOperatorAuthorized
-            );
+            emit OperatorStatus(addressPrefix, operator, newOperatorBitField);
         }
     }
 
