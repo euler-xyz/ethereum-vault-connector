@@ -8,25 +8,10 @@ pragma solidity ^0.8.20;
 contract Events {
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
     event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
-    event OperatorStatus(
-        uint152 indexed addressPrefix,
-        address indexed operator,
-        uint256 accountOperatorAuthorized
-    );
-    event CollateralStatus(
-        address indexed account,
-        address indexed collateral,
-        bool enabled
-    );
-    event ControllerStatus(
-        address indexed account,
-        address indexed controller,
-        bool enabled
-    );
+    event OperatorStatus(uint152 indexed addressPrefix, address indexed operator, uint256 accountOperatorAuthorized);
+    event CollateralStatus(address indexed account, address indexed collateral, bool enabled);
+    event ControllerStatus(address indexed account, address indexed controller, bool enabled);
     event CallWithContext(
-        address indexed caller,
-        address indexed targetContract,
-        address indexed onBehalfOfAccount,
-        bytes4 selector
+        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
     );
 }

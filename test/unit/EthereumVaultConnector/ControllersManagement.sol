@@ -39,21 +39,13 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
 contract ControllersManagementTest is Test {
     EthereumVaultConnectorHandler internal evc;
 
-    event ControllerStatus(
-        address indexed account,
-        address indexed controller,
-        bool enabled
-    );
+    event ControllerStatus(address indexed account, address indexed controller, bool enabled);
 
     function setUp() public {
         evc = new EthereumVaultConnectorHandler();
     }
 
-    function test_ControllersManagement(
-        address alice,
-        uint8 subAccountId,
-        uint seed
-    ) public {
+    function test_ControllersManagement(address alice, uint8 subAccountId, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 1000);
 
@@ -61,11 +53,8 @@ contract ControllersManagementTest is Test {
 
         // test controllers management with use of an operator
         address msgSender = alice;
-        if (
-            seed % 2 == 0 &&
-            !evc.haveCommonOwner(account, address(uint160(seed)))
-        ) {
-            msgSender = address(uint160(uint(keccak256(abi.encode(seed)))));
+        if (seed % 2 == 0 && !evc.haveCommonOwner(account, address(uint160(seed)))) {
+            msgSender = address(uint160(uint256(keccak256(abi.encode(seed)))));
             vm.prank(alice);
             evc.setAccountOperator(account, msgSender, true);
         }
@@ -86,7 +75,8 @@ contract ControllersManagementTest is Test {
         assertEq(controllersPost[controllersPost.length - 1], vault);
         assertTrue(evc.isControllerEnabled(account, vault));
 
-        // enabling the same controller again should succeed (duplicate will not be added and the event won't be emitted)
+        // enabling the same controller again should succeed (duplicate will not be added and the event won't be
+        // emitted)
         assertTrue(evc.isControllerEnabled(account, vault));
         controllersPre = evc.getControllers(account);
 
@@ -113,13 +103,7 @@ contract ControllersManagementTest is Test {
         vm.prank(msgSender);
         vm.expectEmit(true, true, false, true, address(evc));
         emit ControllerStatus(account, vault, false);
-        Vault(vault).call(
-            address(evc),
-            abi.encodeWithSelector(
-                evc.handlerDisableController.selector,
-                account
-            )
-        );
+        Vault(vault).call(address(evc), abi.encodeWithSelector(evc.handlerDisableController.selector, account));
 
         controllersPost = evc.getControllers(account);
 
@@ -128,16 +112,8 @@ contract ControllersManagementTest is Test {
         assertFalse(evc.isControllerEnabled(account, vault));
     }
 
-    function test_RevertIfNotOwnerOrNotOperator_EnableController(
-        address alice,
-        address bob
-    ) public {
-        vm.assume(
-            alice != address(0) &&
-                alice != address(evc) &&
-                bob != address(0) &&
-                bob != address(evc)
-        );
+    function test_RevertIfNotOwnerOrNotOperator_EnableController(address alice, address bob) public {
+        vm.assume(alice != address(0) && alice != address(evc) && bob != address(0) && bob != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, bob));
 
         address vault = address(new Vault(evc));
@@ -153,9 +129,7 @@ contract ControllersManagementTest is Test {
         evc.handlerEnableController(bob, vault);
     }
 
-    function test_RevertIfProgressReentrancy_ControllersManagement(
-        address alice
-    ) public {
+    function test_RevertIfProgressReentrancy_ControllersManagement(address alice) public {
         vm.assume(alice != address(evc));
 
         address vault = address(new Vault(evc));
@@ -183,9 +157,7 @@ contract ControllersManagementTest is Test {
         evc.disableController(alice);
     }
 
-    function test_RevertIfImpersonateReentrancy_ControllersManagement(
-        address alice
-    ) public {
+    function test_RevertIfImpersonateReentrancy_ControllersManagement(address alice) public {
         vm.assume(alice != address(evc));
 
         address vault = address(new Vault(evc));
@@ -213,18 +185,14 @@ contract ControllersManagementTest is Test {
         evc.disableController(alice);
     }
 
-    function test_RevertIfInvalidVault_ControllersManagement(
-        address alice
-    ) public {
+    function test_RevertIfInvalidVault_ControllersManagement(address alice) public {
         vm.assume(alice != address(evc));
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
         evc.enableController(alice, address(evc));
     }
 
-    function test_RevertIfAccountStatusViolated_ControllersManagement(
-        address alice
-    ) public {
+    function test_RevertIfAccountStatusViolated_ControllersManagement(address alice) public {
         vm.assume(alice != address(evc));
 
         address vault = address(new Vault(evc));
@@ -237,10 +205,7 @@ contract ControllersManagementTest is Test {
 
         vm.prank(alice);
         // succeeds as there's no controller to perform the account status check
-        Vault(vault).call(
-            address(evc),
-            abi.encodeWithSelector(evc.handlerDisableController.selector, alice)
-        );
+        Vault(vault).call(address(evc), abi.encodeWithSelector(evc.handlerDisableController.selector, alice));
 
         Vault(vault).setAccountStatusState(1); // account status is still violated
 

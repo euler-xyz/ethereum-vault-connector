@@ -41,27 +41,17 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         expectedVaultsChecked.push(vault);
     }
 
-    function getExpectedAccountStatusChecks()
-        external
-        view
-        returns (address[] memory)
-    {
+    function getExpectedAccountStatusChecks() external view returns (address[] memory) {
         return expectedAccountsChecked;
     }
 
-    function getExpectedVaultStatusChecks()
-        external
-        view
-        returns (address[] memory)
-    {
+    function getExpectedVaultStatusChecks() external view returns (address[] memory) {
         return expectedVaultsChecked;
     }
 
     function setCallDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext = EC.wrap(
-            (EC.unwrap(executionContext) & ~uint256(0xff)) | depth
-        );
+        executionContext = EC.wrap((EC.unwrap(executionContext) & ~uint256(0xff)) | depth);
     }
 
     function setChecksLock(bool locked) external {
@@ -70,10 +60,8 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         if (locked) {
             executionContext = executionContext.setChecksInProgress();
         } else {
-            executionContext = EC.wrap(
-                EC.unwrap(executionContext) &
-                    ~uint256(0xFF000000000000000000000000000000000000000000)
-            );
+            executionContext =
+                EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF000000000000000000000000000000000000000000));
         }
     }
 
@@ -83,10 +71,8 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         if (locked) {
             executionContext = executionContext.setImpersonationInProgress();
         } else {
-            executionContext = EC.wrap(
-                EC.unwrap(executionContext) &
-                    ~uint256(0xFF00000000000000000000000000000000000000000000)
-            );
+            executionContext =
+                EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF00000000000000000000000000000000000000000000));
         }
     }
 
@@ -106,12 +92,8 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         if (inProgress) {
             executionContext = executionContext.setSimulationInProgress();
         } else {
-            executionContext = EC.wrap(
-                EC.unwrap(executionContext) &
-                    ~uint256(
-                        0xFF000000000000000000000000000000000000000000000000
-                    )
-            );
+            executionContext =
+                EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF000000000000000000000000000000000000000000000000));
         }
     }
 
@@ -121,16 +103,12 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
     }
 
     // function overrides in order to verify the account and vault checks
-    function requireAccountStatusCheck(
-        address account
-    ) public payable override {
+    function requireAccountStatusCheck(address account) public payable override {
         super.requireAccountStatusCheck(account);
         expectedAccountsChecked.push(account);
     }
 
-    function requireAccountStatusCheckNow(
-        address account
-    ) public payable override {
+    function requireAccountStatusCheckNow(address account) public payable override {
         super.requireAccountStatusCheckNow(account);
         expectedAccountsChecked.push(account);
     }
@@ -159,23 +137,20 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         super.requireVaultStatusCheckNow();
     }
 
-    function requireAccountAndVaultStatusCheck(
-        address account
-    ) public payable override {
+    function requireAccountAndVaultStatusCheck(address account) public payable override {
         super.requireAccountAndVaultStatusCheck(account);
 
         expectedAccountsChecked.push(account);
         expectedVaultsChecked.push(msg.sender);
     }
 
-    function requireAccountStatusCheckInternal(
-        address account
-    ) internal override {
+    function requireAccountStatusCheckInternal(address account) internal override {
         super.requireAccountStatusCheckInternal(account);
 
         address[] memory controllers = accountControllers[account].get();
-        if (controllers.length == 1)
+        if (controllers.length == 1) {
             Vault(controllers[0]).pushAccountStatusChecked(account);
+        }
     }
 
     function requireVaultStatusCheckInternal(address vault) internal override {
@@ -186,30 +161,19 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
 
     function verifyVaultStatusChecks() public view {
         for (uint256 i = 0; i < expectedVaultsChecked.length; ++i) {
-            require(
-                Vault(expectedVaultsChecked[i])
-                    .getVaultStatusChecked()
-                    .length == 1,
-                "verifyVaultStatusChecks"
-            );
+            require(Vault(expectedVaultsChecked[i]).getVaultStatusChecked().length == 1, "verifyVaultStatusChecks");
         }
     }
 
     function verifyAccountStatusChecks() public view {
         for (uint256 i = 0; i < expectedAccountsChecked.length; ++i) {
-            address[] memory controllers = accountControllers[
-                expectedAccountsChecked[i]
-            ].get();
+            address[] memory controllers = accountControllers[expectedAccountsChecked[i]].get();
 
-            require(
-                controllers.length <= 1,
-                "verifyAccountStatusChecks/length"
-            );
+            require(controllers.length <= 1, "verifyAccountStatusChecks/length");
 
             if (controllers.length == 0) continue;
 
-            address[] memory accounts = Vault(controllers[0])
-                .getAccountStatusChecked();
+            address[] memory accounts = Vault(controllers[0]).getAccountStatusChecked();
 
             uint256 counter = 0;
             for (uint256 j = 0; j < accounts.length; ++j) {

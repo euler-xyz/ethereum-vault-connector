@@ -7,8 +7,9 @@ import "../../../src/Set.sol";
 
 contract SetTest is Test {
     using Set for SetStorage;
+
     SetStorage setStorage;
-    uint counter;
+    uint256 counter;
 
     function setUp() public {
         delete setStorage;
@@ -25,12 +26,8 @@ contract SetTest is Test {
         }
 
         // count added elements not to exceed the limit
-        uint expectedNumElements;
-        for (
-            uint i = 0;
-            i < elements.length && expectedNumElements < Set.MAX_ELEMENTS;
-            ++i
-        ) {
+        uint256 expectedNumElements;
+        for (uint256 i = 0; i < elements.length && expectedNumElements < Set.MAX_ELEMENTS; ++i) {
             if (setStorage.insert(elements[i])) ++expectedNumElements;
         }
 
@@ -39,19 +36,20 @@ contract SetTest is Test {
         assertEq(array.length, expectedNumElements);
 
         // check the elements
-        uint lastExpectedIndex = 0;
-        for (uint i = 0; i < array.length; ++i) {
+        uint256 lastExpectedIndex = 0;
+        for (uint256 i = 0; i < array.length; ++i) {
             // expected element has to be found as the duplicates are not being inserted
             address expectedElement;
-            uint seenBeforeCnt;
+            uint256 seenBeforeCnt;
 
             do {
                 seenBeforeCnt = 0;
                 expectedElement = elements[lastExpectedIndex];
 
-                for (uint j = 0; j < lastExpectedIndex; ++j) {
-                    if (elements[lastExpectedIndex] == elements[j])
+                for (uint256 j = 0; j < lastExpectedIndex; ++j) {
+                    if (elements[lastExpectedIndex] == elements[j]) {
                         ++seenBeforeCnt;
+                    }
                 }
 
                 ++lastExpectedIndex;
@@ -61,10 +59,10 @@ contract SetTest is Test {
         }
 
         // ------------------ REMOVING ------------------
-        uint cnt;
+        uint256 cnt;
         while (setStorage.get().length > 0) {
-            uint lengthBeforeRemoval = setStorage.get().length;
-            uint indexToBeRemoved = seed % lengthBeforeRemoval;
+            uint256 lengthBeforeRemoval = setStorage.get().length;
+            uint256 indexToBeRemoved = seed % lengthBeforeRemoval;
             address elementToBeRemoved = setStorage.get()[indexToBeRemoved];
 
             // try to remove non-existent element to exercise an edge case
@@ -83,25 +81,16 @@ contract SetTest is Test {
         }
     }
 
-    function test_RevertIfTooManyElements_Insert(uint seed) public {
-        seed = bound(seed, 101, type(uint).max);
+    function test_RevertIfTooManyElements_Insert(uint256 seed) public {
+        seed = bound(seed, 101, type(uint256).max);
         delete setStorage;
 
-        for (uint i = 0; i < Set.MAX_ELEMENTS; ++i) {
-            assertEq(
-                setStorage.insert(
-                    address(
-                        uint160(uint(bytes32(keccak256(abi.encode(seed, i)))))
-                    )
-                ),
-                true
-            );
+        for (uint256 i = 0; i < Set.MAX_ELEMENTS; ++i) {
+            assertEq(setStorage.insert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, i))))))), true);
         }
 
         vm.expectRevert(Set.TooManyElements.selector);
-        setStorage.insert(
-            address(uint160(uint(bytes32(keccak256(abi.encode(seed, seed))))))
-        );
+        setStorage.insert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, seed)))))));
     }
 
     function test_insert_first(address element) public {
@@ -128,10 +117,7 @@ contract SetTest is Test {
         assertEq(setStorage.firstElement, element);
     }
 
-    function test_insert_duplicateOfArrayElement(
-        address elementA,
-        address elementB
-    ) public {
+    function test_insert_duplicateOfArrayElement(address elementA, address elementB) public {
         vm.assume(elementA != elementB);
 
         assertTrue(setStorage.insert(elementA));
@@ -142,7 +128,7 @@ contract SetTest is Test {
     }
 
     function test_insert_and_contains_20Elements() public {
-        for (uint i = 0; i < 20; i++) {
+        for (uint256 i = 0; i < 20; i++) {
             address e = address(uint160(uint256(i)));
             address eNext = address(uint160(uint256(i + 1)));
             assertTrue(setStorage.insert(e));

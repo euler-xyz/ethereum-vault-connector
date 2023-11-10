@@ -42,12 +42,13 @@ library Set {
     uint8 public constant MAX_ELEMENTS = 20;
 
     /// @notice Initializes the stamp field of the SetStorage and its elements to DUMMY_STAMP.
-    /// @dev The stamp field is used to keep the storage slot non-zero when the element is removed. It allows for cheaper SSTORE when an element is inserted.
+    /// @dev The stamp field is used to keep the storage slot non-zero when the element is removed. It allows for
+    /// cheaper SSTORE when an element is inserted.
     /// @param setStorage The set storage whose stamp fields will be initialized.
     function initializeStamps(SetStorage storage setStorage) internal {
         setStorage.stamp = DUMMY_STAMP;
 
-        for (uint i = 1; i < MAX_ELEMENTS; ) {
+        for (uint256 i = 1; i < MAX_ELEMENTS;) {
             setStorage.elements[i].stamp = DUMMY_STAMP;
 
             unchecked {
@@ -60,11 +61,9 @@ library Set {
     /// @dev Reverts if the set is full but the element is not in the set storage.
     /// @param setStorage The set storage to which the element will be inserted.
     /// @param element The address of the element to be inserted.
-    /// @return A boolean value that indicates whether the element was inserted or not. If the element was already in the set storage, it returns false.
-    function insert(
-        SetStorage storage setStorage,
-        address element
-    ) internal returns (bool) {
+    /// @return A boolean value that indicates whether the element was inserted or not. If the element was already in
+    /// the set storage, it returns false.
+    function insert(SetStorage storage setStorage, address element) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
 
@@ -81,7 +80,7 @@ library Set {
 
         if (firstElement == element) return false;
 
-        for (uint256 i = 1; i < numElements; ) {
+        for (uint256 i = 1; i < numElements;) {
             if (setStorage.elements[i].value == element) return false;
 
             unchecked {
@@ -103,11 +102,9 @@ library Set {
     /// @notice Removes an element and returns information whether the element was removed or not.
     /// @param setStorage The set storage from which the element will be removed.
     /// @param element The address of the element to be removed.
-    /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set storage, it returns false.
-    function remove(
-        SetStorage storage setStorage,
-        address element
-    ) internal returns (bool) {
+    /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set
+    /// storage, it returns false.
+    function remove(SetStorage storage setStorage, address element) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
 
@@ -115,7 +112,7 @@ library Set {
 
         uint256 searchIndex;
         if (firstElement != element) {
-            for (searchIndex = 1; searchIndex < numElements; ) {
+            for (searchIndex = 1; searchIndex < numElements;) {
                 if (setStorage.elements[searchIndex].value == element) {
                     break;
                 }
@@ -144,9 +141,7 @@ library Set {
                 setStorage.firstElement = setStorage.elements[lastIndex].value;
                 setStorage.numElements = uint8(lastIndex);
             } else {
-                setStorage.elements[searchIndex].value = setStorage
-                    .elements[lastIndex]
-                    .value;
+                setStorage.elements[searchIndex].value = setStorage.elements[lastIndex].value;
                 setStorage.numElements = uint8(lastIndex);
             }
         } else {
@@ -162,9 +157,7 @@ library Set {
     /// @dev The order of the elements in the memory array is not preserved.
     /// @param setStorage The set storage to be copied.
     /// @return A memory array that contains the same elements as the set storage.
-    function get(
-        SetStorage storage setStorage
-    ) internal view returns (address[] memory) {
+    function get(SetStorage storage setStorage) internal view returns (address[] memory) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
         address[] memory output = new address[](numElements);
@@ -173,7 +166,7 @@ library Set {
 
         output[0] = firstElement;
 
-        for (uint256 i = 1; i < numElements; ) {
+        for (uint256 i = 1; i < numElements;) {
             output[i] = setStorage.elements[i].value;
 
             unchecked {
@@ -184,28 +177,26 @@ library Set {
         return output;
     }
 
-    /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the result.
+    /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the
+    /// result.
     /// @param setStorage The set storage to be searched.
     /// @param element The address of the element to be checked.
     /// @return A boolean value that indicates whether the set storage includes the element or not.
-    function contains(
-        SetStorage storage setStorage,
-        address element
-    ) internal view returns (bool) {
+    function contains(SetStorage storage setStorage, address element) internal view returns (bool) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
 
         if (numElements == 0) return false;
         if (firstElement == element) return true;
 
-        for (uint256 i = 1; i < numElements; ) {
+        for (uint256 i = 1; i < numElements;) {
             if (setStorage.elements[i].value == element) return true;
 
             unchecked {
                 ++i;
             }
         }
-        
+
         return false;
     }
 
@@ -213,10 +204,7 @@ library Set {
     /// @dev The set is cleared as a result of this call.
     /// @param setStorage The set storage to be processed.
     /// @param callback The function to be applied to each element.
-    function forEachAndClear(
-        SetStorage storage setStorage,
-        function(address) callback
-    ) internal {
+    function forEachAndClear(SetStorage storage setStorage, function(address) callback) internal {
         uint256 numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
 
@@ -224,7 +212,7 @@ library Set {
 
         setStorage.numElements = 0;
 
-        for (uint256 i; i < numElements; ) {
+        for (uint256 i; i < numElements;) {
             address element;
             if (i == 0) {
                 element = firstElement;
@@ -242,7 +230,8 @@ library Set {
         }
     }
 
-    /// @notice Iterates over each element in the set and applies the callback function to it, returning the array of callback results.
+    /// @notice Iterates over each element in the set and applies the callback function to it, returning the array of
+    /// callback results.
     /// @dev The set is cleared as a result of this call.
     /// @param setStorage The set storage to be processed.
     /// @param callback The function to be applied to each element.
@@ -259,7 +248,7 @@ library Set {
 
         setStorage.numElements = 0;
 
-        for (uint256 i; i < numElements; ) {
+        for (uint256 i; i < numElements;) {
             address element;
             if (i == 0) {
                 element = firstElement;

@@ -17,22 +17,18 @@ contract AccountAndVaultStatusTest is Test {
         bytes memory seed,
         bool allStatusesValid
     ) external {
-        vm.assume(
-            numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS
-        );
+        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
         address[] memory vaults = new address[](numberOfAddresses);
-        for (uint i = 0; i < numberOfAddresses; i++) {
-            accounts[i] = address(
-                uint160(uint(keccak256(abi.encode(i, seed))))
-            );
+        for (uint256 i = 0; i < numberOfAddresses; i++) {
+            accounts[i] = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             controllers[i] = address(new Vault(evc));
             vaults[i] = address(new Vault(evc));
         }
 
-        for (uint i = 0; i < numberOfAddresses; i++) {
+        for (uint256 i = 0; i < numberOfAddresses; i++) {
             address account = accounts[i];
             address controller = controllers[i];
             address vault = vaults[i];
@@ -45,19 +41,11 @@ contract AccountAndVaultStatusTest is Test {
             // check all the options: states are ok, states are violated with
             // vault/controller returning false and reverting
             Vault(controller).setAccountStatusState(
-                allStatusesValid ? 0 : uint160(account) % 3 == 0
-                    ? 0
-                    : uint160(account) % 3 == 1
-                    ? 1
-                    : 2
+                allStatusesValid ? 0 : uint160(account) % 3 == 0 ? 0 : uint160(account) % 3 == 1 ? 1 : 2
             );
 
             Vault(vault).setVaultStatusState(
-                allStatusesValid ? 0 : uint160(vault) % 3 == 0
-                    ? 0
-                    : uint160(vault) % 3 == 1
-                    ? 1
-                    : 2
+                allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
             );
 
             bool alredyExpectsRevert;
@@ -65,20 +53,13 @@ contract AccountAndVaultStatusTest is Test {
                 alredyExpectsRevert = true;
 
                 vm.expectRevert(
-                    uint160(account) % 3 == 1
-                        ? bytes("account status violation")
-                        : abi.encode(bytes4(uint32(2)))
+                    uint160(account) % 3 == 1 ? bytes("account status violation") : abi.encode(bytes4(uint32(2)))
                 );
             }
 
-            if (
-                !(allStatusesValid || uint160(vault) % 3 == 0) &&
-                !alredyExpectsRevert
-            ) {
+            if (!(allStatusesValid || uint160(vault) % 3 == 0) && !alredyExpectsRevert) {
                 vm.expectRevert(
-                    uint160(vault) % 3 == 1
-                        ? bytes("vault status violation")
-                        : abi.encode(bytes4(uint32(1)))
+                    uint160(vault) % 3 == 1 ? bytes("vault status violation") : abi.encode(bytes4(uint32(1)))
                 );
             }
 
@@ -93,26 +74,19 @@ contract AccountAndVaultStatusTest is Test {
         }
     }
 
-    function test_WhenDeferred_RequireAccountAndVaultStatusCheck(
-        uint8 numberOfAddresses,
-        bytes memory seed
-    ) external {
-        vm.assume(
-            numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS
-        );
+    function test_WhenDeferred_RequireAccountAndVaultStatusCheck(uint8 numberOfAddresses, bytes memory seed) external {
+        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
         address[] memory vaults = new address[](numberOfAddresses);
-        for (uint i = 0; i < numberOfAddresses; i++) {
-            accounts[i] = address(
-                uint160(uint(keccak256(abi.encode(i, seed))))
-            );
+        for (uint256 i = 0; i < numberOfAddresses; i++) {
+            accounts[i] = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             controllers[i] = address(new Vault(evc));
             vaults[i] = address(new Vault(evc));
         }
 
-        for (uint i = 0; i < numberOfAddresses; i++) {
+        for (uint256 i = 0; i < numberOfAddresses; i++) {
             evc.setCallDepth(0);
 
             address account = accounts[i];
@@ -155,9 +129,7 @@ contract AccountAndVaultStatusTest is Test {
 
         evc.setChecksLock(true);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
         vm.prank(vault);
         evc.requireAccountAndVaultStatusCheck(accounts[index]);
 
@@ -170,17 +142,13 @@ contract AccountAndVaultStatusTest is Test {
         uint8 numberOfAddresses,
         bytes memory seed
     ) external {
-        vm.assume(
-            numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS
-        );
+        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
         address[] memory vaults = new address[](numberOfAddresses);
-        for (uint i = 0; i < numberOfAddresses; i++) {
-            accounts[i] = address(
-                uint160(uint(keccak256(abi.encode(i, seed))))
-            );
+        for (uint256 i = 0; i < numberOfAddresses; i++) {
+            accounts[i] = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
 
             controllers[i] = address(new VaultMalicious(evc));
             vaults[i] = address(new VaultMalicious(evc));
@@ -188,9 +156,7 @@ contract AccountAndVaultStatusTest is Test {
             vm.prank(accounts[i]);
             evc.enableController(accounts[i], controllers[i]);
 
-            VaultMalicious(controllers[i]).setExpectedErrorSelector(
-                Errors.EVC_ChecksReentrancy.selector
-            );
+            VaultMalicious(controllers[i]).setExpectedErrorSelector(Errors.EVC_ChecksReentrancy.selector);
 
             // function will revert with EVC_AccountStatusViolation according to VaultMalicious implementation
             vm.expectRevert(bytes("malicious vault"));

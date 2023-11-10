@@ -11,21 +11,14 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
     function handlerImpersonate(
         address targetContract,
         address onBehalfOfAccount,
-        uint value,
+        uint256 value,
         bytes calldata data
     ) public payable returns (bytes memory result) {
-        (bool success, ) = msg.sender.call(
-            abi.encodeWithSelector(Vault.clearChecks.selector)
-        );
+        (bool success,) = msg.sender.call(abi.encodeWithSelector(Vault.clearChecks.selector));
         success;
         clearExpectedChecks();
 
-        result = super.impersonate(
-            targetContract,
-            onBehalfOfAccount,
-            value,
-            data
-        );
+        result = super.impersonate(targetContract, onBehalfOfAccount, value, data);
 
         verifyVaultStatusChecks();
         verifyAccountStatusChecks();
@@ -36,10 +29,7 @@ contract ImpersonateTest is Test {
     EthereumVaultConnectorHandler internal evc;
 
     event CallWithContext(
-        address indexed caller,
-        address indexed targetContract,
-        address indexed onBehalfOfAccount,
-        bytes4 selector
+        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
     );
 
     function setUp() public {
@@ -60,30 +50,15 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableController(alice, controller);
 
-        bytes memory data = abi.encodeWithSelector(
-            Target(collateral).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
-        );
+        bytes memory data =
+            abi.encodeWithSelector(Target(collateral).impersonateTest.selector, address(evc), address(evc), seed, alice);
 
         vm.deal(controller, seed);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(
-            controller,
-            collateral,
-            alice,
-            Target.impersonateTest.selector
-        );
+        emit CallWithContext(controller, collateral, alice, Target.impersonateTest.selector);
         vm.prank(controller);
-        bytes memory result = evc.handlerImpersonate{value: seed}(
-            collateral,
-            alice,
-            seed,
-            data
-        );
-        assertEq(abi.decode(result, (uint)), seed);
+        bytes memory result = evc.handlerImpersonate{value: seed}(collateral, alice, seed, data);
+        assertEq(abi.decode(result, (uint256)), seed);
 
         evc.clearExpectedChecks();
         Vault(controller).clearChecks();
@@ -107,10 +82,7 @@ contract ImpersonateTest is Test {
         evc.impersonate(collateral, alice, 0, "");
     }
 
-    function test_RevertIfChecksReentrancy_Impersonate(
-        address alice,
-        uint seed
-    ) public {
+    function test_RevertIfChecksReentrancy_Impersonate(address alice, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
 
         address collateral = address(new Vault(evc));
@@ -126,11 +98,7 @@ contract ImpersonateTest is Test {
         evc.setChecksLock(true);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(address(evc)).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
+            Target(address(evc)).impersonateTest.selector, address(evc), address(evc), seed, alice
         );
 
         vm.deal(alice, seed);
@@ -139,10 +107,7 @@ contract ImpersonateTest is Test {
         evc.impersonate{value: seed}(collateral, alice, seed, data);
     }
 
-    function test_RevertIfImpersonateReentrancy_Impersonate(
-        address alice,
-        uint seed
-    ) public {
+    function test_RevertIfImpersonateReentrancy_Impersonate(address alice, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
 
         address collateral = address(new Vault(evc));
@@ -158,11 +123,7 @@ contract ImpersonateTest is Test {
         evc.setImpersonateLock(true);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(address(evc)).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
+            Target(address(evc)).impersonateTest.selector, address(evc), address(evc), seed, alice
         );
 
         vm.deal(alice, seed);
@@ -171,10 +132,7 @@ contract ImpersonateTest is Test {
         evc.impersonate{value: seed}(collateral, alice, seed, data);
     }
 
-    function test_RevertIfTargetContractInvalid_Impersonate(
-        address alice,
-        uint seed
-    ) public {
+    function test_RevertIfTargetContractInvalid_Impersonate(address alice, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
 
         address controller = address(new Vault(evc));
@@ -184,11 +142,7 @@ contract ImpersonateTest is Test {
 
         // target contract is the EVC
         bytes memory data = abi.encodeWithSelector(
-            Target(address(evc)).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
+            Target(address(evc)).impersonateTest.selector, address(evc), address(evc), seed, alice
         );
 
         vm.deal(alice, seed);
@@ -197,10 +151,7 @@ contract ImpersonateTest is Test {
         evc.impersonate{value: seed}(address(evc), alice, seed, data);
     }
 
-    function test_RevertIfNoControllerEnabled_Impersonate(
-        address alice,
-        uint seed
-    ) public {
+    function test_RevertIfNoControllerEnabled_Impersonate(address alice, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
 
         address collateral = address(new Vault(evc));
@@ -211,13 +162,8 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableCollateral(alice, collateral);
 
-        bytes memory data = abi.encodeWithSelector(
-            Target(collateral).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
-        );
+        bytes memory data =
+            abi.encodeWithSelector(Target(collateral).impersonateTest.selector, address(evc), address(evc), seed, alice);
 
         vm.deal(controller, seed);
         vm.prank(controller);
@@ -225,10 +171,7 @@ contract ImpersonateTest is Test {
         evc.impersonate{value: seed}(collateral, alice, seed, data);
     }
 
-    function test_RevertIfMultipleControllersEnabled_Impersonate(
-        address alice,
-        uint seed
-    ) public {
+    function test_RevertIfMultipleControllersEnabled_Impersonate(address alice, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
 
         address collateral = address(new Vault(evc));
@@ -249,13 +192,8 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableController(alice, controller_2);
 
-        bytes memory data = abi.encodeWithSelector(
-            Target(collateral).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
-        );
+        bytes memory data =
+            abi.encodeWithSelector(Target(collateral).impersonateTest.selector, address(evc), address(evc), seed, alice);
 
         vm.deal(controller_1, seed);
         vm.prank(controller_1);
@@ -266,7 +204,7 @@ contract ImpersonateTest is Test {
     function test_RevertIfMsgSenderIsNotEnabledController_Impersonate(
         address alice,
         address randomAddress,
-        uint seed
+        uint256 seed
     ) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(uint160(randomAddress) > 10 && randomAddress != address(evc));
@@ -283,26 +221,19 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableController(alice, controller);
 
-        bytes memory data = abi.encodeWithSelector(
-            Target(collateral).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
-        );
+        bytes memory data =
+            abi.encodeWithSelector(Target(collateral).impersonateTest.selector, address(evc), address(evc), seed, alice);
 
         vm.deal(randomAddress, seed);
         vm.prank(randomAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.EVC_NotAuthorized.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Errors.EVC_NotAuthorized.selector));
         evc.impersonate{value: seed}(collateral, alice, seed, data);
     }
 
     function test_RevertIfTargetContractIsNotEnabledCollateral_Impersonate(
         address alice,
         address targetContract,
-        uint seed
+        uint256 seed
     ) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(targetContract != address(evc));
@@ -318,26 +249,16 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableController(alice, controller);
 
-        bytes memory data = abi.encodeWithSelector(
-            Target(collateral).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
-        );
+        bytes memory data =
+            abi.encodeWithSelector(Target(collateral).impersonateTest.selector, address(evc), address(evc), seed, alice);
 
         vm.deal(controller, seed);
         vm.prank(controller);
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.EVC_NotAuthorized.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Errors.EVC_NotAuthorized.selector));
         evc.impersonate{value: seed}(targetContract, alice, seed, data);
     }
 
-    function test_RevertIfValueExceedsBalance_Impersonate(
-        address alice,
-        uint128 seed
-    ) public {
+    function test_RevertIfValueExceedsBalance_Impersonate(address alice, uint128 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 0);
 
@@ -352,11 +273,7 @@ contract ImpersonateTest is Test {
         evc.enableController(alice, controller);
 
         bytes memory data = abi.encodeWithSelector(
-            Target(address(evc)).impersonateTest.selector,
-            address(evc),
-            address(evc),
-            seed,
-            alice
+            Target(address(evc)).impersonateTest.selector, address(evc), address(evc), seed, alice
         );
 
         // reverts if value exceeds balance
@@ -370,9 +287,7 @@ contract ImpersonateTest is Test {
         evc.impersonate{value: seed}(collateral, alice, seed, data);
     }
 
-    function test_RevertIfInternalCallIsUnsuccessful_Impersonate(
-        address alice
-    ) public {
+    function test_RevertIfInternalCallIsUnsuccessful_Impersonate(address alice) public {
         // call setUp() explicitly for Dilligence Fuzzing tool to pass
         setUp();
 
@@ -389,9 +304,7 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableController(alice, controller);
 
-        bytes memory data = abi.encodeWithSelector(
-            Target(collateral).revertEmptyTest.selector
-        );
+        bytes memory data = abi.encodeWithSelector(Target(collateral).revertEmptyTest.selector);
 
         vm.prank(controller);
         vm.expectRevert(Errors.EVC_EmptyError.selector);

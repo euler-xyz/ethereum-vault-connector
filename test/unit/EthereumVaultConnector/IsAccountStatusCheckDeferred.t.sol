@@ -12,19 +12,14 @@ contract IsAccountStatusCheckDeferredTest is Test {
         evc = new EthereumVaultConnectorHarness();
     }
 
-    function test_IsAccountStatusCheckDeferred(
-        uint8 numberOfAccounts,
-        bytes memory seed
-    ) external {
+    function test_IsAccountStatusCheckDeferred(uint8 numberOfAccounts, bytes memory seed) external {
         vm.assume(numberOfAccounts <= Set.MAX_ELEMENTS);
 
-        for (uint i = 0; i < numberOfAccounts; ++i) {
+        for (uint256 i = 0; i < numberOfAccounts; ++i) {
             // we're not in a batch thus the check will not get deferred
             evc.setCallDepth(0);
 
-            address account = address(
-                uint160(uint(keccak256(abi.encode(i, seed))))
-            );
+            address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             assertFalse(evc.isAccountStatusCheckDeferred(account));
 
             evc.requireAccountStatusCheck(account);
