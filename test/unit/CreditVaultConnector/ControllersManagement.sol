@@ -103,7 +103,7 @@ contract ControllersManagementTest is Test {
         address otherVault = address(new Vault(cvc));
 
         vm.prank(msgSender);
-        vm.expectRevert(CreditVaultConnector.CVC_ControllerViolation.selector);
+        vm.expectRevert(Errors.CVC_ControllerViolation.selector);
         cvc.handlerEnableController(account, otherVault);
 
         // only the controller vault can disable itself
@@ -143,7 +143,7 @@ contract ControllersManagementTest is Test {
         address vault = address(new Vault(cvc));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.handlerEnableController(bob, vault);
 
         vm.prank(bob);
@@ -163,7 +163,7 @@ contract ControllersManagementTest is Test {
         cvc.setChecksLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.enableController(alice, vault);
 
         cvc.setChecksLock(false);
@@ -174,7 +174,7 @@ contract ControllersManagementTest is Test {
         cvc.setChecksLock(true);
 
         vm.prank(vault);
-        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.disableController(alice);
 
         cvc.setChecksLock(false);
@@ -193,9 +193,7 @@ contract ControllersManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-        );
+        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.enableController(alice, vault);
 
         cvc.setImpersonateLock(false);
@@ -206,9 +204,7 @@ contract ControllersManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(vault);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-        );
+        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.disableController(alice);
 
         cvc.setImpersonateLock(false);
@@ -222,7 +218,7 @@ contract ControllersManagementTest is Test {
     ) public {
         vm.assume(alice != address(cvc));
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.enableController(alice, address(cvc));
     }
 

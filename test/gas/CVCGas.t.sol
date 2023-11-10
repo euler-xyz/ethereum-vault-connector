@@ -57,6 +57,7 @@ contract CVCGas is Test {
         bytes32 hash,
         bytes memory signature
     ) public {
+        vm.assume(!cvc.haveCommonOwner(signer, address(0)));
         vm.assume(signature.length < 100);
         cvc.getIsValidERC1271Signature(signer, hash, signature);
     }

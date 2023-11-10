@@ -101,9 +101,7 @@ contract VaultStatusTest is Test {
 
         vm.prank(vaults[index]);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.requireVaultStatusCheck();
 
@@ -122,7 +120,7 @@ contract VaultStatusTest is Test {
             vaults[i] = address(new VaultMalicious(cvc));
 
             VaultMalicious(vaults[i]).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             vm.prank(vaults[i]);
@@ -134,18 +132,13 @@ contract VaultStatusTest is Test {
 
     function test_RequireVaultStatusCheckNow(
         uint8 vaultsNumber,
-        uint notRequestedVaultIndex,
         bool allStatusesValid
     ) external {
         vm.assume(vaultsNumber > 0 && vaultsNumber <= Set.MAX_ELEMENTS);
-        vm.assume(notRequestedVaultIndex < vaultsNumber);
 
         address[] memory vaults = new address[](vaultsNumber);
         for (uint i = 0; i < vaultsNumber; i++) {
             vaults[i] = address(new Vault(cvc));
-        }
-
-        for (uint i = 0; i < vaultsNumber; i++) {
             address vault = vaults[i];
 
             // check all the options: vault state is ok, vault state is violated with
@@ -169,6 +162,7 @@ contract VaultStatusTest is Test {
             cvc.clearExpectedChecks();
 
             assertTrue(cvc.isVaultStatusCheckDeferred(vault));
+            vm.prank(vault);
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(
                     uint160(vault) % 3 == 1
@@ -176,7 +170,7 @@ contract VaultStatusTest is Test {
                         : abi.encode(bytes4(uint32(1)))
                 );
             }
-            cvc.requireVaultStatusCheckNow(vault);
+            cvc.requireVaultStatusCheckNow();
 
             if (allStatusesValid || uint160(vault) % 3 == 0) {
                 assertFalse(cvc.isVaultStatusCheckDeferred(vault));
@@ -201,6 +195,7 @@ contract VaultStatusTest is Test {
         for (uint i = 0; i < vaultsNumber; i++) {
             address vault = vaults[i];
 
+            vm.prank(vault);
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 vm.expectRevert(
                     uint160(vault) % 3 == 1
@@ -208,7 +203,7 @@ contract VaultStatusTest is Test {
                         : abi.encode(bytes4(uint32(1)))
                 );
             }
-            cvc.requireVaultStatusCheckNow(vault);
+            cvc.requireVaultStatusCheckNow();
 
             if (allStatusesValid || uint160(vault) % 3 == 0) {
                 assertFalse(cvc.isVaultStatusCheckDeferred(vault));
@@ -217,119 +212,28 @@ contract VaultStatusTest is Test {
             }
         }
         cvc.verifyVaultStatusChecks();
-
-        // verify that the checks are not being performed if they hadn't been requested before
-        cvc.reset();
-        for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = vaults[i];
-
-            cvc.setCallDepth(1);
-
-            if (i != notRequestedVaultIndex) {
-                vm.prank(vault);
-                cvc.requireVaultStatusCheck();
-            }
-
-            Vault(vault).clearChecks();
-            cvc.clearExpectedChecks();
-
-            assertEq(
-                cvc.isVaultStatusCheckDeferred(vault),
-                i != notRequestedVaultIndex
-            );
-            if (
-                !(allStatusesValid || uint160(vault) % 3 == 0) &&
-                i != notRequestedVaultIndex
-            ) {
-                vm.expectRevert(
-                    uint160(vault) % 3 == 1
-                        ? bytes("vault status violation")
-                        : abi.encode(bytes4(uint32(1)))
-                );
-            }
-            cvc.requireVaultStatusCheckNow(vault);
-
-            if (
-                !(!(allStatusesValid || uint160(vault) % 3 == 0) &&
-                    i != notRequestedVaultIndex)
-            ) {
-                assertFalse(cvc.isVaultStatusCheckDeferred(vault));
-            } else {
-                assertTrue(cvc.isVaultStatusCheckDeferred(vault));
-            }
-            cvc.verifyVaultStatusChecks();
-
-            if (i == notRequestedVaultIndex) {
-                assertEq(Vault(vault).getVaultStatusChecked().length, 0);
-            }
-        }
-
-        cvc.setCallDepth(1);
-        for (uint i = 0; i < vaultsNumber; i++) {
-            address vault = vaults[i];
-
-            if (i != notRequestedVaultIndex) {
-                vm.prank(vault);
-                cvc.requireVaultStatusCheck();
-            }
-
-            Vault(vault).clearChecks();
-            assertEq(
-                cvc.isVaultStatusCheckDeferred(vault),
-                i != notRequestedVaultIndex
-            );
-        }
-        cvc.clearExpectedChecks();
-
-        for (uint i = 0; i < vaultsNumber; ++i) {
-            address vault = vaults[i];
-
-            assertEq(
-                cvc.isVaultStatusCheckDeferred(vault),
-                i != notRequestedVaultIndex
-            );
-            if (
-                !(allStatusesValid || uint160(vault) % 3 == 0) &&
-                i != notRequestedVaultIndex
-            ) {
-                vm.expectRevert(
-                    uint160(vault) % 3 == 1
-                        ? bytes("vault status violation")
-                        : abi.encode(bytes4(uint32(1)))
-                );
-            }
-            cvc.requireVaultStatusCheckNow(vault);
-
-            if (
-                !(!(allStatusesValid || uint160(vault) % 3 == 0) &&
-                    i != notRequestedVaultIndex)
-            ) {
-                assertFalse(cvc.isVaultStatusCheckDeferred(vault));
-            } else {
-                assertTrue(cvc.isVaultStatusCheckDeferred(vault));
-            }
-
-            if (i == notRequestedVaultIndex) {
-                assertEq(Vault(vault).getVaultStatusChecked().length, 0);
-            }
-        }
-        cvc.verifyVaultStatusChecks();
     }
 
     function test_RevertIfChecksReentrancy_RequireVaultStatusCheckNow(
-        address vault
+        uint8 numberOfVaults
     ) external {
-        cvc.setChecksLock(true);
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
-        );
-        cvc.requireVaultStatusCheckNow(vault);
+        address[] memory vaults = new address[](numberOfVaults);
+        for (uint i = 0; i < numberOfVaults; i++) {
+            vaults[i] = address(new Vault(cvc));
 
-        cvc.setChecksLock(false);
-        cvc.requireVaultStatusCheckNow(vault);
+            cvc.setChecksLock(true);
+            vm.prank(vaults[i]);
+            vm.expectRevert(
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
+            );
+            cvc.requireVaultStatusCheckNow();
+
+            cvc.setChecksLock(false);
+            vm.prank(vaults[i]);
+            cvc.requireVaultStatusCheckNow();
+        }
     }
 
     function test_AcquireChecksLock_RequireVaultStatusChecksNow(
@@ -346,12 +250,13 @@ contract VaultStatusTest is Test {
             cvc.requireVaultStatusCheck();
 
             VaultMalicious(vault).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
 
             // function will revert with CVC_VaultStatusViolation according to VaultMalicious implementation
+            vm.prank(vault);
             vm.expectRevert(bytes("malicious vault"));
-            cvc.requireVaultStatusCheckNow(vault);
+            cvc.requireVaultStatusCheckNow();
         }
     }
 
@@ -451,9 +356,7 @@ contract VaultStatusTest is Test {
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_ChecksReentrancy.selector
-                )
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
             );
         cvc.requireAllVaultsStatusCheckNow();
     }
@@ -473,7 +376,7 @@ contract VaultStatusTest is Test {
             cvc.requireVaultStatusCheck();
 
             VaultMalicious(vaults[i]).setExpectedErrorSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
+                Errors.CVC_ChecksReentrancy.selector
             );
         }
 
@@ -507,9 +410,7 @@ contract VaultStatusTest is Test {
 
         if (locked)
             vm.expectRevert(
-                abi.encodeWithSelector(
-                    CreditVaultConnector.CVC_ChecksReentrancy.selector
-                )
+                abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
             );
         cvc.forgiveVaultStatusCheck();
     }

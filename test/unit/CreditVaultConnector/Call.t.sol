@@ -51,12 +51,18 @@ contract CallTest is Test {
         vm.assume(account != address(0));
 
         address targetContract = address(new Target());
+        address nestedTargetContract = address(new TargetWithNesting());
+        address controller = address(new Vault(cvc));
         vm.assume(
             targetContract != address(cvc) &&
                 !cvc.haveCommonOwner(targetContract, alice) &&
                 !cvc.haveCommonOwner(targetContract, account)
         );
-        address controller = address(new Vault(cvc));
+        vm.assume(
+            nestedTargetContract != address(cvc) &&
+                !cvc.haveCommonOwner(nestedTargetContract, alice) &&
+                !cvc.haveCommonOwner(nestedTargetContract, account)
+        );
 
         vm.prank(alice);
         cvc.enableController(account, controller);
@@ -93,7 +99,6 @@ contract CallTest is Test {
         Vault(controller).reset();
 
         // on behalf of account should be correct in a nested call as well
-        address nestedTargetContract = address(new TargetWithNesting());
         data = abi.encodeWithSelector(
             TargetWithNesting(nestedTargetContract).nestedCallTest.selector,
             address(cvc),
@@ -149,7 +154,7 @@ contract CallTest is Test {
         vm.assume(bob != address(0));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
@@ -162,7 +167,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.call{value: seed}(targetContract, bob, seed, data);
     }
 
@@ -173,7 +178,7 @@ contract CallTest is Test {
         vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         cvc.setChecksLock(true);
 
@@ -188,7 +193,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.call{value: seed}(targetContract, alice, seed, data);
     }
 
@@ -199,7 +204,7 @@ contract CallTest is Test {
         vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         cvc.setImpersonateLock(true);
 
@@ -214,9 +219,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-        );
+        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.call{value: seed}(targetContract, alice, seed, data);
     }
 
@@ -243,7 +246,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.call{value: seed}(targetContract, alice, seed, data);
 
         // target contract is the msg.sender
@@ -258,7 +261,7 @@ contract CallTest is Test {
         );
 
         vm.deal(address(this), seed);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.call{value: seed}(targetContract, address(this), seed, data);
 
         // target contract is the ERC1820 registry
@@ -274,7 +277,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.call{value: seed}(targetContract, alice, seed, data);
     }
 
@@ -286,7 +289,7 @@ contract CallTest is Test {
         vm.assume(seed > 0);
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector,
@@ -300,7 +303,7 @@ contract CallTest is Test {
         // reverts if value exceeds balance
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidValue.selector);
+        vm.expectRevert(Errors.CVC_InvalidValue.selector);
         cvc.call{value: seed - 1}(targetContract, alice, seed, data);
 
         // succeeds if value does not exceed balance
@@ -318,14 +321,14 @@ contract CallTest is Test {
         vm.assume(alice != address(cvc));
 
         address targetContract = address(new Target());
-        vm.assume(targetContract != address(cvc));
+        vm.assume(targetContract != alice && targetContract != address(cvc));
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).revertEmptyTest.selector
         );
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
+        vm.expectRevert(Errors.CVC_EmptyError.selector);
         cvc.call(targetContract, alice, 0, data);
     }
 }

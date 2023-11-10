@@ -4,6 +4,17 @@ pragma solidity ^0.8.20;
 
 type EC is uint;
 
+/// @title ExecutionContext
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This library provides functions for managing the execution context in the Credit Vault Connector.
+/// @dev The execution context is a bit field that stores the following information:
+/// @dev - call depth - used to indicate the number of nested checks-deferrable calls
+/// @dev - on behalf of account - an account on behalf of which the currently executed operation is being performed
+/// @dev - checks lock flag - used to indicate that the account/vault status checks are in progress. This flag is used to prevent reentrancy.
+/// @dev - impersonation lock flag - used to indicate that the currently executed operation is impersonating an account. This flag is used to prevent reentrancy.
+/// @dev - operator authenticated flag - used to indicate that the currently executed operation is being performed by the account operator
+/// @dev - simulation flag - used to indicate that the currently executed batch call is a simulation
+/// @dev - stamp - dummy value for optimization purposes
 library ExecutionContext {
     uint internal constant CALL_DEPTH_MASK =
         0x00000000000000000000000000000000000000000000000000000000000000FF;
@@ -25,20 +36,13 @@ library ExecutionContext {
     uint internal constant STAMP_DUMMY_VALUE = 1;
 
     error CallDepthViolation();
-    
+
     // None of the functions below modifies the state. All the functions operate on the copy
     // of the execution context and return its modified value as a result. In order to update
     // one should use the result of the function call as a new execution context value.
     // i.e. the following call: executionContext.setChecksInProgress() returns the new execution
     // context value that should be written to the executionContext storage pointer:
     // executionContext = executionContext.setChecksInProgress();
-
-    function isEqual(
-        EC context1,
-        EC context2
-    ) internal pure returns (bool result) {
-        result = EC.unwrap(context1) == EC.unwrap(context2);
-    }
 
     function areChecksDeferred(EC context) internal pure returns (bool result) {
         result = EC.unwrap(context) & CALL_DEPTH_MASK != 0;
@@ -57,29 +61,6 @@ library ExecutionContext {
         unchecked {
             result = EC.wrap(EC.unwrap(context) + 1);
         }
-    }
-
-    /// #if_succeeds "call depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function decreaseCallDepth(EC context) internal pure returns (EC result) {
-        if (getCallDepth(context) > 0) {
-            revert CallDepthViolation();
-        }
-
-        unchecked {
-            result = EC.wrap(EC.unwrap(context) - 1);
-        }
-    }
-
-    /// #if_succeeds "call depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) && !isImpersonationInProgress(context);
-    function setCallDepth(
-        EC context,
-        uint8 callDepth
-    ) internal pure returns (EC result) {
-        if (callDepth > CALL_DEPTH_MAX) {
-            revert CallDepthViolation();
-        }
-
-        result = EC.wrap((EC.unwrap(context) & ~CALL_DEPTH_MASK) | callDepth);
     }
 
     function getOnBehalfOfAccount(
@@ -113,12 +94,6 @@ library ExecutionContext {
         result = EC.wrap(EC.unwrap(context) | CHECKS_LOCK_MASK);
     }
 
-    function clearChecksInProgress(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~CHECKS_LOCK_MASK);
-    }
-
     function isImpersonationInProgress(
         EC context
     ) internal pure returns (bool result) {
@@ -129,12 +104,6 @@ library ExecutionContext {
         EC context
     ) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | IMPERSONATE_LOCK_MASK);
-    }
-
-    function clearImpersonationInProgress(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~IMPERSONATE_LOCK_MASK);
     }
 
     function isOperatorAuthenticated(
@@ -165,12 +134,6 @@ library ExecutionContext {
         EC context
     ) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | SIMULATION_MASK);
-    }
-
-    function clearSimulationInProgress(
-        EC context
-    ) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~SIMULATION_MASK);
     }
 
     function initialize() internal pure returns (EC result) {

@@ -2,6 +2,9 @@
 
 pragma solidity ^0.8.20;
 
+/// @title ICVC
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This interface defines the methods for the Credit Vault Connector.
 interface ICVC {
     /// @notice A struct representing a batch item.
     /// @dev Each batch item represents a single operation to be performed within a checks deferred context.
@@ -252,13 +255,13 @@ interface ICVC {
     /// @notice For a given account, calls into one of the enabled collateral vaults from the currently enabled controller vault as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks are performed after the call.
     /// @dev This function can be used to interact with any contract while checks deferred as long as the contract is enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
-    /// @param targetContract The collateral address to be called.
+    /// @param targetCollateral The collateral address to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to act on behalf.
     /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint).max, the whole balance of the CVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
@@ -270,24 +273,12 @@ interface ICVC {
     function batch(BatchItem[] calldata items) external payable;
 
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
-    /// @dev This function always reverts as it's only used for simulation purposes.
+    /// @dev This function always reverts as it's only used for simulation purposes. This function cannot be called within a checks-deferrable call.
     /// @param items An array of batch items to be executed.
-    /// @return batchItemsResult An array of batch item results for each item.
-    /// @return accountsStatusResult An array of account status results for each account.
-    /// @return vaultsStatusResult An array of vault status results for each vault.
-    function batchRevert(
-        BatchItem[] calldata items
-    )
-        external
-        payable
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        );
+    function batchRevert(BatchItem[] calldata items) external payable;
 
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
-    /// @dev This function does not modify state and should only be used for simulation purposes.
+    /// @dev This function does not modify state and should only be used for simulation purposes. This function cannot be called within a checks-deferrable call.
     /// @param items An array of batch items to be executed.
     /// @return batchItemsResult An array of batch item results for each item.
     /// @return accountsStatusResult An array of account status results for each account.
@@ -316,12 +307,12 @@ interface ICVC {
     function requireAccountStatusCheck(address account) external payable;
 
     /// @notice Immediately checks the status of an account and reverts if it is not valid.
-    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account status check was previously deferred, it is removed from the set.
+    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account status check was previously deferred, it is removed from the set. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheckNow(address account) external payable;
 
     /// @notice Immediately checks the status of all the accounts for which the checks were deferred and reverts if any of them is not valid.
-    /// @dev Account status checks are performed on the fly regardless of the current execution context state. The deferred accounts set is cleared.
+    /// @dev Account status checks are performed on the fly regardless of the current execution context state. The deferred accounts set is cleared. If controller is not selected for a given, the account is always considered valid.
     function requireAllAccountsStatusCheckNow() external payable;
 
     /// @notice Forgives previously deferred account status check.
@@ -340,10 +331,9 @@ interface ICVC {
     /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the top-level checks-deferrable call. This function can only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
 
-    /// @notice Immediately checks the status of a vault if the check had been deferred by it prior to this call. It reverts if status is not valid.
-    /// @dev Vault status check is performed on the fly regardless of the current execution context state, but only if the check had been deferred by the vault prior to this call. If vault status check was previously deferred, it is removed from the set.
-    /// @param vault The address of the vault to be checked.
-    function requireVaultStatusCheckNow(address vault) external payable;
+    /// @notice Immediately checks the status of a vault. It reverts if status is not valid.
+    /// @dev Vault status check is performed on the fly regardless of the current execution context state. If vault status check was previously deferred, it is removed from the set. This function can only be called by the vault itself. If checking the vault status is a two-step process, i.e. the vault requires its prior state snapshot, this function should be called after the snapshot is taken and the vault should handle the situation when the snapshot is not available then calling this function.
+    function requireVaultStatusCheckNow() external payable;
 
     /// @notice Immediately checks the status of all vaults for which the checks were deferred and reverts if any of them is not valid.
     /// @dev Vault status checks are performed on the fly regardless of the current execution context state. The deferred vaults set is cleared.

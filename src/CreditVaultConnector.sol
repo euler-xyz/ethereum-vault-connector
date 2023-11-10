@@ -3,12 +3,17 @@
 pragma solidity ^0.8.20;
 
 import "./Set.sol";
+import "./Events.sol";
+import "./Errors.sol";
 import "./TransientStorage.sol";
 import "./interfaces/ICreditVaultConnector.sol";
 import "./interfaces/ICreditVault.sol";
 import "./interfaces/IERC1271.sol";
 
-contract CreditVaultConnector is TransientStorage, ICVC {
+/// @title CreditVaultConnector
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This contract implements the Credit Vault Connector.
+contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
@@ -74,55 +79,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         internal operatorLookup;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
-    //                                        EVENTS                                             //
+    //                                CONSTRUCTOR, FALLBACKS                                     //
     ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
-    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
-    event OperatorStatus(
-        uint152 indexed addressPrefix,
-        address indexed operator,
-        uint operatorBitField
-    );
-    event CollateralStatus(
-        address indexed account,
-        address indexed collateral,
-        bool enabled
-    );
-    event ControllerStatus(
-        address indexed account,
-        address indexed controller,
-        bool enabled
-    );
-    event CallWithContext(
-        address indexed caller,
-        address indexed targetContract,
-        address indexed onBehalfOfAccount,
-        bytes4 selector
-    );
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //                                         ERRORS                                            //
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    error CVC_NotAuthorized();
-    error CVC_AccountOwnerNotRegistered();
-    error CVC_OnBehalfOfAccountNotAuthenticated();
-    error CVC_InvalidNonce();
-    error CVC_InvalidAddress();
-    error CVC_InvalidTimestamp();
-    error CVC_InvalidValue();
-    error CVC_InvalidData();
-    error CVC_ChecksReentrancy();
-    error CVC_ImpersonateReentrancy();
-    error CVC_ControllerViolation();
-    error CVC_RevertedBatchResult(
-        BatchItemResult[] batchItemsResult,
-        BatchItemResult[] accountsStatusResult,
-        BatchItemResult[] vaultsStatusResult
-    );
-    error CVC_BatchPanic();
-    error CVC_EmptyError();
 
     constructor() {
         CACHED_CHAIN_ID = block.chainid;
@@ -379,7 +337,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revert CVC_InvalidAddress();
         }
 
-        if (operatorLookup[addressPrefix][operator] != operatorBitField) {
+        if (operatorLookup[addressPrefix][operator] == operatorBitField) {
+            revert CVC_InvalidOperatorStatus();
+        } else {
             operatorLookup[addressPrefix][operator] = operatorBitField;
 
             emit OperatorStatus(addressPrefix, operator, operatorBitField);
@@ -425,7 +385,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             ? oldOperatorBitField | bitMask
             : oldOperatorBitField & ~bitMask;
 
-        if (oldOperatorBitField != newOperatorBitField) {
+        if (oldOperatorBitField == newOperatorBitField) {
+            revert CVC_InvalidOperatorStatus();
+        } else {
             operatorLookup[addressPrefix][operator] = newOperatorBitField;
 
             emit OperatorStatus(addressPrefix, operator, newOperatorBitField);
@@ -527,11 +489,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     ) public payable virtual nonReentrant {
         uint152 addressPrefix = getAddressPrefixInternal(signer);
 
-        if (signer == address(0)) {
+        if (signer == address(0) || !isSignerValid(signer)) {
             revert CVC_InvalidAddress();
         }
 
-        if (++nonceLookup[addressPrefix][nonceNamespace] != nonce) {
+        if (
+            nonce == type(uint256).max ||
+            ++nonceLookup[addressPrefix][nonceNamespace] != nonce
+        ) {
             revert CVC_InvalidNonce();
         }
 
@@ -603,14 +568,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc ICVC
@@ -639,24 +597,19 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc ICVC
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
-        if (address(this) == targetContract || msg.sender == targetContract) {
+        if (
+            address(this) == targetCollateral || msg.sender == targetCollateral
+        ) {
             revert CVC_InvalidAddress();
         }
 
@@ -667,7 +620,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         bool success;
         (success, result) = impersonateInternal(
-            targetContract,
+            targetCollateral,
             onBehalfOfAccount,
             value,
             data
@@ -677,14 +630,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             revertBytes(result);
         }
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc ICVC
@@ -694,16 +640,9 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         EC contextCache = executionContext;
         executionContext = contextCache.increaseCallDepth();
 
-        batchInternal(items, false);
+        batchInternal(items);
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
-
-            checkStatusAll(SetType.Account, false);
-            checkStatusAll(SetType.Vault, false);
-        }
-
-        executionContext = contextCache;
+        restoreExecutionContext(contextCache);
     }
 
     // Simulations
@@ -711,31 +650,27 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     /// @inheritdoc ICVC
     function batchRevert(
         BatchItem[] calldata items
-    )
-        public
-        payable
-        virtual
-        nonReentrant
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
+    ) public payable virtual nonReentrant {
+        BatchItemResult[] memory batchItemsResult;
+        BatchItemResult[] memory accountsStatusResult;
+        BatchItemResult[] memory vaultsStatusResult;
+
         EC contextCache = executionContext;
+
+        if (contextCache.areChecksDeferred()) {
+            revert CVC_SimulationBatchNested();
+        }
 
         executionContext = contextCache
             .increaseCallDepth()
             .setSimulationInProgress();
 
-        batchItemsResult = batchInternal(items, true);
+        batchItemsResult = batchInternalWithResult(items);
 
-        if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
+        executionContext = contextCache.setChecksInProgress();
 
-            accountsStatusResult = checkStatusAll(SetType.Account, true);
-            vaultsStatusResult = checkStatusAll(SetType.Vault, true);
-        }
+        accountsStatusResult = checkStatusAllWithResult(SetType.Account);
+        vaultsStatusResult = checkStatusAllWithResult(SetType.Vault);
 
         executionContext = contextCache;
 
@@ -815,7 +750,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         nonReentrantChecks
     {
-        checkStatusAll(SetType.Account, false);
+        checkStatusAll(SetType.Account);
     }
 
     /// @inheritdoc ICVC
@@ -849,12 +784,14 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     /// @inheritdoc ICVC
-    function requireVaultStatusCheckNow(
-        address vault
-    ) public payable virtual nonReentrantChecks {
-        if (vaultStatusChecks.remove(vault)) {
-            requireVaultStatusCheckInternal(vault);
-        }
+    function requireVaultStatusCheckNow()
+        public
+        payable
+        virtual
+        nonReentrantChecks
+    {
+        vaultStatusChecks.remove(msg.sender);
+        requireVaultStatusCheckInternal(msg.sender);
     }
 
     /// @inheritdoc ICVC
@@ -864,7 +801,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         virtual
         nonReentrantChecks
     {
-        checkStatusAll(SetType.Vault, false);
+        checkStatusAll(SetType.Vault);
     }
 
     /// @inheritdoc ICVC
@@ -925,9 +862,12 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             ? contextCache.getOnBehalfOfAccount()
             : msg.sender;
 
-        // set the onBehalfOfAccount in the execution context for the duration of the call.
-        // apart from a usual scenario, clear the operator authenticated flag
-        // if about to execute the permit self-call or a callback
+        // set the onBehalfOfAccount in the execution context for the duration of the external call.
+        // considering that the operatorAuthenticated is only meant to be observable by external
+        // contracts, it is sufficient to set it here rather than in the onlyOwner and onlyOwnerOrOperator
+        // modifiers.
+        // apart from the usual scenario (when an owner operates on behalf of its account),
+        // the operatorAuthenticated should be cleared when about to execute the permit self-call or a callback
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) ||
             address(this) == targetContract ||
@@ -971,7 +911,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
     }
 
     function impersonateInternal(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
@@ -981,53 +921,64 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         onlyController(onBehalfOfAccount)
         returns (bool success, bytes memory result)
     {
-        if (!accountCollaterals[onBehalfOfAccount].contains(targetContract)) {
+        if (!accountCollaterals[onBehalfOfAccount].contains(targetCollateral)) {
             revert CVC_NotAuthorized();
         }
 
         (success, result) = callWithContextInternal(
-            targetContract,
+            targetCollateral,
             onBehalfOfAccount,
             value,
             data
         );
     }
 
-    function batchInternal(
-        BatchItem[] calldata items,
-        bool returnResult
-    ) internal virtual returns (BatchItemResult[] memory batchItemsResult) {
+    function callBatchItemInternal(
+        BatchItem calldata item
+    ) internal returns (bool success, bytes memory result) {
+        if (item.targetContract == address(this)) {
+            // delegatecall is used here to preserve msg.sender in order
+            // to be able to perform authentication
+            (success, result) = address(this).delegatecall(item.data);
+        } else {
+            (success, result) = callInternal(
+                item.targetContract,
+                item.onBehalfOfAccount,
+                item.value,
+                item.data
+            );
+        }
+    }
+
+    function batchInternal(BatchItem[] calldata items) internal {
         uint length = items.length;
 
-        if (returnResult) {
-            batchItemsResult = new BatchItemResult[](length);
-        }
-
         for (uint i; i < length; ) {
-            BatchItem calldata item = items[i];
-            address targetContract = item.targetContract;
-            bool success;
-            bytes memory result;
+            (bool success, bytes memory result) = callBatchItemInternal(
+                items[i]
+            );
 
-            if (targetContract == address(this)) {
-                // delegatecall is used here to preserve msg.sender in order
-                // to be able to perform authentication
-                (success, result) = address(this).delegatecall(item.data);
-            } else {
-                (success, result) = callInternal(
-                    targetContract,
-                    item.onBehalfOfAccount,
-                    item.value,
-                    item.data
-                );
-            }
-
-            if (returnResult) {
-                batchItemsResult[i].success = success;
-                batchItemsResult[i].result = result;
-            } else if (!success) {
+            if (!success) {
                 revertBytes(result);
             }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function batchInternalWithResult(
+        BatchItem[] calldata items
+    ) internal returns (BatchItemResult[] memory batchItemsResult) {
+        uint length = items.length;
+        batchItemsResult = new BatchItemResult[](length);
+
+        for (uint i; i < length; ) {
+            (
+                batchItemsResult[i].success,
+                batchItemsResult[i].result
+            ) = callBatchItemInternal(items[i]);
 
             unchecked {
                 ++i;
@@ -1054,7 +1005,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         isValid =
             success &&
-            result.length >= 32 &&
+            result.length == 32 &&
             abi.decode(result, (bytes32)) ==
             bytes32(ICreditVault.checkAccountStatus.selector);
     }
@@ -1081,7 +1032,7 @@ contract CreditVaultConnector is TransientStorage, ICVC {
 
         isValid =
             success &&
-            result.length >= 32 &&
+            result.length == 32 &&
             abi.decode(result, (bytes32)) ==
             bytes32(ICreditVault.checkVaultStatus.selector);
     }
@@ -1094,50 +1045,36 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
-    function checkStatusAll(
-        SetType setType,
-        bool returnResult
-    ) internal virtual returns (BatchItemResult[] memory result) {
-        function(address) returns (bool, bytes memory) checkStatus;
-        function(address) requireStatusCheck;
-        SetStorage storage setStorage;
+    function checkStatusAll(SetType setType) internal virtual {
+        setType == SetType.Account
+            ? accountStatusChecks.forEachAndClear(
+                requireAccountStatusCheckInternal
+            )
+            : vaultStatusChecks.forEachAndClear(
+                requireVaultStatusCheckInternal
+            );
+    }
 
-        if (setType == SetType.Account) {
-            checkStatus = checkAccountStatusInternal;
-            requireStatusCheck = requireAccountStatusCheckInternal;
-            setStorage = accountStatusChecks;
-        } else {
-            checkStatus = checkVaultStatusInternal;
-            requireStatusCheck = requireVaultStatusCheckInternal;
-            setStorage = vaultStatusChecks;
-        }
+    function checkStatusAllWithResult(
+        SetType setType
+    ) internal virtual returns (BatchItemResult[] memory checksResult) {
+        bytes[] memory callbackResult = setType == SetType.Account
+            ? accountStatusChecks.forEachAndClearWithResult(
+                checkAccountStatusInternal
+            )
+            : vaultStatusChecks.forEachAndClearWithResult(
+                checkVaultStatusInternal
+            );
 
-        uint numElements = setStorage.numElements;
-        address firstElement = setStorage.firstElement;
+        uint length = callbackResult.length;
+        checksResult = new BatchItemResult[](length);
 
-        if (returnResult) result = new BatchItemResult[](numElements);
-
-        if (numElements == 0) return result;
-
-        setStorage.numElements = 0;
-
-        for (uint i; i < numElements; ) {
-            address addressToCheck;
-            if (i == 0) {
-                addressToCheck = firstElement;
-                delete setStorage.firstElement;
-            } else {
-                addressToCheck = setStorage.elements[i].value;
-                delete setStorage.elements[i].value;
-            }
-
-            if (returnResult) {
-                (result[i].success, result[i].result) = checkStatus(
-                    addressToCheck
-                );
-            } else {
-                requireStatusCheck(addressToCheck);
-            }
+        for (uint i; i < length; ) {
+            (bool isValid, bytes memory result) = abi.decode(
+                callbackResult[i],
+                (bool, bytes)
+            );
+            checksResult[i] = BatchItemResult(isValid, result);
 
             unchecked {
                 ++i;
@@ -1145,7 +1082,27 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         }
     }
 
+    function restoreExecutionContext(EC contextCache) internal virtual {
+        if (!contextCache.areChecksDeferred()) {
+            executionContext = contextCache.setChecksInProgress();
+
+            checkStatusAll(SetType.Account);
+            checkStatusAll(SetType.Vault);
+        }
+
+        executionContext = contextCache;
+    }
+
     // Permit-related functions
+
+    function isSignerValid(
+        address signer
+    ) internal pure returns (bool isValid) {
+        // not valid if the signer address falls into any of the precompiles/predeploys
+        // addresses space (depends on the chain ID).
+        // IMPORTANT: revisit this logic when deploying on chains other than the Ethereum mainnet
+        return !haveCommonOwnerInternal(signer, address(0));
+    }
 
     function getPermitHash(
         address signer,
@@ -1171,6 +1128,8 @@ contract CreditVaultConnector is TransientStorage, ICVC {
             )
         );
 
+        // This code overwrites the two most significant bytes of the free memory pointer, 
+        // and restores them to 0 after
         assembly ("memory-safe") {
             mstore(0x00, "\x19\x01")
             mstore(0x02, domainSeparator)
@@ -1230,13 +1189,15 @@ contract CreditVaultConnector is TransientStorage, ICVC {
         bytes32 hash,
         bytes memory signature
     ) internal view returns (bool isValid) {
+        if (signer.code.length == 0) return false;
+
         (bool success, bytes memory result) = signer.staticcall(
             abi.encodeCall(IERC1271.isValidSignature, (hash, signature))
         );
 
         isValid =
             success &&
-            result.length >= 32 &&
+            result.length == 32 &&
             abi.decode(result, (bytes32)) ==
             bytes32(IERC1271.isValidSignature.selector);
     }

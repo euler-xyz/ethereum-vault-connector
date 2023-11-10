@@ -74,9 +74,7 @@ contract Vault is ICreditVault, Target {
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                CreditVaultConnector
-                    .CVC_OnBehalfOfAccountNotAuthenticated
-                    .selector
+                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cvs/on-behalf-of-account-2");
             }
@@ -101,9 +99,7 @@ contract Vault is ICreditVault, Target {
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                CreditVaultConnector
-                    .CVC_OnBehalfOfAccountNotAuthenticated
-                    .selector
+                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cas/on-behalf-of-account-2");
             }
@@ -168,9 +164,7 @@ contract VaultMalicious is Vault {
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                CreditVaultConnector
-                    .CVC_OnBehalfOfAccountNotAuthenticated
-                    .selector
+                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cvs/on-behalf-of-account-2");
             }
@@ -201,9 +195,7 @@ contract VaultMalicious is Vault {
         } catch (bytes memory reason) {
             if (
                 bytes4(reason) !=
-                CreditVaultConnector
-                    .CVC_OnBehalfOfAccountNotAuthenticated
-                    .selector
+                Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector
             ) {
                 revert("cas/on-behalf-of-account-2");
             }

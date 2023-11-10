@@ -89,17 +89,18 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     function setOperator(
         uint152 addressPrefix,
         address operator,
-        uint accountOperatorAuthorized
+        uint operatorBitField
     ) public payable override {
         if (msg.sender == address(this)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        if (operatorLookup[addressPrefix][operator] == operatorBitField) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
         setAccountOwnerInternal(
             address(uint160(addressPrefix) << 8),
             msg.sender
         );
-        super.setOperator(addressPrefix, operator, accountOperatorAuthorized);
+        super.setOperator(addressPrefix, operator, operatorBitField);
     }
 
     function setAccountOperator(
@@ -111,6 +112,9 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         if (account == address(0)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
+        if (
+            isAccountOperatorAuthorizedInternal(account, operator) == authorized
+        ) return;
         account = msg.sender;
         setAccountOwnerInternal(account, msg.sender);
         super.setAccountOperator(account, operator, authorized);
@@ -210,20 +214,20 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
     }
 
     function impersonate(
-        address targetContract,
+        address targetCollateral,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
-        if (uint160(msg.sender) <= 10) return "";
+        if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
-        if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this) || targetContract == msg.sender)
+        if (uint160(targetCollateral) <= 10) return "";
+        if (targetCollateral == address(this) || targetCollateral == msg.sender)
             return "";
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);
-        accountCollaterals[onBehalfOfAccount].insert(targetContract);
+        accountCollaterals[onBehalfOfAccount].insert(targetCollateral);
 
         uint8 numElementsCache = accountControllers[onBehalfOfAccount]
             .numElements;
@@ -233,7 +237,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
         result = super.impersonate(
-            targetContract,
+            targetCollateral,
             onBehalfOfAccount,
             value,
             data
@@ -252,7 +256,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
-        if (uint160(signer) <= 10) return;
+        if (uint160(signer) <= 255 || signer == address(this)) return;
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
         deal(address(this), value);
@@ -284,20 +288,8 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorScribble, Test {
         super.batch(items);
     }
 
-    function batchRevert(
-        BatchItem[] calldata
-    )
-        public
-        payable
-        override
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
-        BatchItemResult[] memory x = new BatchItemResult[](0);
-        return (x, x, x);
+    function batchRevert(BatchItem[] calldata) public payable override {
+        return;
     }
 
     function batchSimulation(
@@ -406,9 +398,7 @@ contract CreditVaultConnectorInvariants is Test {
     }
 
     function invariant_ExecutionContext() external {
-        vm.expectRevert(
-            CreditVaultConnector.CVC_OnBehalfOfAccountNotAuthenticated.selector
-        );
+        vm.expectRevert(Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector);
         cvc.getCurrentOnBehalfOfAccount(address(0));
 
         assertEq(cvc.getRawExecutionContext(), 1 << 200);

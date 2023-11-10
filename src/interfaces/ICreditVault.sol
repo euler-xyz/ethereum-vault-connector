@@ -2,6 +2,9 @@
 
 pragma solidity ^0.8.20;
 
+/// @title ICreditVault
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This interface defines the methods for the Credit Vault for the purpose of integration with the Credit Vault Connector.
 interface ICreditVault {
     /// @notice Disables a controller (this vault) for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s balances in the enabled collaterals vaults. User calls this function in order for the vault to disable itself for the account if the conditions are met (i.e. user has repaid debt in full).

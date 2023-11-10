@@ -59,7 +59,9 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
 
     function setCallDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext = executionContext.setCallDepth(depth);
+        executionContext = EC.wrap(
+            (EC.unwrap(executionContext) & ~uint(0xff)) | depth
+        );
     }
 
     function setChecksLock(bool locked) external {
@@ -68,7 +70,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         if (locked) {
             executionContext = executionContext.setChecksInProgress();
         } else {
-            executionContext = executionContext.clearChecksInProgress();
+            executionContext = EC.wrap(
+                EC.unwrap(executionContext) &
+                    ~uint(0xFF000000000000000000000000000000000000000000)
+            );
         }
     }
 
@@ -78,7 +83,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         if (locked) {
             executionContext = executionContext.setImpersonationInProgress();
         } else {
-            executionContext = executionContext.clearImpersonationInProgress();
+            executionContext = EC.wrap(
+                EC.unwrap(executionContext) &
+                    ~uint(0xFF00000000000000000000000000000000000000000000)
+            );
         }
     }
 
@@ -98,7 +106,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         if (inProgress) {
             executionContext = executionContext.setSimulationInProgress();
         } else {
-            executionContext = executionContext.clearSimulationInProgress();
+            executionContext = EC.wrap(
+                EC.unwrap(executionContext) &
+                    ~uint(0xFF000000000000000000000000000000000000000000000000)
+            );
         }
     }
 
@@ -138,12 +149,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         expectedVaultsChecked.push(msg.sender);
     }
 
-    function requireVaultStatusCheckNow(address vault) public payable override {
-        if (vaultStatusChecks.contains(vault)) {
-            expectedVaultsChecked.push(vault);
+    function requireVaultStatusCheckNow() public payable override {
+        if (vaultStatusChecks.contains(msg.sender)) {
+            expectedVaultsChecked.push(msg.sender);
         }
 
-        super.requireVaultStatusCheckNow(vault);
+        super.requireVaultStatusCheckNow();
     }
 
     function requireAccountAndVaultStatusCheck(

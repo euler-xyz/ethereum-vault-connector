@@ -5,6 +5,10 @@ pragma solidity ^0.8.20;
 import "./ExecutionContext.sol";
 import "./Set.sol";
 
+/// @title TransientStorage
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This contract provides transient storage for the Credit Vault Connector.
+/// @dev All the variables in this contract are considered transient meaning that their state does not change between transactions.
 abstract contract TransientStorage {
     using Set for SetStorage;
 
