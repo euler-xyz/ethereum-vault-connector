@@ -205,6 +205,8 @@ library Set {
                 ++i;
             }
         }
+
+        return false;
     }
 
     /// @notice Iterates over each element in the set and applies the callback function to it.
