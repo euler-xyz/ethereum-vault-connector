@@ -7,7 +7,7 @@ import "./Set.sol";
 
 /// @title TransientStorage
 /// @author Euler Labs (https://www.eulerlabs.com/)
-/// @notice This contract provides transient storage for the Credit Vault Connector.
+/// @notice This contract provides transient storage for the Ethereum Vault Connector.
 /// @dev All the variables in this contract are considered transient meaning that their state does not change between transactions.
 abstract contract TransientStorage {
     using Set for SetStorage;
@@ -28,7 +28,7 @@ abstract contract TransientStorage {
 
         // there are two types of data that are stored using SetStorage type:
         // - the data that is transient in nature (accountStatusChecks and vaultStatusChecks)
-        // - the data that is permanent (accountControllers and accountCollaterals from the CreditVaultConnector contract)
+        // - the data that is permanent (accountControllers and accountCollaterals from the EthereumVaultConnector contract)
 
         // for the permanent data, there's no need to care that much about optimizations. each account has its two sets.
         // usually, an address inserted to either of them won't be removed within the same transaction. the only optimization

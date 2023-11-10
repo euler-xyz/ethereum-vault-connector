@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../cvc/CreditVaultConnectorHarness.sol";
+import "../../evc/EthereumVaultConnectorHarness.sol";
 
-contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
+contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
     using Set for SetStorage;
 
     function handlerCallback(
@@ -21,7 +21,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 }
 
 contract CallbackTest is Test {
-    CreditVaultConnectorHandler internal cvc;
+    EthereumVaultConnectorHandler internal evc;
 
     event CallWithContext(
         address indexed caller,
@@ -31,7 +31,7 @@ contract CallbackTest is Test {
     );
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHandler();
+        evc = new EthereumVaultConnectorHandler();
     }
 
     fallback(bytes calldata data) external payable returns (bytes memory) {
@@ -47,14 +47,14 @@ contract CallbackTest is Test {
         bytes memory data,
         uint96 seed
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
-        address controller = address(new Vault(cvc));
+        vm.assume(alice != address(0) && alice != address(evc));
+        address controller = address(new Vault(evc));
 
         // first, test with a fallback function
         vm.deal(address(this), seed);
-        vm.expectEmit(true, true, true, true, address(cvc));
+        vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(address(this), address(this), alice, bytes4(data));
-        bytes memory result = cvc.handlerCallback{value: seed}(
+        bytes memory result = evc.handlerCallback{value: seed}(
             alice,
             seed,
             data
@@ -63,20 +63,20 @@ contract CallbackTest is Test {
 
         // then, test with a function selector
         vm.prank(alice);
-        cvc.enableController(alice, controller);
-        cvc.reset();
+        evc.enableController(alice, controller);
+        evc.reset();
         Vault(controller).reset();
 
         data = abi.encodeWithSelector(
             Target(controller).callbackTest.selector,
-            address(cvc),
-            address(cvc),
+            address(evc),
+            address(evc),
             seed,
             alice
         );
 
         vm.deal(controller, seed);
-        vm.expectEmit(true, true, true, true, address(cvc));
+        vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(
             controller,
             controller,
@@ -84,44 +84,44 @@ contract CallbackTest is Test {
             Target.callbackTest.selector
         );
         vm.prank(controller);
-        result = cvc.handlerCallback{value: seed}(alice, seed, data);
+        result = evc.handlerCallback{value: seed}(alice, seed, data);
         assertEq(abi.decode(result, (uint)), seed);
     }
 
     function test_RevertIfDepthExceeded_Callback(address alice) external {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        cvc.setCallDepth(10);
+        evc.setCallDepth(10);
 
         vm.prank(alice);
         vm.expectRevert(ExecutionContext.CallDepthViolation.selector);
-        cvc.callback(alice, 0, "");
+        evc.callback(alice, 0, "");
     }
 
     function test_RevertIfChecksReentrancy_Callback(
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        cvc.setChecksLock(true);
+        evc.setChecksLock(true);
 
         vm.deal(address(this), seed);
-        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
-        cvc.callback{value: seed}(alice, seed, "");
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.callback{value: seed}(alice, seed, "");
     }
 
     function test_RevertIfImpersonateReentrancy_Callback(
         address alice,
         uint seed
     ) public {
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        cvc.setImpersonateLock(true);
+        evc.setImpersonateLock(true);
 
         vm.deal(address(this), seed);
-        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
-        cvc.callback{value: seed}(alice, seed, "");
+        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        evc.callback{value: seed}(alice, seed, "");
     }
 
     function test_RevertIfMsgSenderNotAuthorized_Callback(
@@ -129,42 +129,42 @@ contract CallbackTest is Test {
         uint seed
     ) public {
         vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
-        // msg.sender is the CVC
-        vm.deal(address(cvc), seed);
-        vm.prank(address(cvc));
-        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
-        cvc.callback{value: seed}(alice, seed, "");
+        // msg.sender is the EVC
+        vm.deal(address(evc), seed);
+        vm.prank(address(evc));
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.callback{value: seed}(alice, seed, "");
     }
 
     function test_RevertIfValueExceedsBalance_Call(
         address alice,
         uint128 seed
     ) public {
-        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 0);
 
         // reverts if value exceeds balance
         vm.deal(address(this), seed);
-        vm.expectRevert(Errors.CVC_InvalidValue.selector);
-        cvc.callback{value: seed - 1}(alice, seed, "");
+        vm.expectRevert(Errors.EVC_InvalidValue.selector);
+        evc.callback{value: seed - 1}(alice, seed, "");
 
         // succeeds if value does not exceed balance
-        cvc.callback{value: seed}(alice, seed, "");
+        evc.callback{value: seed}(alice, seed, "");
     }
 
     function test_RevertIfInternalCallIsUnsuccessful_Callback(
         address alice
     ) public {
         vm.assume(alice != address(0));
-        vm.assume(alice != address(cvc));
+        vm.assume(alice != address(evc));
 
         bytes memory data = abi.encodeWithSelector(
             this.revertEmptyTest.selector
         );
 
-        vm.expectRevert(Errors.CVC_EmptyError.selector);
-        cvc.callback(alice, 0, data);
+        vm.expectRevert(Errors.EVC_EmptyError.selector);
+        evc.callback(alice, 0, data);
     }
 }

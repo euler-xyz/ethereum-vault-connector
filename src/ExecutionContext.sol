@@ -6,7 +6,7 @@ type EC is uint256;
 
 /// @title ExecutionContext
 /// @author Euler Labs (https://www.eulerlabs.com/)
-/// @notice This library provides functions for managing the execution context in the Credit Vault Connector.
+/// @notice This library provides functions for managing the execution context in the Ethereum Vault Connector.
 /// @dev The execution context is a bit field that stores the following information:
 /// @dev - call depth - used to indicate the number of nested checks-deferrable calls
 /// @dev - on behalf of account - an account on behalf of which the currently executed operation is being performed

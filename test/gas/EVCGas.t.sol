@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../src/CreditVaultConnector.sol";
+import "../../src/EthereumVaultConnector.sol";
 
-contract CVCHarness is CreditVaultConnector {
+contract EVCHarness is EthereumVaultConnector {
     function permitHash(
         address signer,
         uint nonceNamespace,
@@ -28,13 +28,13 @@ contract CVCHarness is CreditVaultConnector {
     }
 }
 
-contract CVCGas is Test {
+contract EVCGas is Test {
     using Set for SetStorage;
 
-    CVCHarness cvc;
+    EVCHarness evc;
 
     function setUp() public {
-        cvc = new CVCHarness();
+        evc = new EVCHarness();
     }
 
     function testGas_getPermitHash(
@@ -45,11 +45,11 @@ contract CVCGas is Test {
         uint value,
         bytes calldata data
     ) public view {
-        cvc.permitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        evc.permitHash(signer, nonceNamespace, nonce, deadline, value, data);
     }
 
     function testGas_haveCommonOwner(address a, address b) public view {
-        cvc.haveCommonOwner(a, b);
+        evc.haveCommonOwner(a, b);
     }
 
     function testGas_isValidSignature_eoa(
@@ -57,9 +57,9 @@ contract CVCGas is Test {
         bytes32 hash,
         bytes memory signature
     ) public {
-        vm.assume(!cvc.haveCommonOwner(signer, address(0)));
+        vm.assume(!evc.haveCommonOwner(signer, address(0)));
         vm.assume(signature.length < 100);
-        cvc.getIsValidERC1271Signature(signer, hash, signature);
+        evc.getIsValidERC1271Signature(signer, hash, signature);
     }
 
     function testGas_isValidSignature_contract(
@@ -67,9 +67,9 @@ contract CVCGas is Test {
         bytes32 hash,
         bytes memory signature
     ) public {
-        vm.assume(signer != address(cvc) && uint160(signer) > 1000);
+        vm.assume(signer != address(evc) && uint160(signer) > 1000);
         vm.assume(signature.length < 100);
         vm.etch(signer, "ff");
-        cvc.getIsValidERC1271Signature(signer, hash, signature);
+        evc.getIsValidERC1271Signature(signer, hash, signature);
     }
 }

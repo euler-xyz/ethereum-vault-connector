@@ -6,7 +6,7 @@ solc = "0.8.20"
 optimizer_runs = 10000
 ignored_error_codes = ["unreachable"]
 gas_reports = [
-    "CreditVaultConnector"
+    "EthereumVaultConnector"
 ]
 remappings = [
     "forge-std/=lib/forge-std/src/",
@@ -28,7 +28,7 @@ runs = 1000
 [profile.smt.model_checker]
 engine = "chc"
 timeout = 100_000
-contracts = {"./src/CreditVaultConnector.sol" = ["CreditVaultConnector"]}
+contracts = {"./src/EthereumVaultConnector.sol" = ["EthereumVaultConnector"]}
 invariants = ["contract", "reentrancy"]
 targets = [
     "assert",

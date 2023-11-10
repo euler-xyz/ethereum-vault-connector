@@ -3,13 +3,13 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../cvc/CreditVaultConnectorHarness.sol";
+import "../../evc/EthereumVaultConnectorHarness.sol";
 
 contract IsAccountStatusCheckDeferredTest is Test {
-    CreditVaultConnectorHarness internal cvc;
+    EthereumVaultConnectorHarness internal evc;
 
     function setUp() public {
-        cvc = new CreditVaultConnectorHarness();
+        evc = new EthereumVaultConnectorHarness();
     }
 
     function test_IsAccountStatusCheckDeferred(
@@ -20,23 +20,23 @@ contract IsAccountStatusCheckDeferredTest is Test {
 
         for (uint i = 0; i < numberOfAccounts; ++i) {
             // we're not in a batch thus the check will not get deferred
-            cvc.setCallDepth(0);
+            evc.setCallDepth(0);
 
             address account = address(
                 uint160(uint(keccak256(abi.encode(i, seed))))
             );
-            assertFalse(cvc.isAccountStatusCheckDeferred(account));
+            assertFalse(evc.isAccountStatusCheckDeferred(account));
 
-            cvc.requireAccountStatusCheck(account);
-            assertFalse(cvc.isAccountStatusCheckDeferred(account));
+            evc.requireAccountStatusCheck(account);
+            assertFalse(evc.isAccountStatusCheckDeferred(account));
 
             // simulate being in a batch
-            cvc.setCallDepth(1);
+            evc.setCallDepth(1);
 
-            cvc.requireAccountStatusCheck(account);
-            assertTrue(cvc.isAccountStatusCheckDeferred(account));
+            evc.requireAccountStatusCheck(account);
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
 
-            cvc.reset();
+            evc.reset();
         }
     }
 }

@@ -6,14 +6,14 @@ import "./Set.sol";
 import "./Events.sol";
 import "./Errors.sol";
 import "./TransientStorage.sol";
-import "./interfaces/ICreditVaultConnector.sol";
-import "./interfaces/ICreditVault.sol";
+import "./interfaces/IEthereumVaultConnector.sol";
+import "./interfaces/IVault.sol";
 import "./interfaces/IERC1271.sol";
 
-/// @title CreditVaultConnector
+/// @title EthereumVaultConnector
 /// @author Euler Labs (https://www.eulerlabs.com/)
-/// @notice This contract implements the Credit Vault Connector.
-contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
+/// @notice This contract implements the Ethereum Vault Connector.
+contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
@@ -21,7 +21,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     //                                       CONSTANTS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    string public constant name = "Credit Vault Connector";
+    string public constant name = "Ethereum Vault Connector";
     string public constant version = "1";
 
     bytes32 public constant PERMIT_TYPEHASH =
@@ -50,16 +50,16 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     mapping(address account => SetStorage) internal accountCollaterals;
     mapping(address account => SetStorage) internal accountControllers;
 
-    // CVC implements controller isolation, meaning that unless in transient state, only one controller per account can
+    // EVC implements controller isolation, meaning that unless in transient state, only one controller per account can
     // be enabled. However, this can lead to a suboptimal user experience. In the event a user wants to have multiple
     // controllers enabled, a separate wallet must be created and funded. Although there is nothing wrong with having
-    // many accounts within the same wallet, this can be a bad experience. In order to improve on this, CVC supports
-    // the concept of an owner that owns 256 accounts within CVC.
+    // many accounts within the same wallet, this can be a bad experience. In order to improve on this, EVC supports
+    // the concept of an owner that owns 256 accounts within EVC.
 
-    // Every Ethereum address has 256 accounts in the CVC (including the primary account - called the owner).
+    // Every Ethereum address has 256 accounts in the EVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
     // addresses, the account ID is treated as a uint256 and XORed (exclusive ORed) with the Ethereum address.
-    // In order to record the owner of a group of 256 accounts, the CVC uses a definition of a address prefix.
+    // In order to record the owner of a group of 256 accounts, the EVC uses a definition of a address prefix.
     // An address prefix is a part of an address having the first 19 bytes common with any of the 256 account
     // addresses belonging to the same group.
     // account/152 -> prefix/152
@@ -67,7 +67,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Yes, this reduces the security of addresses by 8 bits, but creating multiple addresses in the wallet also reduces
     // security: if somebody is trying to brute-force one of user's N>1 private keys, they have N times as many chances
-    // of succeeding per guess. It has to be admitted that the CVC model is weaker because finding a private key for
+    // of succeeding per guess. It has to be admitted that the EVC model is weaker because finding a private key for
     // an owner gives access to all accounts, but there is still a very comfortable security margin.
 
     mapping(uint152 addressPrefix => address owner) internal ownerLookup;
@@ -94,14 +94,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @notice A modifier that allows only the address recorded as an owner of the address prefix to call the function.
-    /// @dev The owner of an address prefix is an address that matches the address that has previously been recorded (or will be) as an owner in the ownerLookup. In case of the self-call in the permit() function, the CVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
+    /// @dev The owner of an address prefix is an address that matches the address that has previously been recorded (or will be) as an owner in the ownerLookup. In case of the self-call in the permit() function, the EVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
     /// @param addressPrefix The address prefix for which it is checked whether the caller is the owner.
     modifier onlyOwner(uint152 addressPrefix) virtual {
         {
             // calculate a phantom address from the address prefix which can be used as an input to internal functions
             address account = address(uint160(addressPrefix) << 8);
 
-            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
             address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
@@ -113,10 +113,10 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
                 } else if (owner != msgSender) {
-                    revert CVC_NotAuthorized();
+                    revert EVC_NotAuthorized();
                 }
             } else {
-                revert CVC_NotAuthorized();
+                revert EVC_NotAuthorized();
             }
         }
 
@@ -124,11 +124,11 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     }
 
     /// @notice A modifier that allows only the owner or an operator of the account to call the function.
-    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner. In case of the self-call in the permit() function, the CVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
+    /// @dev The owner of an account is an address that matches first 19 bytes of the account address and has been recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been authorized by the owner of an account to perform operations on behalf of the owner. In case of the self-call in the permit() function, the EVC address becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution context.
     /// @param account The address of the account for which it is checked whether the caller is the owner or an operator.
     modifier onlyOwnerOrOperator(address account) virtual {
         {
-            // CVC can only be msg.sender during the self-call in the permit() function. in that case,
+            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
             // the "true" sender address (that is the permit message signer) is taken from the execution context
             address msgSender = address(this) == msg.sender
                 ? executionContext.getOnBehalfOfAccount()
@@ -140,12 +140,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
                 } else if (owner != msgSender) {
-                    revert CVC_NotAuthorized();
+                    revert EVC_NotAuthorized();
                 }
             } else if (
                 !isAccountOperatorAuthorizedInternal(account, msgSender)
             ) {
-                revert CVC_NotAuthorized();
+                revert EVC_NotAuthorized();
             }
         }
 
@@ -159,11 +159,11 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             address controller = accountControllers[account].firstElement;
 
             if (numOfControllers != 1) {
-                revert CVC_ControllerViolation();
+                revert EVC_ControllerViolation();
             }
 
             if (controller != msg.sender) {
-                revert CVC_NotAuthorized();
+                revert EVC_NotAuthorized();
             }
         }
 
@@ -176,11 +176,11 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             EC context = executionContext;
 
             if (context.areChecksInProgress()) {
-                revert CVC_ChecksReentrancy();
+                revert EVC_ChecksReentrancy();
             }
 
             if (context.isImpersonationInProgress()) {
-                revert CVC_ImpersonateReentrancy();
+                revert EVC_ImpersonateReentrancy();
             }
         }
 
@@ -192,7 +192,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         EC contextCache = executionContext;
 
         if (contextCache.areChecksInProgress()) {
-            revert CVC_ChecksReentrancy();
+            revert EVC_ChecksReentrancy();
         }
 
         executionContext = contextCache
@@ -210,17 +210,17 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Execution internals
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getRawExecutionContext() external view returns (uint256 context) {
         context = EC.unwrap(executionContext);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getCurrentCallDepth() external view returns (uint256) {
         return executionContext.getCallDepth();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getCurrentOnBehalfOfAccount(
         address controllerToCheck
     ) public view returns (address onBehalfOfAccount, bool controllerEnabled) {
@@ -228,7 +228,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
         // for safety, revert if no account has been auhenticated
         if (onBehalfOfAccount == address(0)) {
-            revert CVC_OnBehalfOfAccountNotAuthenticated();
+            revert EVC_OnBehalfOfAccountNotAuthenticated();
         }
 
         controllerEnabled = controllerToCheck == address(0)
@@ -236,29 +236,29 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             : accountControllers[onBehalfOfAccount].contains(controllerToCheck);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function areChecksInProgress() external view returns (bool) {
         return executionContext.areChecksInProgress();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isImpersonationInProgress() external view returns (bool) {
         return executionContext.isImpersonationInProgress();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isOperatorAuthenticated() external view returns (bool) {
         return executionContext.isOperatorAuthenticated();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isSimulationInProgress() external view returns (bool) {
         return executionContext.isSimulationInProgress();
     }
 
     // Owners and operators
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function haveCommonOwner(
         address account,
         address otherAccount
@@ -266,21 +266,21 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         return haveCommonOwnerInternal(account, otherAccount);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getAddressPrefix(address account) external pure returns (uint152) {
         return getAddressPrefixInternal(account);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getAccountOwner(
         address account
     ) external view returns (address owner) {
         owner = getAccountOwnerInternal(account);
 
-        if (owner == address(0)) revert CVC_AccountOwnerNotRegistered();
+        if (owner == address(0)) revert EVC_AccountOwnerNotRegistered();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getNonce(
         uint152 addressPrefix,
         uint256 nonceNamespace
@@ -288,7 +288,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         return nonceLookup[addressPrefix][nonceNamespace];
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getOperator(
         uint152 addressPrefix,
         address operator
@@ -296,7 +296,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         return operatorLookup[addressPrefix][operator];
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isAccountOperatorAuthorized(
         address account,
         address operator
@@ -304,27 +304,27 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         return isAccountOperatorAuthorizedInternal(account, operator);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function setNonce(
         uint152 addressPrefix,
         uint256 nonceNamespace,
         uint256 nonce
     ) public payable virtual onlyOwner(addressPrefix) {
         if (nonceLookup[addressPrefix][nonceNamespace] >= nonce) {
-            revert CVC_InvalidNonce();
+            revert EVC_InvalidNonce();
         }
 
         nonceLookup[addressPrefix][nonceNamespace] = nonce;
         emit NonceUsed(addressPrefix, nonce);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function setOperator(
         uint152 addressPrefix,
         address operator,
         uint256 operatorBitField
     ) public payable virtual onlyOwner(addressPrefix) {
-        // if CVC is msg.sender (during the self-call in the permit() function), the owner address will
+        // if EVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
         address owner = address(this) == msg.sender
             ? ownerLookup[addressPrefix]
@@ -334,11 +334,11 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         if (
             operator == address(0) || haveCommonOwnerInternal(owner, operator)
         ) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         if (operatorLookup[addressPrefix][operator] == operatorBitField) {
-            revert CVC_InvalidOperatorStatus();
+            revert EVC_InvalidOperatorStatus();
         } else {
             operatorLookup[addressPrefix][operator] = operatorBitField;
 
@@ -346,21 +346,21 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         }
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function setAccountOperator(
         address account,
         address operator,
         bool authorized
     ) public payable virtual onlyOwnerOrOperator(account) {
-        // if CVC is msg.sender (during the self-call in the permit() function), it won't have the common owner
-        // with the account as it would mean that the CVC itself signed the ERC-1271 message which is not
+        // if EVC is msg.sender (during the self-call in the permit() function), it won't have the common owner
+        // with the account as it would mean that the EVC itself signed the ERC-1271 message which is not
         // possible. hence in that case, the owner address will be taken from the storage which
         // must be storing the correct owner address
         address owner = haveCommonOwnerInternal(account, msg.sender)
             ? msg.sender
             : getAccountOwnerInternal(account);
 
-        // if CVC is msg.sender (during the self-call in the permit() function), it acts as if it
+        // if EVC is msg.sender (during the self-call in the permit() function), it acts as if it
         // was an owner, meaning it can authorize and deauthorize operators as per signed data.
         // if it's an operator calling, it can only make changes for itself hence must be equal to msg.sender
         if (
@@ -368,14 +368,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             operator != msg.sender &&
             address(this) != msg.sender
         ) {
-            revert CVC_NotAuthorized();
+            revert EVC_NotAuthorized();
         }
 
         // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
         if (
             operator == address(0) || haveCommonOwnerInternal(owner, operator)
         ) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
@@ -386,7 +386,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             : oldOperatorBitField & ~bitMask;
 
         if (oldOperatorBitField == newOperatorBitField) {
-            revert CVC_InvalidOperatorStatus();
+            revert EVC_InvalidOperatorStatus();
         } else {
             operatorLookup[addressPrefix][operator] = newOperatorBitField;
 
@@ -396,14 +396,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Collaterals management
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getCollaterals(
         address account
     ) external view returns (address[] memory) {
         return accountCollaterals[account].get();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isCollateralEnabled(
         address account,
         address vault
@@ -411,12 +411,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         return accountCollaterals[account].contains(vault);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function enableCollateral(
         address account,
         address vault
     ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
-        if (vault == address(this)) revert CVC_InvalidAddress();
+        if (vault == address(this)) revert EVC_InvalidAddress();
 
         if (accountCollaterals[account].insert(vault)) {
             emit CollateralStatus(account, vault, true);
@@ -424,7 +424,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         requireAccountStatusCheck(account);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function disableCollateral(
         address account,
         address vault
@@ -437,14 +437,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Controllers management
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function getControllers(
         address account
     ) external view returns (address[] memory) {
         return accountControllers[account].get();
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isControllerEnabled(
         address account,
         address vault
@@ -452,12 +452,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         return accountControllers[account].contains(vault);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function enableController(
         address account,
         address vault
     ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
-        if (vault == address(this)) revert CVC_InvalidAddress();
+        if (vault == address(this)) revert EVC_InvalidAddress();
 
         if (accountControllers[account].insert(vault)) {
             emit ControllerStatus(account, vault, true);
@@ -465,7 +465,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         requireAccountStatusCheck(account);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function disableController(
         address account
     ) public payable virtual nonReentrant {
@@ -477,7 +477,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Permit
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function permit(
         address signer,
         uint256 nonceNamespace,
@@ -490,22 +490,22 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         uint152 addressPrefix = getAddressPrefixInternal(signer);
 
         if (signer == address(0) || !isSignerValid(signer)) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         if (
             nonce == type(uint256).max ||
             ++nonceLookup[addressPrefix][nonceNamespace] != nonce
         ) {
-            revert CVC_InvalidNonce();
+            revert EVC_InvalidNonce();
         }
 
         if (deadline < block.timestamp) {
-            revert CVC_InvalidTimestamp();
+            revert EVC_InvalidTimestamp();
         }
 
         if (data.length == 0) {
-            revert CVC_InvalidData();
+            revert EVC_InvalidData();
         }
 
         bytes32 permitHash = getPermitHash(
@@ -521,12 +521,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             signer != recoverECDSASigner(permitHash, signature) &&
             !isValidERC1271Signature(signer, permitHash, signature)
         ) {
-            revert CVC_NotAuthorized();
+            revert EVC_NotAuthorized();
         }
 
         emit NonceUsed(addressPrefix, nonce);
 
-        // CVC address becomes msg.sender for the duration this self-call
+        // EVC address becomes msg.sender for the duration this self-call
         (bool success, bytes memory result) = callWithContextInternal(
             address(this),
             signer,
@@ -541,7 +541,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Calls forwarding
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function callback(
         address onBehalfOfAccount,
         uint256 value,
@@ -549,7 +549,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     ) public payable virtual nonReentrant returns (bytes memory result) {
         // cannot be called within the self-call of the permit()
         if (address(this) == msg.sender) {
-            revert CVC_NotAuthorized();
+            revert EVC_NotAuthorized();
         }
 
         EC contextCache = executionContext;
@@ -571,7 +571,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         restoreExecutionContext(contextCache);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -579,7 +579,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
         if (address(this) == targetContract || msg.sender == targetContract) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         EC contextCache = executionContext;
@@ -600,7 +600,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         restoreExecutionContext(contextCache);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function impersonate(
         address targetCollateral,
         address onBehalfOfAccount,
@@ -610,7 +610,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         if (
             address(this) == targetCollateral || msg.sender == targetCollateral
         ) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         EC contextCache = executionContext;
@@ -633,7 +633,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         restoreExecutionContext(contextCache);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function batch(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
@@ -647,7 +647,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Simulations
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function batchRevert(
         BatchItem[] calldata items
     ) public payable virtual nonReentrant {
@@ -658,7 +658,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         EC contextCache = executionContext;
 
         if (contextCache.areChecksDeferred()) {
-            revert CVC_SimulationBatchNested();
+            revert EVC_SimulationBatchNested();
         }
 
         executionContext = contextCache
@@ -674,14 +674,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
         executionContext = contextCache;
 
-        revert CVC_RevertedBatchResult(
+        revert EVC_RevertedBatchResult(
             batchItemsResult,
             accountsStatusResult,
             vaultsStatusResult
         );
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function batchSimulation(
         BatchItem[] calldata items
     )
@@ -699,8 +699,8 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         );
 
         if (success) {
-            revert CVC_BatchPanic();
-        } else if (bytes4(result) != CVC_RevertedBatchResult.selector) {
+            revert EVC_BatchPanic();
+        } else if (bytes4(result) != EVC_RevertedBatchResult.selector) {
             revertBytes(result);
         }
 
@@ -717,14 +717,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Account Status Check
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isAccountStatusCheckDeferred(
         address account
     ) external view returns (bool) {
         return accountStatusChecks.contains(account);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireAccountStatusCheck(
         address account
     ) public payable virtual nonReentrantChecks {
@@ -735,7 +735,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         }
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireAccountStatusCheckNow(
         address account
     ) public payable virtual nonReentrantChecks {
@@ -743,7 +743,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         requireAccountStatusCheckInternal(account);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireAllAccountsStatusCheckNow()
         public
         payable
@@ -753,7 +753,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         checkStatusAll(SetType.Account);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function forgiveAccountStatusCheck(
         address account
     ) public payable virtual nonReentrantChecks onlyController(account) {
@@ -762,14 +762,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
     // Vault Status Check
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function isVaultStatusCheckDeferred(
         address vault
     ) external view returns (bool) {
         return vaultStatusChecks.contains(vault);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireVaultStatusCheck()
         public
         payable
@@ -783,7 +783,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         }
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireVaultStatusCheckNow()
         public
         payable
@@ -794,7 +794,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         requireVaultStatusCheckInternal(msg.sender);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireAllVaultsStatusCheckNow()
         public
         payable
@@ -804,7 +804,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         checkStatusAll(SetType.Vault);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function forgiveVaultStatusCheck()
         public
         payable
@@ -814,7 +814,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         vaultStatusChecks.remove(msg.sender);
     }
 
-    /// @inheritdoc ICVC
+    /// @inheritdoc IEVC
     function requireAccountAndVaultStatusCheck(
         address account
     ) public payable virtual nonReentrantChecks {
@@ -842,7 +842,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             value != type(uint256).max &&
             value > address(this).balance
         ) {
-            revert CVC_InvalidValue();
+            revert EVC_InvalidValue();
         } else if (value == type(uint256).max) {
             value = address(this).balance;
         }
@@ -856,7 +856,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
 
         EC contextCache = executionContext;
 
-        // CVC can only be msg.sender after the self-call in the permit() function. in that case,
+        // EVC can only be msg.sender after the self-call in the permit() function. in that case,
         // the "true" sender address (that is the permit message signer) is taken from the execution context
         address msgSender = address(this) == msg.sender
             ? contextCache.getOnBehalfOfAccount()
@@ -899,7 +899,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         returns (bool success, bytes memory result)
     {
         if (targetContract == ERC1820_REGISTRY) {
-            revert CVC_InvalidAddress();
+            revert EVC_InvalidAddress();
         }
 
         (success, result) = callWithContextInternal(
@@ -922,7 +922,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         returns (bool success, bytes memory result)
     {
         if (!accountCollaterals[onBehalfOfAccount].contains(targetCollateral)) {
-            revert CVC_NotAuthorized();
+            revert EVC_NotAuthorized();
         }
 
         (success, result) = callWithContextInternal(
@@ -993,12 +993,12 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
         address controller = accountControllers[account].firstElement;
 
         if (numOfControllers == 0) return (true, "");
-        else if (numOfControllers > 1) revert CVC_ControllerViolation();
+        else if (numOfControllers > 1) revert EVC_ControllerViolation();
 
         bool success;
         (success, result) = controller.call(
             abi.encodeCall(
-                ICreditVault.checkAccountStatus,
+                IVault.checkAccountStatus,
                 (account, accountCollaterals[account].get())
             )
         );
@@ -1007,7 +1007,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             success &&
             result.length == 32 &&
             abi.decode(result, (bytes32)) ==
-            bytes32(ICreditVault.checkAccountStatus.selector);
+            bytes32(IVault.checkAccountStatus.selector);
     }
 
     function requireAccountStatusCheckInternal(
@@ -1027,14 +1027,14 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
     ) internal returns (bool isValid, bytes memory result) {
         bool success;
         (success, result) = vault.call(
-            abi.encodeCall(ICreditVault.checkVaultStatus, ())
+            abi.encodeCall(IVault.checkVaultStatus, ())
         );
 
         isValid =
             success &&
             result.length == 32 &&
             abi.decode(result, (bytes32)) ==
-            bytes32(ICreditVault.checkVaultStatus.selector);
+            bytes32(IVault.checkVaultStatus.selector);
     }
 
     function requireVaultStatusCheckInternal(address vault) internal virtual {
@@ -1128,7 +1128,7 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
             )
         );
 
-        // This code overwrites the two most significant bytes of the free memory pointer, 
+        // This code overwrites the two most significant bytes of the free memory pointer,
         // and restores them to 0 after
         assembly ("memory-safe") {
             mstore(0x00, "\x19\x01")
@@ -1266,6 +1266,6 @@ contract CreditVaultConnector is Events, Errors, TransientStorage, ICVC {
                 revert(add(32, errMsg), mload(errMsg))
             }
         }
-        revert CVC_EmptyError();
+        revert EVC_EmptyError();
     }
 }
