@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-type EC is uint;
+type EC is uint256;
 
 /// @title ExecutionContext
 /// @author Euler Labs (https://www.eulerlabs.com/)
@@ -16,24 +16,24 @@ type EC is uint;
 /// @dev - simulation flag - used to indicate that the currently executed batch call is a simulation
 /// @dev - stamp - dummy value for optimization purposes
 library ExecutionContext {
-    uint internal constant CALL_DEPTH_MASK =
+    uint256 internal constant CALL_DEPTH_MASK =
         0x00000000000000000000000000000000000000000000000000000000000000FF;
-    uint internal constant ON_BEHALF_OF_ACCOUNT_MASK =
+    uint256 internal constant ON_BEHALF_OF_ACCOUNT_MASK =
         0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00;
-    uint internal constant CHECKS_LOCK_MASK =
+    uint256 internal constant CHECKS_LOCK_MASK =
         0x00000000000000000000FF000000000000000000000000000000000000000000;
-    uint internal constant IMPERSONATE_LOCK_MASK =
+    uint256 internal constant IMPERSONATE_LOCK_MASK =
         0x000000000000000000FF00000000000000000000000000000000000000000000;
-    uint internal constant OPERATOR_AUTHENTICATED_MASK =
+    uint256 internal constant OPERATOR_AUTHENTICATED_MASK =
         0x0000000000000000FF0000000000000000000000000000000000000000000000;
-    uint internal constant SIMULATION_MASK =
+    uint256 internal constant SIMULATION_MASK =
         0x00000000000000FF000000000000000000000000000000000000000000000000;
-    uint internal constant STAMP_MASK =
+    uint256 internal constant STAMP_MASK =
         0xFFFFFFFFFFFFFF00000000000000000000000000000000000000000000000000;
-    uint internal constant ON_BEHALF_OF_ACCOUNT_OFFSET = 8;
-    uint internal constant STAMP_OFFSET = 200;
-    uint internal constant CALL_DEPTH_MAX = 10;
-    uint internal constant STAMP_DUMMY_VALUE = 1;
+    uint256 internal constant ON_BEHALF_OF_ACCOUNT_OFFSET = 8;
+    uint256 internal constant STAMP_OFFSET = 200;
+    uint256 internal constant CALL_DEPTH_MAX = 10;
+    uint256 internal constant STAMP_DUMMY_VALUE = 1;
 
     error CallDepthViolation();
 
@@ -80,7 +80,7 @@ library ExecutionContext {
     ) internal pure returns (EC result) {
         result = EC.wrap(
             (EC.unwrap(context) & ~ON_BEHALF_OF_ACCOUNT_MASK) |
-                (uint(uint160(account)) << ON_BEHALF_OF_ACCOUNT_OFFSET)
+                (uint256(uint160(account)) << ON_BEHALF_OF_ACCOUNT_OFFSET)
         );
     }
 

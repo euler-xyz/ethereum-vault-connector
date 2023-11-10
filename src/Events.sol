@@ -7,11 +7,11 @@ pragma solidity ^0.8.20;
 /// @notice This contract implements the events for the Credit Vault Connector.
 contract Events {
     event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
-    event NonceUsed(uint152 indexed addressPrefix, uint nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
     event OperatorStatus(
         uint152 indexed addressPrefix,
         address indexed operator,
-        uint accountOperatorAuthorized
+        uint256 accountOperatorAuthorized
     );
     event CollateralStatus(
         address indexed account,
