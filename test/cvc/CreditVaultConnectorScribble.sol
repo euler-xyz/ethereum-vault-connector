@@ -4,21 +4,20 @@ pragma solidity ^0.8.20;
 
 import "../../src/CreditVaultConnector.sol";
 
-/// #if_succeeds "batch state doesn't change" old(executionContext.isInBatch()) == executionContext.isInBatch();
+/// #if_succeeds "call depth doesn't change" old(executionContext.getCallDepth()) == executionContext.getCallDepth();
 /// #if_succeeds "on behalf account state doesn't change" old(executionContext.getOnBehalfOfAccount()) == executionContext.getOnBehalfOfAccount();
 /// #if_succeeds "checks in progress state doesn't change" old(executionContext.areChecksInProgress()) == executionContext.areChecksInProgress();
 /// #if_succeeds "impersonation in progress state doesn't change" old(executionContext.isImpersonationInProgress()) == executionContext.isImpersonationInProgress();
 /// #if_succeeds "operator authenticated state doesn't change" old(executionContext.isOperatorAuthenticated()) == executionContext.isOperatorAuthenticated();
-/// #if_succeeds "permit in progress state doesn't change" old(executionContext.isPermitInProgress()) == executionContext.isPermitInProgress();
 /// #if_succeeds "simulation in progress state doesn't change" old(executionContext.isSimulationInProgress()) == executionContext.isSimulationInProgress();
 /// #if_succeeds "on behalf of account is zero when checks in progress" executionContext.areChecksInProgress() ==> executionContext.getOnBehalfOfAccount() == address(0);
-/// #if_succeeds "account status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
-/// #if_succeeds "account status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
-/// #if_succeeds "account status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
-/// #if_succeeds "vault status checks set is empty 1" !old(executionContext.isInBatch()) ==> old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
-/// #if_succeeds "vault status checks set is empty 2" !old(executionContext.isInBatch()) ==> old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
-/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.isInBatch()) ==> forall(uint i in 0...20) vaultStatusChecks.elements[i].value == address(0);
-/// #if_succeeds "each account has at most 1 controller" !old(executionContext.isInBatch()) ==> forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
+/// #if_succeeds "account status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
+/// #if_succeeds "account status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
+/// #if_succeeds "account status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint i in 0...20) accountStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "vault status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
+/// #if_succeeds "vault status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
+/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint i in 0...20) vaultStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "each account has at most 1 controller" !old(executionContext.areChecksDeferred()) ==> forall(uint i in ownerLookup) forall(uint j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 /// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
 /// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
 contract CreditVaultConnectorScribble is CreditVaultConnector {
@@ -67,43 +66,64 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
-    function call(
-        address targetContract,
-        address onBehalfOfAccount,
-        bytes calldata data
-    ) public payable virtual override returns (bytes memory result) {
-        return super.call(targetContract, onBehalfOfAccount, data);
-    }
-
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetContract);
-    /// #if_succeeds "the target cannot be this contract" targetContract != address(this);
-    function impersonate(
-        address targetContract,
-        address onBehalfOfAccount,
-        bytes calldata data
-    ) public payable virtual override returns (bytes memory result) {
-        return super.impersonate(targetContract, onBehalfOfAccount, data);
-    }
-
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     function permit(
         address signer,
         uint nonceNamespace,
         uint nonce,
         uint deadline,
+        uint value,
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual override {
-        super.permit(signer, nonceNamespace, nonce, deadline, data, signature);
+        super.permit(
+            signer,
+            nonceNamespace,
+            nonce,
+            deadline,
+            value,
+            data,
+            signature
+        );
     }
 
     /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "batch depth doesn't change pre- and post- execution" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
-    /// #if_succeeds "checks are properly executed 1" !old(executionContext.isInBatch()) && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
-    /// #if_succeeds "checks are properly executed 2" !old(executionContext.isInBatch()) && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
-    /// #if_succeeds "batch depth is in range" !old(executionContext.isBatchDepthExceeded());
+    /// #if_succeeds "the caller cannot be CVC" msg.sender != address(this);
+    function callback(
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) public payable virtual override returns (bytes memory result) {
+        return super.callback(onBehalfOfAccount, value, data);
+    }
+
+    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry nor itself" targetContract != address(this) && targetContract != ERC1820_REGISTRY && targetContract != msg.sender;
+    function call(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) public payable virtual override returns (bytes memory result) {
+        return super.call(targetContract, onBehalfOfAccount, value, data);
+    }
+
+    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetCollateral);
+    /// #if_succeeds "the target can neither be this contract not itself" targetCollateral != address(this) && targetCollateral != msg.sender;
+    function impersonate(
+        address targetCollateral,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) public payable virtual override returns (bytes memory result) {
+        return
+            super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
+    }
+
+    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "call depth doesn't change pre- and post- execution" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
+    /// #if_succeeds "checks are properly executed 1" !old(executionContext.areChecksDeferred()) && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
+    /// #if_succeeds "checks are properly executed 2" !old(executionContext.areChecksDeferred()) && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
     function batch(BatchItem[] calldata items) public payable virtual override {
         super.batch(items);
     }
@@ -111,34 +131,16 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "this function must always revert" false;
     function batchRevert(
         BatchItem[] calldata items
-    )
-        public
-        payable
-        virtual
-        override
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
-        return super.batchRevert(items);
+    ) public payable virtual override {
+        super.batchRevert(items);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "account is added to the set only if checks deferred" old(executionContext.isInBatch()) ==> accountStatusChecks.contains(account);
+    /// #if_succeeds "account is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> accountStatusChecks.contains(account);
     function requireAccountStatusCheck(
         address account
     ) public payable virtual override {
         super.requireAccountStatusCheck(account);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "accounts are added to the set only if checks deferred" old(executionContext.isInBatch()) ==> forall(uint i in 0...accounts.length-1) accountStatusChecks.contains(accounts[i]);
-    function requireAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable virtual override {
-        super.requireAccountsStatusCheck(accounts);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
@@ -147,14 +149,6 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
         address account
     ) public payable virtual override {
         super.requireAccountStatusCheckNow(account);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "accounts are never added to the set or they're removed if previously present" forall(uint i in 0...accounts.length-1) !accountStatusChecks.contains(accounts[i]);
-    function requireAccountsStatusCheckNow(
-        address[] calldata accounts
-    ) public payable virtual override {
-        super.requireAccountsStatusCheckNow(accounts);
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
@@ -177,33 +171,15 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "accounts are never present in the set after calling this" forall(uint i in 0...accounts.length-1) !accountStatusChecks.contains(accounts[i]);
-    function forgiveAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable virtual override {
-        super.forgiveAccountsStatusCheck(accounts);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "vault is added to the set only if checks deferred" old(executionContext.isInBatch()) ==> vaultStatusChecks.contains(msg.sender);
+    /// #if_succeeds "vault is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> vaultStatusChecks.contains(msg.sender);
     function requireVaultStatusCheck() public payable virtual override {
         super.requireVaultStatusCheck();
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(vault);
-    function requireVaultStatusCheckNow(
-        address vault
-    ) public payable virtual override {
-        super.requireVaultStatusCheckNow(vault);
-    }
-
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "vaults are never added to the set or they're removed if previously present" forall(uint i in 0...vaults.length-1) !vaultStatusChecks.contains(vaults[i]);
-    function requireVaultsStatusCheckNow(
-        address[] calldata vaults
-    ) public payable virtual override {
-        super.requireVaultsStatusCheckNow(vaults);
+    /// #if_succeeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(msg.sender);
+    function requireVaultStatusCheckNow() public payable virtual override {
+        super.requireVaultStatusCheckNow();
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
@@ -219,23 +195,23 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     }
 
     /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "account is added to the set only if checks deferred" executionContext.isInBatch() ==> accountStatusChecks.contains(account);
-    /// #if_succeeds "vault is added to the set only if checks deferred" executionContext.isInBatch() ==> vaultStatusChecks.contains(msg.sender);
+    /// #if_succeeds "account is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> accountStatusChecks.contains(account);
+    /// #if_succeeds "vault is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> vaultStatusChecks.contains(msg.sender);
     function requireAccountAndVaultStatusCheck(
         address account
     ) public payable virtual override {
         super.requireAccountAndVaultStatusCheck(account);
     }
 
-    /// #if_succeeds "impersonate reentrancy guard must be locked" executionContext.isImpersonationInProgress();
-    function impersonateInternal(
+    /// #if_succeeds "checks must be deferred if not in permit" bytes4(msg.data) != this.permit.selector ==> executionContext.areChecksDeferred();
+    function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
         uint value,
         bytes calldata data
     ) internal virtual override returns (bool success, bytes memory result) {
         return
-            super.impersonateInternal(
+            super.callWithContextInternal(
                 targetContract,
                 onBehalfOfAccount,
                 value,
@@ -243,12 +219,20 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
             );
     }
 
-    /// #if_succeeds "must be in a batch" executionContext.isInBatch();
-    function batchInternal(
-        BatchItem[] calldata items,
-        bool returnResult
-    ) internal override returns (BatchItemResult[] memory batchItemsResult) {
-        return super.batchInternal(items, returnResult);
+    /// #if_succeeds "impersonate reentrancy guard must be locked" executionContext.isImpersonationInProgress();
+    function impersonateInternal(
+        address targetCollateral,
+        address onBehalfOfAccount,
+        uint value,
+        bytes calldata data
+    ) internal virtual override returns (bool success, bytes memory result) {
+        return
+            super.impersonateInternal(
+                targetCollateral,
+                onBehalfOfAccount,
+                value,
+                data
+            );
     }
 
     /// #if_succeeds "must have at most one controller" accountControllers[account].numElements <= 1;
@@ -262,10 +246,17 @@ contract CreditVaultConnectorScribble is CreditVaultConnector {
     /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
     /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
     /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
-    function checkStatusAll(
-        SetType setType,
-        bool returnResult
+    function checkStatusAll(SetType setType) internal override {
+        return super.checkStatusAll(setType);
+    }
+
+    /// #if_succeeds "checks reentrancy guard must be locked" executionContext.areChecksInProgress();
+    /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
+    /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
+    /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
+    function checkStatusAllWithResult(
+        SetType setType
     ) internal override returns (BatchItemResult[] memory result) {
-        return super.checkStatusAll(setType, returnResult);
+        return super.checkStatusAllWithResult(setType);
     }
 }

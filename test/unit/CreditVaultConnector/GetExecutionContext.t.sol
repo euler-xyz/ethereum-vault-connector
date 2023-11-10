@@ -14,33 +14,31 @@ contract GetExecutionContextTest is Test {
 
     function test_GetExecutionContext(
         address account,
-        uint8 batchDepth,
-        uint seed
+        uint8 callDepth,
+        uint8 seed
     ) external {
         vm.assume(account != address(0) && account != address(cvc));
+        vm.assume(callDepth <= 10);
 
         address controller = address(new Vault(cvc));
 
-        vm.expectRevert(
-            CreditVaultConnector.CVC_OnBehalfOfAccountNotAuthenticated.selector
-        );
+        vm.expectRevert(Errors.CVC_OnBehalfOfAccountNotAuthenticated.selector);
         cvc.getCurrentOnBehalfOfAccount(controller);
 
         uint context = cvc.getRawExecutionContext();
-        assertEq(context, 1 << 208);
+        assertEq(context, 1 << 200);
 
         if (seed % 2 == 0) {
             vm.prank(account);
             cvc.enableController(account, controller);
         }
 
-        cvc.setBatchDepth(seed % 3 == 0 ? batchDepth : 0);
+        cvc.setCallDepth(seed % 3 == 0 ? callDepth : 0);
         cvc.setOnBehalfOfAccount(account);
         cvc.setChecksLock(seed % 4 == 0 ? true : false);
         cvc.setImpersonateLock(seed % 5 == 0 ? true : false);
         cvc.setOperatorAuthenticated(seed % 6 == 0 ? true : false);
-        cvc.setPermit(seed % 7 == 0 ? true : false);
-        cvc.setSimulation(seed % 8 == 0 ? true : false);
+        cvc.setSimulation(seed % 7 == 0 ? true : false);
 
         (address onBehalfOfAccount, bool controllerEnabled) = cvc
             .getCurrentOnBehalfOfAccount(controller);
@@ -51,9 +49,9 @@ contract GetExecutionContextTest is Test {
         assertEq(
             context &
                 0x00000000000000000000000000000000000000000000000000000000000000FF,
-            seed % 3 == 0 ? batchDepth : 0
+            seed % 3 == 0 ? callDepth : 0
         );
-        assertEq(cvc.getCurrentBatchDepth(), seed % 3 == 0 ? batchDepth : 0);
+        assertEq(cvc.getCurrentCallDepth(), seed % 3 == 0 ? callDepth : 0);
         assertEq(
             context &
                 0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00,
@@ -86,13 +84,6 @@ contract GetExecutionContextTest is Test {
                 0,
             seed % 7 == 0 ? true : false
         );
-        assertEq(cvc.isPermitInProgress(), seed % 7 == 0 ? true : false);
-        assertEq(
-            context &
-                0x000000000000FF00000000000000000000000000000000000000000000000000 !=
-                0,
-            seed % 8 == 0 ? true : false
-        );
-        assertEq(cvc.isSimulationInProgress(), seed % 8 == 0 ? true : false);
+        assertEq(cvc.isSimulationInProgress(), seed % 7 == 0 ? true : false);
     }
 }

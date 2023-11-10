@@ -14,7 +14,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.enableCollateral(account, vault);
 
-        if (executionContext.isInBatch()) return;
+        if (executionContext.areChecksDeferred()) return;
 
         expectedAccountsChecked.push(account);
 
@@ -26,7 +26,7 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 
         super.disableCollateral(account, vault);
 
-        if (executionContext.isInBatch()) return;
+        if (executionContext.areChecksDeferred()) return;
 
         expectedAccountsChecked.push(account);
 
@@ -37,10 +37,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
 contract CollateralsManagementTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
-    event OperatorAuthenticated(
-        address indexed operator,
-        address indexed onBehalfOfAccount
-    );
     event CollateralStatus(
         address indexed account,
         address indexed collateral,
@@ -66,9 +62,7 @@ contract CollateralsManagementTest is Test {
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
-        vm.expectRevert(
-            CreditVaultConnector.CVC_AccountOwnerNotRegistered.selector
-        );
+        vm.expectRevert(Errors.CVC_AccountOwnerNotRegistered.selector);
         cvc.getAccountOwner(account);
 
         // test collaterals management with use of an operator
@@ -109,10 +103,6 @@ contract CollateralsManagementTest is Test {
                     (!alreadyEnabled && i % 5 != 0)
             );
 
-            if (msgSender != alice) {
-                vm.expectEmit(true, true, false, false, address(cvc));
-                emit OperatorAuthenticated(msgSender, account);
-            }
             if (!alreadyEnabled) {
                 vm.expectEmit(true, true, false, true, address(cvc));
                 emit CollateralStatus(account, vault, true);
@@ -140,10 +130,6 @@ contract CollateralsManagementTest is Test {
             address[] memory collateralsPre = cvc.getCollaterals(account);
             address vault = collateralsPre[seed % collateralsPre.length];
 
-            if (msgSender != alice) {
-                vm.expectEmit(true, true, false, false, address(cvc));
-                emit OperatorAuthenticated(msgSender, account);
-            }
             vm.expectEmit(true, true, false, true, address(cvc));
             emit CollateralStatus(account, vault, false);
             vm.prank(msgSender);
@@ -174,11 +160,11 @@ contract CollateralsManagementTest is Test {
         address vault = address(new Vault(cvc));
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.enableCollateral(bob, vault);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.disableCollateral(bob, vault);
 
         vm.prank(bob);
@@ -200,7 +186,7 @@ contract CollateralsManagementTest is Test {
         cvc.setChecksLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.enableCollateral(alice, vault);
 
         cvc.setChecksLock(false);
@@ -211,7 +197,7 @@ contract CollateralsManagementTest is Test {
         cvc.setChecksLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_ChecksReentrancy.selector);
+        vm.expectRevert(Errors.CVC_ChecksReentrancy.selector);
         cvc.disableCollateral(alice, vault);
 
         cvc.setChecksLock(false);
@@ -229,9 +215,7 @@ contract CollateralsManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-        );
+        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.enableCollateral(alice, vault);
 
         cvc.setImpersonateLock(false);
@@ -242,9 +226,7 @@ contract CollateralsManagementTest is Test {
         cvc.setImpersonateLock(true);
 
         vm.prank(alice);
-        vm.expectRevert(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-        );
+        vm.expectRevert(Errors.CVC_ImpersonateReentrancy.selector);
         cvc.disableCollateral(alice, vault);
 
         cvc.setImpersonateLock(false);
@@ -258,7 +240,7 @@ contract CollateralsManagementTest is Test {
     ) public {
         vm.assume(alice != address(cvc));
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.enableCollateral(alice, address(cvc));
     }
 

@@ -49,7 +49,7 @@ contract SetNonceTest is Test {
 
         // fails if address prefix does not belong to an owner
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setNonce(addressPrefix + 1, nonceNamespace, nonce);
 
         // succeeds if address prefix belongs to an owner
@@ -58,7 +58,7 @@ contract SetNonceTest is Test {
 
         // fails if owner not consistent
         vm.prank(address(uint160(uint160(alice) ^ 1)));
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setNonce(addressPrefix, nonceNamespace, nonce);
 
         // reverts if sender is an operator
@@ -66,7 +66,7 @@ contract SetNonceTest is Test {
         cvc.setAccountOperator(alice, operator, true);
 
         vm.prank(operator);
-        vm.expectRevert(CreditVaultConnector.CVC_NotAuthorized.selector);
+        vm.expectRevert(Errors.CVC_NotAuthorized.selector);
         cvc.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
@@ -82,7 +82,7 @@ contract SetNonceTest is Test {
 
         // fails if invalid nonce
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidNonce.selector);
+        vm.expectRevert(Errors.CVC_InvalidNonce.selector);
         cvc.setNonce(addressPrefix, nonceNamespace, 0);
 
         // succeeds if valid nonce
@@ -91,7 +91,7 @@ contract SetNonceTest is Test {
 
         // fails again if invalid nonce
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidNonce.selector);
+        vm.expectRevert(Errors.CVC_InvalidNonce.selector);
         cvc.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 }

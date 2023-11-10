@@ -4,16 +4,14 @@ pragma solidity ^0.8.20;
 
 import "../../../src/CreditVaultConnector.sol";
 
-// mock target contract that allows to test call() and impersonate() functions of the CVC
+// mock target contract that allows to test call(), callback() and impersonate() functions of the CVC
 contract Target {
     function callTest(
         address cvc,
         address msgSender,
         uint value,
-        bool checksDeferred,
         address onBehalfOfAccount,
-        bool operatorAuthenticated,
-        bool permitInProgress
+        bool operatorAuthenticated
     ) external payable returns (uint) {
         try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
@@ -32,12 +30,10 @@ contract Target {
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
         require(
-            checksDeferred
-                ? ICVC(cvc).getCurrentBatchDepth() > 0
-                : ICVC(cvc).getCurrentBatchDepth() == 0,
+            ICVC(cvc).getCurrentCallDepth() > 0,
             "ct/invalid-checks-deferred"
         );
-
+        require(!ICVC(cvc).areChecksInProgress(), "ct/checks-lock");
         require(!ICVC(cvc).isImpersonationInProgress(), "ct/impersonate-lock");
         require(
             operatorAuthenticated
@@ -45,24 +41,108 @@ contract Target {
                 : !ICVC(cvc).isOperatorAuthenticated(),
             "ct/operator-authenticated"
         );
+
+        ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
         require(
-            permitInProgress
-                ? ICVC(cvc).isPermitInProgress()
-                : !ICVC(cvc).isPermitInProgress(),
-            "ct/permit-in-progress"
+            ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
+            "ct/account-status-checks-not-deferred"
+        );
+        return msg.value;
+    }
+
+    function impersonateTest(
+        address cvc,
+        address msgSender,
+        uint value,
+        address onBehalfOfAccount
+    ) external payable returns (uint) {
+        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+            address _onBehalfOfAccount,
+            bool
+        ) {
+            require(
+                _onBehalfOfAccount == onBehalfOfAccount,
+                "it/invalid-on-behalf-of-account"
+            );
+        } catch {
+            require(
+                onBehalfOfAccount == address(0),
+                "it/invalid-on-behalf-of-account-2"
+            );
+        }
+        require(msg.sender == msgSender, "it/invalid-sender");
+        require(msg.value == value, "it/invalid-msg-value");
+        require(
+            ICVC(cvc).getCurrentCallDepth() > 0,
+            "it/invalid-checks-deferred"
+        );
+        require(!ICVC(cvc).areChecksInProgress(), "it/checks-lock");
+        require(ICVC(cvc).isImpersonationInProgress(), "it/impersonate-lock");
+
+        ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
+        require(
+            ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
+            "it/account-status-checks-not-deferred"
         );
 
         return msg.value;
     }
 
-    function nestedCallTest(
+    function callbackTest(
         address cvc,
         address msgSender,
         uint value,
-        bool checksDeferred,
+        address onBehalfOfAccount
+    ) external payable returns (uint) {
+        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
+            address _onBehalfOfAccount,
+            bool
+        ) {
+            require(
+                _onBehalfOfAccount == onBehalfOfAccount,
+                "cbt/invalid-on-behalf-of-account"
+            );
+        } catch {
+            require(
+                onBehalfOfAccount == address(0),
+                "cbt/invalid-on-behalf-of-account-2"
+            );
+        }
+        require(msg.sender == msgSender, "cbt/invalid-sender");
+        require(msg.value == value, "ct/invalid-msg-value");
+        require(
+            ICVC(cvc).getCurrentCallDepth() > 0,
+            "cbt/invalid-checks-deferred"
+        );
+
+        require(!ICVC(cvc).areChecksInProgress(), "cbt/impersonate-lock");
+        require(!ICVC(cvc).isImpersonationInProgress(), "cbt/impersonate-lock");
+        require(
+            !ICVC(cvc).isOperatorAuthenticated(),
+            "cbt/operator-authenticated"
+        );
+
+        ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
+        require(
+            ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
+            "cbt/account-status-checks-not-deferred"
+        );
+        return msg.value;
+    }
+
+    function revertEmptyTest() external pure {
+        revert();
+    }
+}
+
+contract TargetWithNesting {
+    function nestedCallTest(
+        address cvc,
+        address msgSender,
+        address targetContract,
+        uint value,
         address onBehalfOfAccount,
-        bool operatorAuthenticated,
-        bool permitInProgress
+        bool operatorAuthenticated
     ) external payable returns (uint) {
         try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
             address _onBehalfOfAccount,
@@ -81,11 +161,10 @@ contract Target {
         require(msg.sender == msgSender, "nct/invalid-sender");
         require(msg.value == value, "nct/invalid-msg-value");
         require(
-            checksDeferred
-                ? ICVC(cvc).getCurrentBatchDepth() > 0
-                : ICVC(cvc).getCurrentBatchDepth() == 0,
+            ICVC(cvc).getCurrentCallDepth() > 0,
             "nct/invalid-checks-deferred"
         );
+        require(!ICVC(cvc).areChecksInProgress(), "nct/checks-lock");
         require(!ICVC(cvc).isImpersonationInProgress(), "nct/impersonate-lock");
         require(
             operatorAuthenticated
@@ -93,22 +172,16 @@ contract Target {
                 : !ICVC(cvc).isOperatorAuthenticated(),
             "nct/operator-authenticated"
         );
-        require(
-            permitInProgress
-                ? ICVC(cvc).isPermitInProgress()
-                : !ICVC(cvc).isPermitInProgress(),
-            "nct/permit-in-progress"
-        );
 
         bytes memory result = ICVC(cvc).call(
+            targetContract,
             address(this),
-            address(this),
+            0,
             abi.encodeWithSelector(
-                this.callTest.selector,
+                Target.callTest.selector,
                 cvc,
                 cvc,
                 0,
-                checksDeferred,
                 address(this),
                 false,
                 false
@@ -131,9 +204,7 @@ contract Target {
             );
         }
         require(
-            checksDeferred
-                ? ICVC(cvc).getCurrentBatchDepth() > 0
-                : ICVC(cvc).getCurrentBatchDepth() == 0,
+            ICVC(cvc).getCurrentCallDepth() > 0,
             "nct/invalid-checks-deferred-2"
         );
         require(
@@ -146,67 +217,7 @@ contract Target {
                 : !ICVC(cvc).isOperatorAuthenticated(),
             "nct/operator-authenticated-2"
         );
-        require(
-            permitInProgress
-                ? ICVC(cvc).isPermitInProgress()
-                : !ICVC(cvc).isPermitInProgress(),
-            "nct/permit-in-progress-2"
-        );
 
         return msg.value;
-    }
-
-    function impersonateTest(
-        address cvc,
-        address msgSender,
-        uint value,
-        bool checksDeferred,
-        address onBehalfOfAccount
-    ) external payable returns (uint) {
-        try ICVC(cvc).getCurrentOnBehalfOfAccount(address(0)) returns (
-            address _onBehalfOfAccount,
-            bool
-        ) {
-            require(
-                _onBehalfOfAccount == onBehalfOfAccount,
-                "it/invalid-on-behalf-of-account"
-            );
-        } catch {
-            require(
-                onBehalfOfAccount == address(0),
-                "it/invalid-on-behalf-of-account-2"
-            );
-        }
-        require(msg.sender == msgSender, "it/invalid-sender");
-        require(msg.value == value, "it/invalid-msg-value");
-        require(
-            checksDeferred
-                ? ICVC(cvc).getCurrentBatchDepth() > 0
-                : ICVC(cvc).getCurrentBatchDepth() == 0,
-            "it/invalid-checks-deferred"
-        );
-        require(ICVC(cvc).isImpersonationInProgress(), "it/impersonate-lock");
-
-        // requireAccountStatusCheck and requireAccountsStatusCheck function have their own unit tests
-        // therefore it's not necessary to fully verify it here
-        if (checksDeferred) {
-            require(
-                !ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
-                "it/1"
-            );
-            ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
-            require(
-                ICVC(cvc).isAccountStatusCheckDeferred(onBehalfOfAccount),
-                "it/2"
-            );
-        } else {
-            ICVC(cvc).requireAccountStatusCheck(onBehalfOfAccount);
-        }
-
-        return msg.value;
-    }
-
-    function revertEmptyTest() external pure {
-        revert();
     }
 }

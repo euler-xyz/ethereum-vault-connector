@@ -12,8 +12,6 @@ contract CreditVaultConnectorHandler is CreditVaultConnectorHarness {
     function handlerBatch(BatchItem[] calldata items) public payable {
         super.batch(items);
 
-        if (executionContext.isInBatch()) return;
-
         verifyVaultStatusChecks();
         verifyAccountStatusChecks();
     }
@@ -24,31 +22,21 @@ contract CreditVaultConnectorNoRevert is CreditVaultConnectorHarness {
 
     function batchRevert(
         BatchItem[] calldata
-    )
-        public
-        payable
-        override
-        nonReentrant
-        returns (
-            BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
-        )
-    {
+    ) public payable override nonReentrant {
         // doesn't revert as expected
-        return (batchItemsResult, accountsStatusResult, vaultsStatusResult);
+        return;
     }
 }
 
 contract BatchTest is Test {
     CreditVaultConnectorHandler internal cvc;
 
-    event OperatorAuthenticated(
-        address indexed operator,
-        address indexed onBehalfOfAccount
+    event CallWithContext(
+        address indexed caller,
+        address indexed targetContract,
+        address indexed onBehalfOfAccount,
+        bytes4 selector
     );
-    event BatchStart(address indexed caller, uint batchDepth);
-    event BatchEnd(address indexed caller, uint batchDepth);
 
     function setUp() public {
         cvc = new CreditVaultConnectorHandler();
@@ -107,9 +95,7 @@ contract BatchTest is Test {
                 address(cvc),
                 controller,
                 seed / 3,
-                true,
                 alice,
-                false,
                 false
             )
         );
@@ -122,9 +108,7 @@ contract BatchTest is Test {
             address(cvc),
             address(cvc),
             seed - seed / 3,
-            true,
             alice,
-            false,
             false
         );
 
@@ -138,10 +122,22 @@ contract BatchTest is Test {
         );
 
         vm.deal(alice, seed);
-        vm.expectEmit(true, false, false, true, address(cvc));
-        emit BatchStart(alice, 1);
-        vm.expectEmit(true, false, false, true, address(cvc));
-        emit BatchEnd(alice, 1);
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(
+            alice,
+            otherVault,
+            alicesSubAccount,
+            Vault.requireChecks.selector
+        );
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(alice, controller, alice, Vault.call.selector);
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(
+            alice,
+            otherVault,
+            alice,
+            Target.callTest.selector
+        );
         vm.prank(alice);
         cvc.handlerBatch{value: seed}(items);
 
@@ -164,11 +160,12 @@ contract BatchTest is Test {
             cvc.call.selector,
             address(cvc),
             alice,
+            0,
             ""
         );
 
         vm.prank(bob);
-        vm.expectRevert(CreditVaultConnector.CVC_InvalidAddress.selector);
+        vm.expectRevert(Errors.CVC_InvalidAddress.selector);
         cvc.handlerBatch(items);
 
         // -------------- THIRD BATCH -------------------------
@@ -206,19 +203,34 @@ contract BatchTest is Test {
             address(cvc),
             address(cvc),
             0,
-            true,
             alice,
-            true,
-            false
+            true
         );
 
         vm.prank(bob);
-        vm.expectEmit(true, false, false, true, address(cvc));
-        emit BatchStart(bob, 1);
-        vm.expectEmit(true, true, false, false, address(cvc));
-        emit OperatorAuthenticated(bob, alice);
-        vm.expectEmit(true, false, false, true, address(cvc));
-        emit BatchEnd(bob, 1);
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(
+            bob,
+            controller,
+            alice,
+            Vault.disableController.selector
+        );
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(
+            bob,
+            controller,
+            bob,
+            Vault.requireChecks.selector
+        );
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(
+            bob,
+            otherVault,
+            bob,
+            Vault.requireChecks.selector
+        );
+        vm.expectEmit(true, true, true, true, address(cvc));
+        emit CallWithContext(bob, otherVault, alice, Target.callTest.selector);
         cvc.handlerBatch(items);
         assertFalse(cvc.isControllerEnabled(alice, controller));
 
@@ -231,18 +243,15 @@ contract BatchTest is Test {
         items[0].data = abi.encodeWithSelector(Target.revertEmptyTest.selector);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_EmptyError.selector);
+        vm.expectRevert(Errors.CVC_EmptyError.selector);
         cvc.handlerBatch(items);
     }
 
-    function test_RevertIfDeferralDepthExceeded_Batch_BatchRevert(
-        address alice,
-        uint seed
-    ) external {
-        vm.assume(alice != address(cvc));
+    function test_RevertIfDepthExceeded_Batch(address alice) external {
+        vm.assume(alice != address(0) && alice != address(cvc));
         address vault = address(new Vault(cvc));
 
-        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](9);
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](10);
 
         for (int i = int(items.length - 1); i >= 0; --i) {
             uint j = uint(i);
@@ -253,6 +262,7 @@ contract BatchTest is Test {
             if (j == items.length - 1) {
                 ICVC.BatchItem[] memory nestedItems = new ICVC.BatchItem[](2);
 
+                // non-checks-deferrable call
                 nestedItems[0].onBehalfOfAccount = alice;
                 nestedItems[0].targetContract = vault;
                 nestedItems[0].value = 0;
@@ -261,6 +271,7 @@ contract BatchTest is Test {
                     alice
                 );
 
+                // non-checks-deferrable call
                 nestedItems[1].onBehalfOfAccount = alice;
                 nestedItems[1].targetContract = address(cvc);
                 nestedItems[1].value = 0;
@@ -271,9 +282,7 @@ contract BatchTest is Test {
                 );
 
                 items[j].data = abi.encodeWithSelector(
-                    seed % 2 == 0
-                        ? cvc.batch.selector
-                        : cvc.batchRevert.selector,
+                    cvc.batch.selector,
                     nestedItems
                 );
             } else {
@@ -288,34 +297,22 @@ contract BatchTest is Test {
         }
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_BatchDepthViolation.selector);
-        cvc.handlerBatch(items);
-
-        // check one item less call only if the most nested batch call doesn't go through
-        // the batchRevert() function. if it does, we'll revert with a standard
-        // CVC_RevertedBatchResult error
-        if (seed % 2 != 0) return;
+        vm.expectRevert(ExecutionContext.CallDepthViolation.selector);
+        cvc.batch(items);
 
         // should succeed when one less item. doesn't revert anymore,
         // but checks are performed only once, when the top level batch concludes
         ICVC.BatchItem[] memory itemsOneLess = new ICVC.BatchItem[](8);
         for (uint i = 1; i <= itemsOneLess.length; ++i) {
             itemsOneLess[i - 1] = items[i];
-
-            vm.expectEmit(true, false, false, true, address(cvc));
-            emit BatchStart(alice, i);
-        }
-        for (uint i = itemsOneLess.length - 1; i >= 1; --i) {
-            vm.expectEmit(true, false, false, true, address(cvc));
-            emit BatchEnd(alice, i);
         }
 
         vm.prank(alice);
-        cvc.handlerBatch(itemsOneLess);
+        cvc.batch(itemsOneLess);
     }
 
     // for coverage
-    function test_RevertIfDeferralDepthExceeded_BatchSimulation(
+    function test_RevertIfSimulationBatchNested_BatchRevert_BatchSimulation(
         address alice
     ) external {
         vm.assume(alice != address(cvc));
@@ -327,10 +324,14 @@ contract BatchTest is Test {
         items[0].value = 0;
         items[0].data = "";
 
-        cvc.setBatchDepth(9);
+        cvc.setCallDepth(10);
 
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_BatchDepthViolation.selector);
+        vm.expectRevert(Errors.CVC_SimulationBatchNested.selector);
+        cvc.batchRevert(items);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.CVC_SimulationBatchNested.selector);
         cvc.batchSimulation(items);
     }
 
@@ -340,9 +341,7 @@ contract BatchTest is Test {
         vm.assume(alice != address(cvc));
         cvc.setChecksLock(true);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.batch(new ICVC.BatchItem[](0));
         cvc.setChecksLock(false);
@@ -362,7 +361,7 @@ contract BatchTest is Test {
         // internal batch in the malicious vault reverts with CVC_ChecksReentrancy error,
         // check VaultMalicious implementation
         VaultMalicious(vault).setExpectedErrorSelector(
-            CreditVaultConnector.CVC_ChecksReentrancy.selector
+            Errors.CVC_ChecksReentrancy.selector
         );
 
         vm.prank(alice);
@@ -377,16 +376,12 @@ contract BatchTest is Test {
 
         cvc.setChecksLock(true);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.batchRevert(new ICVC.BatchItem[](0));
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ChecksReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ChecksReentrancy.selector)
         );
         cvc.batchSimulation(new ICVC.BatchItem[](0));
         cvc.setChecksLock(false);
@@ -426,13 +421,13 @@ contract BatchTest is Test {
         );
 
         VaultMalicious(vault).setExpectedErrorSelector(
-            CreditVaultConnector.CVC_ChecksReentrancy.selector
+            Errors.CVC_ChecksReentrancy.selector
         );
 
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                CreditVaultConnector.CVC_RevertedBatchResult.selector,
+                Errors.CVC_RevertedBatchResult.selector,
                 expectedBatchItemsResult,
                 expectedAccountsStatusResult,
                 expectedVaultsStatusResult
@@ -442,7 +437,7 @@ contract BatchTest is Test {
 
         // same should happen for batchSimulation() but without reverting with standard error
         VaultMalicious(vault).setExpectedErrorSelector(
-            CreditVaultConnector.CVC_ChecksReentrancy.selector
+            Errors.CVC_ChecksReentrancy.selector
         );
 
         vm.prank(alice);
@@ -490,9 +485,7 @@ contract BatchTest is Test {
 
         cvc.setImpersonateLock(true);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ImpersonateReentrancy.selector)
         );
         cvc.batch(new ICVC.BatchItem[](0));
         cvc.setImpersonateLock(false);
@@ -509,7 +502,7 @@ contract BatchTest is Test {
         // internal batch in the malicious vault reverts with CVC_ImpersonateReentrancy error,
         // check VaultMalicious implementation
         VaultMalicious(collateral).setExpectedErrorSelector(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+            Errors.CVC_ImpersonateReentrancy.selector
         );
 
         vm.prank(controller);
@@ -517,6 +510,7 @@ contract BatchTest is Test {
         cvc.impersonate(
             collateral,
             alice,
+            0,
             abi.encodeWithSelector(VaultMalicious.callBatch.selector)
         );
     }
@@ -528,16 +522,12 @@ contract BatchTest is Test {
 
         cvc.setImpersonateLock(true);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ImpersonateReentrancy.selector)
         );
         cvc.batchRevert(new ICVC.BatchItem[](0));
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                CreditVaultConnector.CVC_ImpersonateReentrancy.selector
-            )
+            abi.encodeWithSelector(Errors.CVC_ImpersonateReentrancy.selector)
         );
         cvc.batchSimulation(new ICVC.BatchItem[](0));
 
@@ -555,7 +545,7 @@ contract BatchTest is Test {
         // internal batch in the malicious vault reverts with CVC_ImpersonateReentrancy error,
         // check VaultMalicious implementation
         VaultMalicious(collateral).setExpectedErrorSelector(
-            CreditVaultConnector.CVC_ImpersonateReentrancy.selector
+            Errors.CVC_ImpersonateReentrancy.selector
         );
 
         vm.prank(controller);
@@ -563,8 +553,38 @@ contract BatchTest is Test {
         cvc.impersonate(
             collateral,
             alice,
+            0,
             abi.encodeWithSelector(VaultMalicious.callBatch.selector)
         );
+    }
+
+    function test_RevertIfValueExceedsBalance_Batch(
+        address alice,
+        uint128 seed
+    ) external {
+        vm.assume(alice != address(0) && alice != address(cvc));
+        vm.assume(seed > 0);
+
+        address vault = address(new Vault(cvc));
+
+        ICVC.BatchItem[] memory items = new ICVC.BatchItem[](1);
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = vault;
+        items[0].value = seed;
+        items[0].data = abi.encodeWithSelector(
+            Vault.requireChecks.selector,
+            alice
+        );
+
+        // reverts if value exceeds balance
+        vm.deal(alice, seed);
+        vm.prank(alice);
+        vm.expectRevert(Errors.CVC_InvalidValue.selector);
+        cvc.batch{value: seed - 1}(items);
+
+        // succeeds if value does not exceed balance
+        vm.prank(alice);
+        cvc.batch{value: seed}(items);
     }
 
     function test_BatchRevert_BatchSimulation(address alice) external {
@@ -613,10 +633,7 @@ contract BatchTest is Test {
             try cvc.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(
-                    bytes4(err),
-                    CreditVaultConnector.CVC_RevertedBatchResult.selector
-                );
+                assertEq(bytes4(err), Errors.CVC_RevertedBatchResult.selector);
 
                 assembly {
                     err := add(err, 4)
@@ -747,10 +764,7 @@ contract BatchTest is Test {
             try cvc.batchRevert(items) {
                 assert(false);
             } catch (bytes memory err) {
-                assertEq(
-                    bytes4(err),
-                    CreditVaultConnector.CVC_RevertedBatchResult.selector
-                );
+                assertEq(bytes4(err), Errors.CVC_RevertedBatchResult.selector);
 
                 assembly {
                     err := add(err, 4)
@@ -862,7 +876,7 @@ contract BatchTest is Test {
 
         ICVC cvc_noRevert = new CreditVaultConnectorNoRevert();
         vm.prank(alice);
-        vm.expectRevert(CreditVaultConnector.CVC_BatchPanic.selector);
+        vm.expectRevert(Errors.CVC_BatchPanic.selector);
         cvc_noRevert.batchSimulation(new ICVC.BatchItem[](0));
     }
 }

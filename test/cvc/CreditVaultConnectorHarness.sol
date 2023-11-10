@@ -57,9 +57,11 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         return expectedVaultsChecked;
     }
 
-    function setBatchDepth(uint8 depth) external {
+    function setCallDepth(uint8 depth) external {
         if (isFuzzSender()) return;
-        executionContext = executionContext.setBatchDepth(depth);
+        executionContext = EC.wrap(
+            (EC.unwrap(executionContext) & ~uint(0xff)) | depth
+        );
     }
 
     function setChecksLock(bool locked) external {
@@ -68,7 +70,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         if (locked) {
             executionContext = executionContext.setChecksInProgress();
         } else {
-            executionContext = executionContext.clearChecksInProgress();
+            executionContext = EC.wrap(
+                EC.unwrap(executionContext) &
+                    ~uint(0xFF000000000000000000000000000000000000000000)
+            );
         }
     }
 
@@ -78,7 +83,10 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         if (locked) {
             executionContext = executionContext.setImpersonationInProgress();
         } else {
-            executionContext = executionContext.clearImpersonationInProgress();
+            executionContext = EC.wrap(
+                EC.unwrap(executionContext) &
+                    ~uint(0xFF00000000000000000000000000000000000000000000)
+            );
         }
     }
 
@@ -92,23 +100,16 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         }
     }
 
-    function setPermit(bool inProgress) external {
-        if (isFuzzSender()) return;
-
-        if (inProgress) {
-            executionContext = executionContext.setPermitInProgress();
-        } else {
-            executionContext = executionContext.clearPermitInProgress();
-        }
-    }
-
     function setSimulation(bool inProgress) external {
         if (isFuzzSender()) return;
 
         if (inProgress) {
             executionContext = executionContext.setSimulationInProgress();
         } else {
-            executionContext = executionContext.clearSimulationInProgress();
+            executionContext = EC.wrap(
+                EC.unwrap(executionContext) &
+                    ~uint(0xFF000000000000000000000000000000000000000000000000)
+            );
         }
     }
 
@@ -125,32 +126,11 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         expectedAccountsChecked.push(account);
     }
 
-    function requireAccountsStatusCheck(
-        address[] calldata accounts
-    ) public payable override {
-        super.requireAccountsStatusCheck(accounts);
-
-        for (uint i = 0; i < accounts.length; ++i) {
-            expectedAccountsChecked.push(accounts[i]);
-        }
-    }
-
     function requireAccountStatusCheckNow(
         address account
     ) public payable override {
         super.requireAccountStatusCheckNow(account);
-
         expectedAccountsChecked.push(account);
-    }
-
-    function requireAccountsStatusCheckNow(
-        address[] calldata accounts
-    ) public payable override {
-        super.requireAccountsStatusCheckNow(accounts);
-
-        for (uint i = 0; i < accounts.length; ++i) {
-            expectedAccountsChecked.push(accounts[i]);
-        }
     }
 
     function requireAllAccountsStatusCheckNow() public payable override {
@@ -169,32 +149,12 @@ contract CreditVaultConnectorHarness is CreditVaultConnectorScribble {
         expectedVaultsChecked.push(msg.sender);
     }
 
-    function requireVaultStatusCheckNow(address vault) public payable override {
-        if (vaultStatusChecks.contains(vault))
-            expectedVaultsChecked.push(vault);
-
-        super.requireVaultStatusCheckNow(vault);
-    }
-
-    function requireVaultsStatusCheckNow(
-        address[] calldata vaults
-    ) public payable override {
-        for (uint i = 0; i < vaults.length; ++i) {
-            if (vaultStatusChecks.contains(vaults[i]))
-                expectedVaultsChecked.push(vaults[i]);
+    function requireVaultStatusCheckNow() public payable override {
+        if (vaultStatusChecks.contains(msg.sender)) {
+            expectedVaultsChecked.push(msg.sender);
         }
 
-        super.requireVaultsStatusCheckNow(vaults);
-    }
-
-    function requireAllVaultsStatusCheckNow() public payable override {
-        address[] memory vaults = vaultStatusChecks.get();
-
-        super.requireAllVaultsStatusCheckNow();
-
-        for (uint i = 0; i < vaults.length; ++i) {
-            expectedVaultsChecked.push(vaults[i]);
-        }
+        super.requireVaultStatusCheckNow();
     }
 
     function requireAccountAndVaultStatusCheck(
