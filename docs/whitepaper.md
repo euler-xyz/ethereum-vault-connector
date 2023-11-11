@@ -85,7 +85,7 @@ Although the vaults themselves implement `checkAccountStatus`, there is no need 
 
 Upon a `requireAccountStatusCheck` call, the EVC will determine whether the current execution context is in a batch and if so, it will defer checking the status for this account until the end of the execution context. Otherwise, the account status check will be performed immediately.
 
-There is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), then when it calls `requireAccountStatusCheck` on the EVC, the EVC may immediately call back into the vault's `checkAccountStatus` function. A normal reentrancy guard would fail upon re-entering at this point. Because of this, the vault reference implementation relaxes the reentrancy modifier to allow `checkAccountStatus` call while invoking `requireAccountStatusCheck`.
+There is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal reentrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
 
 ### Single Controller
 
@@ -187,11 +187,12 @@ Permits are EIP-712 typed data messages with the following fields:
 * `signer`: The address to execute the operation on behalf of.
 * `nonceNamespace` and `nonce`: Values used to prevent replaying permit messages, and for sequencing (see below)
 * `deadline`: A timestamp after which the permit becomes invalid.
+* `value`: The value of ETH that is expected to be sent to the EVC
 * `data`: Arbitrary calldata that will be used to invoke the EVC. Typically this will contain an invocation of the `batch` method.
 
 There are two types of signature methods supported by permits: ECDSA, which is used by EOAs, and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) which is used by smart contract wallets. In both cases, the `permit` method can be invoked by any unprivileged address, such as a keeper. If the signature is exactly 65 bytes long, an `ecrecover` is attempted. If the recovered address does not match `signer`, or for signature lengths other than 65, then an ERC-1271 verification is attempted, by staticcalling `isValidSignature` on `signer`.
 
-After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC. Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
+After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC, forwarding the specified `value` of ETH (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
 
 Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via a batch, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
 
@@ -229,6 +230,13 @@ The `impersonate` function can only be used in one specific case: When a control
 
 This is accomplished by the controller vault calling `impersonate`. It passes in the collateral vault as the target contract and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
 
+### callback
+
+Because vaults can be called directly without going through the EVC, a [batch context](#batches) may not be open when they are invoked. The EVC provides a function `callback` so that vaults can be coded in a way that assumes they are always executing within a batch.
+
+`callback` will create a new batch, and call-back into the caller with the provided `msg.data`, forwarding the provided `value` (or full balance of the EVC if max `uint256` was specified). Inside the batch, the `onBehalfOfAccount` account will be set to whatever was provided by the calling vault. The vault should use `msg.sender` for this. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: Recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself.
+
+To use `callback`, it is recommended that vaults use a special modifier `routedThroughCVC` before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption it is always inside a batch.
 
 
 ### Execution Contexts
@@ -250,7 +258,7 @@ Additionally, the execution context contains some locks that protect critical re
 
 If a vault or other contract is invoked via the EVC, and that contract in turn re-invokes the EVC to call another vault/contract, then the execution context is considered nested. The execution context is however *not* treated as a stack. The sets of deferred account and vault status checks are added to, and only after unwinding the final execution context will they be validated.
 
-Internally, the execution context stores a batch depth value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
+Internally, the execution context stores a *call depth* value that increases each time a batch is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting batches is useful because otherwise calling contracts from a batch that themselves want to defer checks would be more complicated, and these contracts would need two code-paths: one that defers and one that doesn't.
 
 The previous value of `onBehalfOfAccount` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAccount` at all times when `msg.sender` is the EVC (see [Authentication by Vaults](#authentication-by-vaults)). However, when `msg.sender` is not the EVC, vaults cannot rely on `onBehalfOfAccount` because it could have been changed by a nested context.
 
