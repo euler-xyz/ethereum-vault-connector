@@ -1,8 +1,8 @@
 {
-  "name": "euler-evc",
+  "name": "ethereum-vault-connector",
   "version": "1.0.0",
   "main": "index.js",
-  "repository": "https://github.com/euler-xyz/euler-evc.git",
+  "repository": "https://github.com/euler-xyz/ethereum-vault-connector.git",
   "author": "Euler Labs",
   "license": "GPL-2.0-or-later",
   "scripts": {},
