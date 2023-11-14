@@ -1,16 +1,11 @@
 {
-  "name": "euler-cvc",
+  "name": "euler-evc",
   "version": "1.0.0",
   "main": "index.js",
-  "repository": "https://github.com/euler-xyz/euler-cvc.git",
+  "repository": "https://github.com/euler-xyz/euler-evc.git",
   "author": "Euler Labs",
   "license": "GPL-2.0-or-later",
-  "scripts": {
-    "prettier": "prettier --write src/ test/"
-  },
+  "scripts": {},
   "dependencies": {},
-  "devDependencies": {
-    "prettier": "2.8.8",
-    "prettier-plugin-solidity": "1.1.3"
-  }
+  "devDependencies": {}
 }

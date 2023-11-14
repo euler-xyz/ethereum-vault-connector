@@ -36,9 +36,15 @@ contract SetGasTest is Test {
         }
     }
 
-    /******************/
-    /**    insert    **/
-    /******************/
+    /**
+     *
+     */
+    /**
+     * insert    *
+     */
+    /**
+     *
+     */
     function testGas_insert_size00() public {
         size00.insert(ELEMENT_1);
     }
@@ -96,9 +102,15 @@ contract SetGasTest is Test {
         size20.insert(ELEMENT_20);
     }
 
-    /******************/
-    /**   contains   **/
-    /******************/
+    /**
+     *
+     */
+    /**
+     * contains   *
+     */
+    /**
+     *
+     */
 
     function testGas_contains_size00_notFound() public view {
         size00.contains(ELEMENT_1);
@@ -156,9 +168,15 @@ contract SetGasTest is Test {
         size20.contains(ELEMENT_20);
     }
 
-    /******************/
-    /**    remove    **/
-    /******************/
+    /**
+     *
+     */
+    /**
+     * remove    *
+     */
+    /**
+     *
+     */
 
     function testGas_remove_size00_notFound() public {
         size00.remove(ELEMENT_1);
