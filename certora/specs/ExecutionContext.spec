@@ -99,13 +99,6 @@ methods {
     function initialize() external returns (ExecutionContextHarness.EC) envfree;
 }
 
-//rule sanity(method f) {
-//    env e;
-//    calldataarg args;
-//    f(e, args);
-//    assert(false);
-//}
-
 /// check that bitmasks are pairwise disjoint
 rule check_bitmasks_disjoint() {
     assert(BATCH_DEPTH_MASK() & ON_BEHALF_OF_ACCOUNT_MASK() == 0);
@@ -168,3 +161,49 @@ rule check_bitmasks_offsets() {
 /// check that batch depth zero means we are not in a batch
 invariant check_batch_zero_is_not_in_batch(uint ec)
     getBatchDepth(ec) != 0 <=> isInBatch(ec);
+
+/// check basic functionality of getBatchDepth and setBatchDepth
+rule check_batch_depth(uint ec, uint8 depth) {
+    uint8 before = getBatchDepth(ec);
+    uint newec = setBatchDepth(ec, depth);
+    assert(getBatchDepth(newec) == depth);
+    uint resetec = setBatchDepth(ec, before);
+    assert(resetec == ec);
+}
+
+rule check_batch_depth_maximum(uint ec) {
+    uint8 newBatchDepth;
+    // TODO: BATCH_DEPTH_MAX suggests that the value itself is still valid. It is not.
+    require(require_uint256(newBatchDepth) < BATCH_DEPTH_MAX());
+    uint newec = setBatchDepth(ec, newBatchDepth);
+    assert(!isBatchDepthExceeded(newec));
+}
+
+/// check basic functionality of getOnBehalfOfAccount and setOnBehalfOfAccount
+rule check_on_behalf_of_account(uint ec, address adr) {
+    address before = getOnBehalfOfAccount(ec);
+    uint newec = setOnBehalfOfAccount(ec, adr);
+    assert(getOnBehalfOfAccount(newec) == adr);
+    uint resetec = setOnBehalfOfAccount(ec, before);
+    assert(resetec == ec);
+}
+
+/// check basic functionality of areChecksInProgress, setChecksInProgress and clearChecksInProgress
+/// TODO: This current needs `-smt_bitVectorTheory true`, no longer with #5074
+rule check_checks_in_progress(uint ec1) {
+    bool before = areChecksInProgress(ec1);
+    // make sure that the bitmask is either 0x00 or 0xFF
+    require(before => ((ec1 & CHECKS_LOCK_MASK()) >> 168 == 0xFF));
+    require(!before => ((ec1 & CHECKS_LOCK_MASK()) >> 168 == 0x00));
+    uint ec2 = setChecksInProgress(ec1);
+    assert(areChecksInProgress(ec2), "assert 1");
+    uint ec3 = clearChecksInProgress(ec2);
+    assert(!areChecksInProgress(ec3), "assert 2");
+    if (before) {
+        uint ec4 = setChecksInProgress(ec3);
+        assert(ec4 == ec1, "assert 3");
+    } else {
+        uint ec4 = clearChecksInProgress(ec3);
+        assert(ec4 == ec1, "assert 4");
+    }
+}
