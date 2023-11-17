@@ -9,10 +9,11 @@ methods{
 }
 
 //checks that all EVC checks are deferred iff the contract is in call depth > 0
+//TODO: Rule fails on method `enableController` in a rule error: See #4160.
 invariant check_callDepth_zero_means_checksAreDeferred()
     getExecutionContextCallDepth() > 0 <=> getExecutionContextAreChecksDeferred();
 
-//check that to addresses with the same prefix also have a common owner.
+//check that to addresses with the same prefix also have a common owner
 rule check_have_commonPrefix(){
     address x;
     address y;
