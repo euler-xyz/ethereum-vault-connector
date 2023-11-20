@@ -800,6 +800,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function callBatchItemInternal(BatchItem calldata item) internal returns (bool success, bytes memory result) {
         if (item.targetContract == address(this)) {
+            if (item.onBehalfOfAccount != address(0)) {
+                revert EVC_InvalidAddress();
+            }
+
+            if (item.value != 0) {
+                revert EVC_InvalidValue();
+            }
+
             // delegatecall is used here to preserve msg.sender in order
             // to be able to perform authentication
             (success, result) = address(this).delegatecall(item.data);

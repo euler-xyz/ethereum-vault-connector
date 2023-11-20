@@ -699,7 +699,7 @@ contract PermitTest is Test {
         // encode a call that needs authentication wrapped in a batch
         data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
         items[0].targetContract = address(evc);
-        items[0].onBehalfOfAccount = bob;
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
         items[0].data = data;
         data = abi.encodeWithSelector(IEVC.batch.selector, items);
@@ -712,7 +712,7 @@ contract PermitTest is Test {
         // a call using ERC1271 signature fails because bob signed on behalf of alice
         data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
         items[0].targetContract = address(evc);
-        items[0].onBehalfOfAccount = alice;
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
         items[0].data = data;
         data = abi.encodeWithSelector(IEVC.batch.selector, items);
@@ -741,7 +741,7 @@ contract PermitTest is Test {
         // encode a call that needs authentication wrapped in a batch
         data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
         items[0].targetContract = address(evc);
-        items[0].onBehalfOfAccount = alice;
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
         items[0].data = data;
         data = abi.encodeWithSelector(IEVC.batch.selector, items);
@@ -753,7 +753,7 @@ contract PermitTest is Test {
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
         data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
         items[0].targetContract = address(evc);
-        items[0].onBehalfOfAccount = bob;
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
         items[0].data = data;
         data = abi.encodeWithSelector(IEVC.batch.selector, items);

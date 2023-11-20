@@ -12,10 +12,10 @@ interface IEVC {
         /// @notice The target contract to be called.
         address targetContract;
         /// @notice The account on behalf of which the operation is to be performed. msg.sender must be authorized to
-        /// act on behalf.
+        /// act on behalf of this account. Must be address(0) if the target contract is the EVC itself.
         address onBehalfOfAccount;
         /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
-        /// balance of the EVC contract will be forwarded.
+        /// balance of the EVC contract will be forwarded. Must be 0 if the target contract is the EVC itself.
         uint256 value;
         /// @notice The encoded data which is called on the target contract.
         bytes data;

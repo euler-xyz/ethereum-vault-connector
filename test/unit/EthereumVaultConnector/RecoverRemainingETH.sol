@@ -26,7 +26,7 @@ contract RecoverRemainingETHTest is Test {
 
     function test_RecoverRemainingETH(address alice, uint64 value, bool isOperatorCalling, uint96 seed) public {
         vm.assume(
-            alice != address(0) && alice != address(evc)
+            uint160(alice) > 10 && alice != address(evc)
                 && !evc.haveCommonOwner(alice, 0x4e59b44847b379578588920cA78FbF26c0B4956C)
         );
         vm.assume(seed % 256 != 0);

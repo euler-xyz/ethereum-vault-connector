@@ -68,11 +68,10 @@ contract VaultEchidna is IVault {
         try evc.impersonate(address(this), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
-        items[0].targetContract = address(this);
-        items[0].onBehalfOfAccount = account;
+        items[0].targetContract = address(address(evc));
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
-        items[0].data = "";
-        hevm.prank(account);
+        items[0].data = abi.encodeWithSelector(evc.callback.selector, account, 0, "");
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
@@ -139,11 +138,10 @@ contract VaultEchidna is IVault {
         try evc.impersonate(address(this), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
-        items[0].targetContract = address(this);
-        items[0].onBehalfOfAccount = account;
+        items[0].targetContract = address(address(evc));
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
-        items[0].data = "";
-        hevm.prank(account);
+        items[0].data = abi.encodeWithSelector(evc.callback.selector, account, 0, "");
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}

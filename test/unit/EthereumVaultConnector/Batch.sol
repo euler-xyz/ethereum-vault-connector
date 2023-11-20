@@ -51,12 +51,12 @@ contract BatchTest is Test {
         vm.assume(bob != controller && bob != otherVault);
 
         // -------------- FIRST BATCH -------------------------
-        items[0].onBehalfOfAccount = alice;
+        items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(evc);
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(evc.enableController.selector, alice, controller);
 
-        items[1].onBehalfOfAccount = alice;
+        items[1].onBehalfOfAccount = address(0);
         items[1].targetContract = address(evc);
         items[1].value = 0;
         items[1].data = abi.encodeWithSelector(evc.setAccountOperator.selector, alice, bob, true);
@@ -81,7 +81,7 @@ contract BatchTest is Test {
         items[4].data =
             abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), seed - seed / 3, alice, false);
 
-        items[5].onBehalfOfAccount = alicesSubAccount;
+        items[5].onBehalfOfAccount = address(0);
         items[5].targetContract = address(evc);
         items[5].value = 0;
         items[5].data = abi.encodeWithSelector(evc.enableController.selector, alicesSubAccount, controller);
@@ -108,7 +108,7 @@ contract BatchTest is Test {
         // -------------- SECOND BATCH -------------------------
         items = new IEVC.BatchItem[](1);
 
-        items[0].onBehalfOfAccount = alice;
+        items[0].onBehalfOfAccount = address(0);
         items[0].targetContract = address(evc);
         items[0].value = 0;
         items[0].data = abi.encodeWithSelector(evc.call.selector, address(evc), alice, 0, "");
@@ -165,6 +165,28 @@ contract BatchTest is Test {
         evc.handlerBatch(items);
     }
 
+    function test_RevertIfInvalidBatchItem_Batch(address alice, uint256 value, bytes calldata data) external {
+        vm.assume(alice != address(0));
+        vm.assume(value > 0);
+
+        IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
+        items[0].onBehalfOfAccount = alice;
+        items[0].targetContract = address(evc);
+        items[0].value = 0;
+        items[0].data = data;
+
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.batch(items);
+
+        items[0].onBehalfOfAccount = address(0);
+        items[0].targetContract = address(evc);
+        items[0].value = value;
+        items[0].data = data;
+
+        vm.expectRevert(Errors.EVC_InvalidValue.selector);
+        evc.batch(items);
+    }
+
     function test_RevertIfDepthExceeded_Batch(address alice) external {
         vm.assume(alice != address(0) && alice != address(evc));
         address vault = address(new Vault(evc));
@@ -173,7 +195,7 @@ contract BatchTest is Test {
 
         for (int256 i = int256(items.length - 1); i >= 0; --i) {
             uint256 j = uint256(i);
-            items[j].onBehalfOfAccount = alice;
+            items[j].onBehalfOfAccount = address(0);
             items[j].targetContract = address(evc);
             items[j].value = 0;
 
@@ -187,7 +209,7 @@ contract BatchTest is Test {
                 nestedItems[0].data = abi.encodeWithSelector(Vault.requireChecks.selector, alice);
 
                 // non-checks-deferrable call
-                nestedItems[1].onBehalfOfAccount = alice;
+                nestedItems[1].onBehalfOfAccount = address(0);
                 nestedItems[1].targetContract = address(evc);
                 nestedItems[1].value = 0;
                 nestedItems[1].data = abi.encodeWithSelector(evc.enableController.selector, alice, vault);
@@ -424,6 +446,7 @@ contract BatchTest is Test {
         vm.assume(seed > 0);
 
         address vault = address(new Vault(evc));
+        vm.assume(alice != vault);
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0].onBehalfOfAccount = alice;
