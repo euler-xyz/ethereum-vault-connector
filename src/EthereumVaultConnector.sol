@@ -602,7 +602,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         EC contextCache = executionContext;
 
-        if (contextCache.areChecksDeferred()) {
+        if (contextCache.getCallDepth() > 0) {
             revert EVC_SimulationBatchNested();
         }
 
