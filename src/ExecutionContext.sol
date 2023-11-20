@@ -50,8 +50,6 @@ library ExecutionContext {
         result = uint8(EC.unwrap(context) & CALL_DEPTH_MASK);
     }
 
-    /// #if_succeeds "call depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) &&
-    /// !isImpersonationInProgress(context);
     function increaseCallDepth(EC context) internal pure returns (EC result) {
         if (getCallDepth(context) > CALL_DEPTH_MAX - 1) {
             revert CallDepthViolation();

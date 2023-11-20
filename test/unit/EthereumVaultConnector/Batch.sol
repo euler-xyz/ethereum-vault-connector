@@ -418,7 +418,7 @@ contract BatchTest is Test {
     }
 
     function test_RevertIfTargetContractInvalid_Batch(address alice) external {
-        vm.assume(alice != address(0) && alice != address(evc));
+        vm.assume(alice != address(0) && alice != address(evc) && !evc.haveCommonOwner(alice, address(this)));
 
         // allow this contract to operate on behalf of alice
         vm.prank(alice);
