@@ -6,6 +6,7 @@
 * [What is the Ethereum Vault Connector?](#what-is-the-ethereum-vault-connector)
 * [How does the EVC work in principle?](#how-does-the-evc-work-in-principle)
 * [What are the benefits of building on the EVC?](#what-are-the-benefits-of-building-on-the-evc)
+* [What can be built using the EVC?](#what-can-be-built-using-the-evc)
 * [What is a Controller in the context of EVC?](#what-is-a-controller-in-the-context-of-evc)
 * [What are Account Status Checks?](#what-are-account-status-checks)
 * [What are Vault Status Checks?](#what-are-vault-status-checks)
@@ -31,7 +32,28 @@ When a user wishes to borrow, they must link their accounts and collateral vault
 ## What are the benefits of building on the EVC?
 
 The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors such as pricing and risk management.
-The EVC offers the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
+The EVC creates the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
+
+## What can be built using the EVC?
+
+The Ethereum Vault Connector (EVC) provides a robust and flexible framework for developers to build a variety of new products. These include but are not limited to:
+
+1. Traditional, overcollateralized lending products
+1. Uncollateralized lending products
+1. Real World Assets (RWA) lending products
+1. NFT lending products
+1. P2P lending products
+1. Oracle-free lending products
+1. Lending products based on alternate oracles
+1. Novel risk management solutions
+1. Novel interest rate models
+1. Transaction relayers
+1. Intent-based systems
+1. Automations (conditional orders, custom liquidation flows, strategies, position managers, optimizers, guardians etc.)
+1. Smart contract tooling (i.e. swap hubs using new dexes or new dex aggregators)
+1. Integrations
+
+These are just a few examples of what can be built using the EVC. The possibilities are vast and limited only by the creativity and ingenuity of the developer community.
 
 ## What is a Controller in the context of EVC?
 

@@ -47,7 +47,7 @@ To illustrate the process of vault mediation, let's consider a straightforward e
 
 In addition to vault mediation, the EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. Here are some of the benefits of building on the EVC:
 
-* Unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
+* Network effect thanks to unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
 * Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, uncollateralised IOUs, or synthetics.
 * Standardized approach to account liquidity checks and vault global constraints enforcement: The EVC allows for deferral of the liquidity checks and vault status checks, preventing transient violations from causing a failure. The EVC exposes an interface which abstracts management of the checks away from the vault.
 * Batching: Multiple operations affecting multiple vaults and external smart contracts can be performed within a single batch operation. This is more convenient for UI users, more gas efficient, and allows deferring liquidity checks until the end of the batch.
