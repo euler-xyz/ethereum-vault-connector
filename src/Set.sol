@@ -235,16 +235,17 @@ library Set {
     /// @dev The set is cleared as a result of this call.
     /// @param setStorage The set storage to be processed.
     /// @param callback The function to be applied to each element.
-    /// @return result An array of encoded bytes that are the results of the callback function.
+    /// @return result An array of encoded bytes that are the addresses passed to the callback function and results of
+    /// calling it.
     function forEachAndClearWithResult(
         SetStorage storage setStorage,
         function(address) returns (bool, bytes memory) callback
     ) internal returns (bytes[] memory) {
         uint256 numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
-        bytes[] memory result = new bytes[](numElements);
+        bytes[] memory results = new bytes[](numElements);
 
-        if (numElements == 0) return result;
+        if (numElements == 0) return results;
 
         setStorage.numElements = 0;
 
@@ -258,14 +259,14 @@ library Set {
                 delete setStorage.elements[i].value;
             }
 
-            (bool result1, bytes memory result2) = callback(element);
-            result[i] = abi.encode(result1, result2);
+            (bool success, bytes memory result) = callback(element);
+            results[i] = abi.encode(element, success, result);
 
             unchecked {
                 ++i;
             }
         }
 
-        return result;
+        return results;
     }
 }

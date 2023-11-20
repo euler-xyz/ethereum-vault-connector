@@ -572,8 +572,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function batchRevert(BatchItem[] calldata items) public payable virtual nonReentrant {
         BatchItemResult[] memory batchItemsResult;
-        BatchItemResult[] memory accountsStatusResult;
-        BatchItemResult[] memory vaultsStatusResult;
+        StatusCheckResult[] memory accountsStatusCheckResult;
+        StatusCheckResult[] memory vaultsStatusCheckResult;
 
         EC contextCache = executionContext;
 
@@ -587,12 +587,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         executionContext = contextCache.setChecksInProgress();
 
-        accountsStatusResult = checkStatusAllWithResult(SetType.Account);
-        vaultsStatusResult = checkStatusAllWithResult(SetType.Vault);
+        accountsStatusCheckResult = checkStatusAllWithResult(SetType.Account);
+        vaultsStatusCheckResult = checkStatusAllWithResult(SetType.Vault);
 
         executionContext = contextCache;
 
-        revert EVC_RevertedBatchResult(batchItemsResult, accountsStatusResult, vaultsStatusResult);
+        revert EVC_RevertedBatchResult(batchItemsResult, accountsStatusCheckResult, vaultsStatusCheckResult);
     }
 
     /// @inheritdoc IEVC
@@ -602,8 +602,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         virtual
         returns (
             BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            StatusCheckResult[] memory accountsStatusCheckResult,
+            StatusCheckResult[] memory vaultsStatusCheckResult
         )
     {
         (bool success, bytes memory result) = address(this).delegatecall(abi.encodeCall(this.batchRevert, items));
@@ -618,8 +618,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             result := add(result, 4)
         }
 
-        (batchItemsResult, accountsStatusResult, vaultsStatusResult) =
-            abi.decode(result, (BatchItemResult[], BatchItemResult[], BatchItemResult[]));
+        (batchItemsResult, accountsStatusCheckResult, vaultsStatusCheckResult) =
+            abi.decode(result, (BatchItemResult[], StatusCheckResult[], StatusCheckResult[]));
     }
 
     // Account Status Check
@@ -863,18 +863,19 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function checkStatusAllWithResult(SetType setType)
         internal
         virtual
-        returns (BatchItemResult[] memory checksResult)
+        returns (StatusCheckResult[] memory checksResult)
     {
         bytes[] memory callbackResult = setType == SetType.Account
             ? accountStatusChecks.forEachAndClearWithResult(checkAccountStatusInternal)
             : vaultStatusChecks.forEachAndClearWithResult(checkVaultStatusInternal);
 
         uint256 length = callbackResult.length;
-        checksResult = new BatchItemResult[](length);
+        checksResult = new StatusCheckResult[](length);
 
         for (uint256 i; i < length;) {
-            (bool isValid, bytes memory result) = abi.decode(callbackResult[i], (bool, bytes));
-            checksResult[i] = BatchItemResult(isValid, result);
+            (address checkedAddress, bool isValid, bytes memory result) =
+                abi.decode(callbackResult[i], (address, bool, bytes));
+            checksResult[i] = StatusCheckResult(checkedAddress, isValid, result);
 
             unchecked {
                 ++i;

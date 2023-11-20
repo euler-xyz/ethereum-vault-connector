@@ -30,6 +30,17 @@ interface IEVC {
         bytes result;
     }
 
+    /// @notice A struct representing the result of the account or vault status check.
+    /// @dev Used only for simulation purposes.
+    struct StatusCheckResult {
+        /// @notice The address of the account or vault for which the check was performed.
+        address checkedAddress;
+        /// @notice A boolean indicating whether the status of the account or vault is valid.
+        bool isValid;
+        /// @notice The result of the check.
+        bytes result;
+    }
+
     /// @notice Returns current raw execution context.
     /// @dev When checks in progress, on behalf of account is always address(0).
     /// @return context Current raw execution context.
@@ -309,15 +320,15 @@ interface IEVC {
     /// be called within a checks-deferrable call.
     /// @param items An array of batch items to be executed.
     /// @return batchItemsResult An array of batch item results for each item.
-    /// @return accountsStatusResult An array of account status results for each account.
-    /// @return vaultsStatusResult An array of vault status results for each vault.
+    /// @return accountsStatusCheckResult An array of account status check results for each account.
+    /// @return vaultsStatusCheckResult An array of vault status check results for each vault.
     function batchSimulation(BatchItem[] calldata items)
         external
         payable
         returns (
             BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            StatusCheckResult[] memory accountsStatusCheckResult,
+            StatusCheckResult[] memory vaultsStatusCheckResult
         );
 
     /// @notice Checks whether the status check is deferred for a given account.

@@ -205,7 +205,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
     /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
     /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
-    function checkStatusAllWithResult(SetType setType) internal override returns (BatchItemResult[] memory result) {
+    function checkStatusAllWithResult(SetType setType) internal override returns (StatusCheckResult[] memory result) {
         return super.checkStatusAllWithResult(setType);
     }
 }

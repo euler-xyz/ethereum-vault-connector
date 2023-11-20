@@ -23,8 +23,8 @@ contract Errors {
     error EVC_SimulationBatchNested();
     error EVC_RevertedBatchResult(
         IEVC.BatchItemResult[] batchItemsResult,
-        IEVC.BatchItemResult[] accountsStatusResult,
-        IEVC.BatchItemResult[] vaultsStatusResult
+        IEVC.StatusCheckResult[] accountsStatusResult,
+        IEVC.StatusCheckResult[] vaultsStatusResult
     );
     error EVC_BatchPanic();
     error EVC_EmptyError();

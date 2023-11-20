@@ -284,17 +284,19 @@ contract BatchTest is Test {
         // check VaultMalicious implementation
         // error will be encoded in the result
         IEVC.BatchItemResult[] memory expectedBatchItemsResult = new IEVC.BatchItemResult[](1);
-        IEVC.BatchItemResult[] memory expectedAccountsStatusResult = new IEVC.BatchItemResult[](1);
-        IEVC.BatchItemResult[] memory expectedVaultsStatusResult = new IEVC.BatchItemResult[](1);
+        IEVC.StatusCheckResult[] memory expectedAccountsStatusCheckResult = new IEVC.StatusCheckResult[](1);
+        IEVC.StatusCheckResult[] memory expectedVaultsStatusCheckResult = new IEVC.StatusCheckResult[](1);
 
         expectedBatchItemsResult[0].success = true;
         expectedBatchItemsResult[0].result = "";
 
-        expectedAccountsStatusResult[0].success = true;
-        expectedAccountsStatusResult[0].result = "";
+        expectedAccountsStatusCheckResult[0].checkedAddress = alice;
+        expectedAccountsStatusCheckResult[0].isValid = true;
+        expectedAccountsStatusCheckResult[0].result = "";
 
-        expectedVaultsStatusResult[0].success = false;
-        expectedVaultsStatusResult[0].result = abi.encodeWithSignature("Error(string)", "malicious vault");
+        expectedVaultsStatusCheckResult[0].checkedAddress = vault;
+        expectedVaultsStatusCheckResult[0].isValid = false;
+        expectedVaultsStatusCheckResult[0].result = abi.encodeWithSignature("Error(string)", "malicious vault");
 
         VaultMalicious(vault).setExpectedErrorSelector(Errors.EVC_ChecksReentrancy.selector);
 
@@ -303,8 +305,8 @@ contract BatchTest is Test {
             abi.encodeWithSelector(
                 Errors.EVC_RevertedBatchResult.selector,
                 expectedBatchItemsResult,
-                expectedAccountsStatusResult,
-                expectedVaultsStatusResult
+                expectedAccountsStatusCheckResult,
+                expectedVaultsStatusCheckResult
             )
         );
         evc.batchRevert(items);
@@ -315,21 +317,23 @@ contract BatchTest is Test {
         vm.prank(alice);
         (
             IEVC.BatchItemResult[] memory batchItemsResult,
-            IEVC.BatchItemResult[] memory accountsStatusResult,
-            IEVC.BatchItemResult[] memory vaultsStatusResult
+            IEVC.StatusCheckResult[] memory accountsStatusCheckResult,
+            IEVC.StatusCheckResult[] memory vaultsStatusCheckResult
         ) = evc.batchSimulation(items);
 
         assertEq(batchItemsResult.length, 1);
         assertEq(batchItemsResult[0].success, expectedBatchItemsResult[0].success);
         assertEq(batchItemsResult[0].result, expectedBatchItemsResult[0].result);
 
-        assertEq(accountsStatusResult.length, 1);
-        assertEq(accountsStatusResult[0].success, expectedAccountsStatusResult[0].success);
-        assertEq(accountsStatusResult[0].result, expectedAccountsStatusResult[0].result);
+        assertEq(accountsStatusCheckResult.length, 1);
+        assertEq(accountsStatusCheckResult[0].checkedAddress, expectedAccountsStatusCheckResult[0].checkedAddress);
+        assertEq(accountsStatusCheckResult[0].isValid, expectedAccountsStatusCheckResult[0].isValid);
+        assertEq(accountsStatusCheckResult[0].result, expectedAccountsStatusCheckResult[0].result);
 
-        assertEq(vaultsStatusResult.length, 1);
-        assertEq(vaultsStatusResult[0].success, expectedVaultsStatusResult[0].success);
-        assertEq(vaultsStatusResult[0].result, expectedVaultsStatusResult[0].result);
+        assertEq(vaultsStatusCheckResult.length, 1);
+        assertEq(vaultsStatusCheckResult[0].checkedAddress, expectedVaultsStatusCheckResult[0].checkedAddress);
+        assertEq(vaultsStatusCheckResult[0].isValid, expectedVaultsStatusCheckResult[0].isValid);
+        assertEq(vaultsStatusCheckResult[0].result, expectedVaultsStatusCheckResult[0].result);
     }
 
     function test_RevertIfImpersonateReentrancy_AcquireImpersonateLock_Batch(address alice) external {
@@ -418,8 +422,8 @@ contract BatchTest is Test {
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         IEVC.BatchItemResult[] memory expectedBatchItemsResult = new IEVC.BatchItemResult[](1);
-        IEVC.BatchItemResult[] memory expectedAccountsStatusResult = new IEVC.BatchItemResult[](1);
-        IEVC.BatchItemResult[] memory expectedVaultsStatusResult = new IEVC.BatchItemResult[](1);
+        IEVC.StatusCheckResult[] memory expectedAccountsStatusCheckResult = new IEVC.StatusCheckResult[](1);
+        IEVC.StatusCheckResult[] memory expectedVaultsStatusCheckResult = new IEVC.StatusCheckResult[](1);
 
         address controller = address(new Vault(evc));
 
@@ -434,11 +438,13 @@ contract BatchTest is Test {
         expectedBatchItemsResult[0].success = true;
         expectedBatchItemsResult[0].result = "";
 
-        expectedAccountsStatusResult[0].success = true;
-        expectedAccountsStatusResult[0].result = abi.encode(IVault.checkAccountStatus.selector);
+        expectedAccountsStatusCheckResult[0].checkedAddress = alice;
+        expectedAccountsStatusCheckResult[0].isValid = true;
+        expectedAccountsStatusCheckResult[0].result = abi.encode(IVault.checkAccountStatus.selector);
 
-        expectedVaultsStatusResult[0].success = true;
-        expectedVaultsStatusResult[0].result = abi.encode(IVault.checkVaultStatus.selector);
+        expectedVaultsStatusCheckResult[0].checkedAddress = controller;
+        expectedVaultsStatusCheckResult[0].isValid = true;
+        expectedVaultsStatusCheckResult[0].result = abi.encode(IVault.checkVaultStatus.selector);
 
         // regular batch doesn't revert
         vm.prank(alice);
@@ -456,21 +462,30 @@ contract BatchTest is Test {
                 }
                 (
                     IEVC.BatchItemResult[] memory batchItemsResult,
-                    IEVC.BatchItemResult[] memory accountsStatusResult,
-                    IEVC.BatchItemResult[] memory vaultsStatusResult
-                ) = abi.decode(err, (IEVC.BatchItemResult[], IEVC.BatchItemResult[], IEVC.BatchItemResult[]));
+                    IEVC.StatusCheckResult[] memory accountsStatusCheckResult,
+                    IEVC.StatusCheckResult[] memory vaultsStatusCheckResult
+                ) = abi.decode(err, (IEVC.BatchItemResult[], IEVC.StatusCheckResult[], IEVC.StatusCheckResult[]));
 
                 assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
                 assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
                 assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
 
-                assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-                assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-                assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+                assertEq(expectedAccountsStatusCheckResult.length, accountsStatusCheckResult.length);
+                assertEq(
+                    expectedAccountsStatusCheckResult[0].checkedAddress, accountsStatusCheckResult[0].checkedAddress
+                );
+                assertEq(expectedAccountsStatusCheckResult[0].isValid, accountsStatusCheckResult[0].isValid);
+                assertEq(
+                    keccak256(expectedAccountsStatusCheckResult[0].result),
+                    keccak256(accountsStatusCheckResult[0].result)
+                );
 
-                assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-                assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-                assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+                assertEq(expectedVaultsStatusCheckResult.length, vaultsStatusCheckResult.length);
+                assertEq(expectedVaultsStatusCheckResult[0].checkedAddress, vaultsStatusCheckResult[0].checkedAddress);
+                assertEq(expectedVaultsStatusCheckResult[0].isValid, vaultsStatusCheckResult[0].isValid);
+                assertEq(
+                    keccak256(expectedVaultsStatusCheckResult[0].result), keccak256(vaultsStatusCheckResult[0].result)
+                );
             }
         }
 
@@ -478,21 +493,25 @@ contract BatchTest is Test {
             vm.prank(alice);
             (
                 IEVC.BatchItemResult[] memory batchItemsResult,
-                IEVC.BatchItemResult[] memory accountsStatusResult,
-                IEVC.BatchItemResult[] memory vaultsStatusResult
+                IEVC.StatusCheckResult[] memory accountsStatusCheckResult,
+                IEVC.StatusCheckResult[] memory vaultsStatusCheckResult
             ) = evc.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
             assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
             assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
 
-            assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-            assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-            assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+            assertEq(expectedAccountsStatusCheckResult.length, accountsStatusCheckResult.length);
+            assertEq(expectedAccountsStatusCheckResult[0].checkedAddress, accountsStatusCheckResult[0].checkedAddress);
+            assertEq(expectedAccountsStatusCheckResult[0].isValid, accountsStatusCheckResult[0].isValid);
+            assertEq(
+                keccak256(expectedAccountsStatusCheckResult[0].result), keccak256(accountsStatusCheckResult[0].result)
+            );
 
-            assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-            assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-            assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+            assertEq(expectedVaultsStatusCheckResult.length, vaultsStatusCheckResult.length);
+            assertEq(expectedVaultsStatusCheckResult[0].checkedAddress, vaultsStatusCheckResult[0].checkedAddress);
+            assertEq(expectedVaultsStatusCheckResult[0].isValid, vaultsStatusCheckResult[0].isValid);
+            assertEq(keccak256(expectedVaultsStatusCheckResult[0].result), keccak256(vaultsStatusCheckResult[0].result));
         }
 
         // invalidate both checks
@@ -500,11 +519,12 @@ contract BatchTest is Test {
         Vault(controller).setAccountStatusState(1);
 
         // update expected behavior
-        expectedAccountsStatusResult[0].success = false;
-        expectedAccountsStatusResult[0].result = abi.encodeWithSignature("Error(string)", "account status violation");
+        expectedAccountsStatusCheckResult[0].isValid = false;
+        expectedAccountsStatusCheckResult[0].result =
+            abi.encodeWithSignature("Error(string)", "account status violation");
 
-        expectedVaultsStatusResult[0].success = false;
-        expectedVaultsStatusResult[0].result = abi.encodeWithSignature("Error(string)", "vault status violation");
+        expectedVaultsStatusCheckResult[0].isValid = false;
+        expectedVaultsStatusCheckResult[0].result = abi.encodeWithSignature("Error(string)", "vault status violation");
 
         // regular batch reverts now
         vm.prank(alice);
@@ -523,21 +543,30 @@ contract BatchTest is Test {
                 }
                 (
                     IEVC.BatchItemResult[] memory batchItemsResult,
-                    IEVC.BatchItemResult[] memory accountsStatusResult,
-                    IEVC.BatchItemResult[] memory vaultsStatusResult
-                ) = abi.decode(err, (IEVC.BatchItemResult[], IEVC.BatchItemResult[], IEVC.BatchItemResult[]));
+                    IEVC.StatusCheckResult[] memory accountsStatusCheckResult,
+                    IEVC.StatusCheckResult[] memory vaultsStatusCheckResult
+                ) = abi.decode(err, (IEVC.BatchItemResult[], IEVC.StatusCheckResult[], IEVC.StatusCheckResult[]));
 
                 assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
                 assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
                 assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
 
-                assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-                assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-                assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+                assertEq(expectedAccountsStatusCheckResult.length, accountsStatusCheckResult.length);
+                assertEq(
+                    expectedAccountsStatusCheckResult[0].checkedAddress, accountsStatusCheckResult[0].checkedAddress
+                );
+                assertEq(expectedAccountsStatusCheckResult[0].isValid, accountsStatusCheckResult[0].isValid);
+                assertEq(
+                    keccak256(expectedAccountsStatusCheckResult[0].result),
+                    keccak256(accountsStatusCheckResult[0].result)
+                );
 
-                assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-                assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-                assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+                assertEq(expectedVaultsStatusCheckResult.length, vaultsStatusCheckResult.length);
+                assertEq(expectedVaultsStatusCheckResult[0].checkedAddress, vaultsStatusCheckResult[0].checkedAddress);
+                assertEq(expectedVaultsStatusCheckResult[0].isValid, vaultsStatusCheckResult[0].isValid);
+                assertEq(
+                    keccak256(expectedVaultsStatusCheckResult[0].result), keccak256(vaultsStatusCheckResult[0].result)
+                );
             }
         }
 
@@ -545,21 +574,25 @@ contract BatchTest is Test {
             vm.prank(alice);
             (
                 IEVC.BatchItemResult[] memory batchItemsResult,
-                IEVC.BatchItemResult[] memory accountsStatusResult,
-                IEVC.BatchItemResult[] memory vaultsStatusResult
+                IEVC.StatusCheckResult[] memory accountsStatusCheckResult,
+                IEVC.StatusCheckResult[] memory vaultsStatusCheckResult
             ) = evc.batchSimulation(items);
 
             assertEq(expectedBatchItemsResult.length, batchItemsResult.length);
             assertEq(expectedBatchItemsResult[0].success, batchItemsResult[0].success);
             assertEq(keccak256(expectedBatchItemsResult[0].result), keccak256(batchItemsResult[0].result));
 
-            assertEq(expectedAccountsStatusResult.length, accountsStatusResult.length);
-            assertEq(expectedAccountsStatusResult[0].success, accountsStatusResult[0].success);
-            assertEq(keccak256(expectedAccountsStatusResult[0].result), keccak256(accountsStatusResult[0].result));
+            assertEq(expectedAccountsStatusCheckResult.length, accountsStatusCheckResult.length);
+            assertEq(expectedAccountsStatusCheckResult[0].checkedAddress, accountsStatusCheckResult[0].checkedAddress);
+            assertEq(expectedAccountsStatusCheckResult[0].isValid, accountsStatusCheckResult[0].isValid);
+            assertEq(
+                keccak256(expectedAccountsStatusCheckResult[0].result), keccak256(accountsStatusCheckResult[0].result)
+            );
 
-            assertEq(expectedVaultsStatusResult.length, vaultsStatusResult.length);
-            assertEq(expectedVaultsStatusResult[0].success, vaultsStatusResult[0].success);
-            assertEq(keccak256(expectedVaultsStatusResult[0].result), keccak256(vaultsStatusResult[0].result));
+            assertEq(expectedVaultsStatusCheckResult.length, vaultsStatusCheckResult.length);
+            assertEq(expectedVaultsStatusCheckResult[0].checkedAddress, vaultsStatusCheckResult[0].checkedAddress);
+            assertEq(expectedVaultsStatusCheckResult[0].isValid, vaultsStatusCheckResult[0].isValid);
+            assertEq(keccak256(expectedVaultsStatusCheckResult[0].result), keccak256(vaultsStatusCheckResult[0].result));
         }
     }
 

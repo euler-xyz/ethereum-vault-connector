@@ -65,9 +65,10 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
 
     function setNonce(uint152 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
         if (msg.sender == address(this)) return;
+        if (nonceLookup[addressPrefix][nonceNamespace] == type(uint256).max) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
         setAccountOwnerInternal(address(uint160(addressPrefix) << 8), msg.sender);
-        nonce = nonceLookup[addressPrefix][nonceNamespace];
+        nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
         super.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
@@ -243,12 +244,11 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         override
         returns (
             BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            StatusCheckResult[] memory accountsStatusCheckResult,
+            StatusCheckResult[] memory vaultsStatusCheckResult
         )
     {
-        BatchItemResult[] memory x = new BatchItemResult[](0);
-        return (x, x, x);
+        return (new BatchItemResult[](0), new StatusCheckResult[](0), new StatusCheckResult[](0));
     }
 
     function forgiveAccountStatusCheck(address account) public payable override {
