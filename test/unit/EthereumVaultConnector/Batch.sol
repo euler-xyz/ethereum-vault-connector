@@ -47,7 +47,8 @@ contract BatchTest is Test {
         address otherVault = address(new Vault(evc));
         address alicesSubAccount = address(uint160(alice) ^ 0x10);
 
-        vm.assume(bob != controller);
+        vm.assume(alice != controller && alice != otherVault);
+        vm.assume(bob != controller && bob != otherVault);
 
         // -------------- FIRST BATCH -------------------------
         items[0].onBehalfOfAccount = alice;

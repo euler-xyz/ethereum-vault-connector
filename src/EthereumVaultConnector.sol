@@ -482,6 +482,31 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
+    // Recover remaining ETH
+
+    /// @inheritdoc IEVC
+    function recoverRemainingETH(address recipient)
+        public
+        payable
+        virtual
+        nonReentrant
+        onlyOwnerOrOperator(recipient)
+    {
+        // to prevent losing ETH, the recipient cannot be an account other than the registered owner
+        if (getAccountOwnerInternal(recipient) != recipient) {
+            revert EVC_InvalidAddress();
+        }
+
+        // callWithContextInternal is used here to properly set the context for the sake of fallback
+        // functions that are receiving ETH. msg.data[:0] is a trick to pass empty calldata
+        (bool success, bytes memory result) =
+            callWithContextInternal(recipient, recipient, type(uint256).max, msg.data[:0]);
+
+        if (!success) {
+            revertBytes(result);
+        }
+    }
+
     // Calls forwarding
 
     /// @inheritdoc IEVC

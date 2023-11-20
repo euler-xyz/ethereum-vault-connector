@@ -243,6 +243,12 @@ interface IEVC {
         bytes calldata signature
     ) external payable;
 
+    /// @notice Recovers any remaining ETH in the contract and sends it to the specified recipient.
+    /// @dev Only the owner or an operator of the recipient account can call this function. The recipient must be a
+    /// registered owner.
+    /// @param recipient The address to which the remaining ETH will be sent.
+    function recoverRemainingETH(address recipient) external payable;
+
     /// @notice Calls back into the msg.sender with the context set as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
     /// call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks

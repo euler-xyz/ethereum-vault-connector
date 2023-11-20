@@ -221,6 +221,16 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
+    function recoverRemainingETH(address recipient) public payable override {
+        if (haveCommonOwnerInternal(recipient, msg.sender)) return;
+        if (recipient == address(0)) return;
+        if (uint160(recipient) <= 10) return;
+
+        setup(recipient, address(0));
+
+        super.recoverRemainingETH(recipient);
+    }
+
     function batch(BatchItem[] calldata items) public payable override {
         if (items.length > Set.MAX_ELEMENTS) return;
 

@@ -56,6 +56,9 @@ contract VaultEchidna is IVault {
         hevm.prank(address(this));
         try evc.disableController(account) {} catch {}
 
+        hevm.prank(account);
+        try evc.recoverRemainingETH(account) {} catch {}
+
         try evc.callback(account, 0, "") {} catch {}
 
         hevm.prank(account);
@@ -122,6 +125,9 @@ contract VaultEchidna is IVault {
 
         hevm.prank(address(this));
         try evc.disableController(account) {} catch {}
+
+        hevm.prank(account);
+        try evc.recoverRemainingETH(account) {} catch {}
 
         try evc.callback(account, 0, "") {} catch {}
 
@@ -192,6 +198,9 @@ contract VaultEchidna is IVault {
 
         hevm.prank(address(this));
         try evc.disableController(account) {} catch {}
+
+        hevm.prank(account);
+        try evc.recoverRemainingETH(account) {} catch {}
 
         hevm.prank(account);
         try evc.call(address(targetEchidna), account, 0, "") {} catch {}
@@ -277,6 +286,12 @@ contract EchidnaTest {
             data,
             signature
         );
+    }
+
+    function recoverRemainingETH(address recipient) public payable {
+        if (recipient == address(evc)) return;
+        hevm.prank(address(recipient));
+        evc.recoverRemainingETH(recipient);
     }
 
     function callback(address onBehalfOfAccount, bytes calldata data) public payable {
