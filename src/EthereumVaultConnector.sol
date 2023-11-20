@@ -516,7 +516,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
-        if (address(this) == targetContract || msg.sender == targetContract) {
+        if (address(this) == targetContract) {
             revert EVC_InvalidAddress();
         }
 
@@ -753,7 +753,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual onlyOwnerOrOperator(onBehalfOfAccount) returns (bool success, bytes memory result) {
-        if (targetContract == ERC1820_REGISTRY) {
+        if (msg.sender == targetContract || targetContract == ERC1820_REGISTRY) {
             revert EVC_InvalidAddress();
         }
 

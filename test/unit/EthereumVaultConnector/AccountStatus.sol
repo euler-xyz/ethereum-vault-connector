@@ -380,6 +380,8 @@ contract AccountStatusTest is Test {
     }
 
     function test_RevertIfChecksReentrancy_ForgiveAccountStatusCheckNow(address account) external {
+        vm.assume(account != address(evc));
+
         address controller = address(new Vault(evc));
 
         vm.prank(account);
