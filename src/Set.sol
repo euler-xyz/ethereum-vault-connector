@@ -41,11 +41,12 @@ library Set {
     uint8 public constant DUMMY_STAMP = 1;
     uint8 public constant MAX_ELEMENTS = 20;
 
-    /// @notice Initializes the stamp field of the SetStorage and its elements to DUMMY_STAMP.
+    /// @notice Initializes the set by setting the stamp field of the SetStorage and the stamp field of elements to
+    /// DUMMY_STAMP.
     /// @dev The stamp field is used to keep the storage slot non-zero when the element is removed. It allows for
     /// cheaper SSTORE when an element is inserted.
     /// @param setStorage The set storage whose stamp fields will be initialized.
-    function initializeStamps(SetStorage storage setStorage) internal {
+    function initialize(SetStorage storage setStorage) internal {
         setStorage.stamp = DUMMY_STAMP;
 
         for (uint256 i = 1; i < MAX_ELEMENTS;) {
@@ -69,9 +70,8 @@ library Set {
 
         if (numElements == 0) {
             // gas optimization:
-            // on the first element insertion, set the stamp to non-zero value
-            // to keep the storage slot non-zero when the element is removed.
-            // when a new element is inserted after the removal, it should be cheaper
+            // on the first element insertion, set the stamp to non-zero value to keep the storage slot non-zero when
+            // the element is removed. when a new element is inserted after the removal, it should be cheaper
             setStorage.numElements = 1;
             setStorage.firstElement = element;
             setStorage.stamp = DUMMY_STAMP;
