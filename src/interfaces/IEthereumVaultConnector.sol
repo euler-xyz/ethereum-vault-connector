@@ -94,14 +94,13 @@ interface IEVC {
     /// the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the last consumed nonce for a given address prefix and nonce namespace.
+    /// @notice Returns the current nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use
     /// all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in
-    /// a non-sequential manner. A valid nonce value for the permit purposes is considered to be the last consumed nonce
-    /// value plus one.
+    /// a non-sequential manner.
     /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
-    /// @return nonce The last consumed nonce for the given address prefix and nonce namespace.
+    /// @return nonce The current nonce for the given address prefix and nonce namespace.
     function getNonce(uint152 addressPrefix, uint256 nonceNamespace) external view returns (uint256 nonce);
 
     /// @notice Returns the bit field for a given address prefix and operator.
@@ -110,11 +109,8 @@ interface IEVC {
     /// authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being retrieved.
     /// @param operator The address of the operator for which the bit field is being retrieved.
-    /// @return accountOperatorAuthorized The bit field for the given address prefix and operator.
-    function getOperator(
-        uint152 addressPrefix,
-        address operator
-    ) external view returns (uint256 accountOperatorAuthorized);
+    /// @return operatorBitField The bit field for the given address prefix and operator.
+    function getOperator(uint152 addressPrefix, address operator) external view returns (uint256 operatorBitField);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
@@ -220,7 +216,7 @@ interface IEVC {
     /// during the execution of the arbitrary data call.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
     /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the
-    /// last consumed nonce value plus one.
+    /// value currently stored and can take any value between 0 and type(uint256).max - 1.
     /// @param deadline The timestamp after which the permit is considered expired.
     /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
     /// balance of the EVC contract will be forwarded.

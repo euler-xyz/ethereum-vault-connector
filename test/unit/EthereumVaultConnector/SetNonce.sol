@@ -14,16 +14,15 @@ contract SetNonceTest is Test {
         evc = new EthereumVaultConnectorHarness();
     }
 
-    function test_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce, uint8 iterations) public {
+    function test_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(iterations > 0 && iterations < 5);
-        vm.assume(nonce > 0 && nonce <= type(uint256).max - 256 * iterations);
+        vm.assume(nonce > 0);
 
         uint152 addressPrefix = evc.getAddressPrefix(alice);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), 0);
 
         vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(addressPrefix, ++nonce);
+        emit NonceUsed(addressPrefix, nonce - 1);
         vm.prank(alice);
         evc.setNonce(addressPrefix, nonceNamespace, nonce);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), nonce);
@@ -40,7 +39,7 @@ contract SetNonceTest is Test {
         vm.assume(addressPrefix != type(uint152).max);
         vm.assume(operator != address(0));
         vm.assume(!evc.haveCommonOwner(alice, operator));
-        vm.assume(nonce > 0 && nonce < type(uint256).max);
+        vm.assume(nonce > 0);
 
         // fails if address prefix does not belong to an owner
         vm.prank(alice);

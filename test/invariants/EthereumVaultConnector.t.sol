@@ -67,7 +67,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (msg.sender == address(this)) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
         setAccountOwnerInternal(address(uint160(addressPrefix) << 8), msg.sender);
-        nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
+        nonce = nonceLookup[addressPrefix][nonceNamespace];
         super.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
@@ -215,7 +215,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
         deal(address(this), value);
-        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] + 1;
+        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace];
         deadline = block.timestamp;
         super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
     }

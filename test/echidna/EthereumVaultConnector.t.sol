@@ -34,9 +34,9 @@ contract VaultEchidna is IVault {
         // try to reenter the EVC
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint256 nextNonce = evc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
-        try evc.setNonce(prefix, 0, nextNonce) {} catch {}
+        try evc.setNonce(prefix, 0, evc.getNonce(prefix, 0)) {} catch {}
 
         hevm.prank(account);
         try evc.setOperator(prefix, address(this), 0) {} catch {}
@@ -101,7 +101,7 @@ contract VaultEchidna is IVault {
         address account = address(1);
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint256 nextNonce = evc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -171,7 +171,7 @@ contract VaultEchidna is IVault {
         address account = address(2);
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint256 nextNonce = evc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -271,7 +271,7 @@ contract EchidnaTest {
         evc.permit(
             address(signerEchidna),
             0,
-            evc.getNonce(evc.getAddressPrefix(address(evc)), 0) + 1,
+            evc.getNonce(evc.getAddressPrefix(address(evc)), 0),
             block.timestamp,
             0,
             data,
