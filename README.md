@@ -48,10 +48,10 @@ This will download foundryup. To start Foundry, run:
 foundryup
 ```
 
-To clone the repo and install dependencies:
+To clone the repo:
 
 ```sh
-git clone https://github.com/euler-xyz/ethereum-vault-connector.git && cd ethereum-vault-connector && yarn
+git clone https://github.com/euler-xyz/ethereum-vault-connector.git && cd ethereum-vault-connector
 ```
 
 ## Testing
