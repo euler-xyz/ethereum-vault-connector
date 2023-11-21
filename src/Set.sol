@@ -38,8 +38,9 @@ struct SetStorage {
 library Set {
     error TooManyElements();
 
-    uint8 public constant DUMMY_STAMP = 1;
     uint8 public constant MAX_ELEMENTS = 20;
+    uint8 internal constant EMPTY_ELEMENT_OFFSET = 1;
+    uint8 internal constant DUMMY_STAMP = 1;
 
     /// @notice Initializes the set by setting the stamp field of the SetStorage and the stamp field of elements to
     /// DUMMY_STAMP.
@@ -49,7 +50,7 @@ library Set {
     function initialize(SetStorage storage setStorage) internal {
         setStorage.stamp = DUMMY_STAMP;
 
-        for (uint256 i = 1; i < MAX_ELEMENTS;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < MAX_ELEMENTS;) {
             setStorage.elements[i].stamp = DUMMY_STAMP;
 
             unchecked {
@@ -80,7 +81,7 @@ library Set {
 
         if (firstElement == element) return false;
 
-        for (uint256 i = 1; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
             if (setStorage.elements[i].value == element) return false;
 
             unchecked {
@@ -112,7 +113,7 @@ library Set {
 
         uint256 searchIndex;
         if (firstElement != element) {
-            for (searchIndex = 1; searchIndex < numElements;) {
+            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements;) {
                 if (setStorage.elements[searchIndex].value == element) {
                     break;
                 }
@@ -166,7 +167,7 @@ library Set {
 
         output[0] = firstElement;
 
-        for (uint256 i = 1; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
             output[i] = setStorage.elements[i].value;
 
             unchecked {
@@ -189,7 +190,7 @@ library Set {
         if (numElements == 0) return false;
         if (firstElement == element) return true;
 
-        for (uint256 i = 1; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
             if (setStorage.elements[i].value == element) return true;
 
             unchecked {
@@ -214,7 +215,7 @@ library Set {
 
         for (uint256 i; i < numElements;) {
             address element;
-            if (i == 0) {
+            if (i < EMPTY_ELEMENT_OFFSET) {
                 element = firstElement;
                 delete setStorage.firstElement;
             } else {
@@ -251,7 +252,7 @@ library Set {
 
         for (uint256 i; i < numElements;) {
             address element;
-            if (i == 0) {
+            if (i < EMPTY_ELEMENT_OFFSET) {
                 element = firstElement;
                 delete setStorage.firstElement;
             } else {
