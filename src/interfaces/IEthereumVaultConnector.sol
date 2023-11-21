@@ -158,14 +158,14 @@ interface IEVC {
     function setAccountOperator(address account, address operator, bool authorized) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
     /// controller vault.
     /// @param account The address of the account whose collaterals are being queried.
     /// @return An array of addresses that are enabled collaterals for the account.
     function getCollaterals(address account) external view returns (address[] memory);
 
     /// @notice Returns whether a collateral is enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
     /// controller vault.
     /// @param account The address of the account that is being checked.
     /// @param vault The address of the collateral that is being checked.
@@ -173,7 +173,7 @@ interface IEVC {
     function isCollateralEnabled(address account, address vault) external view returns (bool);
 
     /// @notice Enables a collateral for an account.
-    /// @dev A collaterals is a vault for which account's balances are under the control of the currently chosen
+    /// @dev A collaterals is a vault for which account's balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. Account status checks are
     /// performed.
     /// @param account The account address for which the collateral is being enabled.
@@ -181,7 +181,7 @@ interface IEVC {
     function enableCollateral(address account, address vault) external payable;
 
     /// @notice Disables a collateral for an account.
-    /// @dev A collateral is a vault for which account’s balances are under the control of the currently chosen
+    /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. Account status checks are
     /// performed.
     /// @param account The account address for which the collateral is being disabled.

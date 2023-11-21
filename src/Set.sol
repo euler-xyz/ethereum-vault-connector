@@ -212,16 +212,13 @@ library Set {
         if (numElements == 0) return;
 
         setStorage.numElements = 0;
+        setStorage.firstElement = address(0);
 
-        for (uint256 i; i < numElements;) {
-            address element;
-            if (i < EMPTY_ELEMENT_OFFSET) {
-                element = firstElement;
-                delete setStorage.firstElement;
-            } else {
-                element = setStorage.elements[i].value;
-                delete setStorage.elements[i].value;
-            }
+        callback(firstElement);
+
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+            address element = setStorage.elements[i].value;
+            setStorage.elements[i].value = address(0);
 
             callback(element);
 
@@ -249,18 +246,16 @@ library Set {
         if (numElements == 0) return results;
 
         setStorage.numElements = 0;
+        setStorage.firstElement = address(0);
 
-        for (uint256 i; i < numElements;) {
-            address element;
-            if (i < EMPTY_ELEMENT_OFFSET) {
-                element = firstElement;
-                delete setStorage.firstElement;
-            } else {
-                element = setStorage.elements[i].value;
-                delete setStorage.elements[i].value;
-            }
+        (bool success, bytes memory result) = callback(firstElement);
+        results[0] = abi.encode(firstElement, success, result);
 
-            (bool success, bytes memory result) = callback(element);
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+            address element = setStorage.elements[i].value;
+            setStorage.elements[i].value = address(0);
+
+            (success, result) = callback(element);
             results[i] = abi.encode(element, success, result);
 
             unchecked {
