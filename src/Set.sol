@@ -149,7 +149,7 @@ library Set {
             setStorage.numElements = uint8(lastIndex);
         }
 
-        delete setStorage.elements[lastIndex].value;
+        setStorage.elements[lastIndex].value = address(0);
 
         return true;
     }
