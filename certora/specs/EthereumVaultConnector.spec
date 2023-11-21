@@ -1,11 +1,10 @@
 
 methods{
     function getExecutionContextCallDepth() external returns (uint8) envfree;
+    function getExecutionContextAreChecksDeferred() external returns (bool) envfree;
 
     function getAddressPrefix(address) external returns (uint152) envfree;
     function haveCommonOwner(address, address) external returns (bool) envfree;
-
-    function getExecutionContextAreChecksDeferred() external returns (bool) envfree;
 }
 
 //checks that all EVC checks are deferred iff the contract is in call depth > 0
