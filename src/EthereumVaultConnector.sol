@@ -398,6 +398,80 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         requireAccountStatusCheck(account);
     }
 
+    /// @inheritdoc IEVC
+    function replaceCollaterals(
+        address account,
+        address[] calldata vaults
+    ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
+        // get the array of currently enabled collateral vaults
+        address[] memory oldVaults = accountCollaterals[account].get();
+        uint256 oldVaultsLength = oldVaults.length;
+
+        // replace the currently enabled collateral vaults with an array of collateral vaults provided
+        accountCollaterals[account].replace(vaults);
+
+        for (uint256 i; i < vaults.length;) {
+            address vault = vaults[i];
+            bool enabled;
+
+            if (vault == address(this)) revert EVC_InvalidAddress();
+
+            for (uint256 j; j < oldVaultsLength;) {
+                // check if the collateral vault that is enabled after the replacement, was enabled before the
+                // replacement
+                if (vault == oldVaults[j]) {
+                    // remove the collateral vault from the array if it was enabled before the replacement and is
+                    // enabled after the replacement
+                    oldVaults[j] = oldVaults[oldVaultsLength - 1];
+                    oldVaultsLength--;
+
+                    enabled = true;
+                    break;
+                }
+
+                unchecked {
+                    ++j;
+                }
+            }
+
+            // if the collateral vault that is enabled after the replacement, wasn't enabled before the replacement,
+            // emit an event
+            if (!enabled) emit CollateralStatus(account, vault, true);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        for (uint256 i; i < oldVaultsLength;) {
+            address vault = oldVaults[i];
+            bool enabled;
+
+            for (uint256 j; j < vaults.length;) {
+                // check if the collateral vault that was enabled before the replacement is still enabled after the
+                // replacement
+                if (vault == vaults[j]) {
+                    enabled = true;
+                    break;
+                }
+
+                unchecked {
+                    ++j;
+                }
+            }
+
+            // if the collateral vault that was enabled before the replacement is no longer enabled after the
+            // replacement, emit an event
+            if (!enabled) emit CollateralStatus(account, vault, false);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        requireAccountStatusCheck(account);
+    }
+
     // Controllers management
 
     /// @inheritdoc IEVC

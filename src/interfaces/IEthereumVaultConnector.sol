@@ -188,6 +188,15 @@ interface IEVC {
     /// @param vault The address of a collateral being disabled.
     function disableCollateral(address account, address vault) external payable;
 
+    /// @notice Replaces the collaterals enabled for an account with a new array of collaterals.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
+    /// controller vault. Only the owner or an operator of the account can call this function. Account status checks are
+    /// performed. The function will revert if the new array of collaterals contains more than the maximum allowed
+    /// collaterals or if there are duplicates in the array. The vaults are inserted in the order they are provided.
+    /// @param account The account address for which the collaterals are being replaced.
+    /// @param vaults The new array of collaterals.
+    function replaceCollaterals(address account, address[] calldata vaults) external payable;
+
     /// @notice Returns an array of enabled controllers for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances
     /// in the enabled collaterals vaults. A user can have multiple controllers during a call execution, but at most one

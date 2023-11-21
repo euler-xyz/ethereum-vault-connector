@@ -37,6 +37,7 @@ struct SetStorage {
 /// @dev The maximum number of elements in the set is defined by the constant MAX_ELEMENTS.
 library Set {
     error TooManyElements();
+    error DuplicateInArray();
 
     uint8 public constant MAX_ELEMENTS = 20;
     uint8 internal constant EMPTY_ELEMENT_OFFSET = 1;
@@ -152,6 +153,50 @@ library Set {
         delete setStorage.elements[lastIndex].value;
 
         return true;
+    }
+
+    /// @notice Replaces the elements in the set storage with a new array of elements.
+    /// @dev The function will revert if the new array of elements contains more than the maximum allowed elements or if
+    /// there are duplicates in the array.
+    /// @param setStorage The set storage to be replaced.
+    /// @param elements The new array of elements.
+    function replace(SetStorage storage setStorage, address[] calldata elements) internal {
+        uint256 length = elements.length;
+
+        if (length > MAX_ELEMENTS) revert TooManyElements();
+
+        uint256 numElements = setStorage.numElements;
+
+        setStorage.numElements = uint8(length);
+        setStorage.firstElement = length > 0 ? elements[0] : address(0);
+
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < length;) {
+            address element = elements[i];
+
+            for (uint256 j; j < i;) {
+                if (elements[j] == element) revert DuplicateInArray();
+
+                unchecked {
+                    ++j;
+                }
+            }
+
+            setStorage.elements[i].value = element;
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (numElements > EMPTY_ELEMENT_OFFSET && numElements > length) {
+            for (uint256 i = length; i < numElements;) {
+                setStorage.elements[i].value = address(0);
+
+                unchecked {
+                    ++i;
+                }
+            }
+        }
     }
 
     /// @notice Returns a copy of the set storage as a memory array.
