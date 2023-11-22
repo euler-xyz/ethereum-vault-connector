@@ -87,14 +87,14 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
-        uint256 vaule,
+        uint256 value,
         bytes calldata data,
         bytes calldata signature
     ) public payable override nonReentrant {
         // copied function body with setting inPermit flag
         inPermit = true;
 
-        super.permit(signer, nonceNamespace, nonce, deadline, vaule, data, signature);
+        super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
 
         inPermit = false;
     }
