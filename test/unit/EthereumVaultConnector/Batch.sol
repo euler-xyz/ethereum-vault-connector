@@ -268,6 +268,7 @@ contract BatchTest is Test {
         evc.setChecksLock(false);
 
         address vault = address(new VaultMalicious(evc));
+        vm.assume(alice != vault);
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0].onBehalfOfAccount = alice;
@@ -296,6 +297,7 @@ contract BatchTest is Test {
         evc.setChecksLock(false);
 
         address vault = address(new VaultMalicious(evc));
+        vm.assume(alice != vault);
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0].onBehalfOfAccount = alice;

@@ -443,6 +443,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual nonReentrant {
+        // cannot be called within the self-call of the permit(); can occur for nested permit() calls
+        if (address(this) == msg.sender) {
+            revert EVC_NotAuthorized();
+        }
+
         uint152 addressPrefix = getAddressPrefixInternal(signer);
 
         if (signer == address(0) || !isSignerValid(signer)) {

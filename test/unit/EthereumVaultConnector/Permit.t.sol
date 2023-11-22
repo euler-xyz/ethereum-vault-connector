@@ -278,6 +278,43 @@ contract PermitTest is Test {
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
+    function test_RevertIfNestedPermit_Permit(
+        uint256 privateKey,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        uint128 value,
+        bytes memory data2
+    ) public {
+        vm.assume(
+            privateKey > 0
+                && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
+        address alice = vm.addr(privateKey);
+        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        data2 = abi.encode(keccak256(data2));
+        vm.assume(nonce > 0 && nonce < type(uint256).max - 1);
+
+        vm.warp(deadline);
+        vm.deal(address(this), type(uint128).max);
+        signerECDSA.setPrivateKey(privateKey);
+
+        if (nonce > 0) {
+            vm.prank(alice);
+            evc.setNonce(addressPrefix, nonceNamespace, nonce);
+        }
+
+        bytes memory signature2 = signerECDSA.signPermit(alice, nonceNamespace, nonce + 1, deadline, 0, data2);
+        bytes memory data1 = abi.encodeWithSelector(
+            IEVC.permit.selector, alice, nonceNamespace, nonce + 1, deadline, 0, data2, signature2
+        );
+        bytes memory signature1 = signerECDSA.signPermit(alice, nonceNamespace, nonce, deadline, value, data1);
+
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit{value: value}(alice, nonceNamespace, nonce, deadline, value, data1, signature1);
+    }
+
     function test_RevertIfSignerInvalid_Permit(
         address alice,
         uint256 nonceNamespace,
