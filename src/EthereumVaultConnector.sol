@@ -757,10 +757,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // contracts, it is sufficient to set it here rather than in the onlyOwner and onlyOwnerOrOperator
         // modifiers.
         // apart from the usual scenario (when an owner operates on behalf of its account),
-        // the operatorAuthenticated should be cleared when about to execute the permit self-call or a callback
+        // the operatorAuthenticated should be cleared when about to execute the permit self-call, callback,
+        // or when the impersonation is in progress (in which case the operatorAuthenticated is not relevant)
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) || address(this) == targetContract
-                || msg.sender == targetContract
+                || msg.sender == targetContract || contextCache.isImpersonationInProgress()
         ) {
             executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount).clearOperatorAuthenticated();
         } else {
