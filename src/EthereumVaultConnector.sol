@@ -223,7 +223,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     {
         onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
 
-        // for safety, revert if no account has been auhenticated
+        // for safety, revert if no account has been authenticated
         if (onBehalfOfAccount == address(0)) {
             revert EVC_OnBehalfOfAccountNotAuthenticated();
         }
