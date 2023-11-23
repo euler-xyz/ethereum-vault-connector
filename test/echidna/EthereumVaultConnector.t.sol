@@ -50,6 +50,11 @@ contract VaultEchidna is IVault {
         hevm.prank(account);
         try evc.enableCollateral(account, address(this)) {} catch {}
 
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
+
         hevm.prank(account);
         try evc.enableController(account, address(this)) {} catch {}
 
@@ -118,6 +123,11 @@ contract VaultEchidna is IVault {
 
         hevm.prank(account);
         try evc.enableCollateral(account, address(this)) {} catch {}
+
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
 
         hevm.prank(account);
         try evc.enableController(account, address(this)) {} catch {}
@@ -191,6 +201,11 @@ contract VaultEchidna is IVault {
         hevm.prank(account);
         try evc.enableCollateral(account, address(this)) {} catch {}
 
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
+
         hevm.prank(account);
         try evc.enableController(account, address(this)) {} catch {}
 
@@ -205,6 +220,11 @@ contract VaultEchidna is IVault {
 
         hevm.prank(account);
         try evc.enableCollateral(account, address(targetEchidna)) {} catch {}
+
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
 
         hevm.prank(address(this));
         try evc.impersonate(address(targetEchidna), account, 0, "") {} catch {}
@@ -252,6 +272,12 @@ contract EchidnaTest {
         if (account == address(0) || account == address(evc)) return;
         hevm.prank(account);
         evc.enableCollateral(account, vault);
+    }
+
+    function reorderCollateral(address account, uint8 index1, uint8 index2) public payable {
+        if (account == address(0) || account == address(evc)) return;
+        hevm.prank(account);
+        evc.reorderCollaterals(account, index1, index2);
     }
 
     function disableCollateral(address account, address vault) public payable {

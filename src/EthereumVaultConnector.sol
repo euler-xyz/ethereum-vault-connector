@@ -398,6 +398,15 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         requireAccountStatusCheck(account);
     }
 
+    /// @inheritdoc IEVC
+    function reorderCollaterals(
+        address account,
+        uint8 index1,
+        uint8 index2
+    ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
+        accountCollaterals[account].reorder(index1, index2);
+    }
+
     // Controllers management
 
     /// @inheritdoc IEVC

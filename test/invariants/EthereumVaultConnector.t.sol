@@ -113,6 +113,22 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         super.disableCollateral(account, vault);
     }
 
+    function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable override {
+        if (msg.sender == address(this)) return;
+        if (haveCommonOwnerInternal(account, msg.sender)) return;
+        if (account == address(0)) return;
+
+        account = msg.sender;
+
+        if (index1 >= index2 || int256(uint256(index2)) >= int256(uint256(accountCollaterals[account].numElements)) - 2)
+        {
+            return;
+        }
+
+        setAccountOwnerInternal(account, msg.sender);
+        super.reorderCollaterals(account, index1, index2);
+    }
+
     function enableController(address account, address vault) public payable override {
         if (msg.sender == address(this)) return;
         if (haveCommonOwnerInternal(account, msg.sender)) return;
@@ -213,6 +229,8 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         bytes calldata signature
     ) public payable override {
         if (uint160(signer) <= 255 || signer == address(this)) return;
+        if (nonce == type(uint256).max) return;
+        if (value > type(uint128).max) return;
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
         deal(address(this), value);

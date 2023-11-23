@@ -37,6 +37,7 @@ struct SetStorage {
 /// @dev The maximum number of elements in the set is defined by the constant MAX_ELEMENTS.
 library Set {
     error TooManyElements();
+    error InvalidIndex();
 
     uint8 public constant MAX_ELEMENTS = 20;
     uint8 internal constant EMPTY_ELEMENT_OFFSET = 1;
@@ -152,6 +153,23 @@ library Set {
         setStorage.elements[lastIndex].value = address(0);
 
         return true;
+    }
+
+    function reorder(SetStorage storage setStorage, uint8 index1, uint8 index2) internal {
+        address firstElement = setStorage.firstElement;
+        uint256 numElements = setStorage.numElements;
+
+        if (index1 >= index2 || index1 >= numElements || index2 >= numElements) {
+            revert InvalidIndex();
+        }
+
+        if (index1 == 0) {
+            (setStorage.firstElement, setStorage.elements[index2].value) =
+                (setStorage.elements[index2].value, firstElement);
+        } else {
+            (setStorage.elements[index1].value, setStorage.elements[index2].value) =
+                (setStorage.elements[index2].value, setStorage.elements[index1].value);
+        }
     }
 
     /// @notice Returns a copy of the set storage as a memory array.
