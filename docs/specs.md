@@ -175,3 +175,79 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 1. The vault has freedom to implement the Vault Status Check. Depending on the implementation, the initial state snapshotting might not be needed. Depending on the implementation, not all the actions may require the Vault Status Check (i.e. vault share transfers)
 1. One should be careful when forgiving the Account Status Check after impersonation. A malicious target collateral could manipulate the impersonation process leading to a bad debt accrual. To prevent that, ensure that only trusted collaterals that behave in the expected way are being called using the impersonate functionality
 1. When sending regular ERC20 tokens from a vault to an address, one can ensure that the address is not a sub-account but a valid EOA/contract address by getting an account owner from the EVC
+
+### Typical implementation pattern of the EVC-compliant function for a vault
+
+```solidity
+function func() external routedThroughEVC nonReentrant {
+    // retrieve the "true" message sender from the EVC. true/false parameter depends whether it's a debt-related
+    // functionality
+    address msgSender = EVCAuthenticate(true/false);
+
+    // accrue the interest before the snapshot if it relies on it. otherwise it can be accrued after or never if 
+    // the vault does not implement the interest accrual
+    _accrueInterest();
+
+    // take the snapshot if given functionality requires it
+    takeVaultSnapshot();
+
+
+
+    // CUSTOM FUNCTON LOGIC HERE
+
+
+
+    // after all the custom logic has been executed, trigger the account status check and vault status check, if 
+    // the latter one needed. the account for which the account status check is required my differ and depends on 
+    // the function logic. i.e.: 
+    // - for shares transfer the `from` account should be checked 
+    // - for debt transfer the `to` account should be checked
+    // - for borrow the account taking on the debt should be checked
+    // hence, the account checked is not always the `msgSender`
+    requireAccountAndVaultStatusCheck(account);
+}
+```
+
+where `routedThroughEVC` can be implemented as follows:
+
+```solidity
+/// @notice Ensures that the caller is the EVC by using the EVC callback functionality if necessary.
+modifier routedThroughEVC() {
+    if (msg.sender == address(evc)) {
+        _;
+    } else {
+        bytes memory result = evc.callback(msg.sender, 0, msg.data);
+
+        assembly {
+            return(add(32, result), mload(result))
+        }
+    }
+}
+```
+
+where `EVCAuthenticate` can be implemented as follows:
+
+```solidity
+/// @notice Authenticates the caller in the context of the EVC.
+/// @param checkController A boolean flag that indicates whether is should be checked if the vault is enabled as a
+/// controller for the account on behalf of which the operation is being executed.
+/// @return The address of the account on behalf of which the operation is being executed.
+function EVCAuthenticate(bool checkController) internal view returns (address) {
+    if (msg.sender == address(evc)) {
+        (address onBehalfOfAccount, bool controllerEnabled) =
+            evc.getCurrentOnBehalfOfAccount(checkController ? address(this) : address(0));
+
+        if (checkController && !controllerEnabled) {
+            revert ControllerDisabled();
+        }
+
+        return onBehalfOfAccount;
+    }
+
+    if (checkController && !evc.isControllerEnabled(msg.sender, address(this))) {
+        revert ControllerDisabled();
+    }
+
+    return msg.sender;
+}
+```
