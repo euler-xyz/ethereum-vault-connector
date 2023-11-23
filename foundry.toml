@@ -40,6 +40,12 @@ ignore = [
 ]
 
 
+[profile.default.doc]
+out = "forgedoc"
+title = "Ethereum Vault Connector (EVC)"
+repository = "https://github.com/euler-xyz/ethereum-vault-connector"
+
+
 [profile.smt.model_checker]
 engine = "chc"
 timeout = 100_000

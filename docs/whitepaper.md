@@ -164,21 +164,7 @@ Because vaults can be called directly without going through the EVC, checks may 
 
 `callback` will create a context, and call-back into the caller with the provided `msg.data`, forwarding the provided `value` (or full balance of the EVC if max `uint256` was specified). Inside the callback, the `onBehalfOfAccount` account will be set to whatever was provided by the calling vault. The vault should use `msg.sender` for this. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: Recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself.
 
-To use `callback`, it is recommended that vaults use a special modifier `routedThroughEVC` before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
-
-```
-modifier routedThroughEVC() {
-    if (msg.sender == address(evc)) {
-        _;
-    } else {
-        bytes memory result = evc.callback{value: msg.value}(msg.sender, msg.value, msg.data);
-
-        assembly {
-            return(add(32, result), mload(result))
-        }
-    }
-}
-```
+To use `callback`, it is recommended that vaults use a special modifier [`routedThroughEVC`](/docs/specs.md#typical-implementation-pattern-of-the-evc-compliant-function-for-a-vault) before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
 
 ### batch
 
