@@ -22,12 +22,12 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
     }
 }
 
-//Models invariants from other files using a hook on the sets
+//Models invariants `accountControllerNeverContainsEVC` from file EVC_Invariants.spec using a hook on the sets.
 hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement STORAGE {
     require value != currentContract;
 }
 
-//Models invariants from other files using a hook on the sets
+//Models invariants `vaultStatusChecksNeverContainsEVC` from file EVC_Invariants.spec using a hook on the sets. CAUTION: Not sure if this holds.
 hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.firstElement STORAGE {
     require value != currentContract;
 }
