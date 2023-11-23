@@ -6,8 +6,6 @@ methods{
 ghost bool callOpCodeHasBeenCalledWithEVC;
 
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args){
-    requireInvariant accountControllerNeverContainsEVC(e.msg.sender);
-    
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
     require(callOpCodeHasBeenCalledWithEVC == false);
@@ -24,6 +22,12 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
     }
 }
 
-invariant accountControllerNeverContainsEVC(address x)
-    accountControllerContains(x, currentContract) == false;
+//Models invariants from other files using a hook on the sets
+hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement STORAGE {
+    require value != currentContract;
+}
 
+//Models invariants from other files using a hook on the sets
+hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.firstElement STORAGE {
+    require value != currentContract;
+}
