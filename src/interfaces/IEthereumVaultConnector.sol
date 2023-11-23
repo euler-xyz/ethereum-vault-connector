@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 /// @title IEVC
 /// @author Euler Labs (https://www.eulerlabs.com/)

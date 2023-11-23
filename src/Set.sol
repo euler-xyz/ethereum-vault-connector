@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 /// @title ElementStorage
 /// @notice This struct is used to store the value and stamp of an element.
