@@ -310,8 +310,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // be taken from the storage which must be storing the correct owner address
         address owner = address(this) == msg.sender ? ownerLookup[addressPrefix] : msg.sender;
 
-        // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
-        if (operator == address(0) || haveCommonOwnerInternal(owner, operator)) {
+        // the operator can neither be zero address nor be the EVC nor can belong to one of 256 accounts of the owner
+        if (operator == address(0) || operator == address(this) || haveCommonOwnerInternal(owner, operator)) {
             revert EVC_InvalidAddress();
         }
 
@@ -343,8 +343,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_NotAuthorized();
         }
 
-        // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
-        if (operator == address(0) || haveCommonOwnerInternal(owner, operator)) {
+        // the operator can neither be zero address nor be the EVC nor can belong to one of 256 accounts of the owner
+        if (operator == address(0) || operator == address(this) || haveCommonOwnerInternal(owner, operator)) {
             revert EVC_InvalidAddress();
         }
 

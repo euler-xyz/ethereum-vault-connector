@@ -340,8 +340,8 @@ contract EthereumVaultConnectorInvariants is Test {
     }
 
     function invariant_ExecutionContext() external {
-        //vm.expectRevert(Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector);
-        //evc.getCurrentOnBehalfOfAccount(address(0));
+        vm.expectRevert(Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector);
+        evc.getCurrentOnBehalfOfAccount(address(0));
 
         assertEq(evc.getRawExecutionContext(), 1 << 200);
         assertEq(evc.getCurrentCallDepth(), 0);

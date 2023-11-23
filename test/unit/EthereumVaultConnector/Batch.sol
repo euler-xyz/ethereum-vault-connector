@@ -476,6 +476,7 @@ contract BatchTest is Test {
         IEVC.StatusCheckResult[] memory expectedVaultsStatusCheckResult = new IEVC.StatusCheckResult[](1);
 
         address controller = address(new Vault(evc));
+        vm.assume(alice != controller);
 
         vm.prank(alice);
         evc.enableController(alice, controller);

@@ -264,6 +264,14 @@ contract SetOperatorTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.setOperator(addressPrefix, address(evc), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.setAccountOperator(alice, address(evc), true);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
         evc.setOperator(addressPrefix, address(uint160(alice) ^ subAccountId), 0);
 
         vm.prank(alice);
