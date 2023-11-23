@@ -159,7 +159,7 @@ library Set {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
 
-        if (index1 >= index2 || index1 >= numElements || index2 >= numElements) {
+        if (index1 >= index2 || index2 >= numElements) {
             revert InvalidIndex();
         }
 
