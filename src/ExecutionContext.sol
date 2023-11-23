@@ -30,7 +30,7 @@ library ExecutionContext {
     uint256 internal constant STAMP_MASK = 0xFFFFFFFFFFFFFF00000000000000000000000000000000000000000000000000;
     uint256 internal constant ON_BEHALF_OF_ACCOUNT_OFFSET = 8;
     uint256 internal constant STAMP_OFFSET = 200;
-    uint256 internal constant CALL_DEPTH_MAX = 10;
+    uint256 internal constant CALL_DEPTH_MAX = 10; // must not exceed 255
     uint256 internal constant STAMP_DUMMY_VALUE = 1;
 
     error CallDepthViolation();

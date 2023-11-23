@@ -39,8 +39,8 @@ library Set {
     error TooManyElements();
     error InvalidIndex();
 
-    uint8 public constant MAX_ELEMENTS = 20;
-    uint8 internal constant EMPTY_ELEMENT_OFFSET = 1;
+    uint8 public constant MAX_ELEMENTS = 20; // must not exceed 255
+    uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be other than 1
     uint8 internal constant DUMMY_STAMP = 1;
 
     /// @notice Initializes the set by setting the stamp field of the SetStorage and the stamp field of elements to
