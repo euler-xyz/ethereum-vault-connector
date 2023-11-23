@@ -98,7 +98,7 @@ Although having more than one controller is disallowed when the account status c
 
 ### Require Immediate
 
-Inside a checks-deferrable call, account status checks are defered and only checked at the end. However, in some cases it is desirable to immediately check an account's status using `requireAccountStatusCheckNow`. If the specified account has a controller, this vault's `checkAccountStatus` is immediately invoked to determine if the account has a valid status.
+Inside a checks-deferrable call, account status checks are deferred and only checked at the end. However, in some cases it is desirable to immediately check an account's status using `requireAccountStatusCheckNow`. If the specified account has a controller, this vault's `checkAccountStatus` is immediately invoked to determine if the account has a valid status.
 
 If valid, the account is removed from the account status deferral set (if present), so it will not be checked again at the end of the checks-deferrable call. However, any future operations in the same checks-deferrable call that require a (non-immediate) status check will re-add it to the set, and the status will be checked at the end of the call.
 
@@ -118,7 +118,7 @@ When doing so, it is important that vaults verify that no *other* collaterals ha
 
 ## Vault Status Checks
 
-Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maxium amount of assets that can be supplied or borrowed, as a risk minimisation.
+Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maximum amount of assets that can be supplied or borrowed, as a risk minimisation.
 
 It does not necessarily make sense to enforce these checks when checking account status. First of all, if many accounts are affected within a batch, checking these global constraints each time would be redundant.
 
@@ -188,7 +188,7 @@ At the time of this writing, public/private keypair Ethereum accounts (EOAs) can
 * Gas savings: If contracts are invoked multiple times, then the cost of "cold" access can be amortised across all of the invocations.
 * Status check deferrals: Sometimes multiple operations in a batch may require status checks or it is more convenient or efficient to perform some operation that would leave an account/vault in an invalid state, but fix this state in a subsequent operation in a batch. For example, you may want to perform withdrawal and borrow in one batch or borrow and swap *before* you deposit your collateral. With batches, these checks can be performed once at the end of a batch (which can also itself be more gas efficient).
 
-Batches can be composed of both calls to the EVC itself and external calls (when the `targetContract` is not the EVC). Calling the EVC is how users can enable collateral from within a batch, for example. In order to preseve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall` (except for [permit](#permit)).
+Batches can be composed of both calls to the EVC itself and external calls (when the `targetContract` is not the EVC). Calling the EVC is how users can enable collateral from within a batch, for example. In order to preserve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall` (except for [permit](#permit)).
 
 Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
 

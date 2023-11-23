@@ -119,7 +119,7 @@ contract VaultStatusTest is Test {
                 allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
             );
 
-            // first, schedule the check to be performed later to prove that after being peformed on the fly
+            // first, schedule the check to be performed later to prove that after being performed on the fly
             // vault is no longer contained in the set to be performed later
             evc.setCallDepth(1);
 
@@ -146,7 +146,7 @@ contract VaultStatusTest is Test {
             evc.verifyVaultStatusChecks();
         }
 
-        // schedule the checks to be performed later to prove that after being peformed on the fly
+        // schedule the checks to be performed later to prove that after being performed on the fly
         // vaults are no longer contained in the set to be performed later
         evc.setCallDepth(1);
         for (uint256 i = 0; i < vaultsNumber; i++) {

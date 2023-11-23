@@ -44,7 +44,7 @@ contract CollateralsManagementTest is Test {
     }
 
     function test_CollateralsManagement(address alice, uint8 subAccountId, uint8 numberOfVaults, uint256 seed) public {
-        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        // call setUp() explicitly for Diligence Fuzzing tool to pass
         setUp();
 
         vm.assume(alice != address(0) && alice != address(evc));
