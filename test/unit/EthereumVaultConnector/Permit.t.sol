@@ -867,6 +867,10 @@ contract PermitTest is Test {
 
         // a call using ECDSA signature succeeds because alice signed on behalf of herself
         signature = signerECDSA.signPermit(alice, 0, 4, block.timestamp, type(uint256).max, data);
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(address(this), address(evc), alice, bytes4(data));
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(alice, target, alice, Target.callTest.selector);
         evc.permit{value: 123}(alice, 0, 4, block.timestamp, type(uint256).max, data, signature);
 
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
@@ -881,6 +885,9 @@ contract PermitTest is Test {
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 4, block.timestamp, type(uint256).max, data);
+        emit CallWithContext(address(this), address(evc), bob, bytes4(data));
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(bob, target, bob, Target.callTest.selector);
         evc.permit{value: 123}(bob, 0, 4, block.timestamp, type(uint256).max, data, signature);
 
         // encode a call to an external target contract wrapped in a batch
@@ -893,6 +900,10 @@ contract PermitTest is Test {
 
         // a call using ECDSA signature succeeds because alice signed on behalf of herself
         signature = signerECDSA.signPermit(alice, 0, 5, block.timestamp, 456, data);
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(address(this), address(evc), alice, bytes4(data));
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(alice, target, alice, Target.callTest.selector);
         evc.permit{value: 456}(alice, 0, 5, block.timestamp, 456, data, signature);
 
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
@@ -906,6 +917,9 @@ contract PermitTest is Test {
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 5, block.timestamp, 456, data);
+        emit CallWithContext(address(this), address(evc), bob, bytes4(data));
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(bob, target, bob, Target.callTest.selector);
         evc.permit{value: 456}(bob, 0, 5, block.timestamp, 456, data, signature);
     }
 

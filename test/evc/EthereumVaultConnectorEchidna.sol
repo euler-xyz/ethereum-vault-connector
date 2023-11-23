@@ -199,13 +199,19 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         // copied function body with inserted assertion
-        emit CallWithContext(msg.sender, targetContract, onBehalfOfAccount, bytes4(data));
+        if (value > 0 && value != type(uint256).max && value > address(this).balance) {
+            revert EVC_InvalidValue();
+        } else if (value == type(uint256).max) {
+            value = address(this).balance;
+        }
 
         EC contextCache = executionContext;
 
         // EVC can only be msg.sender after the self-call in the permit() function. in that case,
         // the "true" sender address (that is the permit message signer) is taken from the execution context
         address msgSender = address(this) == msg.sender ? contextCache.getOnBehalfOfAccount() : msg.sender;
+
+        emit CallWithContext(msgSender, targetContract, onBehalfOfAccount, bytes4(data));
 
         // set the onBehalfOfAccount in the execution context for the duration of the call.
         // apart from a usual scenario, clear the operator authenticated flag

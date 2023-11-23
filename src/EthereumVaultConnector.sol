@@ -749,13 +749,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             value = address(this).balance;
         }
 
-        emit CallWithContext(msg.sender, targetContract, onBehalfOfAccount, bytes4(data));
-
         EC contextCache = executionContext;
 
         // EVC can only be msg.sender after the self-call in the permit() function. in that case,
         // the "true" sender address (that is the permit message signer) is taken from the execution context
         address msgSender = address(this) == msg.sender ? contextCache.getOnBehalfOfAccount() : msg.sender;
+
+        emit CallWithContext(msgSender, targetContract, onBehalfOfAccount, bytes4(data));
 
         // set the onBehalfOfAccount in the execution context for the duration of the external call.
         // considering that the operatorAuthenticated is only meant to be observable by external
