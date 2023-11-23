@@ -288,7 +288,7 @@ contract ImpersonateTest is Test {
     }
 
     function test_RevertIfInternalCallIsUnsuccessful_Impersonate(address alice) public {
-        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        // call setUp() explicitly for Diligence Fuzzing tool to pass
         setUp();
 
         vm.assume(alice != address(0));

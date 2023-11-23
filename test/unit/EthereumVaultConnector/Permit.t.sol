@@ -544,43 +544,43 @@ contract PermitTest is Test {
         vm.warp(deadline);
 
         // ECDSA signature invalid due to signer.
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         bytes memory signature = signerECDSA.signPermit(address(uint160(alice) + 1), 0, 0, deadline, 0, bytes("0"));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid due to nonce namespace.
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = signerECDSA.signPermit(alice, 1, 0, deadline, 0, bytes("0"));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid due to nonce.
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = signerECDSA.signPermit(alice, 0, 1, deadline, 0, bytes("0"));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid due to deadline.
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = signerECDSA.signPermit(alice, 0, 0, uint256(deadline) + 1, 0, bytes("0"));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid due to value.
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = signerECDSA.signPermit(alice, 0, 0, deadline, 1, bytes("0"));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid due to data.
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = signerECDSA.signPermit(alice, 0, 0, deadline, 0, bytes("1"));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid (wrong length due to added 1).
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = signerECDSA.signPermit(alice, 0, 0, deadline, 0, bytes("0"));
 
         bytes32 r;
@@ -597,25 +597,25 @@ contract PermitTest is Test {
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid (r is 0).
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = abi.encodePacked(uint256(0), s, v);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid (s is 0).
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = abi.encodePacked(r, uint256(0), v);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid (v is 0).
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = abi.encodePacked(r, s, uint8(0));
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);
 
         // ECDSA signature invalid (malleability protection).
-        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccesful
+        // ERC-1271 signature invalid as the signer is EOA and isValidSignature() call is unsuccessful
         signature = abi.encodePacked(r, uint256(0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1), v);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.permit(alice, 0, 0, deadline, 0, bytes("0"), signature);

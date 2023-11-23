@@ -48,7 +48,7 @@
 1. EVC allows a Vault to forgive the Vault Status Check for itself.
 1. Simulation-related functions do not modify the state.
 
-NOTE: In order to borrow, a user must enable a Controller. From then on, whenever the user wants to perform an action that may affect thir solvency, the Controller must be consulted (the Account Status Check must be performed) in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent. The Account Status Check may be requested by the liability vault by calling the EVC which determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
+NOTE: In order to borrow, a user must enable a Controller. From then on, whenever the user wants to perform an action that may affect their solvency, the Controller must be consulted (the Account Status Check must be performed) in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent. The Account Status Check may be requested by the liability vault by calling the EVC which determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
 
 NOTE: Enabling a Controller submits the account to the rules encoded in the Controller contract's code. All the funds in all enabled Collateral Vaults are now indirectly under control of the Controller Vault.
 
@@ -56,7 +56,7 @@ NOTE: Only the Controller can disable itself for the Account. This should typica
 
 NOTE: The protocol deliberately doesn't enforce specific properties about the assets being used as collateral or liabilities. EVC users can therefore create vaults backed by irregular asset classes, such as NFTs, uncollateralised IOUs, or synthetics.
 
-NOTE: Accounts are fully isolated and can be treated as independent positions. Failing Account Status Check (ruled by enabled Controller Vault) may affect the ability to interact with the Account, including operations on the Vaults that are not enabled as Collaterals. In order to make the Account fully functional again, one must satify the Controller Vault's conditions.
+NOTE: Accounts are fully isolated and can be treated as independent positions. Failing Account Status Check (ruled by enabled Controller Vault) may affect the ability to interact with the Account, including operations on the Vaults that are not enabled as Collaterals. In order to make the Account fully functional again, one must satisfy the Controller Vault's conditions.
 
 NOTE: Because the EVC contract can be made to invoke any arbitrary target contract with any arbitrary calldata, it should never be given any privileges, or hold any ETH or tokens.
 
@@ -73,7 +73,7 @@ NOTE: Because the EVC contract can be made to invoke any arbitrary target contra
 1. Vault may implement `checkVaultStatus` function which gets called if the vault requests that via the EVC. The EVC determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately. This is an optional functionality that allows the vault to enforce its constraints (like supply/borrow caps, invariants checks etc.). Vault Status Check must always be requested by the vault after each operation affecting the vault's state. The `checkVaultStatus` function must determine whether or not the Vault is in an acceptable state by returning the magic value or throwing an exception. If the vault doesn't implement this function, the vault mustn't request the Vault Status Check.
 1. In order to evaluate the Vault Status, `checkVaultStatus` may need access to a snapshot of the initial vault state which should be taken at the beginning of the action that requires the check.
 1. Both Account and Vault Status Check should be requested at the very end of the operation.
-1. The Controller may need to forgive the Account Status Check in order for the operation to succeed, i.e. during liquidation. However, the Account Status Check forgiveness must be done with care by ensuring that the forgiven Account's Status Check hadn't been deferred before the operation and that the call requiring the Account Status Check (i.e. Impersonation) does not perform any unexpected operations down the call path.
+1. The Controller may need to forgive the Account Status Check in order for the operation to succeed, i.e. during liquidation. However, the Account Status Check forgiveness must be done with care by ensuring that the forgiven Account's Status Check hasn't been deferred before the operation and that the call requiring the Account Status Check (i.e. Impersonation) does not perform any unexpected operations down the call path.
 
 NOTE: It may be tempting to allow a large set of collateral assets for a Vault. However, vault creators must be careful about which assets they accept. A malicious Vault could lie about the amount of assets it holds, or reject liquidations when a user is in violation. For this reason, vaults should restrict allowed collaterals to a known-good set of audited addresses, or lookup the addresses in a registry or factory contract to ensure they were created by known-good, audited contracts.
 
@@ -81,7 +81,7 @@ NOTE: There is a subtle complication that Vault implementations should consider 
 
 NOTE: It may be critical to protect `check(Account|Vault)Status` functions against reentrancy (depends on individual implementation). Additionally, it is recommended to include the following check as well: `require(msg.sender == address(evc) && evc.areChecksInProgress());`
 
-NOTE: Care should be taken not to transfer any assets to the Accounts other than the Account Owner (ID 0). Otherwise, the assets may be lost. If unsure, a vault may call `getAccountOwner()` function that returns an address of the Account Owner if it's alredy registered on the EVC.
+NOTE: Care should be taken not to transfer any assets to the Accounts other than the Account Owner (ID 0). Otherwise, the assets may be lost. If unsure, a vault may call `getAccountOwner()` function that returns an address of the Account Owner if it's already registered on the EVC.
 
 NOTE: If a Vault attempted to read the Collateral or Controller sets of an Account in order to enforce some policy of its own, then it is possible that a user could defer checks in a batch in order to be able to transiently violate them to satisfy the Vault's policy. For this reason, Vaults should not rely on the Controller or Collateral sets of an Account if checks are deferred.
 
@@ -128,7 +128,7 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 1. Require the Account Status Check on the `from` account
 1. Require the Vault Status Check
 
-### Debt transfer considertations
+### Debt transfer considerations
 1. Ensure reentrancy protection
 1. Authenticate the caller (the account which will receive the debt) depending on whether the vault is being called directly or through the EVC
 1. Check whether the account which will receive the debt has enabled the vault as a controller
@@ -171,7 +171,7 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ### Other considerations
 1. The vault can only be released from being a controller only if the acount has the debt fully repaid
-1. The vault has freedom to execute the Account Status Check, allowing it to price all assets according to its preference, without depending on potentially untrustworthy oracles
-1. The vault has freedeom to implement the Vault Status Check. Depending on the implementation, the initial state snapshotting might not be needed. Depending on the implementation, not all the actions may require the Vault Status Check (i.e. vault share transfers). If snapshot is needed, note that it might require a prior vault state update (i.e. interest rate accrual). 
+1. The vault has freedom to execute the Account Status Check, allowing it to price all the assets according to its preference, without depending on potentially untrustworthy oracles
+1. The vault has freedom to implement the Vault Status Check. Depending on the implementation, the initial state snapshotting might not be needed. Depending on the implementation, not all the actions may require the Vault Status Check (i.e. vault share transfers). If snapshot is needed, note that it might require a prior vault state update (i.e. interest rate accrual). 
 1. One should be careful when forgiving the Account Status Check after impersonation. A malicious target collateral could manipulate the impersonation process leading to a bad debt accrual. To prevent that, ensure that only trusted collaterals that behave in the expected way are being called using the impersonate functionality
 1. When sending regular ERC20 tokens from a vault to an address, one can ensure that the address is not a sub-account but a valid EOA/contract address by getting an account owner from the EVC

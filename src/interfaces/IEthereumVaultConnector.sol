@@ -106,7 +106,7 @@ interface IEVC {
     function getAccountOwner(address account) external view returns (address);
 
     /// @notice Returns the current nonce for a given address prefix and nonce namespace.
-    /// @dev Each nonce namespace provides 256 bit nonce that has to be used seqentially. There's no requirement to use
+    /// @dev Each nonce namespace provides 256 bit nonce that has to be used sequentially. There's no requirement to use
     /// all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in
     /// a non-sequential manner.
     /// @param addressPrefix The address prefix for which the nonce is being retrieved.
@@ -131,7 +131,7 @@ interface IEVC {
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit
-    /// nonce that has to be used seqentially. There's no requirement to use all the nonces for a given nonce namespace
+    /// nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce namespace
     /// before moving to the next one which allows to use permit messages in a non-sequential manner. To invalidate
     /// signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit
     /// messages for a given nonce namespace, set the nonce to type(uint).max.
@@ -151,7 +151,7 @@ interface IEVC {
     /// @notice Authorizes or deauthorizes an operator for the account.
     /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that
     /// can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can
-    /// only deauthorize ifself.
+    /// only deauthorize itself.
     /// @param account The address of the account whose operator is being set or unset.
     /// @param operator The address of the operator that is being installed or uninstalled.
     /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
@@ -263,7 +263,7 @@ interface IEVC {
 
     /// @notice Calls back into the msg.sender with the context set as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks
+    /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
     /// are performed after the call.
     /// @dev This function can be used to defer account and vault status checks by providing calldata and the context
     /// with which the msg.sender will be called back.
@@ -281,7 +281,7 @@ interface IEVC {
 
     /// @notice Calls into a target contract as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks
+    /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
     /// are performed after the call.
     /// @dev This function can be used to interact with any contract while checks deferred. Only the owner or an
     /// operator of the account can call this function.
@@ -302,7 +302,7 @@ interface IEVC {
     /// @notice For a given account, calls into one of the enabled collateral vaults from the currently enabled
     /// controller vault as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the call. If the initiall call depth is 0, the account and vault status checks
+    /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
     /// are performed after the call.
     /// @dev This function can be used to interact with any contract while checks deferred as long as the contract is
     /// enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
@@ -322,7 +322,7 @@ interface IEVC {
 
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the calls. If the initiall call depth is 0, the account and vault status checks
+    /// call depth for the duration of the calls. If the initial call depth is 0, the account and vault status checks
     /// are performed after the calls.
     /// @param items An array of batch items to be executed.
     function batch(BatchItem[] calldata items) external payable;

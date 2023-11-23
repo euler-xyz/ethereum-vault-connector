@@ -131,7 +131,7 @@ contract AccountStatusTest is Test {
                 allStatusesValid ? 0 : uint160(account) % 3 == 0 ? 0 : uint160(account) % 3 == 1 ? 1 : 2
             );
 
-            // first, schedule the check to be performed later to prove that after being peformed on the fly
+            // first, schedule the check to be performed later to prove that after being performed on the fly
             // account is no longer contained in the set to be performed later
             evc.setCallDepth(1);
             evc.requireAccountStatusCheck(account);
@@ -157,7 +157,7 @@ contract AccountStatusTest is Test {
             evc.reset();
         }
 
-        // schedule the checks to be performed later to prove that after being peformed on the fly
+        // schedule the checks to be performed later to prove that after being performed on the fly
         // accounts are no longer contained in the set to be performed later
         evc.setCallDepth(1);
 

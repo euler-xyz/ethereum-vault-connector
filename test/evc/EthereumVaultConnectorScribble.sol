@@ -24,7 +24,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     /// #if_succeeds "collateral cannot be EVC" vault != address(this);
@@ -32,21 +32,21 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.enableCollateral(account, vault);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vaults are swapped" old(accountCollaterals[account].get()[index1]) == accountCollaterals[account].get()[index2] && old(accountCollaterals[account].get()[index2]) == accountCollaterals[account].get()[index1];
     /// #if_succeeds "number of vaults in the set doesn't change" old(accountCollaterals[account].numElements) == accountCollaterals[account].numElements;
     function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable virtual override {
         super.reorderCollaterals(account, index1, index2);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     function disableCollateral(address account, address vault) public payable virtual override {
         super.disableCollateral(account, vault);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
     /// #if_succeeds "controller cannot be EVC" vault != address(this);
@@ -54,14 +54,14 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.enableController(account, vault);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountControllers[account].contains(msg.sender);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountControllers[account].numElements == accountControllers[account].get().length;
     function disableController(address account) public payable virtual override {
         super.disableController(account);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     function permit(
         address signer,
         uint256 nonceNamespace,
@@ -74,13 +74,13 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "EVC balance is zero after calling this" address(this).balance == 0;
     function recoverRemainingETH(address recipient) public payable virtual override {
         super.recoverRemainingETH(recipient);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the caller cannot be EVC" msg.sender != address(this);
     function callback(
         address onBehalfOfAccount,
@@ -90,7 +90,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         return super.callback(onBehalfOfAccount, value, data);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry nor itself" targetContract != address(this) && targetContract != ERC1820_REGISTRY && targetContract != msg.sender;
     function call(
         address targetContract,
@@ -101,7 +101,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         return super.call(targetContract, onBehalfOfAccount, value, data);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetCollateral);
     /// #if_succeeds "the target can neither be this contract not itself" targetCollateral != address(this) && targetCollateral != msg.sender;
     function impersonate(
@@ -113,7 +113,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         return super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
     }
 
-    /// #if_succeeds "is non-reentant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "call depth doesn't change pre- and post- execution" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
     /// #if_succeeds "checks are properly executed 1" !old(executionContext.areChecksDeferred()) && old(accountStatusChecks.numElements) > 0 ==> accountStatusChecks.numElements == 0;
     /// #if_succeeds "checks are properly executed 2" !old(executionContext.areChecksDeferred()) && old(vaultStatusChecks.numElements) > 0 ==> vaultStatusChecks.numElements == 0;
@@ -126,55 +126,55 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.batchRevert(items);
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> accountStatusChecks.contains(account);
     function requireAccountStatusCheck(address account) public payable virtual override {
         super.requireAccountStatusCheck(account);
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is never added to the set or it's removed if previously present" !accountStatusChecks.contains(account);
     function requireAccountStatusCheckNow(address account) public payable virtual override {
         super.requireAccountStatusCheckNow(account);
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "the set is empty after calling this" accountStatusChecks.numElements == 0;
     function requireAllAccountsStatusCheckNow() public payable virtual override {
         super.requireAllAccountsStatusCheckNow();
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is never present in the set after calling this" !accountStatusChecks.contains(account);
     function forgiveAccountStatusCheck(address account) public payable virtual override {
         super.forgiveAccountStatusCheck(account);
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "vault is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> vaultStatusChecks.contains(msg.sender);
     function requireVaultStatusCheck() public payable virtual override {
         super.requireVaultStatusCheck();
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(msg.sender);
     function requireVaultStatusCheckNow() public payable virtual override {
         super.requireVaultStatusCheckNow();
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "the set is empty after calling this" vaultStatusChecks.numElements == 0;
     function requireAllVaultsStatusCheckNow() public payable virtual override {
         super.requireAllVaultsStatusCheckNow();
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "vault is never present in the set after calling this" !vaultStatusChecks.contains(msg.sender);
     function forgiveVaultStatusCheck() public payable virtual override {
         super.forgiveVaultStatusCheck();
     }
 
-    /// #if_succeeds "is checks non-reentant" !old(executionContext.areChecksInProgress());
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> accountStatusChecks.contains(account);
     /// #if_succeeds "vault is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> vaultStatusChecks.contains(msg.sender);
     function requireAccountAndVaultStatusCheck(address account) public payable virtual override {

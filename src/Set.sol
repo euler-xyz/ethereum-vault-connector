@@ -15,7 +15,7 @@ struct ElementStorage {
 
 /// @title SetStorage
 /// @notice This struct is used to store the set data.
-/// @dev To optimize the gas consuption, firstElement is stored in the same storage slot as the numElements
+/// @dev To optimize the gas consumption, firstElement is stored in the same storage slot as the numElements
 /// @dev so that for sets with one element, only one storage slot has to be read/written. To keep the elements
 /// @dev array indexing consistent and because the first element is stored outside of the array, the elements[0]
 /// @dev is not utilized. The stamp field is used to keep the storage slot non-zero when the element is removed.
