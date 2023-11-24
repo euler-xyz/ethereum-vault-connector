@@ -23,4 +23,8 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function vaultStatusCheckContains(address vault) public view returns (bool){
         return vaultStatusChecks.contains(vault);
     }
+    
+    function getOwnerOf(uint152 prefix) public view returns (address) {
+        return ownerLookup[prefix];
+    }
 }
