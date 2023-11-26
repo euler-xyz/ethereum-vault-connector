@@ -76,6 +76,10 @@ contract SignerECDSA is EIP712, Test {
     EthereumVaultConnector private immutable evc;
     uint256 private privateKey;
 
+    bytes32 internal constant PERMIT_TYPEHASH = keccak256(
+        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
+    );
+
     constructor(EthereumVaultConnector _evc) EIP712(_evc.name(), _evc.version()) {
         evc = _evc;
     }
@@ -96,9 +100,8 @@ contract SignerECDSA is EIP712, Test {
         uint256 value,
         bytes calldata data
     ) external view returns (bytes memory signature) {
-        bytes32 structHash = keccak256(
-            abi.encode(evc.PERMIT_TYPEHASH(), signer, nonceNamespace, nonce, deadline, value, keccak256(data))
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(PERMIT_TYPEHASH, signer, nonceNamespace, nonce, deadline, value, keccak256(data)));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, _hashTypedDataV4(structHash));
         signature = abi.encodePacked(r, s, v);
     }
@@ -108,6 +111,10 @@ contract SignerERC1271 is EIP712, IERC1271 {
     EthereumVaultConnector private immutable evc;
     bytes32 private signatureHash;
     bytes32 private permitHash;
+
+    bytes32 internal constant PERMIT_TYPEHASH = keccak256(
+        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
+    );
 
     constructor(EthereumVaultConnector _evc) EIP712(_evc.name(), _evc.version()) {
         evc = _evc;
@@ -129,9 +136,8 @@ contract SignerERC1271 is EIP712, IERC1271 {
         uint256 value,
         bytes calldata data
     ) external {
-        bytes32 structHash = keccak256(
-            abi.encode(evc.PERMIT_TYPEHASH(), signer, nonceNamespace, nonce, deadline, value, keccak256(data))
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(PERMIT_TYPEHASH, signer, nonceNamespace, nonce, deadline, value, keccak256(data)));
         permitHash = _hashTypedDataV4(structHash);
     }
 

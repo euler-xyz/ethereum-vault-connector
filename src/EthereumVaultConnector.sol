@@ -24,15 +24,15 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     string public constant name = "Ethereum Vault Connector";
     string public constant version = "1";
 
-    bytes32 public constant PERMIT_TYPEHASH = keccak256(
+    bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
+    bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
+
+    bytes32 internal constant PERMIT_TYPEHASH = keccak256(
         "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
     bytes32 internal constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-
-    bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
-    bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
     address internal constant ERC1820_REGISTRY = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
