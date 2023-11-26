@@ -378,12 +378,12 @@ contract EthereumVaultConnectorInvariants is Test {
         ) = evc.exposeAccountAndVaultStatusCheck();
 
         assertTrue(accountStatusChecksNumElements == 0);
-        for (uint256 i = 0; i < accountStatusChecks.length; i++) {
+        for (uint256 i = 0; i < accountStatusChecks.length; ++i) {
             assertTrue(accountStatusChecks[i] == address(0));
         }
 
         assertTrue(vaultStatusChecksNumElements == 0);
-        for (uint256 i = 0; i < vaultStatusChecks.length; i++) {
+        for (uint256 i = 0; i < vaultStatusChecks.length; ++i) {
             assertTrue(vaultStatusChecks[i] == address(0));
         }
     }

@@ -28,13 +28,9 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
 
         if (executionContext.areChecksDeferred()) return;
 
-        address[] memory controllers = accountControllers[account].get();
+        expectedAccountsChecked.push(account);
 
-        require(controllers.length <= 1, "handlerReorderCollaterals/length1");
-
-        if (controllers.length == 0) return;
-
-        require(Vault(controllers[0]).getAccountStatusChecked().length == 0, "handlerReorderCollaterals/length2");
+        verifyAccountStatusChecks();
     }
 
     function handlerDisableCollateral(address account, address vault) external {

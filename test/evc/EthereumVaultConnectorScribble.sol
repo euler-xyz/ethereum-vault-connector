@@ -33,17 +33,17 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the vaults are swapped" old(accountCollaterals[account].get()[index1]) == accountCollaterals[account].get()[index2] && old(accountCollaterals[account].get()[index2]) == accountCollaterals[account].get()[index1];
-    /// #if_succeeds "number of vaults in the set doesn't change" old(accountCollaterals[account].numElements) == accountCollaterals[account].numElements;
-    function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable virtual override {
-        super.reorderCollaterals(account, index1, index2);
-    }
-
-    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is not present the collateral set 2" !accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 2" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     function disableCollateral(address account, address vault) public payable virtual override {
         super.disableCollateral(account, vault);
+    }
+
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "the vaults are swapped" old(accountCollaterals[account].get()[index1]) == accountCollaterals[account].get()[index2] && old(accountCollaterals[account].get()[index2]) == accountCollaterals[account].get()[index1];
+    /// #if_succeeds "number of vaults in the set doesn't change" old(accountCollaterals[account].numElements) == accountCollaterals[account].numElements;
+    function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable virtual override {
+        super.reorderCollaterals(account, index1, index2);
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());

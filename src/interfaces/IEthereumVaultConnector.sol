@@ -193,7 +193,8 @@ interface IEVC {
     /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. The order of collaterals
     /// can be changed by specifying the indices of the two collaterals to be swapped. Indices are zero-based and must
-    /// be in the range of 0 to the number of collaterals minus 1. index1 must be lower than index2.
+    /// be in the range of 0 to the number of collaterals minus 1. index1 must be lower than index2. Account status
+    /// checks are performed.
     /// @param account The address of the account for which the collaterals are being reordered.
     /// @param index1 The index of the first collateral to be swapped.
     /// @param index2 The index of the second collateral to be swapped.
