@@ -1,8 +1,3 @@
-
-methods{
-    function accountControllerContains(address base, address lookUp) external returns (bool) envfree;
-}
-
 ghost bool callOpCodeHasBeenCalledWithEVC;
 
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args){
@@ -17,9 +12,8 @@ rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args){
 
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
     //e.msg.sender is equal to EVC, switch the flag.
-    if(addr == currentContract){
-        callOpCodeHasBeenCalledWithEVC = true;
-    }
+    callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || 
+        (executingContract == currentContract && addr == currentContract);
 }
 
 //Models invariant `accountControllerNeverContainsEVC` from file EVC_Invariants.spec using a hook on the sets.
