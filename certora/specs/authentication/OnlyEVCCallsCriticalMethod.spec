@@ -59,7 +59,7 @@ hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.element
 ////////////////////////////////////////////////////////////////
 //                                                            //
 //                Ghost and Hook for Property                 //
-//  CVC can only be msg.sender during the permit() function   //
+//  EVC can only be msg.sender during the permit() function   //
 //                                                            //
 ////////////////////////////////////////////////////////////////
 
@@ -92,7 +92,7 @@ invariant vaultStatusChecksNeverContainsEVC()
     filtered {f -> !isMustRevertingFunction(f)}
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
-// This invariant checks the property of interest "CVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
+// This invariant checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
 invariant onlyEVCCanCallCriticalMethod(address x) 
      callOpCodeHasBeenCalledWithEVC == false
      filtered {f -> !isMustRevertingFunction(f)}
