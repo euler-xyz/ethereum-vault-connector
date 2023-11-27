@@ -39,6 +39,12 @@ hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.element
     if (!insertedEVCAsVault) require(value != currentContract);
 }
 
+hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
+    //e.msg.sender is equal to EVC, switch the flag.
+    callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || 
+        (executingContract == currentContract && addr == currentContract);
+}
+
 // This invariant checks that account controller never contains EVC
 invariant accountControllerNeverContainsEVC(address x)
     insertedEVCAsController == false;
@@ -60,10 +66,4 @@ rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args, address x){
     f(e,args);
 
     assert callOpCodeHasBeenCalledWithEVC == false, "Only EVC can call critical method.";
-}
-
-hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
-    //e.msg.sender is equal to EVC, switch the flag.
-    callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || 
-        (executingContract == currentContract && addr == currentContract);
 }
