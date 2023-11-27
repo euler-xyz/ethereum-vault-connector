@@ -1,3 +1,8 @@
+//General definition of functions that must revert. Proven in functionality/MustRevertFunctions.spec
+definition isMustRevertingFunction(method f) returns bool =
+    f.selector == sig:EthereumVaultConnectorHarness.batchSimulation(IEVC.BatchItem[]).selector ||
+    f.selector == sig:EthereumVaultConnectorHarness.batchRevert(IEVC.BatchItem[]).selector;
+
 ////////////////////////////////////////////////////////////////
 //                                                            //
 //           Account Controllers (Ghost and Hooks)            //
@@ -78,16 +83,19 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
 
 // This invariant checks that account controller never contains EVC
 invariant accountControllerNeverContainsEVC(address x)
-    insertedEVCAsController == false;
+    insertedEVCAsController == false
+    filtered {f -> !isMustRevertingFunction(f)}
 
 // This invariant checks that vault status checks never contains EVC
 invariant vaultStatusChecksNeverContainsEVC()
     insertedEVCAsVault == false
+    filtered {f -> !isMustRevertingFunction(f)}
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
 // This invariant checks the property of interest "CVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
-invariant onlyEVCCanCallCriticalMethod(address x)
+invariant onlyEVCCanCallCriticalMethod(address x) 
      callOpCodeHasBeenCalledWithEVC == false
+     filtered {f -> !isMustRevertingFunction(f)}
      {
          preserved with (env e) {
             require e.msg.sender != currentContract;
