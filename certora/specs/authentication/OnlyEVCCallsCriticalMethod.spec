@@ -82,7 +82,7 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
 ////////////////////////////////////////////////////////////////
 
 // This invariant checks that account controller never contains EVC
-invariant accountControllerNeverContainsEVC(address x)
+invariant accountControllerNeverContainsEVC()
     insertedEVCAsController == false
     filtered {f -> !isMustRevertingFunction(f)}
 
@@ -93,13 +93,13 @@ invariant vaultStatusChecksNeverContainsEVC()
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
 // This invariant checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
-invariant onlyEVCCanCallCriticalMethod(address x) 
+invariant onlyEVCCanCallCriticalMethod() 
      callOpCodeHasBeenCalledWithEVC == false
      filtered {f -> !isMustRevertingFunction(f)}
      {
          preserved with (env e) {
             require e.msg.sender != currentContract;
             requireInvariant vaultStatusChecksNeverContainsEVC();
-            requireInvariant accountControllerNeverContainsEVC(x);
+            requireInvariant accountControllerNeverContainsEVC();
          }
      }
