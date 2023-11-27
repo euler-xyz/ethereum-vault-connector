@@ -164,7 +164,7 @@ contract CallTest is Test {
     }
 
     function test_RevertIfTargetContractInvalid_Call(address alice, uint256 seed) public {
-        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        // call setUp() explicitly for Diligence Fuzzing tool to pass
         setUp();
 
         vm.assume(alice != address(0));
@@ -226,7 +226,7 @@ contract CallTest is Test {
     }
 
     function test_RevertIfInternalCallIsUnsuccessful_Call(address alice) public {
-        // call setUp() explicitly for Dilligence Fuzzing tool to pass
+        // call setUp() explicitly for Diligence Fuzzing tool to pass
         setUp();
 
         vm.assume(alice != address(0));

@@ -48,16 +48,16 @@ contract AccountAndVaultStatusTest is Test {
                 allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
             );
 
-            bool alredyExpectsRevert;
+            bool alreadyExpectsRevert;
             if (!(allStatusesValid || uint160(account) % 3 == 0)) {
-                alredyExpectsRevert = true;
+                alreadyExpectsRevert = true;
 
                 vm.expectRevert(
                     uint160(account) % 3 == 1 ? bytes("account status violation") : abi.encode(bytes4(uint32(2)))
                 );
             }
 
-            if (!(allStatusesValid || uint160(vault) % 3 == 0) && !alredyExpectsRevert) {
+            if (!(allStatusesValid || uint160(vault) % 3 == 0) && !alreadyExpectsRevert) {
                 vm.expectRevert(
                     uint160(vault) % 3 == 1 ? bytes("vault status violation") : abi.encode(bytes4(uint32(1)))
                 );
