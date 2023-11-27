@@ -1,3 +1,9 @@
+////////////////////////////////////////////////////////////////
+//                                                            //
+//           Account Controllers (Ghost and Hooks)            //
+//                                                            //
+////////////////////////////////////////////////////////////////
+
 
 // variable is true if we inserted EVC as a controller anywhere
 ghost bool insertedEVCAsController {
@@ -19,6 +25,12 @@ hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY ad
     if (!insertedEVCAsController) require(value != currentContract);
 }
 
+////////////////////////////////////////////////////////////////
+//                                                            //
+//           Vault Status Checks (Ghost and Hooks)            //
+//                                                            //
+////////////////////////////////////////////////////////////////
+
 // variable is true if we inserted EVC as a vault for a check anywhere
 ghost bool insertedEVCAsVault {
     init_state axiom insertedEVCAsVault == false;
@@ -39,11 +51,30 @@ hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.element
     if (!insertedEVCAsVault) require(value != currentContract);
 }
 
+////////////////////////////////////////////////////////////////
+//                                                            //
+//                Ghost and Hook for Property                 //
+//  CVC can only be msg.sender during the permit() function   //
+//                                                            //
+////////////////////////////////////////////////////////////////
+
+// variable is true when a call was made with e.msg.sender == EVC
+ghost bool callOpCodeHasBeenCalledWithEVC {
+    init_state axiom callOpCodeHasBeenCalledWithEVC == false;
+}
+
+// hook applied to every call, updates the ghost.
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
-    //e.msg.sender is equal to EVC, switch the flag.
+    //e.msg.sender is equal to EVC (currentContract and exeuctingContract), switch the flag.
     callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || 
         (executingContract == currentContract && addr == currentContract);
 }
+
+////////////////////////////////////////////////////////////////
+//                                                            //
+//                         Invariants                         //
+//                                                            //
+////////////////////////////////////////////////////////////////
 
 // This invariant checks that account controller never contains EVC
 invariant accountControllerNeverContainsEVC(address x)
@@ -54,16 +85,13 @@ invariant vaultStatusChecksNeverContainsEVC()
     insertedEVCAsVault == false
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
-ghost bool callOpCodeHasBeenCalledWithEVC;
-
-rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args, address x){
-    requireInvariant accountControllerNeverContainsEVC(x);
-    requireInvariant vaultStatusChecksNeverContainsEVC();
-    //Exclude EVC as being the initiator of the call.
-    require(e.msg.sender != currentContract);
-    require(callOpCodeHasBeenCalledWithEVC == false);
-    //Call all contract methods
-    f(e,args);
-
-    assert callOpCodeHasBeenCalledWithEVC == false, "Only EVC can call critical method.";
-}
+// This invariant checks the property of interest "CVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
+invariant onlyEVCCanCallCriticalMethod(address x)
+     callOpCodeHasBeenCalledWithEVC == false
+     {
+         preserved with (env e) {
+            require e.msg.sender != currentContract;
+            requireInvariant vaultStatusChecksNeverContainsEVC();
+            requireInvariant accountControllerNeverContainsEVC(x);
+         }
+     }
