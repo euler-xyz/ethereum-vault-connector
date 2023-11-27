@@ -16,14 +16,6 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return executionContext.areChecksDeferred();
     }
 
-    function accountControllerContains(address base, address lookUp) public view returns (bool){
-        return accountControllers[base].contains(lookUp);
-    }
-
-    function vaultStatusCheckContains(address vault) public view returns (bool){
-        return vaultStatusChecks.contains(vault);
-    }
-    
     function getOwnerOf(uint152 prefix) public view returns (address) {
         return ownerLookup[prefix];
     }
