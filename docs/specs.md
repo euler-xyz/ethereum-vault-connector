@@ -198,13 +198,14 @@ function func() external routedThroughEVC nonReentrant {
 
 
     // after all the custom logic has been executed, trigger the account status check and vault status check, if 
-    // the latter one needed. the account for which the account status check is required my differ and depends on 
+    // the latter one is needed. the account for which the account status check is required my differ and depends on 
     // the function logic. i.e.: 
     // - for shares transfer the `from` account should be checked 
     // - for debt transfer the `to` account should be checked
     // - for borrow the account taking on the debt should be checked
     // hence, the account checked is not always the `msgSender`
-    requireAccountAndVaultStatusCheck(account);
+    requireAccountStatusCheck(account);
+    requireVaultStatusCheck();
 }
 ```
 
