@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 /// @title IEVC
 /// @author Euler Labs (https://www.eulerlabs.com/)
@@ -12,10 +12,10 @@ interface IEVC {
         /// @notice The target contract to be called.
         address targetContract;
         /// @notice The account on behalf of which the operation is to be performed. msg.sender must be authorized to
-        /// act on behalf.
+        /// act on behalf of this account. Must be address(0) if the target contract is the EVC itself.
         address onBehalfOfAccount;
         /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
-        /// balance of the EVC contract will be forwarded.
+        /// balance of the EVC contract will be forwarded. Must be 0 if the target contract is the EVC itself.
         uint256 value;
         /// @notice The encoded data which is called on the target contract.
         bytes data;
@@ -27,6 +27,17 @@ interface IEVC {
         /// @notice A boolean indicating whether the operation was successful.
         bool success;
         /// @notice The result of the operation.
+        bytes result;
+    }
+
+    /// @notice A struct representing the result of the account or vault status check.
+    /// @dev Used only for simulation purposes.
+    struct StatusCheckResult {
+        /// @notice The address of the account or vault for which the check was performed.
+        address checkedAddress;
+        /// @notice A boolean indicating whether the status of the account or vault is valid.
+        bool isValid;
+        /// @notice The result of the check.
         bytes result;
     }
 
@@ -94,14 +105,13 @@ interface IEVC {
     /// the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
-    /// @notice Returns the last consumed nonce for a given address prefix and nonce namespace.
+    /// @notice Returns the current nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used sequentially. There's no requirement to use
     /// all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in
-    /// a non-sequential manner. A valid nonce value for the permit purposes is considered to be the last consumed nonce
-    /// value plus one.
+    /// a non-sequential manner.
     /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
-    /// @return nonce The last consumed nonce for the given address prefix and nonce namespace.
+    /// @return nonce The current nonce for the given address prefix and nonce namespace.
     function getNonce(uint152 addressPrefix, uint256 nonceNamespace) external view returns (uint256 nonce);
 
     /// @notice Returns the bit field for a given address prefix and operator.
@@ -110,11 +120,8 @@ interface IEVC {
     /// authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being retrieved.
     /// @param operator The address of the operator for which the bit field is being retrieved.
-    /// @return accountOperatorAuthorized The bit field for the given address prefix and operator.
-    function getOperator(
-        uint152 addressPrefix,
-        address operator
-    ) external view returns (uint256 accountOperatorAuthorized);
+    /// @return operatorBitField The bit field for the given address prefix and operator.
+    function getOperator(uint152 addressPrefix, address operator) external view returns (uint256 operatorBitField);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
@@ -151,14 +158,15 @@ interface IEVC {
     function setAccountOperator(address account, address operator, bool authorized) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen
-    /// controller vault.
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
+    /// controller vault. The array returned is ordered by the order in which the collaterals were enabled (not
+    /// accounting for duplicates).
     /// @param account The address of the account whose collaterals are being queried.
     /// @return An array of addresses that are enabled collaterals for the account.
     function getCollaterals(address account) external view returns (address[] memory);
 
     /// @notice Returns whether a collateral is enabled for an account.
-    /// @dev A collateral is a vault for which account's balances are under the control of the currently chosen
+    /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
     /// controller vault.
     /// @param account The address of the account that is being checked.
     /// @param vault The address of the collateral that is being checked.
@@ -166,25 +174,37 @@ interface IEVC {
     function isCollateralEnabled(address account, address vault) external view returns (bool);
 
     /// @notice Enables a collateral for an account.
-    /// @dev A collaterals is a vault for which account's balances are under the control of the currently chosen
-    /// controller vault. Only the owner or an operator of the account can call this function. Account status checks are
-    /// performed.
+    /// @dev A collaterals is a vault for which account's balances are under the control of the currently enabled
+    /// controller vault. Only the owner or an operator of the account can call this function. Unless it's a duplicate,
+    /// the collateral is added to the end of the array. Account status checks are performed.
     /// @param account The account address for which the collateral is being enabled.
     /// @param vault The address being enabled as a collateral.
     function enableCollateral(address account, address vault) external payable;
 
     /// @notice Disables a collateral for an account.
-    /// @dev A collateral is a vault for which account’s balances are under the control of the currently chosen
-    /// controller vault. Only the owner or an operator of the account can call this function. Account status checks are
-    /// performed.
+    /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
+    /// controller vault. Only the owner or an operator of the account can call this function. Disabling a collateral
+    /// might change the order of collaterals in storage. Account status checks are performed.
     /// @param account The account address for which the collateral is being disabled.
     /// @param vault The address of a collateral being disabled.
     function disableCollateral(address account, address vault) external payable;
 
+    /// @notice Reorders the set of collaterals for a given account.
+    /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
+    /// controller vault. Only the owner or an operator of the account can call this function. The order of collaterals
+    /// can be changed by specifying the indices of the two collaterals to be swapped. Indices are zero-based and must
+    /// be in the range of 0 to the number of collaterals minus 1. index1 must be lower than index2. Account status
+    /// checks are performed.
+    /// @param account The address of the account for which the collaterals are being reordered.
+    /// @param index1 The index of the first collateral to be swapped.
+    /// @param index2 The index of the second collateral to be swapped.
+    function reorderCollaterals(address account, uint8 index1, uint8 index2) external payable;
+
     /// @notice Returns an array of enabled controllers for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances
     /// in the enabled collaterals vaults. A user can have multiple controllers during a call execution, but at most one
-    /// can be selected when the account status check is performed.
+    /// can be selected when the account status check is performed. The array returned is ordered by the order in which
+    /// the controllers were enabled (not accounting for duplicates).
     /// @param account The address of the account whose controllers are being queried.
     /// @return An array of addresses that are the enabled controllers for the account.
     function getControllers(address account) external view returns (address[] memory);
@@ -200,15 +220,15 @@ interface IEVC {
     /// @notice Enables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s
     /// balances in the enabled collaterals vaults. Only the owner or an operator of the account can call this function.
-    /// Account status checks are performed.
+    /// Unless it's a duplicate, the controller is added to the end of the array. Account status checks are performed.
     /// @param account The address for which the controller is being enabled.
     /// @param vault The address of the controller being enabled.
     function enableController(address account, address vault) external payable;
 
     /// @notice Disables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s
-    /// balances in the enabled collaterals vaults. Only the vault itself can call this function. Account status checks
-    /// are performed.
+    /// balances in the enabled collaterals vaults. Only the vault itself can call this function. Disabling a controller
+    /// might change the order of controllers in storage. Account status checks are performed.
     /// @param account The address for which the calling controller is being disabled.
     function disableController(address account) external payable;
 
@@ -220,7 +240,7 @@ interface IEVC {
     /// during the execution of the arbitrary data call.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
     /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the
-    /// last consumed nonce value plus one.
+    /// value currently stored and can take any value between 0 and type(uint256).max - 1.
     /// @param deadline The timestamp after which the permit is considered expired.
     /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
     /// balance of the EVC contract will be forwarded.
@@ -235,6 +255,12 @@ interface IEVC {
         bytes calldata data,
         bytes calldata signature
     ) external payable;
+
+    /// @notice Recovers any remaining ETH in the contract and sends it to the specified recipient.
+    /// @dev Only the owner or an operator of the recipient account can call this function. The recipient must be a
+    /// registered owner.
+    /// @param recipient The address to which the remaining ETH will be sent.
+    function recoverRemainingETH(address recipient) external payable;
 
     /// @notice Calls back into the msg.sender with the context set as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
@@ -313,15 +339,15 @@ interface IEVC {
     /// be called within a checks-deferrable call.
     /// @param items An array of batch items to be executed.
     /// @return batchItemsResult An array of batch item results for each item.
-    /// @return accountsStatusResult An array of account status results for each account.
-    /// @return vaultsStatusResult An array of vault status results for each vault.
+    /// @return accountsStatusCheckResult An array of account status check results for each account.
+    /// @return vaultsStatusCheckResult An array of vault status check results for each vault.
     function batchSimulation(BatchItem[] calldata items)
         external
         payable
         returns (
             BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            StatusCheckResult[] memory accountsStatusCheckResult,
+            StatusCheckResult[] memory vaultsStatusCheckResult
         );
 
     /// @notice Checks whether the status check is deferred for a given account.
@@ -372,8 +398,8 @@ interface IEVC {
     /// @dev Vault status check is performed on the fly regardless of the current execution context state. If vault
     /// status check was previously deferred, it is removed from the set. This function can only be called by the vault
     /// itself. If checking the vault status is a two-step process, i.e. the vault requires its prior state snapshot,
-    /// this function should be called after the snapshot is taken and the vault should handle the situation when the
-    /// snapshot is not available then calling this function.
+    /// this function should be called after the snapshot is taken. When this function is called and the snapshot is not
+    /// available, the vault should handle this situation by reverting.
     function requireVaultStatusCheckNow() external payable;
 
     /// @notice Immediately checks the status of all vaults for which the checks were deferred and reverts if any of

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -13,6 +13,18 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorHarness {
         clearExpectedChecks();
 
         super.enableCollateral(account, vault);
+
+        if (executionContext.areChecksDeferred()) return;
+
+        expectedAccountsChecked.push(account);
+
+        verifyAccountStatusChecks();
+    }
+
+    function handlerReorderCollaterals(address account, uint8 index1, uint8 index2) external {
+        clearExpectedChecks();
+
+        super.reorderCollaterals(account, index1, index2);
 
         if (executionContext.areChecksDeferred()) return;
 
@@ -103,6 +115,39 @@ contract CollateralsManagementTest is Test {
             for (uint256 j = 0; j < collateralsPre.length; ++j) {
                 assertEq(collateralsPre[j], collateralsPost[j]);
             }
+
+            // try to reorder the collaterals if there's enough of them
+            if (collateralsPost.length > 1) {
+                collateralsPre = evc.getCollaterals(account);
+
+                uint8 index1 = uint8(seed % collateralsPre.length);
+                uint8 index2 = uint8((seed / 2) % collateralsPre.length);
+
+                if (index1 == index2) {
+                    index2 = uint8((index2 + 1) % collateralsPre.length);
+                }
+
+                if (index1 > index2) {
+                    (index1, index2) = (index2, index1);
+                }
+
+                Vault(controller).clearChecks();
+
+                vm.prank(msgSender);
+                evc.handlerReorderCollaterals(account, index1, index2);
+
+                collateralsPost = evc.getCollaterals(account);
+
+                assertEq(collateralsPost.length, collateralsPre.length);
+                assertEq(collateralsPost[index1], collateralsPre[index2]);
+                assertEq(collateralsPost[index2], collateralsPre[index1]);
+
+                (collateralsPost[index1], collateralsPost[index2]) = (collateralsPost[index2], collateralsPost[index1]);
+
+                for (uint256 j = 0; j < collateralsPre.length; ++j) {
+                    assertEq(collateralsPre[j], collateralsPost[j]);
+                }
+            }
         }
 
         // disabling collaterals
@@ -130,78 +175,119 @@ contract CollateralsManagementTest is Test {
         vm.assume(alice != address(0) && alice != address(evc) && bob != address(0) && bob != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, bob));
 
-        address vault = address(new Vault(evc));
+        address vault1 = address(new Vault(evc));
+        address vault2 = address(new Vault(evc));
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
-        evc.enableCollateral(bob, vault);
+        evc.enableCollateral(bob, vault1);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
-        evc.disableCollateral(bob, vault);
+        evc.reorderCollaterals(bob, 0, 1);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.disableCollateral(bob, vault1);
 
         vm.prank(bob);
         evc.setAccountOperator(bob, alice, true);
 
-        vm.prank(alice);
-        evc.enableCollateral(bob, vault);
+        vm.prank(bob);
+        evc.enableCollateral(bob, vault2);
 
         vm.prank(alice);
-        evc.disableCollateral(bob, vault);
+        evc.enableCollateral(bob, vault1);
+
+        vm.prank(alice);
+        evc.reorderCollaterals(bob, 0, 1);
+
+        vm.prank(alice);
+        evc.disableCollateral(bob, vault1);
     }
 
     function test_RevertIfChecksReentrancy_CollateralsManagement(address alice) public {
         vm.assume(alice != address(evc));
-        address vault = address(new Vault(evc));
+        address vault1 = address(new Vault(evc));
+        address vault2 = address(new Vault(evc));
 
         evc.setChecksLock(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
-        evc.enableCollateral(alice, vault);
+        evc.enableCollateral(alice, vault1);
 
         evc.setChecksLock(false);
 
         vm.prank(alice);
-        evc.enableCollateral(alice, vault);
+        evc.enableCollateral(alice, vault1);
+
+        vm.prank(alice);
+        evc.enableCollateral(alice, vault2);
 
         evc.setChecksLock(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
-        evc.disableCollateral(alice, vault);
+        evc.reorderCollaterals(alice, 0, 1);
 
         evc.setChecksLock(false);
 
         vm.prank(alice);
-        evc.disableCollateral(alice, vault);
+        evc.reorderCollaterals(alice, 0, 1);
+
+        evc.setChecksLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.disableCollateral(alice, vault1);
+
+        evc.setChecksLock(false);
+
+        vm.prank(alice);
+        evc.disableCollateral(alice, vault1);
     }
 
     function test_RevertIfImpersonateReentrancy_CollateralsManagement(address alice) public {
         vm.assume(alice != address(evc));
-        address vault = address(new Vault(evc));
+        address vault1 = address(new Vault(evc));
+        address vault2 = address(new Vault(evc));
 
         evc.setImpersonateLock(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
-        evc.enableCollateral(alice, vault);
+        evc.enableCollateral(alice, vault1);
 
         evc.setImpersonateLock(false);
 
         vm.prank(alice);
-        evc.enableCollateral(alice, vault);
+        evc.enableCollateral(alice, vault1);
+
+        vm.prank(alice);
+        evc.enableCollateral(alice, vault2);
 
         evc.setImpersonateLock(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
-        evc.disableCollateral(alice, vault);
+        evc.reorderCollaterals(alice, 0, 1);
 
         evc.setImpersonateLock(false);
 
         vm.prank(alice);
-        evc.disableCollateral(alice, vault);
+        evc.reorderCollaterals(alice, 0, 1);
+
+        evc.setImpersonateLock(true);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        evc.disableCollateral(alice, vault1);
+
+        evc.setImpersonateLock(false);
+
+        vm.prank(alice);
+        evc.disableCollateral(alice, vault1);
     }
 
     function test_RevertIfInvalidVault_CollateralsManagement(address alice) public {

@@ -200,12 +200,12 @@ Internally, `permit` works by `call`ing `address(this)`, which has the effect of
 
 With nonces, Ethereum transactions enforce that transactions cannot be mined multiple times, and that they are included in the same sequence they were created (with no gaps).
 
-`permit` messages contain two `uint256` fields that can be used to enforce the same restrictions: `nonceNamespace` and `nonce`. Each account owner has a mapping that maps from `nonceNamespace` to `nonce`. In order for a permit message to be valid, the `nonce` value inside the specified `nonceNamespace` must be one less than the `nonce` field in the permit message. Using the permit increments the nonce by one.
+`permit` messages contain two `uint256` fields that can be used to enforce the same restrictions: `nonceNamespace` and `nonce`. Each account owner has a mapping that maps from `nonceNamespace` to `nonce`. In order for a permit message to be valid, the `nonce` value inside the specified `nonceNamespace` must be equal to the `nonce` field in the permit message. Using the permit increments the nonce by one.
 
 The separation of `nonceNamespace` and `nonce` allows users to optionally relax the sequencing restrictions. There are several ways that an owner may choose to use the namespaces:
 
 * Always set `nonceNamespace` to `0`, and sign sequentially increasing `nonce`s. These permit messages will function like Ethereum transactions, and must be mined in order, with no gaps.
-* Derive the `nonceNamespace` deterministically from the permit message (for example, a hash of the message fields, excluding `nonceNamespace`), and always set the `nonce` to `1`. These permit messages can be mined in any order, and some may never be mined.
+* Derive the `nonceNamespace` deterministically from the permit message (for example, a hash of the message fields, excluding `nonceNamespace`), and always set the `nonce` to `0`. These permit messages can be mined in any order, and some may never be mined.
 * Some combination of the two approaches. For example, a user could have "regular" and "high priority" namespaces. Normal orders would be included in the regular sequence, while high priority permits are allowed to bypass this queue.
 
 Note that any time sequencing restrictions are relaxed, users should be aware that different orderings of their transactions can have different MEV potential, and they should prepare for their transactions executing in the least favourable order (for them).

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 import "../../src/interfaces/IVault.sol";
 import "../../src/interfaces/IEthereumVaultConnector.sol";
@@ -34,9 +34,9 @@ contract VaultEchidna is IVault {
         // try to reenter the EVC
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint256 nextNonce = evc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
-        try evc.setNonce(prefix, 0, nextNonce) {} catch {}
+        try evc.setNonce(prefix, 0, evc.getNonce(prefix, 0)) {} catch {}
 
         hevm.prank(account);
         try evc.setOperator(prefix, address(this), 0) {} catch {}
@@ -50,11 +50,19 @@ contract VaultEchidna is IVault {
         hevm.prank(account);
         try evc.enableCollateral(account, address(this)) {} catch {}
 
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
+
         hevm.prank(account);
         try evc.enableController(account, address(this)) {} catch {}
 
         hevm.prank(address(this));
         try evc.disableController(account) {} catch {}
+
+        hevm.prank(account);
+        try evc.recoverRemainingETH(account) {} catch {}
 
         try evc.callback(account, 0, "") {} catch {}
 
@@ -65,11 +73,10 @@ contract VaultEchidna is IVault {
         try evc.impersonate(address(this), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
-        items[0].targetContract = address(this);
-        items[0].onBehalfOfAccount = account;
+        items[0].targetContract = address(address(evc));
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
-        items[0].data = "";
-        hevm.prank(account);
+        items[0].data = abi.encodeWithSelector(evc.callback.selector, account, 0, "");
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
@@ -101,7 +108,7 @@ contract VaultEchidna is IVault {
         address account = address(1);
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint256 nextNonce = evc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -117,11 +124,19 @@ contract VaultEchidna is IVault {
         hevm.prank(account);
         try evc.enableCollateral(account, address(this)) {} catch {}
 
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
+
         hevm.prank(account);
         try evc.enableController(account, address(this)) {} catch {}
 
         hevm.prank(address(this));
         try evc.disableController(account) {} catch {}
+
+        hevm.prank(account);
+        try evc.recoverRemainingETH(account) {} catch {}
 
         try evc.callback(account, 0, "") {} catch {}
 
@@ -133,11 +148,10 @@ contract VaultEchidna is IVault {
         try evc.impersonate(address(this), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
-        items[0].targetContract = address(this);
-        items[0].onBehalfOfAccount = account;
+        items[0].targetContract = address(address(evc));
+        items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
-        items[0].data = "";
-        hevm.prank(account);
+        items[0].data = abi.encodeWithSelector(evc.callback.selector, account, 0, "");
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
@@ -171,7 +185,7 @@ contract VaultEchidna is IVault {
         address account = address(2);
 
         uint152 prefix = uint152(uint160(account) >> 8);
-        uint256 nextNonce = evc.getNonce(prefix, 0) + 1;
+        uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}
 
@@ -187,6 +201,11 @@ contract VaultEchidna is IVault {
         hevm.prank(account);
         try evc.enableCollateral(account, address(this)) {} catch {}
 
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
+
         hevm.prank(account);
         try evc.enableController(account, address(this)) {} catch {}
 
@@ -194,10 +213,18 @@ contract VaultEchidna is IVault {
         try evc.disableController(account) {} catch {}
 
         hevm.prank(account);
+        try evc.recoverRemainingETH(account) {} catch {}
+
+        hevm.prank(account);
         try evc.call(address(targetEchidna), account, 0, "") {} catch {}
 
         hevm.prank(account);
         try evc.enableCollateral(account, address(targetEchidna)) {} catch {}
+
+        if (evc.getCollaterals(account).length > 1) {
+            hevm.prank(account);
+            try evc.reorderCollaterals(account, 0, 1) {} catch {}
+        }
 
         hevm.prank(address(this));
         try evc.impersonate(address(targetEchidna), account, 0, "") {} catch {}
@@ -247,6 +274,12 @@ contract EchidnaTest {
         evc.enableCollateral(account, vault);
     }
 
+    function reorderCollateral(address account, uint8 index1, uint8 index2) public payable {
+        if (account == address(0) || account == address(evc)) return;
+        hevm.prank(account);
+        evc.reorderCollaterals(account, index1, index2);
+    }
+
     function disableCollateral(address account, address vault) public payable {
         if (account == address(0) || account == address(evc)) return;
         hevm.prank(account);
@@ -271,12 +304,18 @@ contract EchidnaTest {
         evc.permit(
             address(signerEchidna),
             0,
-            evc.getNonce(evc.getAddressPrefix(address(evc)), 0) + 1,
+            evc.getNonce(evc.getAddressPrefix(address(evc)), 0),
             block.timestamp,
             0,
             data,
             signature
         );
+    }
+
+    function recoverRemainingETH(address recipient) public payable {
+        if (recipient == address(evc)) return;
+        hevm.prank(address(recipient));
+        evc.recoverRemainingETH(recipient);
     }
 
     function callback(address onBehalfOfAccount, bytes calldata data) public payable {

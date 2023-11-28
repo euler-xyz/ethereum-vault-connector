@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -241,7 +241,7 @@ contract ImpersonateTest is Test {
         address collateral = address(new Vault(evc));
         address controller = address(new Vault(evc));
 
-        vm.assume(targetContract != collateral);
+        vm.assume(targetContract != collateral && targetContract != controller);
 
         vm.prank(alice);
         evc.enableCollateral(alice, collateral);

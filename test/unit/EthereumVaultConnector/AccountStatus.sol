@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -380,6 +380,8 @@ contract AccountStatusTest is Test {
     }
 
     function test_RevertIfChecksReentrancy_ForgiveAccountStatusCheckNow(address account) external {
+        vm.assume(account != address(evc));
+
         address controller = address(new Vault(evc));
 
         vm.prank(account);

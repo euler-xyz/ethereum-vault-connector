@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -261,6 +261,14 @@ contract SetOperatorTest is Test {
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
         evc.setAccountOperator(alice, address(0), true);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.setOperator(addressPrefix, address(evc), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.setAccountOperator(alice, address(evc), true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);

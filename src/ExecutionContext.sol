@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 type EC is uint256;
 
@@ -30,7 +30,7 @@ library ExecutionContext {
     uint256 internal constant STAMP_MASK = 0xFFFFFFFFFFFFFF00000000000000000000000000000000000000000000000000;
     uint256 internal constant ON_BEHALF_OF_ACCOUNT_OFFSET = 8;
     uint256 internal constant STAMP_OFFSET = 200;
-    uint256 internal constant CALL_DEPTH_MAX = 10;
+    uint256 internal constant CALL_DEPTH_MAX = 10; // must not exceed 255
     uint256 internal constant STAMP_DUMMY_VALUE = 1;
 
     error CallDepthViolation();
@@ -50,8 +50,6 @@ library ExecutionContext {
         result = uint8(EC.unwrap(context) & CALL_DEPTH_MASK);
     }
 
-    /// #if_succeeds "call depth can only change if reentrancy locks are not acquired" !areChecksInProgress(context) &&
-    /// !isImpersonationInProgress(context);
     function increaseCallDepth(EC context) internal pure returns (EC result) {
         if (getCallDepth(context) > CALL_DEPTH_MAX - 1) {
             revert CallDepthViolation();

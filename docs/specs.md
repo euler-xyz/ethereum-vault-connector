@@ -170,9 +170,9 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 1. Return the magic value if the vault healthy
 
 ### Other considerations
-1. The vault can only be released from being a controller only if the account has the debt fully repaid
-1. The vault possesses the liberty to execute the Account Status Check, allowing it to price all assets according to its preference, without depending on potentially untrustworthy oracles
-1. The vault has freedom to implement the Vault Status Check. Depending on the implementation, the initial state snapshotting might not be needed. Depending on the implementation, not all the actions may require the Vault Status Check (i.e. vault share transfers)
+1. The vault can only be released from being a controller only if the acount has the debt fully repaid
+1. The vault has freedom to execute the Account Status Check, allowing it to price all the assets according to its preference, without depending on potentially untrustworthy oracles
+1. The vault has freedom to implement the Vault Status Check. Depending on the implementation, the initial state snapshotting might not be needed. Depending on the implementation, not all the actions may require the Vault Status Check (i.e. vault share transfers). If snapshot is needed, note that it might require a prior vault state update (i.e. interest rate accrual). 
 1. One should be careful when forgiving the Account Status Check after impersonation. A malicious target collateral could manipulate the impersonation process leading to a bad debt accrual. To prevent that, ensure that only trusted collaterals that behave in the expected way are being called using the impersonate functionality
 1. When sending regular ERC20 tokens from a vault to an address, one can ensure that the address is not a sub-account but a valid EOA/contract address by getting an account owner from the EVC
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity =0.8.19;
 
 import "../../src/EthereumVaultConnector.sol";
 
@@ -40,6 +40,13 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "the vaults are swapped" old(accountCollaterals[account].get()[index1]) == accountCollaterals[account].get()[index2] && old(accountCollaterals[account].get()[index2]) == accountCollaterals[account].get()[index1];
+    /// #if_succeeds "number of vaults in the set doesn't change" old(accountCollaterals[account].numElements) == accountCollaterals[account].numElements;
+    function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable virtual override {
+        super.reorderCollaterals(account, index1, index2);
+    }
+
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
     /// #if_succeeds "controller cannot be EVC" vault != address(this);
@@ -65,6 +72,12 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         bytes calldata signature
     ) public payable virtual override {
         super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
+    }
+
+    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
+    /// #if_succeeds "EVC balance is zero after calling this" address(this).balance == 0;
+    function recoverRemainingETH(address recipient) public payable virtual override {
+        super.recoverRemainingETH(recipient);
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
@@ -168,7 +181,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.requireAccountAndVaultStatusCheck(account);
     }
 
-    /// #if_succeeds "checks must be deferred if not in permit" bytes4(msg.data) != this.permit.selector ==> executionContext.areChecksDeferred();
+    /// #if_succeeds "checks must be deferred if not in permit or recoverRemainingETH" bytes4(msg.data) != this.permit.selector && bytes4(msg.data) != this.recoverRemainingETH.selector ==> executionContext.areChecksDeferred();
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
@@ -205,7 +218,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
     /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
     /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
-    function checkStatusAllWithResult(SetType setType) internal override returns (BatchItemResult[] memory result) {
+    function checkStatusAllWithResult(SetType setType) internal override returns (StatusCheckResult[] memory result) {
         return super.checkStatusAllWithResult(setType);
     }
 }
