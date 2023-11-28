@@ -70,6 +70,7 @@ However, suppose a user wants to take out a borrow from a separate vault. In thi
 
 * When requested to perform an action such as borrow, a liability vault must call into the EVC's `isControllerEnabled` function to ensure that the account has in fact enabled the vault as a controller.
 * Only the controller itself can call `disableController` on the EVC. This should typically happen upon an account repaying its debt in full. Vaults must be coded carefully to not have edge cases such as unrepayable dust, otherwise accounts could become permanently associated with a controller.
+* The order of an account's collateral set can be changed with `reorderCollaterals`. Because some controller vaults will loop over an account's collateral in sequence and return early if sufficient value is found, this can save considerable gas. This feature was inspired by Gearbox's `collateralHints`.
 
 
 ## Account Status Checks
