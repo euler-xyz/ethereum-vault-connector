@@ -14,6 +14,10 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function getExecutionContextAreChecksDeferred() external view returns (bool) {
         return executionContext.areChecksDeferred();
     }
+    
+    function numOfController(address account) public view returns (uint8) {
+        return accountControllers[account].numElements;
+    }
 
     function getOwnerOf(uint152 prefix) public view returns (address) {
         return ownerLookup[prefix];
