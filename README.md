@@ -2,7 +2,7 @@
 
 The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the ERC-4626 interface and contain additional logic for interfacing with other vaults. The EVC not only provides a common base ecosystem but also reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors.
 
-For more information refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md).
+For more information refer to the [WHITEPAPER](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md) and the [SPECS](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/specs.md).
 
 ---
 
@@ -24,7 +24,7 @@ For more information refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPEC
 
 ## Install
 
-To install Ethereum Vault Connector in a [**Foundry**](https://github.com/foundry-rs/foundry) project:
+To install Ethereum Vault Connector in a [Foundry](https://github.com/foundry-rs/foundry) project:
 
 ```sh
 forge install euler-xyz/ethereum-vault-connector
@@ -34,7 +34,7 @@ forge install euler-xyz/ethereum-vault-connector
 
 The Ethereum Vault Connector comes with a comprehensive set of tests written in Solidity, which can be executed using Foundry.
 
-For a detailed understanding of the Ethereum Vault Connector and considerations for its integration, please refer to the [WHITEPAPER](docs/whitepaper.md) and the [SPECS](docs/specs.md). You can find examples of vaults utilizing the Ethereum Vault Connector in the [EVC Playground](https://github.com/euler-xyz/evc-playground/tree/master/src) repository. However, these example vaults are not meant for production use as they have not been audited and are intended solely for testing and experimentation purposes.
+For a detailed understanding of the Ethereum Vault Connector and considerations for its integration, please refer to the [WHITEPAPER](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md) and the [SPECS](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/specs.md). You can find examples of vaults utilizing the Ethereum Vault Connector in the [EVC Playground](https://github.com/euler-xyz/evc-playground/tree/master/src) repository. However, these example vaults are not meant for production use as they have not been audited and are intended solely for testing and experimentation purposes.
 
 To install Foundry:
 
@@ -102,7 +102,7 @@ The Ethereum Vault Connector **has not yet undergone an audit** and should not b
 
 ## Known limitations
 
-Refer to the [WHITEPAPER](docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
+Refer to the [WHITEPAPER](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
 
 ## Contributing
 
@@ -110,4 +110,4 @@ The code is currently in an experimental phase leading up to the first audit. Fe
 
 ## License
 
-Licensed under the [GPL-2.0-or-later](/LICENSE) license.
+Licensed under the [GPL-2.0-or-later](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/LICENSE) license.

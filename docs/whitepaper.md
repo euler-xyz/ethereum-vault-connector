@@ -47,7 +47,7 @@ To illustrate the process of vault mediation, let's consider a straightforward e
 
 In addition to vault mediation, the EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. Here are some of the benefits of building on the EVC:
 
-* Unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
+* Network effect thanks to unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
 * Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, uncollateralised IOUs, or synthetics.
 * Standardized approach to account liquidity checks and vault global constraints enforcement: The EVC allows for deferral of the liquidity checks and vault status checks, preventing transient violations from causing a failure. The EVC exposes an interface which abstracts management of the checks away from the vault.
 * Batching: Multiple operations affecting multiple vaults and external smart contracts can be performed within a single batch operation. This is more convenient for UI users, more gas efficient, and allows deferring liquidity checks until the end of the batch.
@@ -164,21 +164,7 @@ Because vaults can be called directly without going through the EVC, checks may 
 
 `callback` will create a context, and call-back into the caller with the provided `msg.data`, forwarding the provided `value` (or full balance of the EVC if max `uint256` was specified). Inside the callback, the `onBehalfOfAccount` account will be set to whatever was provided by the calling vault. The vault should use `msg.sender` for this. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: Recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself.
 
-To use `callback`, it is recommended that vaults use a special modifier `routedThroughEVC` before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
-
-```
-modifier routedThroughEVC() {
-    if (msg.sender == address(evc)) {
-        _;
-    } else {
-        bytes memory result = evc.callback{value: msg.value}(msg.sender, msg.value, msg.data);
-
-        assembly {
-            return(add(32, result), mload(result))
-        }
-    }
-}
-```
+To use `callback`, it is recommended that vaults use a special modifier [`routedThroughEVC`](/docs/specs.md#typical-implementation-pattern-of-the-evc-compliant-function-for-a-vault) before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
 
 ### batch
 
