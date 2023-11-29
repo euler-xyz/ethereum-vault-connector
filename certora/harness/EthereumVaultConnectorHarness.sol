@@ -7,6 +7,7 @@ import "../../src/ExecutionContext.sol";
 
 contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     using ExecutionContext for EC;
+    using Set for SetStorage;
     function getExecutionContextCallDepth() external view returns (uint8) {
         return executionContext.getCallDepth();
     }
