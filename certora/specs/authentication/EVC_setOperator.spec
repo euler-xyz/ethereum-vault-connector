@@ -41,3 +41,32 @@ rule onlyOwnerCanCallSetOperator() {
     // make sure the right bitfield was set
     assert(getOperator(addressPrefix, operator) == operatorBitField);
 }
+
+rule nonOwnerCallingSetOperatorReverts() {
+    env e;
+
+    uint152 addressPrefix;
+    address operator;
+    uint256 operatorBitField;
+
+    address owner = getOwnerOf(e, addressPrefix);
+
+    // if msg.sender is the currentContract, it means we are within permit() and
+    // we need to use executionContext.getOnBehalfOfAccount() instead.
+    address attacker = e.msg.sender;
+    if (e.msg.sender == currentContract) {
+        attacker = getExecutionContextOnBehalfOfAccount(e);
+    }
+
+    if (owner == 0) {
+        // prefix has not been claimed, and attacker is not from the prefix
+        require(getAddressPrefix(attacker) != addressPrefix);
+    } else {
+        // prefix has been claimed, but not by the attacker
+        require(attacker != owner);
+    }
+
+    // call the setOperator() method.
+    setOperator@withrevert(e, addressPrefix, operator, operatorBitField);
+    assert(lastReverted);
+}
