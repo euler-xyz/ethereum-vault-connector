@@ -64,9 +64,7 @@ hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.element
 ////////////////////////////////////////////////////////////////
 
 // variable is true when a call was made with e.msg.sender == EVC
-ghost bool callOpCodeHasBeenCalledWithEVC {
-    init_state axiom callOpCodeHasBeenCalledWithEVC == false;
-}
+ghost bool callOpCodeHasBeenCalledWithEVC;
 
 // hook applied to every call, updates the ghost.
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
@@ -75,6 +73,10 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
         (executingContract == currentContract && addr == currentContract);
 }
 
+// hook applied to every delegatecall updating the ghost when EVC
+hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
+    callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || addr != currentContract; 
+}
 ////////////////////////////////////////////////////////////////
 //                                                            //
 //                         Invariants                         //
@@ -92,19 +94,22 @@ invariant vaultStatusChecksNeverContainsEVC()
     filtered {f -> !isMustRevertingFunction(f)}
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
-// This invariant checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
-invariant onlyEVCCanCallCriticalMethod() 
-     callOpCodeHasBeenCalledWithEVC == false
-     filtered {f -> !isMustRevertingFunction(f)}
-     {
-         preserved with (env e) {
-            require e.msg.sender != currentContract;
-            requireInvariant vaultStatusChecksNeverContainsEVC();
-            requireInvariant accountControllerNeverContainsEVC();
-         }
-     }
+// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
+rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args){
+    //Exclude EVC as being the initiator of the call.
+    require(e.msg.sender != currentContract);
 
-// hook that ensures that the critical delegatecall is only ever on EVC
-hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
-    assert addr == currentContract;
+    //Require the invariants to hold
+    requireInvariant vaultStatusChecksNeverContainsEVC();
+    requireInvariant accountControllerNeverContainsEVC();
+
+    //Require the ghost flag to be false initially
+    require(!callOpCodeHasBeenCalledWithEVC);
+    //Call all contract methods
+    f(e,args);
+
+    //Ensure the ghost flag to be false eventually
+    assert !callOpCodeHasBeenCalledWithEVC, "Only EVC can call critical method.";
 }
+
+
