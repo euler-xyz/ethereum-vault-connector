@@ -42,6 +42,12 @@ rule onlyOwnerCanCallSetOperator() {
     assert(getOperator(addressPrefix, operator) == operatorBitField);
 }
 
+/**
+ * Checks the inverse of the above rule: if an attacker tries to call
+ * `setOperator()`, the call reverts. We consider the caller an attacker if
+ * either if the prefix has no owner yet, but the caller is not from this prefix
+ * or if the prefix has an owner that is not the caller.
+ */
 rule nonOwnerCallingSetOperatorReverts() {
     env e;
 
