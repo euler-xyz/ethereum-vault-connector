@@ -1,5 +1,6 @@
-methods{
+methods {
     function getOperator(uint152, address) external returns (uint256) envfree;
+    function getAddressPrefix(address) external returns (uint152) envfree;
 }
 
 /**
@@ -10,7 +11,7 @@ methods{
  * - msg.sender is from the prefix itself and thus a plausible owner
  * - msg.sender is stored as the owner after the function call
  * - the owner before the call was either 0 (not set) or msg.sender already
- * We do not check the case where msg.sender is EVC itself!
+ * - the bitset is set as it should be.
  */
 rule onlyOwnerCanCallSetOperator() {
     env e;
@@ -19,21 +20,24 @@ rule onlyOwnerCanCallSetOperator() {
     address operator;
     uint256 operatorBitField;
 
-    // we ignore the case where the contract calls itself. In this case, we
-    // assume authentication was already done via permit.
-    require(e.msg.sender != currentContract);
-
     address ownerBefore = getOwnerOf(e, addressPrefix);
+
+    // if msg.sender is the currentContract, it means we are within permit() and
+    // we need to use executionContext.getOnBehalfOfAccount() instead.
+    address actualCaller = e.msg.sender;
+    if (e.msg.sender == currentContract) {
+        actualCaller = getExecutionContextOnBehalfOfAccount(e);
+    }
 
     // call the setOperator() method.
     setOperator(e, addressPrefix, operator, operatorBitField);
 
     // sender is from the prefix itself and thus plausible to be the owner
-    assert((require_uint160(e.msg.sender) >> 8) == require_uint160(addressPrefix));
+    assert(getAddressPrefix(actualCaller) == addressPrefix);
+    // the owner before the call was either not set or actualCaller already
+    assert(ownerBefore == 0 || ownerBefore == actualCaller);
     // sender is stored as the owner of the address prefix
-    assert(e.msg.sender == getOwnerOf(e, addressPrefix));
-    // the owner before the call was either not set or msg.sender already
-    assert(ownerBefore == 0 || ownerBefore == e.msg.sender);
+    assert(actualCaller == getOwnerOf(e, addressPrefix));
     // make sure the right bitfield was set
     assert(getOperator(addressPrefix, operator) == operatorBitField);
 }
