@@ -103,3 +103,8 @@ invariant onlyEVCCanCallCriticalMethod()
             requireInvariant accountControllerNeverContainsEVC();
          }
      }
+
+// hook that ensures that the critical delegatecall is only ever on EVC
+hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
+    assert addr == currentContract;
+}
