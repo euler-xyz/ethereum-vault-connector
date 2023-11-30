@@ -88,6 +88,8 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ## Collateralized Borrowable Vault Implementation Guide
 
+See the [diagrams](./diagrams) too!
+
 ### Deposit/mint considerations
 1. Ensure reentrancy protection
 1. Authenticate the caller (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
