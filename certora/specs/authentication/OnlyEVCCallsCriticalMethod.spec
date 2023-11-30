@@ -95,7 +95,7 @@ invariant vaultStatusChecksNeverContainsEVC()
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
 // This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
-rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args){
+rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args) filtered {f -> f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector}{
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
 

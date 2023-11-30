@@ -419,7 +419,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         if (accountControllers[account].insert(vault)) {
             return; // skip the check
-            emit ControllerStatus(account, vault, true);
+          //  emit ControllerStatus(account, vault, true);
         }
         requireAccountStatusCheck(account);
     }
@@ -427,7 +427,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function disableController(address account) public payable virtual nonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
-            emit ControllerStatus(account, msg.sender, false);
+         //   emit ControllerStatus(account, msg.sender, false);
         }
         requireAccountStatusCheck(account);
     }
