@@ -40,7 +40,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the vaults are swapped" old(accountCollaterals[account].get()[index1]) == accountCollaterals[account].get()[index2] && old(accountCollaterals[account].get()[index2]) == accountCollaterals[account].get()[index1];
+    // #if_succeeds "the vaults are swapped" not possible with scribble due to out-of-bounds error
     /// #if_succeeds "number of vaults in the set doesn't change" old(accountCollaterals[account].numElements) == accountCollaterals[account].numElements;
     function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable virtual override {
         super.reorderCollaterals(account, index1, index2);
