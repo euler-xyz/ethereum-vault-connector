@@ -382,7 +382,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (vault == address(this)) revert EVC_InvalidAddress();
 
         if (accountCollaterals[account].insert(vault)) {
-            emit CollateralStatus(account, vault, true);
+          //  emit CollateralStatus(account, vault, true);
         }
         requireAccountStatusCheck(account);
     }
@@ -393,7 +393,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address vault
     ) public payable virtual nonReentrant onlyOwnerOrOperator(account) {
         if (accountCollaterals[account].remove(vault)) {
-            emit CollateralStatus(account, vault, false);
+           // emit CollateralStatus(account, vault, false);
         }
         requireAccountStatusCheck(account);
     }
