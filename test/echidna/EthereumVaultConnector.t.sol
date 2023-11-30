@@ -36,7 +36,7 @@ contract VaultEchidna is IVault {
         uint152 prefix = uint152(uint160(account) >> 8);
         uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
-        try evc.setNonce(prefix, 0, evc.getNonce(prefix, 0)) {} catch {}
+        try evc.setNonce(prefix, 0, nextNonce) {} catch {}
 
         hevm.prank(account);
         try evc.setOperator(prefix, address(this), 0) {} catch {}
