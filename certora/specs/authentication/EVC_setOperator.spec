@@ -104,7 +104,7 @@ rule theOwnerCanCallSetOperator() {
 
     // the operator can not be from the prefix either
     // [TODO] this is not part of the interface documentation yet
-    require((require_uint160(operator) | 0xFF) != (require_uint160(caller) | 0xFF));
+    require(getAddressPrefix(operator) != getAddressPrefix(caller));
 
     // the current bitfield must be different from what we try to set
     // [TODO] this is not part of the interface documentation yet
