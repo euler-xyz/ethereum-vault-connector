@@ -27,6 +27,7 @@
 1. An Owner of the group of 256 accounts is recorded only once upon the first interaction of any of its accounts with the EVC.
 1. Only an Account Owner can authorize an Account Operator to operate on behalf of the Account.
 1. An Account can have multiple Account Operators.
+1. Account Operator address cannot belong to the Account Owner of the Account for which the Operator being is authorized.
 1. Each Account can have at most 20 Collateral Vaults enabled at a time.
 1. Each Account can have at most one Controller Vault enabled at a time unless it's a transient state during a Checks-deferrable Call. This is how single-liability-per-account is enforced.
 1. Only an Account Owner or the Account Operator can enable and disable Collateral Vaults for the Account.
@@ -37,15 +38,21 @@
 1. Each Checks-deferrable Call function specifies an Account. The functions determine whether or not `msg.sender` is authorised to perform operations on this Account. Only an Owner or an Operator of the specified Account can call other contract on behalf of the Account through the EVC.
 1. EVC allows to defer Account and Vault Status Checks until the end of the top-level Checks-deferrable Call. That allows for a transient violation of the Account solvency or Vault constraints.
 1. If the execution is not within a Checks-deferrable Call, Account and Vault Status Checks must be performed immediately.
-1. Checks-deferrable Call can be nested up to 10 levels deep.
+1. Both Account- and Vault-Status-Checks-related storage sets must be in their default state after the top-level Checks-deferrable Call to the EVC.
+1. Checks-deferrable Calls can be nested up to 10 levels deep.
 1. Account Status Checks can be deferred for at most 20 Accounts at a time.
 1. Vault Status Checks can be deferred for at most 20 Vaults at a time.
 1. EVC maintains the Execution Context observable by the external contracts.
+1. Execution Context must be in its default state after the top-level Checks-deferrable Call. If it's a reentrant call, the Execution Context is allowed not to be in its default state.
+1. The Callback target can only be the caller itself.
 1. The Callback cannot be executed within the Permit context.
-1. The Call target cannot be the EVC, ERC-1820 registry address or the msg.sender itself
-1. If there's only one enabled Controller Vault for an Account, only that Controller can Impersonate the Account's call into any of its enabled Collateral Vaults.
+1. The Call target cannot be the EVC, ERC-1820 registry address or the msg.sender itself.
+1. The Batch external call target cannot be the EVC, ERC-1820 registry address or the msg.sender itself.
+1. If there's only one enabled Controller Vault for an Account, only that Controller can Impersonate the Account's call into any of its enabled Collateral Vaults. Neither the Controller nor Collateral Vault can be the EVC.
 1. If there's only one enabled Controller Vault for an Account, EVC allows currently enabled Controller to forgive the Account Status Check if it's deferred.
 1. EVC allows a Vault to forgive the Vault Status Check for itself.
+1. EVC allows the remaining ETH to be recovered, but it can only be sent to the stored account owner for which the caller is authorized to act on behalf.
+1. Only the Checks-Deferrable Calls allow to reenter the EVC.
 1. Simulation-related functions do not modify the state.
 
 NOTE: In order to borrow, a user must enable a Controller. From then on, whenever the user wants to perform an action that may affect their solvency, the Controller must be consulted (the Account Status Check must be performed) in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent. The Account Status Check may be requested by the liability vault by calling the EVC which determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
