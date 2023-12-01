@@ -1,3 +1,5 @@
+import "../utils/IsMustRevertFunction.spec";
+
 methods {
     function getOwnerOf(uint152) external returns (address) envfree;
     function getOperator(uint152, address) external returns (uint256) envfree;
@@ -59,7 +61,8 @@ hook Sload address value EthereumVaultConnectorHarness.ownerLookup[KEY uint152 p
 
 // check that an owner of a prefix is always from that prefix
 invariant OwnerIsFromPrefix(uint152 prefix)
-    getOwnerOf(prefix) == 0 || getAddressPrefix(getOwnerOf(prefix)) == prefix;
+    getOwnerOf(prefix) == 0 || getAddressPrefix(getOwnerOf(prefix)) == prefix
+    filtered { f -> !isMustRevertFunction(f) }
 
 /**
  * Checks the inverse of the above rule: if an attacker tries to call
