@@ -10,6 +10,9 @@ jobs:
   checkrules:
     name: Run Certora prover on all configs
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v3
         with:
