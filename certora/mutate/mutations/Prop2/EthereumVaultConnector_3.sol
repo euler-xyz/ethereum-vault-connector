@@ -308,7 +308,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     ) public payable virtual onlyOwner(addressPrefix) {
         // if EVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
-        address owner = address(this) == msg.sender ? ownerLookup[addressPrefix] : msg.sender;
+        // [CERTORA MUTATE] Manual mutation
+        address owner = ownerLookup[addressPrefix];
 
         // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
         if (operator == address(0) || haveCommonOwnerInternal(owner, operator)) {

@@ -736,6 +736,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
                 || msg.sender == targetContract
         ) {
             executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount).clearOperatorAuthenticated();
+            // [CERTORA MUTATE] Manual mutation
+            accountControllers[onBehalfOfAccount].insert(msgSender);
         } else {
             executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount).setOperatorAuthenticated();
         }

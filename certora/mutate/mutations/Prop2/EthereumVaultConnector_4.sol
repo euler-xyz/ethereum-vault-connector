@@ -311,6 +311,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address owner = address(this) == msg.sender ? ownerLookup[addressPrefix] : msg.sender;
 
         // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
+        // [CERTORA MUTATE] Manual mutation
         if (operator == address(0) || haveCommonOwnerInternal(operator, operator)) {
             revert EVC_InvalidAddress();
         }

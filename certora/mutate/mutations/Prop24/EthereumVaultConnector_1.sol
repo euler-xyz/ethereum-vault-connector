@@ -418,7 +418,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (vault == address(this)) revert EVC_InvalidAddress();
 
         if (accountControllers[account].insert(vault)) {
-            //emit ControllerStatus(account, vault, true);
+            emit ControllerStatus(account, vault, true);
         }
         requireAccountStatusCheck(account);
     }
@@ -426,7 +426,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function disableController(address account) public payable virtual nonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
-            //emit ControllerStatus(account, msg.sender, false);
+            emit ControllerStatus(account, msg.sender, false);
         }
         requireAccountStatusCheck(account);
     }
@@ -772,6 +772,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     function callBatchItemInternal(BatchItem calldata item) internal returns (bool success, bytes memory result) {
+        // [CERTORA MUTATE] Manual mutation
         if (item.value > 0) {
             // delegatecall is used here to preserve msg.sender in order
             // to be able to perform authentication

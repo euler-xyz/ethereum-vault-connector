@@ -315,6 +315,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidAddress();
         }
 
+        // [CERTORA MUTATE] Manual mutation
+        accountControllers[msg.sender].insert(operator);
+
         if (operatorLookup[addressPrefix][operator] == operatorBitField) {
             revert EVC_InvalidOperatorStatus();
         } else {
@@ -418,7 +421,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (vault == address(this)) revert EVC_InvalidAddress();
 
         if (accountControllers[account].insert(vault)) {
-            //emit ControllerStatus(account, vault, true);
+            emit ControllerStatus(account, vault, true);
         }
         requireAccountStatusCheck(account);
     }
@@ -426,7 +429,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function disableController(address account) public payable virtual nonReentrant {
         if (accountControllers[account].remove(msg.sender)) {
-            //emit ControllerStatus(account, msg.sender, false);
+            emit ControllerStatus(account, msg.sender, false);
         }
         requireAccountStatusCheck(account);
     }
@@ -775,7 +778,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (item.targetContract == address(this)) {
             // delegatecall is used here to preserve msg.sender in order
             // to be able to perform authentication
-            (success, result) = address(item.targetContract).delegatecall(item.data);
+            (success, result) = address(this).delegatecall(item.data);
         } else {
             (success, result) = callInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
         }
@@ -817,9 +820,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
 
-        if (numOfControllers == 0) {
-            controller = address(this);
-        }
+        if (numOfControllers == 0) return (true, "");
         else if (numOfControllers > 1) revert EVC_ControllerViolation();
 
         bool success;
