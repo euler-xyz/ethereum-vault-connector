@@ -107,9 +107,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
-                } else if (owner != msgSender) {
-                    revert EVC_NotAuthorized();
                 }
+                // [CERTORA MUTATE] Manual mutation
+                /* else if (owner != msgSender) {
+                    revert EVC_NotAuthorized();
+                }*/
+                
             } else {
                 revert EVC_NotAuthorized();
             }

@@ -107,9 +107,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
                 if (owner == address(0)) {
                     setAccountOwnerInternal(account, msgSender);
-                } else if (owner != msgSender) {
-                    revert EVC_NotAuthorized();
                 }
+                // [CERTORA MUTATE] Manual mutation
+                /* else if (owner != msgSender) {
+                    revert EVC_NotAuthorized();
+                }*/
+                
             } else {
                 revert EVC_NotAuthorized();
             }
@@ -308,12 +311,21 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     ) public payable virtual onlyOwner(addressPrefix) {
         // if EVC is msg.sender (during the self-call in the permit() function), the owner address will
         // be taken from the storage which must be storing the correct owner address
+        address owner = address(this) == msg.sender ? ownerLookup[addressPrefix] : msg.sender;
+
+        // the operator can neither be zero address nor can belong to one of 256 accounts of the owner
         // [CERTORA MUTATE] Manual mutation
-        address owner = ownerLookup[addressPrefix];
+        if (operator == address(0) || haveCommonOwnerInternal(operator, operator)) {
+            revert EVC_InvalidAddress();
+        }
 
-        operatorLookup[addressPrefix][operator] = operatorBitField;
+        if (operatorLookup[addressPrefix][operator] == operatorBitField) {
+            revert EVC_InvalidOperatorStatus();
+        } else {
+            operatorLookup[addressPrefix][operator] = operatorBitField;
 
-        emit OperatorStatus(addressPrefix, operator, operatorBitField);
+            emit OperatorStatus(addressPrefix, operator, operatorBitField);
+        }
     }
 
     /// @inheritdoc IEVC
@@ -1008,7 +1020,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function setAccountOwnerInternal(address account, address owner) internal {
         uint152 addressPrefix = getAddressPrefixInternal(account);
-        ownerLookup[addressPrefix] = owner;
+        //[CERTORA MUTATE] Manual mutation
+        //ownerLookup[addressPrefix] = owner;
         emit OwnerRegistered(addressPrefix, owner);
     }
 

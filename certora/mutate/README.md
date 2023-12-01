@@ -8,7 +8,7 @@ Note: The flag --prover_version master is required until fix for https://certora
 ## Property 2
 > certoraMutate --prover_conf certora/conf/authentication/EVC_Prop2_setOperator.conf --mutation_conf certora/mutate/conf/MutateProp2.conf --prover_version master --server production
 
-Link to pre-generated mutation testing report: https://mutation-testing.certora.com/?id=416582c8-5642-4715-b589-a544f2840b58&anonymousKey=be0634a6-0164-4ca8-8c5a-5927e583fbec
+Link to pre-generated mutation testing report: https://mutation-testing.certora.com/?id=37d87d73-0930-43a9-b870-eec84ea6723a&anonymousKey=3efb336b-a639-4fd9-8ff7-fb79acbc44df
 
 ## Property 5
 > certoraMutate --prover_conf certora/conf/authentication/EVC_Prop5_onlyOneController.conf --mutation_conf certora/mutate/conf/MutateProp5.conf --prover_version master --server production
