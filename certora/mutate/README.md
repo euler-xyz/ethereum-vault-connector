@@ -21,5 +21,5 @@ Link to pre-generated mutation testing report:
 https://mutation-testing.certora.com/?id=82627d48-04b2-49c0-928a-0ca1b9139a5c&anonymousKey=c8adf8ed-b740-4a45-8533-f3b5c5003e3d
 
 
-Per property there are several manual mutants, the manual mutants are written per property and are found in the directory `certora/mutate/mutations`. 
+The manual mutants are written per property and are found in the directory `certora/mutate/mutations`. 
 Note: The flag --prover_version master is required until fix for https://certora.atlassian.net/browse/CERT-4160 is released.
