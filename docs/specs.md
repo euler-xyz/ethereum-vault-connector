@@ -151,10 +151,10 @@ See the [diagrams](./diagrams) too!
 1. Ensure reentrancy protection
 1. Authenticate the caller (the liquidator account) depending on whether the Vault is being called directly or through the EVC
 1. Check whether the liquidator has enabled the vault as a controller
-1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Ensure that the liquidator is not liquidating itself
 1. Ensure that the violator does not have the Account Status Check deferred
 1. Ensure that the collateral to be liquidated is recognized and trusted
+1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Ensure that the violator is indeed in violation
 1. Perform the operation
 - Perform all the necessary calculations

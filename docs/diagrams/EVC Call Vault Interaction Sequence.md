@@ -1,6 +1,7 @@
 ```mermaid
 sequenceDiagram
     actor User/Operator
+    Note right of User/Operator: Dotted lines mean optional
     participant EVC
     participant Any Vault
     participant Controller Vault
@@ -8,7 +9,7 @@ sequenceDiagram
 
     User/Operator->>EVC: call(operation)
     EVC->>Any Vault: operation
-    Any Vault-->>EVC: getCurrentOnBehalfOfAccount(true/false)
+    Any Vault->>EVC: getCurrentOnBehalfOfAccount(true/false)
     Any Vault-->>Any Vault: vault snapshot
     Any Vault->>Any Vault: operation logic
     Any Vault->>EVC: requireAccountStatusCheck(account)

@@ -1,6 +1,7 @@
 ```mermaid
 sequenceDiagram
     actor Signature Holder
+    Note right of Signature Holder: Dotted lines mean optional
     participant EVC
     participant Any Vault
     participant Controller Vault
@@ -11,12 +12,14 @@ sequenceDiagram
     EVC->>EVC: set the execution context
     EVC->>EVC: address(this).call(EVC calldata)
 
-    EVC->>Any Vault: operation
-    Any Vault-->>EVC: getCurrentOnBehalfOfAccount(true/false)
-    Any Vault-->>Any Vault: vault snapshot
-    Any Vault->>Any Vault: operation logic
-    Any Vault->>EVC: requireAccountStatusCheck(account)
-    Any Vault->>EVC: requireVaultStatusCheck()
+    loop 
+        EVC->>Any Vault: operation
+        Any Vault->>EVC: getCurrentOnBehalfOfAccount(true/false)
+        Any Vault-->>Any Vault: vault snapshot
+        Any Vault->>Any Vault: operation logic
+        Any Vault->>EVC: requireAccountStatusCheck(account)
+        Any Vault->>EVC: requireVaultStatusCheck()
+    end
 
     critical
         EVC->>Controller Vault: checkAccountStatus(account, collaterals)
