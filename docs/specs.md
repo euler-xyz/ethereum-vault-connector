@@ -47,6 +47,7 @@
 1. If there's only one enabled Controller Vault for an Account, EVC allows currently enabled Controller to forgive the Account Status Check if it's deferred.
 1. EVC allows a Vault to forgive the Vault Status Check for itself.
 1. Simulation-related functions do not modify the state.
+1. EVC can only be msg.sender during the self-call in the permit() function
 
 NOTE: In order to borrow, a user must enable a Controller. From then on, whenever the user wants to perform an action that may affect their solvency, the Controller must be consulted (the Account Status Check must be performed) in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent. The Account Status Check may be requested by the liability vault by calling the EVC which determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
 
