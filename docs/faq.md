@@ -23,7 +23,7 @@
 
 ## What is the Ethereum Vault Connector?
 
-The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the ERC-4626 interface and contain additional logic for interfacing with other vaults.
+The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the [ERC-4626](https://ethereum.org/en/developers/docs/standards/tokens/erc-4626/) interface and contain additional logic for interfacing with other vaults.
 
 ## How does the EVC work in principle?
 
@@ -32,11 +32,12 @@ When a user wishes to borrow, they must link their accounts and collateral vault
 ## What are the benefits of building on the EVC?
 
 The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors such as pricing and risk management.
-The EVC creates the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
+
+The EVC helps create the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
 
 ## What can be built using the EVC?
 
-The Ethereum Vault Connector (EVC) provides a robust and flexible framework for developers to build a variety of new products. These include but are not limited to:
+The EVC provides a robust and flexible framework for developers to build a variety of new products. These include but are not limited to:
 
 1. Traditional, overcollateralized lending products
 1. Uncollateralized lending products

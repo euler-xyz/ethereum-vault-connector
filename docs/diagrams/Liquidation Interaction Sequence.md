@@ -13,7 +13,7 @@ sequenceDiagram
     EVC->>EVC: set the execution context
     EVC->>Controller Vault: liquidate(violator, collateral vault)
 
-    Controller Vault->>EVC: liquidator = getCurrentOnBehalfOfAccount(true)
+    Controller Vault->>EVC: liquidator = getCurrentOnBehalfOfAccount(address(vault))
     Controller Vault->>Controller Vault: is liquidator liquidating itself?
     Controller Vault->>EVC: isControllerEnabled(violator, Controller Vault)
     Controller Vault->>Controller Vault: controller must be enabled
@@ -29,7 +29,7 @@ sequenceDiagram
     critical
         Controller Vault-->>EVC: if Controller Vault != Collateral Vault, impersonate(collateral vault, violator, transfer(liquidator, collateral amount))
         EVC->>Collateral Vault: transfer(liquidator, collateral amount)
-        Collateral Vault->>EVC: getCurrentOnBehalfOfAccount(false)
+        Collateral Vault->>EVC: getCurrentOnBehalfOfAccount(address(0))
         Collateral Vault-->>Collateral Vault: vault snapshot
         Collateral Vault->>Collateral Vault: transfer logic
         Collateral Vault->>EVC: requireAccountStatusCheck(violator)

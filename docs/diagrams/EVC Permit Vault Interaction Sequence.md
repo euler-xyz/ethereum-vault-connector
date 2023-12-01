@@ -14,7 +14,7 @@ sequenceDiagram
 
     loop 
         EVC->>Any Vault: operation
-        Any Vault->>EVC: getCurrentOnBehalfOfAccount(true/false)
+        Any Vault->>EVC: getCurrentOnBehalfOfAccount(address(vault)/address(0))
         Any Vault-->>Any Vault: vault snapshot
         Any Vault->>Any Vault: operation logic
         Any Vault->>EVC: requireAccountStatusCheck(account)
