@@ -56,14 +56,14 @@ def runConf(filename):
 
     setattr(res, 'filename', filename)
     with outputMutex:
-        print(f'::group::Results for {filename}')
+        out = res.stdout.decode().strip()
+        m = re.search('https://[a-z-]+\.certora\.com/output/[0-9a-zA-Z?=/]+', out)
+        if m:
+            runurl = m.group(0)
+        else:
+            runurl = 'run not available'
+        print(f'::group::Results for {filename} ({runurl})')
         if res.stdout != b'':
-            out = res.stdout.decode().strip()
-            m = re.search('https://[a-z-]+\.certora\.com/output/[0-9a-zA-Z?=/]+', out)
-            if m:
-                setattr(res, 'runurl', m.group(0))
-            else:
-                setattr(res, 'runurl', 'not available')
             print(out)
         if res.stderr != b'':
             print(f'error output:')
@@ -78,19 +78,11 @@ def runConf(filename):
 with ThreadPoolExecutor(max_workers=10) as executor:
     results = executor.map(runConf, listChangedConfigs())
 
-results = filter(lambda x: x is not None, results)
-
-print('job urls:')
-for r in results:
-    print(f'\t{r.filename}')
-    print(f'\t\t{r.runurl}')
-
 failed = [r for r in results if r is not None]
 
 if failed:
     print('Some jobs failed:')
     for r in failed:
         print(f'\t{r.filename}')
-        print(f'\t\t{r.runurl}')
     sys.exit(1)
 sys.exit(0)

@@ -1,7 +1,4 @@
-//General definition of functions that must revert. Proven in functionality/MustRevertFunctions.spec
-definition isMustRevertingFunction(method f) returns bool =
-    f.selector == sig:EthereumVaultConnectorHarness.batchSimulation(IEVC.BatchItem[]).selector ||
-    f.selector == sig:EthereumVaultConnectorHarness.batchRevert(IEVC.BatchItem[]).selector;
+import "../utils/IsMustRevertFunction.spec";
 
 ////////////////////////////////////////////////////////////////
 //                                                            //
@@ -86,16 +83,16 @@ hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint r
 // This invariant checks that account controller never contains EVC
 invariant accountControllerNeverContainsEVC()
     insertedEVCAsController == false
-    filtered {f -> !isMustRevertingFunction(f)}
+    filtered {f -> !isMustRevertFunction(f)}
 
 // This invariant checks that vault status checks never contains EVC
 invariant vaultStatusChecksNeverContainsEVC()
     insertedEVCAsVault == false
-    filtered {f -> !isMustRevertingFunction(f)}
+    filtered {f -> !isMustRevertFunction(f)}
     { preserved with (env e) { require e.msg.sender != currentContract; } }
 
 // This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
-rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args) filtered {f -> f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector}{
+rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args) filtered {f -> !isMustRevertFunction(f) && f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector}{
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
 
