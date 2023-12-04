@@ -37,7 +37,6 @@ sequenceDiagram
     end
 
     Controller Vault-->>EVC: if collateral trusted or action can be verified, forgiveAccountStatusCheck(violator)
-    Controller Vault-->>EVC: if violator has not more debt, disableController(violator)
     Controller Vault->>EVC: requireAccountStatusCheck(liquidator)
     Controller Vault->>EVC: requireVaultStatusCheck()
 

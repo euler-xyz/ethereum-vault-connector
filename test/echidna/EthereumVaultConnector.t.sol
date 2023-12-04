@@ -26,8 +26,14 @@ contract VaultEchidna is IVault {
     EthereumVaultConnectorEchidna internal constant evc = EthereumVaultConnectorEchidna(payable(address(0xdead)));
     TargetEchidna internal immutable targetEchidna = TargetEchidna(payable(address(0xbeefbeef)));
 
-    function disableController(address account) external {
-        evc.disableController(account);
+    function disableController() external {
+        address msgSender = msg.sender;
+        if (msgSender == address(evc)) {
+            (address onBehalfOfAccount,) = evc.getCurrentOnBehalfOfAccount(address(0));
+            msgSender = onBehalfOfAccount;
+        }
+
+        evc.disableController(msgSender);
     }
 
     function checkAccountStatus(address account, address[] calldata) public returns (bytes4) {

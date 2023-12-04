@@ -126,7 +126,6 @@ See the [diagrams](./diagrams) too!
 1. Authorize the appropriate account (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
-1. If the debt fully repaid, release the vault from being a controller of the account which used to have the debt
 1. Require the Vault Status Check
 
 ### Shares transfer considerations
@@ -143,7 +142,6 @@ See the [diagrams](./diagrams) too!
 1. Check whether the account which will receive the debt has enabled the vault as a controller
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
-1. Release the vault from being a controller of the `from` account if the `from` account no longer has any debt
 1. Require the Account Status Check on the `to` account
 1. Require the Vault Status Check
 
@@ -160,7 +158,6 @@ See the [diagrams](./diagrams) too!
 - Perform all the necessary calculations
 - Decrease the violator's debt, increase the liquidator's debt
 - Seize the collateral. If it's an internal balance, decrease the violator's balance and increase the liquidator's balance. If it's an external vault, use impersonation functionality to transfer the shares from the violator to the liquidator. After impersonation functionality used, forgive the Account Status Check on the violator
-1. Release the vault from being a controller of the violator if the position is fully liquidated
 1. Require the Account Status Check on the liquidator account
 1. Require the Vault Status Check
 

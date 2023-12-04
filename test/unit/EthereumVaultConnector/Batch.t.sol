@@ -123,7 +123,7 @@ contract BatchTest is Test {
         items[0].onBehalfOfAccount = alice;
         items[0].targetContract = controller;
         items[0].value = 0;
-        items[0].data = abi.encodeWithSelector(Vault.disableController.selector, alice);
+        items[0].data = abi.encodeWithSelector(Vault.disableController.selector);
 
         items[1].onBehalfOfAccount = bob;
         items[1].targetContract = controller;

@@ -13,7 +13,7 @@ contract VaultMock is IVault {
         evc = _evc;
     }
 
-    function disableController(address account) public override {}
+    function disableController() public override {}
 
     function checkAccountStatus(address, address[] memory) external pure override returns (bytes4) {
         return this.checkAccountStatus.selector;
