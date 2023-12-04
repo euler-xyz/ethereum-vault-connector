@@ -27,6 +27,7 @@
 1. An Owner of the group of 256 accounts is recorded only once upon the first interaction of any of its accounts with the EVC.
 1. Only an Account Owner can authorize an Account Operator to operate on behalf of the Account.
 1. An Account can have multiple Account Operators.
+1. Account Operator address cannot belong to the Account Owner of the Account for which the Operator being is authorized.
 1. Each Account can have at most 20 Collateral Vaults enabled at a time.
 1. Each Account can have at most one Controller Vault enabled at a time unless it's a transient state during a Checks-deferrable Call. This is how single-liability-per-account is enforced.
 1. Only an Account Owner or the Account Operator can enable and disable Collateral Vaults for the Account.
@@ -37,15 +38,21 @@
 1. Each Checks-deferrable Call function specifies an Account. The functions determine whether or not `msg.sender` is authorised to perform operations on this Account. Only an Owner or an Operator of the specified Account can call other contract on behalf of the Account through the EVC.
 1. EVC allows to defer Account and Vault Status Checks until the end of the top-level Checks-deferrable Call. That allows for a transient violation of the Account solvency or Vault constraints.
 1. If the execution is not within a Checks-deferrable Call, Account and Vault Status Checks must be performed immediately.
-1. Checks-deferrable Call can be nested up to 10 levels deep.
+1. Both Account- and Vault-Status-Checks-related storage sets must be in their default state after the top-level Checks-deferrable Call to the EVC.
+1. Checks-deferrable Calls can be nested up to 10 levels deep.
 1. Account Status Checks can be deferred for at most 20 Accounts at a time.
 1. Vault Status Checks can be deferred for at most 20 Vaults at a time.
 1. EVC maintains the Execution Context observable by the external contracts.
+1. Execution Context must be in its default state after the top-level Checks-deferrable Call. If it's a reentrant call, the Execution Context is allowed not to be in its default state.
+1. The Callback target can only be the caller itself.
 1. The Callback cannot be executed within the Permit context.
-1. The Call target cannot be the EVC, ERC-1820 registry address or the msg.sender itself
-1. If there's only one enabled Controller Vault for an Account, only that Controller can Impersonate the Account's call into any of its enabled Collateral Vaults.
+1. The Call target cannot be the EVC, ERC-1820 registry address or the msg.sender itself.
+1. The Batch external call target cannot be the EVC, ERC-1820 registry address or the msg.sender itself.
+1. If there's only one enabled Controller Vault for an Account, only that Controller can Impersonate the Account's call into any of its enabled Collateral Vaults. Neither the Controller nor Collateral Vault can be the EVC.
 1. If there's only one enabled Controller Vault for an Account, EVC allows currently enabled Controller to forgive the Account Status Check if it's deferred.
 1. EVC allows a Vault to forgive the Vault Status Check for itself.
+1. EVC allows the remaining ETH to be recovered, but it can only be sent to the stored account owner for which the caller is authorized to act on behalf.
+1. Only the Checks-Deferrable Calls allow to reenter the EVC.
 1. Simulation-related functions do not modify the state.
 
 NOTE: In order to borrow, a user must enable a Controller. From then on, whenever the user wants to perform an action that may affect their solvency, the Controller must be consulted (the Account Status Check must be performed) in order to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent. The Account Status Check may be requested by the liability vault by calling the EVC which determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
@@ -65,10 +72,10 @@ NOTE: Because the EVC contract can be made to invoke any arbitrary target contra
 
 1. A Vault can either only allow to be called through the EVC or allow to be called both through the EVC and directly. When the Vault is called though the EVC, it should rely on `getCurrentOnBehalfOfAccount` function for the currently authenticated Account on behalf of which the operation is being performed. The Vault should consider this the true value of `msg.sender` for authorisation purposes. If the Vault is called directly, the Vault should perform the authentication itself and optionally use `callback` function on the EVC.
 1. In more complex cases, to avoid status-check-related issues, it is advised to use the `callback` function when Vault is called directly. It will ensure the Account and Vault Status Checks are always deferred until the end of the top-level call.
-1. In order to support sub-accounts, operators, impersonation and permits, a Vault must be invoked via the EVC.
+1. In order to support sub-accounts, operators, impersonation and permits, a Vault must be invoked via the EVC or `callback` function must be used.
 1. When a user requests to perform an operation such as borrow, a Vault must call into the EVC in order to ensure that the Account has enabled this vault as a Controller. For that purpose `getCurrentOnBehalfOfAccount` or `isControllerEnabled` functions can be used.
-1. Due to the fact that only the Controller can disable itself for the Account, a Vault must implement a standard `disableController` function that can be called by a user in order to disable the Controller for the Account if vault-specific conditions are met (typically, the vault must check whether the Account has repaid its debt in full).
-1. After each operation potentially affecting the Account's solvency (also on non-borrowable Vault), a Vault must invoke the EVC in order to request the Account Status Check. The EVC determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
+1. Due to the fact that only the Controller can disable itself for the Account, a Vault must implement a standard `disableController` function that can be called by a user in order to disable the Controller if vault-specific conditions are met (typically, the vault must check whether the Account has repaid its debt in full).
+1. After each operation potentially affecting the Account's solvency (also on a non-borrowable Vault), a Vault must invoke the EVC in order to request the Account Status Check. The EVC determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately.
 1. Vault must implement `checkAccountStatus` function which gets called for the accounts which have enabled this vault as Controller. The function receives the Account address and the list of Collateral Vaults enabled for the Account. The function must determine whether or not the Account is in an acceptable state by returning the magic value or throwing an exception. If the vault is deposit-only, the function should always return the appropriate magic value.
 1. Vault may implement `checkVaultStatus` function which gets called if the vault requests that via the EVC. The EVC determines whether the check should be deferred until the very end of the top-level checks-deferrable call (if applicable) or performed immediately. This is an optional functionality that allows the vault to enforce its constraints (like supply/borrow caps, invariants checks etc.). Vault Status Check must always be requested by the vault after each operation affecting the vault's state. The `checkVaultStatus` function must determine whether or not the Vault is in an acceptable state by returning the magic value or throwing an exception. If the vault doesn't implement this function, the vault mustn't request the Vault Status Check.
 1. In order to evaluate the Vault Status, `checkVaultStatus` may need access to a snapshot of the initial vault state which should be taken at the beginning of the action that requires the check.
@@ -88,16 +95,18 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ## Collateralized Borrowable Vault Implementation Guide
 
+See the [diagrams](./diagrams) too!
+
 ### Deposit/mint considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. Require the Vault Status Check
 
 ### Withdraw/redeem considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the deposit owner or the account which was approved to withdraw/redeem) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the deposit owner or the account which was approved to withdraw/redeem) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. Require the Account Status Check on the deposit owner
@@ -105,7 +114,7 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ### Borrow considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account taking on the debt) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account taking on the debt) depending on whether the vault is being called directly or through the EVC
 1. Check whether the account taking on the debt has enabled the vault as a controller
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
@@ -114,7 +123,7 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ### Repay considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. If the debt fully repaid, release the vault from being a controller of the account which used to have the debt
@@ -122,7 +131,7 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ### Shares transfer considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the `from` account or the account which was approved to transfer) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the `from` account or the account which was approved to transfer) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. Require the Account Status Check on the `from` account
@@ -130,7 +139,7 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ### Debt transfer considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account which will receive the debt) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account which will receive the debt) depending on whether the vault is being called directly or through the EVC
 1. Check whether the account which will receive the debt has enabled the vault as a controller
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
@@ -140,12 +149,12 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ### Liquidation considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the liquidator account) depending on whether the Vault is being called directly or through the EVC
+1. Authorize the appropriate account (the liquidator account) depending on whether the Vault is being called directly or through the EVC
 1. Check whether the liquidator has enabled the vault as a controller
-1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Ensure that the liquidator is not liquidating itself
 1. Ensure that the violator does not have the Account Status Check deferred
 1. Ensure that the collateral to be liquidated is recognized and trusted
+1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Ensure that the violator is indeed in violation
 1. Perform the operation
 - Perform all the necessary calculations
@@ -180,9 +189,9 @@ NOTE: If a Vault attempted to read the Collateral or Controller sets of an Accou
 
 ```solidity
 function func() external routedThroughEVC nonReentrant {
-    // retrieve the "true" message sender from the EVC. true/false parameter depends whether it's a debt-related
-    // functionality
-    address msgSender = EVCAuthenticate(true/false);
+    // retrieve the "true" message sender from the EVC. whether _msgSender or _msgSenderForBorrow should be called,
+    // depends whether it's a debt-related functionality
+    address msgSender = _msgSender();    // or _msgSenderForBorrow();
 
     // accrue the interest before the snapshot if it relies on it. otherwise it can be accrued after or never if 
     // the vault does not implement the interest accrual
@@ -212,7 +221,7 @@ function func() external routedThroughEVC nonReentrant {
 where `routedThroughEVC` can be implemented as follows:
 
 ```solidity
-/// @notice Ensures that the caller is the EVC by using the EVC callback functionality if necessary.
+/// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
 modifier routedThroughEVC() {
     if (msg.sender == address(evc)) {
         _;
@@ -226,29 +235,44 @@ modifier routedThroughEVC() {
 }
 ```
 
-where `EVCAuthenticate` can be implemented as follows:
+where `_msgSender` and `_msgSenderForBorrow` can be implemented as follows:
 
 ```solidity
-/// @notice Authenticates the caller in the context of the EVC.
-/// @param checkController A boolean flag that indicates whether is should be checked if the vault is enabled as a
-/// controller for the account on behalf of which the operation is being executed.
-/// @return The address of the account on behalf of which the operation is being executed.
-function EVCAuthenticate(bool checkController) internal view returns (address) {
-    if (msg.sender == address(evc)) {
-        (address onBehalfOfAccount, bool controllerEnabled) =
-            evc.getCurrentOnBehalfOfAccount(checkController ? address(this) : address(0));
+/// @notice Retrieves the message sender in the context of the EVC.
+/// @dev This function returns the account on behalf of which the current operation is being performed, which is
+/// either msg.sender or the account authenticated by the EVC.
+/// @return The address of the message sender.
+function _msgSender() internal view returns (address) {
+    address sender = msg.sender;
 
-        if (checkController && !controllerEnabled) {
-            revert ControllerDisabled();
-        }
-
-        return onBehalfOfAccount;
+    if (sender == address(evc)) {
+        (sender,) = evc.getCurrentOnBehalfOfAccount(address(0));
     }
 
-    if (checkController && !evc.isControllerEnabled(msg.sender, address(this))) {
+    return sender;
+}
+```
+
+```solidity
+/// @notice Retrieves the message sender in the context of the EVC for a borrow operation.
+/// @dev This function returns the account on behalf of which the current operation is being performed, which is
+/// either msg.sender or the account authenticated by the EVC. This function reverts if the vault is not enabled as
+/// a controller for the account on behalf of which the operation is being executed.
+/// @return The address of the message sender.
+function _msgSenderForBorrow() internal view returns (address) {
+    address sender = msg.sender;
+    bool controllerEnabled;
+
+    if (sender == address(evc)) {
+        (sender, controllerEnabled) = evc.getCurrentOnBehalfOfAccount(address(this));
+    } else {
+        controllerEnabled = evc.isControllerEnabled(sender, address(this));
+    }
+
+    if (!controllerEnabled) {
         revert ControllerDisabled();
     }
 
-    return msg.sender;
+    return sender;
 }
 ```

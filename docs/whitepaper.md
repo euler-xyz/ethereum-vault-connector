@@ -41,14 +41,14 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 
 ## Introduction
 
-The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the ERC-4626 interface and contain additional logic for interfacing with other vaults. The EVC not only provides a common base ecosystem but also reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors.
+The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the [ERC-4626](https://ethereum.org/en/developers/docs/standards/tokens/erc-4626/) interface and contain additional logic for interfacing with other vaults. The EVC not only provides a common base ecosystem but also reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors.
 
 To illustrate the process of vault mediation, let's consider a straightforward example. When a user wishes to borrow, they must link their accounts and collateral vaults to the borrowed-from vault via the EVC. The liability vault, also known as the "controller", is then consulted whenever a user wants to perform an action potentially impacting account's solvency, such as withdrawing collateral. The EVC is responsible for calling the controller which determines whether the action is allowed or if it should be blocked to prevent account insolvency.
 
 In addition to vault mediation, the EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. Here are some of the benefits of building on the EVC:
 
 * Network effect thanks to unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
-* Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, uncollateralised IOUs, or synthetics.
+* Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, Real World Assets (RWAs), uncollateralised IOUs, or synthetics.
 * Standardized approach to account liquidity checks and vault global constraints enforcement: The EVC allows for deferral of the liquidity checks and vault status checks, preventing transient violations from causing a failure. The EVC exposes an interface which abstracts management of the checks away from the vault.
 * Batching: Multiple operations affecting multiple vaults and external smart contracts can be performed within a single batch operation. This is more convenient for UI users, more gas efficient, and allows deferring liquidity checks until the end of the batch.
 * Sub-accounts: A feature that allows users to create multiple isolated positions within their single owner account, and easily rebalance collateral/liabilities between them without the need for approvals and without requiring any special logic to be implemented by the vaults.
@@ -80,6 +80,8 @@ Account status checks are implemented by vaults to enforce account solvency. Vau
 ### Collateral Validity
 
 Within the `checkAccountStatus` callback, vaults should inspect the provided list of collaterals and determine whether or not they are acceptable. Vaults can limit themselves to a small set of collaterals, or can be more general-purpose and allow borrowing using any assets they can get prices for. Alternately, a vault could always fail, if it is only intended to be a collateral vault.
+
+Vaults have freedom to price all the assets according to their preference (both liability and recognized collaterals), without depending on potentially untrustworthy oracles.
 
 To encourage borrowing, it may be tempting to allow a large set of collateral assets. However, vault creators must be careful about which assets they accept. A malicious vault could lie about the amount of assets it holds, or reject liquidations when a user is in violation. For this reason, vaults should restrict allowed collaterals to a known-good set of audited addresses, or lookup the addresses in a registry or factory contract to ensure they were created by known-good, audited contracts.
 
@@ -145,19 +147,13 @@ As with the account status check, there is a subtle complication that vault impl
 
 ### Checks-deferrable Call
 
-The EVC exposes multiple functions, each with its own characteristicts, that allow for the [Account Status Checks](#account-status-checks) and [Vault Status Checks](#vault-status-checks) to be deferred. [call](#call), [impersonate](#impersonate), [callback](#callback) and [batch](#batch), so called checks-deferrable call functions, can be nested and allow for the checks to be deferred until the end of the execution of the top-level function call.
+The EVC exposes multiple functions, each with its own characteristicts, that allow for the [Account Status Checks](#account-status-checks) and [Vault Status Checks](#vault-status-checks) to be deferred. [call](#call), [callback](#callback), [batch](#batch) and [impersonate](#impersonate) so called checks-deferrable call functions, can be nested and allow for the checks to be deferred until the end of the execution of the top-level function call.
 
 ### call
 
 The `call` function on the EVC allows users to invoke functions on vaults and other target smart contracts. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function rather than calling the vaults directly. This is because vaults themselves don't understand sub-accounts or operators, and defer their authorisation logic to the EVC (see the [Authentication By Vaults](#authentication-by-vaults) section).
 
 `call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the EVC as `msg.sender`. For this reason, it is critical that the EVC itself never be given any special privileges, or hold any token or ETH balances (except for a few corner cases where it is temporarily safe, see the [EVC Contract Privileges](#evc-contract-privileges) section).
-
-### impersonate
-
-The `impersonate` function can only be used in one specific case: When a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some collateral assets to repay the debt.
-
-This is accomplished by the controller vault calling `impersonate`. It passes in the collateral vault as the target collateral and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
 
 ### callback
 
@@ -178,6 +174,12 @@ At the time of this writing, public/private keypair Ethereum accounts (EOAs) can
 Batches can be composed of both calls to the EVC itself and external calls (when the `targetContract` is not the EVC). Calling the EVC is how users can enable collateral from within a batch, for example. In order to preserve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall` (except for [permit](#permit)).
 
 Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
+
+### impersonate
+
+The `impersonate` function can only be used in one specific case: when a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some collateral assets to repay the debt.
+
+This is accomplished by the controller vault calling `impersonate`. It passes in the collateral vault as the target collateral and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
 
 ### permit
 
@@ -280,7 +282,7 @@ However, when interacting with complicated vaults that may invoke external contr
 
 In order to simplify the implementation of this check, the `impersonateLock` mutex is locked while invoking a collateral vault during the `impersonate` flow. While locked, no accounts' collateral or controller sets can be modified.
 
-Additionally, during an impersonation, the EVC cannot be re-entered via `call`, `batch`, `impersonate`, `callback` or `permit`.
+Additionally, during an impersonation, the EVC cannot be re-entered via `call`, `batch`, `impersonate`, `callback`, `permit` or `recoverRemainingETH`.
 
 #### Extra Information
 
@@ -324,7 +326,7 @@ Because the EVC contract can be made to invoke any arbitrary target contract wit
 
 The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves ETH or tokens into the EVC, but a subsequent batch item moves it out, then as long as no untrusted code runs in between, it is safe. However, moving tokens to the EVC is often unnecessary because tokens can be moved immediately to their final destination with `transferFrom` and by setting various `recipient` parameters in contracts.
 
-One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit).
+One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit using `recoverRemainingETH` function).
 
 One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the EVC doesn't attempt to comprehensively solve this, the ERC-1820 registry address is blocked and can not be invoked via `call` or batches.
 

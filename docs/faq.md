@@ -23,7 +23,7 @@
 
 ## What is the Ethereum Vault Connector?
 
-The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the ERC-4626 interface and contain additional logic for interfacing with other vaults.
+The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the [ERC-4626](https://ethereum.org/en/developers/docs/standards/tokens/erc-4626/) interface and contain additional logic for interfacing with other vaults.
 
 ## How does the EVC work in principle?
 
@@ -32,11 +32,12 @@ When a user wishes to borrow, they must link their accounts and collateral vault
 ## What are the benefits of building on the EVC?
 
 The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors such as pricing and risk management.
-The EVC creates the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
+
+The EVC helps create the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
 
 ## What can be built using the EVC?
 
-The Ethereum Vault Connector (EVC) provides a robust and flexible framework for developers to build a variety of new products. These include but are not limited to:
+The EVC provides a robust and flexible framework for developers to build a variety of new products. These include but are not limited to:
 
 1. Traditional, overcollateralized lending products
 1. Uncollateralized lending products
@@ -104,9 +105,10 @@ In essence, the `impersonate` function provides a mechanism for enforcing the ru
 
 ## How does the EVC interact with other smart contracts?
 
-The EVC interacts with other smart contracts, including vaults, through several key functions: `call`, `impersonate`, `callback`, and `batch`.
+The EVC interacts with other smart contracts, including vaults, through several key functions: `callback`, `call`,`batch`, `impersonate`, `recoverRemainingETH`.
 
+1. `callback`: The function allows the `msg.sender` to be called back by the EVC with specified calldata and the execution context set. The callback is executed with account and vault status checks deferred. This function is used when a vault is called directly and wants to imitate being called through the EVC.
 1. `call`: The function allows an Account Owner or an Account Operator to execute arbitrary calldata on behalf of a specified account. This function is used to interact with other smart contracts while deferring account and vault status checks.
-1. `impersonate`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
-1. `callback`: The function allows the `msg.sender` to be called back by the EVC with specified calldata and context set. The callback is executed with account and vault status checks deferred. This function is used when a vault is called directly and wants to imitate being called through the EVC.
 1. `batch`: The function allows for the execution of a list of operations atomically. This means that all operations either succeed together or fail together. This function is used when the EVC needs to interact with multiple smart contracts in a specific sequence.
+1. `impersonate`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
+1. `recoverRemainingETH`: The function allows an Account Owner or an Account Operator to recover remaing ETH left in the EVC on behalf of a specified receiver account. If the receiver is a smart contract, its `fallback`/`receive` gets triggered.
