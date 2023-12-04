@@ -99,14 +99,14 @@ See the [diagrams](./diagrams) too!
 
 ### Deposit/mint considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. Require the Vault Status Check
 
 ### Withdraw/redeem considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the deposit owner or the account which was approved to withdraw/redeem) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the deposit owner or the account which was approved to withdraw/redeem) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. Require the Account Status Check on the deposit owner
@@ -114,7 +114,7 @@ See the [diagrams](./diagrams) too!
 
 ### Borrow considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account taking on the debt) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account taking on the debt) depending on whether the vault is being called directly or through the EVC
 1. Check whether the account taking on the debt has enabled the vault as a controller
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
@@ -123,7 +123,7 @@ See the [diagrams](./diagrams) too!
 
 ### Repay considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account from which the tokens will be pulled) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. If the debt fully repaid, release the vault from being a controller of the account which used to have the debt
@@ -131,7 +131,7 @@ See the [diagrams](./diagrams) too!
 
 ### Shares transfer considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the `from` account or the account which was approved to transfer) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the `from` account or the account which was approved to transfer) depending on whether the vault is being called directly or through the EVC
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
 1. Require the Account Status Check on the `from` account
@@ -139,7 +139,7 @@ See the [diagrams](./diagrams) too!
 
 ### Debt transfer considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the account which will receive the debt) depending on whether the vault is being called directly or through the EVC
+1. Authorize the appropriate account (the account which will receive the debt) depending on whether the vault is being called directly or through the EVC
 1. Check whether the account which will receive the debt has enabled the vault as a controller
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Perform the operation
@@ -149,7 +149,7 @@ See the [diagrams](./diagrams) too!
 
 ### Liquidation considerations
 1. Ensure reentrancy protection
-1. Authenticate the caller (the liquidator account) depending on whether the Vault is being called directly or through the EVC
+1. Authorize the appropriate account (the liquidator account) depending on whether the Vault is being called directly or through the EVC
 1. Check whether the liquidator has enabled the vault as a controller
 1. Ensure that the liquidator is not liquidating itself
 1. Ensure that the violator does not have the Account Status Check deferred
@@ -189,9 +189,9 @@ See the [diagrams](./diagrams) too!
 
 ```solidity
 function func() external routedThroughEVC nonReentrant {
-    // retrieve the "true" message sender from the EVC. true/false parameter depends whether it's a debt-related
-    // functionality
-    address msgSender = EVCAuthenticate(true/false);
+    // retrieve the "true" message sender from the EVC. whether _msgSender or _msgSenderForBorrow should be called,
+    // depends whether it's a debt-related functionality
+    address msgSender = _msgSender();    // or _msgSenderForBorrow();
 
     // accrue the interest before the snapshot if it relies on it. otherwise it can be accrued after or never if 
     // the vault does not implement the interest accrual
@@ -221,7 +221,7 @@ function func() external routedThroughEVC nonReentrant {
 where `routedThroughEVC` can be implemented as follows:
 
 ```solidity
-/// @notice Ensures that the caller is the EVC by using the EVC callback functionality if necessary.
+/// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
 modifier routedThroughEVC() {
     if (msg.sender == address(evc)) {
         _;
@@ -235,29 +235,44 @@ modifier routedThroughEVC() {
 }
 ```
 
-where `EVCAuthenticate` can be implemented as follows:
+where `_msgSender` and `_msgSenderForBorrow` can be implemented as follows:
 
 ```solidity
-/// @notice Authenticates the caller in the context of the EVC.
-/// @param checkController A boolean flag that indicates whether is should be checked if the vault is enabled as a
-/// controller for the account on behalf of which the operation is being executed.
-/// @return The address of the account on behalf of which the operation is being executed.
-function EVCAuthenticate(bool checkController) internal view returns (address) {
-    if (msg.sender == address(evc)) {
-        (address onBehalfOfAccount, bool controllerEnabled) =
-            evc.getCurrentOnBehalfOfAccount(checkController ? address(this) : address(0));
+/// @notice Retrieves the message sender in the context of the EVC.
+/// @dev This function returns the account on behalf of which the current operation is being performed, which is
+/// either msg.sender or the account authenticated by the EVC.
+/// @return The address of the message sender.
+function _msgSender() internal view returns (address) {
+    address sender = msg.sender;
 
-        if (checkController && !controllerEnabled) {
-            revert ControllerDisabled();
-        }
-
-        return onBehalfOfAccount;
+    if (sender == address(evc)) {
+        (sender,) = evc.getCurrentOnBehalfOfAccount(address(0));
     }
 
-    if (checkController && !evc.isControllerEnabled(msg.sender, address(this))) {
+    return sender;
+}
+```
+
+```solidity
+/// @notice Retrieves the message sender in the context of the EVC for a borrow operation.
+/// @dev This function returns the account on behalf of which the current operation is being performed, which is
+/// either msg.sender or the account authenticated by the EVC. This function reverts if the vault is not enabled as
+/// a controller for the account on behalf of which the operation is being executed.
+/// @return The address of the message sender.
+function _msgSenderForBorrow() internal view returns (address) {
+    address sender = msg.sender;
+    bool controllerEnabled;
+
+    if (sender == address(evc)) {
+        (sender, controllerEnabled) = evc.getCurrentOnBehalfOfAccount(address(this));
+    } else {
+        controllerEnabled = evc.isControllerEnabled(sender, address(this));
+    }
+
+    if (!controllerEnabled) {
         revert ControllerDisabled();
     }
 
-    return msg.sender;
+    return sender;
 }
 ```
