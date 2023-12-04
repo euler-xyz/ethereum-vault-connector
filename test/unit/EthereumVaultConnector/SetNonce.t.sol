@@ -37,7 +37,7 @@ contract SetNonceTest is Test {
         uint152 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(addressPrefix != type(uint152).max);
-        vm.assume(operator != address(0));
+        vm.assume(operator != address(0) && operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
         vm.assume(nonce > 0);
 
