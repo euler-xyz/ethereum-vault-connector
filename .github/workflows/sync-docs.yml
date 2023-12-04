@@ -1,0 +1,18 @@
+name: Sync EVC Docs
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  sync:
+    name: Sync EVC Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.PAT }}
+          repository: euler-xyz/ethereum-vault-connector-docs
+          event-type: sync-docs
