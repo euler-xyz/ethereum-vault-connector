@@ -23,6 +23,7 @@ sequenceDiagram
         EVC->>Controller Vault: checkAccountStatus(account, collaterals)
         Controller Vault->>Controller Vault: is msg.sender EVC?
         Controller Vault->>EVC: areChecksInProgress()
+        Controller Vault-->>Any Vault: balanceOf()
         Controller Vault-->>Price Oracle: getQuote()
         Controller Vault->>Controller Vault: determine account's liquidity
 

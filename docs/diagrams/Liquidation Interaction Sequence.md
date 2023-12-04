@@ -53,6 +53,7 @@ sequenceDiagram
         EVC->>Controller Vault: checkAccountStatus(liquidator, collaterals)
         Controller Vault->>Controller Vault: is msg.sender EVC?
         Controller Vault->>EVC: areChecksInProgress()
+        Controller Vault-->>Collateral Vault: balanceOf()
         Controller Vault-->>Price Oracle: getQuote()
         Controller Vault->>Controller Vault: determine liquidator's liquidity
 
