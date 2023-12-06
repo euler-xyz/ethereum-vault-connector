@@ -8,6 +8,11 @@ import "../../src/ExecutionContext.sol";
 contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
+
+    function getExecutionContextDefault() external view returns (uint256) {
+        return EC.unwrap(ExecutionContext.initialize());
+    }
+
     function getExecutionContextCallDepth() external view returns (uint8) {
         return executionContext.getCallDepth();
     }
@@ -26,5 +31,12 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
 
     function getOwnerOf(uint152 prefix) public view returns (address) {
         return ownerLookup[prefix];
+    }
+
+    function areAccountStatusChecksEmpty() public view returns (bool) {
+        return accountStatusChecks.numElements == 0;
+    }
+    function areVaultStatusChecksEmpty() public view returns (bool) {
+        return vaultStatusChecks.numElements == 0;
     }
 }
