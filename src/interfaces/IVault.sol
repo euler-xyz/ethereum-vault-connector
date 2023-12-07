@@ -10,7 +10,8 @@ interface IVault {
     /// @notice Disables a controller (this vault) for the authenticated account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s
     /// balances in the enabled collaterals vaults. User calls this function in order for the vault to disable itself
-    /// for the account if the conditions are met (i.e. user has repaid debt in full).
+    /// for the account if the conditions are met (i.e. user has repaid debt in full). If the conditions are not met,
+    /// the function reverts.
     function disableController() external;
 
     /// @notice Checks the status of an account.
