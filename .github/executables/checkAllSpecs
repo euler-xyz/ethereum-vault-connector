@@ -47,7 +47,7 @@ def runConf(filename):
     or the CompletedProcess when there was some error."""
     print(f'Starting {filename}')
     try:
-        res = subprocess.run(['certoraRun', '--server', 'production', '--wait_for_results', 'all', filename],
+        res = subprocess.run(['certoraRun', '--server', 'production', '--prover_version', '--master', '--wait_for_results', 'all', filename],
                              capture_output = True)
     except Exception as e:
         with outputMutex:
