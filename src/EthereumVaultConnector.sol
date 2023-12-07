@@ -43,9 +43,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     //                                        STORAGE                                            //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    mapping(address account => SetStorage) internal accountCollaterals;
-    mapping(address account => SetStorage) internal accountControllers;
-
     // EVC implements controller isolation, meaning that unless in transient state, only one controller per account can
     // be enabled. However, this can lead to a suboptimal user experience. In the event a user wants to have multiple
     // controllers enabled, a separate wallet must be created and funded. Although there is nothing wrong with having
@@ -55,7 +52,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Every Ethereum address has 256 accounts in the EVC (including the primary account - called the owner).
     // Each account has an account ID from 0-255, where 0 is the owner account's ID. In order to compute the account
     // addresses, the account ID is treated as a uint256 and XORed (exclusive ORed) with the Ethereum address.
-    // In order to record the owner of a group of 256 accounts, the EVC uses a definition of a address prefix.
+    // In order to record the owner of a group of 256 accounts, the EVC uses a definition of an address prefix.
     // An address prefix is a part of an address having the first 19 bytes common with any of the 256 account
     // addresses belonging to the same group.
     // account/152 -> prefix/152
@@ -68,9 +65,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     mapping(uint152 addressPrefix => address owner) internal ownerLookup;
 
+    mapping(uint152 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
+
     mapping(uint152 addressPrefix => mapping(uint256 nonceNamespace => uint256 nonce)) internal nonceLookup;
 
-    mapping(uint152 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
+    mapping(address account => SetStorage) internal accountCollaterals;
+
+    mapping(address account => SetStorage) internal accountControllers;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                CONSTRUCTOR, FALLBACKS                                     //
@@ -166,8 +167,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         _;
     }
 
-    /// @notice A modifier that verifies whether account or vault status checks are reentered as well as checks for
-    /// impersonate reentrancy.
+    /// @notice A modifier that verifies whether account or vault status checks are re-entered as well as checks for
+    /// impersonate re-entrancy.
     modifier nonReentrant() {
         {
             EC context = executionContext;
@@ -184,7 +185,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         _;
     }
 
-    /// @notice A modifier that verifies whether account or vault status checks are reentered and sets the lock.
+    /// @notice A modifier that verifies whether account or vault status checks are re-entered and sets the lock.
     modifier nonReentrantChecks() virtual {
         EC contextCache = executionContext;
 
