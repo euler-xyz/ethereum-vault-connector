@@ -23,9 +23,15 @@ invariant callDepthIsZero() getCurrentCallDepth() == 0;
 /**
  * Check that we never have more than one controller.
  *
- * It does not work for batch(): this relies on batch() calling
- * checkAccountStatusInternal for all accounts whose controllers might have
- * changed.
+ * It does not work for batch(), as it requires rather complex reasoning. Some
+ * pieces necessary for this reasoning:
+ * - the account status checks verifies that there is only a single controller.
+ * - the only place that adds a controller issues an account status check for
+ *   the respective account, either immediately or by registering it to the set.
+ * - whenever `executionContext` is written to in a way that could set the call
+ *   depth back to zero, we make sure that we run the account status checks for
+ *   all accounts registered for a status check.
+ * - at the end of batch(), the execution context is restored to call depth zero.
  */
 invariant onlyOneController(address a)
     numOfController(a) <= 1
