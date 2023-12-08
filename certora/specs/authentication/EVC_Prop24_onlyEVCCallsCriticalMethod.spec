@@ -1,30 +1,35 @@
 import "../utils/IsMustRevertFunction.spec";
 
+/**
+ * Check that we don't leak write access to storage to other code.
+ */
+import "../utils/CallOpSanity.spec";
+
 ////////////////////////////////////////////////////////////////
 //                                                            //
 //           Account Controllers (Ghost and Hooks)            //
 //                                                            //
 ////////////////////////////////////////////////////////////////
 
-
-// variable is true if we inserted EVC as a controller anywhere
-ghost bool insertedEVCAsController {
-    init_state axiom insertedEVCAsController == false;
-}
-
+/* Any load from `firstElement` or `elements`, for either `accountControllers`
+ * or `vaultStatusChecks`, MUST be dominated by a store on the same memory first.
+ * Thus, requiring `value != currentContract` is safe as we assert it before.
+ * We do this to keep the knowledge about `currentContract` not being in any of
+ * these sets across HAVOC'd function calls.
+ */
 // when writing to accountControllers, check that value != currentContract
 hook Sstore EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement address value STORAGE {
-    if (value == currentContract) insertedEVCAsController = true;
+    assert(value != currentContract);
 }
 hook Sstore EthereumVaultConnectorHarness.accountControllers[KEY address user].elements[INDEX uint256 i].value address value STORAGE {
-    if (value == currentContract) insertedEVCAsController = true;
+    assert(value != currentContract);
 }
 // when loading from accountControllers, we know that value != currentContract
 hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement STORAGE {
-    if (!insertedEVCAsController) require(value != currentContract);
+    require(value != currentContract);
 }
 hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].elements[INDEX uint256 i].value STORAGE {
-    if (!insertedEVCAsController) require(value != currentContract);
+    require(value != currentContract);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -33,24 +38,19 @@ hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY ad
 //                                                            //
 ////////////////////////////////////////////////////////////////
 
-// variable is true if we inserted EVC as a vault for a check anywhere
-ghost bool insertedEVCAsVault {
-    init_state axiom insertedEVCAsVault == false;
-}
-
 // when writing to vaultStatusChecks, check that value != currentContract
 hook Sstore EthereumVaultConnectorHarness.vaultStatusChecks.firstElement address value STORAGE {
-    if (value == currentContract) insertedEVCAsVault = true;
+    assert(value != currentContract);
 }
 hook Sstore EthereumVaultConnectorHarness.vaultStatusChecks.elements[INDEX uint256 i].value address value STORAGE {
-    if (value == currentContract) insertedEVCAsVault = true;
+    assert(value != currentContract);
 }
 // when loading from vaultStatusChecks, we know that value != currentContract
 hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.firstElement STORAGE {
-    if (!insertedEVCAsVault) require(value != currentContract);
+    require(value != currentContract);
 }
 hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.elements[INDEX uint256 i].value STORAGE {
-    if (!insertedEVCAsVault) require(value != currentContract);
+    require(value != currentContract);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -60,36 +60,17 @@ hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.element
 //                                                            //
 ////////////////////////////////////////////////////////////////
 
-// variable is true when a call was made with e.msg.sender == EVC
-ghost bool callOpCodeHasBeenCalledWithEVC;
-
-// hook applied to every call, updates the ghost.
-hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
-    //e.msg.sender is equal to EVC (currentContract and exeuctingContract), switch the flag.
-    callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || 
-        (executingContract == currentContract && addr == currentContract);
+/**
+ * Core property: we never `call` into ourselves (except for `permit`, which we
+ * exclude in the rule below). All other possibilities to be called either have
+ * `msg.sender != currentContract` (reentrant `call` or `staticcall` or internal
+ * `delegatecall`), or have no write access to our storage (reentrant
+ * `delegatecall`).
+ */
+hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
+{
+    assert(executingContract != currentContract || addr != currentContract);
 }
-
-// hook applied to every delegatecall updating the ghost when EVC
-hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc {
-    callOpCodeHasBeenCalledWithEVC = callOpCodeHasBeenCalledWithEVC || addr != currentContract; 
-}
-////////////////////////////////////////////////////////////////
-//                                                            //
-//                         Invariants                         //
-//                                                            //
-////////////////////////////////////////////////////////////////
-
-// This invariant checks that account controller never contains EVC
-invariant accountControllerNeverContainsEVC()
-    insertedEVCAsController == false
-    filtered {f -> !isMustRevertFunction(f)}
-
-// This invariant checks that vault status checks never contains EVC
-invariant vaultStatusChecksNeverContainsEVC()
-    insertedEVCAsVault == false
-    filtered {f -> !isMustRevertFunction(f)}
-    { preserved with (env e) { require e.msg.sender != currentContract; } }
 
 // This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
@@ -100,17 +81,9 @@ rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
 
-    //Require the invariants to hold
-    requireInvariant vaultStatusChecksNeverContainsEVC();
-    requireInvariant accountControllerNeverContainsEVC();
-
-    //Require the ghost flag to be false initially
-    require(!callOpCodeHasBeenCalledWithEVC);
-    //Call all contract methods
     f(e,args);
 
-    //Ensure the ghost flag to be false eventually
-    assert !callOpCodeHasBeenCalledWithEVC, "Only EVC can call critical method.";
+    assert(true);
 }
 
 
