@@ -27,12 +27,18 @@ https://mutation-testing.certora.com/?id=e7809cc8-36dd-476b-b282-7eac7cdddfa6&an
 Link to pre-generated mutation testing report: 
 https://mutation-testing.certora.com/?id=82627d48-04b2-49c0-928a-0ca1b9139a5c&anonymousKey=c8adf8ed-b740-4a45-8533-f3b5c5003e3d
 
-## Mutations for Property 25
+## Mutations for Property 25 & 26
 
-> certoraMutate --prover_conf certora/conf/functionality/EVC_Prop25_ResetsTransientStorage.conf --mutation_conf certora/mutate/conf/MutateProp25.conf --prover_version master --server production
+Note that mutations for Property 25 and 26 share the same manual mutants. The invariant `topLevelFunctionDontChangeTransientStorage` and the rule `noFunctionChangesExecutionContext` fail on the same mutants. 
 
-Link to pre-generated mutation testing report: 
-https://mutation-testing.certora.com/?id=d6359085-a2f3-49e3-8248-8218f22c729d&anonymousKey=26c3f775-4e98-4138-aa83-fe2b99229ed8
+> certoraMutate --prover_conf certora/conf/functionality/EVC_Prop25_ResetsTransientStorage.conf --mutation_conf certora/mutate/conf/MutateProp25_26.conf --prover_version master --server production
+
+Link to pre-generated mutation testing report for Prop 25:
+https://mutation-testing.certora.com/?id=cedd2fce-111d-4b22-bd1a-795d61d8d131&anonymousKey=7d9fafe4-a1b6-4477-b3a8-2fd059eeb5a9
+
+Link to pre-generated mutation testing report for Prop 26:
+https://mutation-testing.certora.com/?id=cedd2fce-111d-4b22-bd1a-795d61d8d131&anonymousKey=7d9fafe4-a1b6-4477-b3a8-2fd059eeb5a9
+
 
 
 The manual mutants are written per property and are found in the directory `certora/mutate/mutations`. 
