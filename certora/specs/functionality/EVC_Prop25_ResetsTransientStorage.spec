@@ -31,7 +31,8 @@ invariant topLevelFunctionDontChangeTransientStorage()
     }
 
 /**
- * Check that `getCurrentOnBehalfOfAccount` always reverts.
+ * Check that `getCurrentOnBehalfOfAccount` always reverts in case the invariant holds.
+ * This justifies the filter applied to the invariant above. 
  */
 rule getCurrentOnBehalfOfAccountAlwaysReverts() {
     requireInvariant topLevelFunctionDontChangeTransientStorage();
