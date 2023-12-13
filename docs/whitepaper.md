@@ -72,6 +72,7 @@ However, suppose a user wants to take out a borrow from a separate vault. In thi
 * Only the controller itself can call `disableController` on the EVC. This should typically happen upon an account repaying its debt in full. Vaults must be coded carefully to not have edge cases such as unrepayable dust, otherwise accounts could become permanently associated with a controller.
 * The order of an account's collateral set can be changed with `reorderCollaterals`. Because some controller vaults will loop over an account's collateral in sequence and return early if sufficient value is found, this can save considerable gas. This feature was inspired by Gearbox's `collateralHints`.
 
+Given that enabling a controller subjects the specified account to the rules encoded in the controller's code, users must only enable trusted, audited controllers. If the controller is malicious or incorrectly coded, it may result in the loss of the user's funds or even render the account unusable.
 
 ## Account Status Checks
 
