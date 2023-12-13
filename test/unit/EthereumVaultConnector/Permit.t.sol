@@ -186,7 +186,7 @@ contract PermitTest is Test {
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
     event CallWithContext(
         address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
     );
@@ -230,8 +230,8 @@ contract PermitTest is Test {
 
         bytes memory signature = signerECDSA.signPermit(alice, nonceNamespace, nonce, deadline, value, data);
 
-        vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(evc.getAddressPrefix(alice), nonce);
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
         vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(address(this), address(evc), alice, bytes4(data));
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);
@@ -272,8 +272,8 @@ contract PermitTest is Test {
 
         SignerERC1271(alice).setPermitHash(alice, nonceNamespace, nonce, deadline, value, data);
 
-        vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(evc.getAddressPrefix(alice), nonce);
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
         vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(address(this), address(evc), alice, bytes4(data));
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);

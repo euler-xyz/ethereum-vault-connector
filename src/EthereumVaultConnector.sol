@@ -298,7 +298,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         nonceLookup[addressPrefix][nonceNamespace] = nonce;
-        emit NonceUsed(addressPrefix, nonce - 1);
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce - 1);
     }
 
     /// @inheritdoc IEVC
@@ -488,7 +488,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_NotAuthorized();
         }
 
-        emit NonceUsed(addressPrefix, nonce);
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
 
         // EVC address becomes msg.sender for the duration this self-call
         (bool success, bytes memory result) = callWithContextInternal(address(this), signer, value, data);
