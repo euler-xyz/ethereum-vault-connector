@@ -40,6 +40,12 @@ Link to pre-generated mutation testing report for Prop 26:
 https://mutation-testing.certora.com/?id=cedd2fce-111d-4b22-bd1a-795d61d8d131&anonymousKey=7d9fafe4-a1b6-4477-b3a8-2fd059eeb5a9
 
 
+## Mutations for Property 27
+
+> certoraMutate --prover_conf certora/conf/authentication/EVC_Prop27_setAccountOwnerSandboxed.conf --mutation_conf certora/mutate/conf/MutateProp27.conf --prover_version master --server production
+
+Link to pre-generated mutation testing report:
+https://mutation-testing.certora.com/?id=b487ec5d-60dc-4c78-a801-3ee40cd8620f&anonymousKey=ab5f3b69-5c63-425b-a9ce-6bbeeaf29278
 
 The manual mutants are written per property and are found in the directory `certora/mutate/mutations`. 
 Note: The flag --prover_version master is required until fix for https://certora.atlassian.net/browse/CERT-4160 is released.
