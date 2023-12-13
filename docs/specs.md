@@ -96,6 +96,8 @@ NOTE: Only the Controller can disable itself for the Account. This should typica
 
 NOTE: The protocol deliberately doesn't enforce specific properties about the assets being used as collateral or liabilities. EVC users can therefore create vaults backed by irregular asset classes, such as NFTs, RWAs, uncollateralised IOUs, or synthetics.
 
+NOTE: While it might be tempting for the Controller to allow a broad range of Collateral vaults to encourage borrowing, the Controller vault creators MUST exercise caution when deciding which vaults to accept as collateral. A malicious or incorrectly coded vault could, among other things, misrepresent the amount of assets it holds, reject liquidations when a user is in violation, or fail to require Account Status Checks when necessary. Therefore, vaults SHOULD limit allowed collaterals to a set of audited addresses known to be reliable, or verify the addresses in a registry or factory contract to ensure they were created by trustworthy, audited contracts.
+
 NOTE: Accounts are fully isolated and can be treated as independent positions. Failing Account Status Check (ruled by enabled Controller Vault) may affect the ability to interact with the Account, including operations on the Vaults that are not enabled as Collaterals. In order to make the Account fully functional again, one MUST satisfy the Controller Vault conditions.
 
 NOTE: Because the EVC contract can be made to invoke any arbitrary target contract with any arbitrary calldata, it SHOULD never be given any privileges, or hold any ETH or tokens.
