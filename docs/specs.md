@@ -42,6 +42,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. Only an Account Owner or the Account Operator MUST be allowed to reorder enabled Collateral Vaults for the Account.
 1. Only an Account Owner or the Account Operator MUST be allowed to enable Controller Vaults for the Account.
 1. Only an enabled Controller Vault for the Account MUST be allowed to disable itself for that Account.
+1. The Controller Vault MUST not be allowed to use Permit message in order to disable itself for an Account.
 1. EVC MUST support signed Permit messages that allow anyone to execute arbitrary calldata on the EVC on behalf of the Account Owner or Account Operator who signed the message.
 1. Signed Permit message MUST conform to the EIP-712 standard rules.
 1. The type of the EIP-712 data structure MUST be encoded as follows: `Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)`.
@@ -77,6 +78,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. The Call target address MUST NOT be the EVC, ERC-1820 registry address or the msg.sender itself.
 1. The Batch external call target MUST NOT be the EVC, ERC-1820 registry address or the msg.sender itself.
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to Impersonate the Account's call into any of its enabled Collateral Vaults. Neither the Controller nor Collateral Vault can be the EVC.
+1. The Controller Vault MUST not be allowed to use Permit message in order to Impersonate.
 1. EVC MUST allow the remaining ETH to be recovered, but it MUST only be sent to an address recorded as an Account Owner for which the caller is authorized to act on behalf (it's either the Account Owner itself or its Account Operator).
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to forgive the Account Status Check if it's deferred.
 1. EVC MUST allow a Vault to forgive the Vault Status Check for itself.
