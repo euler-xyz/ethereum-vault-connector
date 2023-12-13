@@ -11,9 +11,9 @@ type EC is uint256;
 /// @dev - call depth - used to indicate the number of nested checks-deferrable calls
 /// @dev - on behalf of account - an account on behalf of which the currently executed operation is being performed
 /// @dev - checks lock flag - used to indicate that the account/vault status checks are in progress. This flag is used
-/// to prevent reentrancy.
+/// to prevent re-entrancy.
 /// @dev - impersonation lock flag - used to indicate that the currently executed operation is impersonating an account.
-/// This flag is used to prevent reentrancy.
+/// This flag is used to prevent re-entrancy.
 /// @dev - operator authenticated flag - used to indicate that the currently executed operation is being performed by
 /// the account operator
 /// @dev - simulation flag - used to indicate that the currently executed batch call is a simulation

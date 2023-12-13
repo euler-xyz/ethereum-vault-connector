@@ -28,6 +28,7 @@ contract RecoverRemainingETHTest is Test {
         vm.assume(
             uint160(alice) > 10 && alice != address(evc)
                 && !evc.haveCommonOwner(alice, 0x4e59b44847b379578588920cA78FbF26c0B4956C)
+                && !evc.haveCommonOwner(alice, 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38)
         );
         vm.assume(seed % 256 != 0);
 

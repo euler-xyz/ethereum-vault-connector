@@ -91,7 +91,7 @@ Although the vaults themselves implement `checkAccountStatus`, there is no need 
 
 Upon a `requireAccountStatusCheck` call, the EVC will determine whether the current execution context is in a checks-deferrable call and if so, it will defer checking the status for this account until the end of the execution context. Otherwise, the account status check will be performed immediately.
 
-There is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal reentrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
+There is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
 
 ### Single Controller
 
@@ -140,7 +140,7 @@ In order to evaluate the vault status, `checkVaultStatus` may need access to a s
 * The vault should then call `requireVaultStatusCheck`
 * When the `checkVaultStatus` callback is invoked, it should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return a special magic success value, or revert if there is a violation.
 
-As with the account status check, there is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the EVC), if it calls `requireVaultStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkVaultStatus` function. A normal reentrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
+As with the account status check, there is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the EVC), if it calls `requireVaultStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkVaultStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
 
 
 ## Execution
