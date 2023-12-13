@@ -104,7 +104,9 @@ NOTE: Because the EVC contract can be made to invoke any arbitrary target contra
 ## Vault Specification
 
 1. A Vault MAY either only allow to be called through the EVC or MAY allow to be called both through the EVC and directly. When the Vault is called though the EVC, it MUST rely on `getCurrentOnBehalfOfAccount` function for the currently authenticated Account on behalf of which the operation is being performed. The Vault MUST consider this the true value of `msg.sender` for authorization purposes. If the Vault is called directly, the Vault MAY perform the authentication itself and optionally use `callback` function on the EVC.
-1. In more complex cases, to avoid status-check-related issues, it is advised to use the `callback` function when Vault is called directly. It will ensure the Account and Vault Status Checks are always deferred, at least until the end of the `callback` call.
+1. In more complex cases, to avoid status-check-related issues, it is advised to use the `callback` function when the Vault is called directly. It will ensure the Account and Vault Status Checks are always deferred, at least until the end of the `callback` call.
+1. `callback` function SHALL only be used if `msg.sender` is not the EVC, in other words, if the Vault is called directly.
+1. Before using `callback`, the Vault is REQUIRED to authenticate the `msg.sender`. It is strongly advised to pass the `msg.sender` address as `onBehalfOfAccount` input of the `callback` function unless there's a legitimate reason not to do so.
 1. In order to support sub-accounts, operators, impersonation and permits, a Vault MUST be invoked via the EVC.
 1. When a user requests to perform an operation such as borrow, a Vault MUST call into the EVC in order to ensure that the Account has enabled this Vault as a Controller. For that purpose `getCurrentOnBehalfOfAccount` or `isControllerEnabled` functions SHOULD be used.
 1. Due to the fact that only the Controller can disable itself for the Account, a Vault MUST implement a standard `disableController` function that can be called by a user in order to disable the Controller if vault-specific conditions are met (typically, the Vault SHOULD check whether the Account has repaid its debt in full). If the vault-specific conditions are not met, the function MUST revert.
@@ -115,6 +117,7 @@ NOTE: Because the EVC contract can be made to invoke any arbitrary target contra
 1. In order to evaluate the Vault Status, `checkVaultStatus` MAY need access to a snapshot of the initial Vault state which SHOULD be taken at the beginning of the action that requires the check.
 1. Both Account and Vault Status Check SHOULD be required at the very end of the operation.
 1. The Controller MAY need to forgive the Account Status Check in order for the operation to succeed, i.e. during liquidations. However, the Account Status Check forgiveness MUST be done with care by ensuring that the forgiven Account's Status Check hadn't been deferred before the operation and that the call requiring the Account Status Check (i.e. Impersonation) does not perform any unexpected operations down the call path.
+1. Vault MUST not allow calls to arbitrary contracts in uncontrolled manner, including the EVC.
 
 NOTE: It may be tempting to allow a large set of collateral assets for a vault. However, vault creators MUST be careful about which assets they accept. A malicious vault could lie about the amount of assets it holds, or reject liquidations when a user is in violation. For this reason, vaults should restrict allowed collaterals to a known-good set of audited addresses, or lookup the addresses in a registry or factory contract to ensure they were created by known-good, audited contracts.
 
