@@ -298,7 +298,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         nonceLookup[addressPrefix][nonceNamespace] = nonce;
-        emit NonceUsed(addressPrefix, nonce - 1);
+
+        unchecked {
+            nonce -= 1;
+        }
+
+        emit NonceUsed(addressPrefix, nonce);
     }
 
     /// @inheritdoc IEVC
@@ -466,10 +471,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
+
         if (currentNonce == type(uint256).max || currentNonce != nonce) {
             revert EVC_InvalidNonce();
         }
-        nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
+
+        unchecked {
+            nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
+        }
 
         if (deadline < block.timestamp) {
             revert EVC_InvalidTimestamp();
