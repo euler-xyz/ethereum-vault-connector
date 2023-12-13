@@ -667,6 +667,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function isAccountStatusCheckDeferred(address account) external view returns (bool) {
+        if (executionContext.areChecksInProgress()) {
+            revert EVC_ChecksReentrancy();
+        }
+
         return accountStatusChecks.contains(account);
     }
 
@@ -705,6 +709,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function isVaultStatusCheckDeferred(address vault) external view returns (bool) {
+        if (executionContext.areChecksInProgress()) {
+            revert EVC_ChecksReentrancy();
+        }
+
         return vaultStatusChecks.contains(vault);
     }
 
