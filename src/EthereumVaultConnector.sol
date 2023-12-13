@@ -754,10 +754,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual returns (bool success, bytes memory result) {
-        if (value > 0 && value != type(uint256).max && value > address(this).balance) {
-            revert EVC_InvalidValue();
-        } else if (value == type(uint256).max) {
+        if (value == type(uint256).max) {
             value = address(this).balance;
+        } else if (value > address(this).balance) {
+            revert EVC_InvalidValue();
         }
 
         EC contextCache = executionContext;
