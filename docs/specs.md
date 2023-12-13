@@ -62,8 +62,12 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. Execution Context MUST keep track of whether the Impersonate is in progress.
 1. Execution Context MUST keep track of whether an Account Operator was authenticated to perform the current low-level calldata call on behalf of the Account.
 1. Execution Context MUST keep track of whether the Simulation is in progress.
-1. EVC MUST allow to defer Account and Vault Status Checks performance until the Checks-deferrable Call nesting depth counter is decreased back to the default value of 0. That SHOULD allow for a transient violation of the Account solvency or Vault constraints.
-1. If the execution is not within a Checks-deferrable Call, meaning the Checks-deferrable Call nesting depth counter is 0, Account and Vault Status Checks MUST be performed immediately.
+1. EVC MUST allow to require Account and Vault Status Checks which will be performed immediately or deferred, depending on the Execution Context.
+1. EVC MUST allow to defer required Account and Vault Status Checks performance until the Checks-deferrable Call nesting depth counter is decreased back to the default value of 0. That SHOULD allow for a transient violation of the Account solvency or Vault constraints.
+1. If the execution is not within a Checks-deferrable Call, meaning the Checks-deferrable Call nesting depth counter is 0, required Account and Vault Status Checks MUST be performed immediately.
+1. For the Account Status Check to be performed, there MUST be only one Controller enabled for an Account at the time of the Check.
+1. If there is no Controller enabled for an Account at the time of the Check, the Account Status MUST always be considered valid. It includes disabling the only enabled Controller before the Checks.
+1. If there is more than one Controller enabled for an Account at the time of the Check, the Account Status MUST always be considered invalid.
 1. Both Account- and Vault-Status-Checks-related storage sets MUST return to their default state when the Checks-deferrable Call nesting depth counter is 0 and the checks were performed.
 1. EVC MUST allow for Checks-deferrable Calls to be nested up to 10 levels deep.
 1. EVC MUST allow for Account Status Checks to be deferred for at most 20 Accounts at a time.
@@ -79,7 +83,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to Impersonate the Account's call into any of its enabled Collateral Vaults. Neither the Controller nor Collateral Vault can be the EVC.
 1. EVC MUST allow the remaining ETH to be recovered, but it MUST only be sent to an address recorded as an Account Owner for which the caller is authorized to act on behalf (it's either the Account Owner itself or its Account Operator).
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to forgive the Account Status Check if it's deferred.
-1. EVC MUST allow a Vault to forgive the Vault Status Check for itself.
+1. EVC MUST allow a Vault to forgive the Vault Status Check for itself if it's deferred.
+1. Forgiven Account and Vault Status Checks will not be performed when the Checks-deferrable Call nesting depth counter is decreased back to 0, unless they are required again after the forgiveness.
 1. Only the Checks-Deferrable Calls MUST allow to re-enter the EVC.
 1. Simulation-related functions MUST NOT modify the state.
 
@@ -105,6 +110,7 @@ NOTE: Because the EVC contract can be made to invoke any arbitrary target contra
 1. Due to the fact that only the Controller can disable itself for the Account, a Vault MUST implement a standard `disableController` function that can be called by a user in order to disable the Controller if vault-specific conditions are met (typically, the Vault SHOULD check whether the Account has repaid its debt in full). If the vault-specific conditions are not met, the function MUST revert.
 1. After each operation potentially affecting the Account's solvency (also on a non-borrowable Vault), a Vault MUST invoke the EVC in order to request the Account Status Check. The EVC determines whether the check should be deferred or performed immediately.
 1. Vault MUST implement `checkAccountStatus` function which gets called for the accounts which have enabled this Vault as Controller. The function receives the Account address and the list of Collateral Vaults enabled for the Account. The function MUST determine whether or not the Account is in an acceptable state by returning the magic value or throwing an exception. If the Vault is deposit-only, the function SHOULD always return the appropriate magic value unless there's a need to implement custom logic.
+1. `checkAccountStatus` is not called if there is no Controller enabled for the Account at the time of the checks, or when the only Controller was disabled before the checks are performed.
 1. Vault MAY implement `checkVaultStatus` function which gets called if the Vault requests that via the EVC. The EVC determines whether the check should be deferred or performed immediately. This is an OPTIONAL functionality that allows the Vault to enforce its constraints (like supply/borrow caps, invariants checks etc.). If implemented, Vault Status Check MUST always be requested by the Vault after each operation affecting the Vault's state. The `checkVaultStatus` function MUST determine whether or not the Vault is in an acceptable state by returning the magic value or throwing an exception. If the Vault doesn't implement this function, the Vault MUST NOT request the Vault Status Check.
 1. In order to evaluate the Vault Status, `checkVaultStatus` MAY need access to a snapshot of the initial Vault state which SHOULD be taken at the beginning of the action that requires the check.
 1. Both Account and Vault Status Check SHOULD be requested at the very end of the operation.

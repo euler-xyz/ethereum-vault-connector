@@ -255,7 +255,7 @@ An execution context will exist for the duration of the checks-deferrable call, 
 
 When the execution context ends, the address sets are iterated over:
 
-* For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied.
+* For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied. If no controller is installed, `checkAccountStatus` is not invoked and the account status is considered valid by default. Hence, [`disableController`](#controller) must be used with care.
 * For each address in `vaultStatusChecks`, call `checkVaultStatus` on the vault address stored in the set and ensure that the vault is satisfied.
 
 Additionally, the execution context contains some locks that protect critical regions from re-entrancy (see below).
