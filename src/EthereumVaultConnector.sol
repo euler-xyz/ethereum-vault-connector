@@ -498,57 +498,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
-    // Recover remaining ETH
-
-    /// @inheritdoc IEVC
-    function recoverRemainingETH(address recipient)
-        public
-        payable
-        virtual
-        nonReentrant
-        onlyOwnerOrOperator(recipient)
-    {
-        // to prevent losing ETH, the recipient cannot be an account other than the registered owner
-        if (getAccountOwnerInternal(recipient) != recipient) {
-            revert EVC_InvalidAddress();
-        }
-
-        // callWithContextInternal is used here to properly set the context for the sake of fallback
-        // functions that are receiving ETH. msg.data[:0] is a trick to pass empty calldata
-        (bool success, bytes memory result) =
-            callWithContextInternal(recipient, recipient, type(uint256).max, msg.data[:0]);
-
-        if (!success) {
-            revertBytes(result);
-        }
-    }
-
     // Calls forwarding
-
-    /// @inheritdoc IEVC
-    function callback(
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable virtual nonReentrant returns (bytes memory result) {
-        // cannot be called within the self-call of the permit()
-        if (address(this) == msg.sender) {
-            revert EVC_NotAuthorized();
-        }
-
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth();
-
-        // call back into the msg.sender with the context set
-        bool success;
-        (success, result) = callWithContextInternal(msg.sender, onBehalfOfAccount, value, data);
-
-        if (!success) {
-            revertBytes(result);
-        }
-
-        restoreExecutionContext(contextCache);
-    }
 
     /// @inheritdoc IEVC
     function call(
@@ -565,7 +515,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         executionContext = contextCache.increaseCallDepth();
 
         bool success;
-        (success, result) = callInternal(targetContract, onBehalfOfAccount, value, data);
+        if (msg.sender == targetContract) {
+            (success, result) = callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
+        } else {
+            (success, result) = callInternal(targetContract, onBehalfOfAccount, value, data);
+        }
 
         if (!success) {
             revertBytes(result);
@@ -581,7 +535,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) public payable virtual nonReentrant returns (bytes memory result) {
-        if (address(this) == targetCollateral || msg.sender == targetCollateral) {
+        if (address(this) == targetCollateral) {
             revert EVC_InvalidAddress();
         }
 
@@ -773,7 +727,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // contracts, it is sufficient to set it here rather than in the onlyOwner and onlyOwnerOrOperator
         // modifiers.
         // apart from the usual scenario (when an owner operates on behalf of its account),
-        // the operatorAuthenticated should be cleared when about to execute the permit self-call, callback,
+        // the operatorAuthenticated should be cleared when about to execute the permit self-call, callback (via call),
         // or when the impersonation is in progress (in which case the operatorAuthenticated is not relevant)
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) || address(this) == targetContract
@@ -795,7 +749,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual onlyOwnerOrOperator(onBehalfOfAccount) returns (bool success, bytes memory result) {
-        if (msg.sender == targetContract || targetContract == ERC1820_REGISTRY) {
+        if (targetContract == ERC1820_REGISTRY) {
             revert EVC_InvalidAddress();
         }
 
@@ -829,6 +783,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             // to be able to perform authentication
             (success, result) = address(this).delegatecall(item.data);
         } else {
+            if (item.targetContract == msg.sender) {
+                revert EVC_InvalidAddress();
+            }
+
             (success, result) = callInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
         }
     }

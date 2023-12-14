@@ -75,23 +75,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "EVC balance is zero after calling this" address(this).balance == 0;
-    function recoverRemainingETH(address recipient) public payable virtual override {
-        super.recoverRemainingETH(recipient);
-    }
-
-    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the caller cannot be EVC" msg.sender != address(this);
-    function callback(
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable virtual override returns (bytes memory result) {
-        return super.callback(onBehalfOfAccount, value, data);
-    }
-
-    /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
-    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry nor itself" targetContract != address(this) && targetContract != ERC1820_REGISTRY && targetContract != msg.sender;
+    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry" targetContract != address(this) && targetContract != ERC1820_REGISTRY;
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -181,7 +165,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.requireAccountAndVaultStatusCheck(account);
     }
 
-    /// #if_succeeds "checks must be deferred if not in permit or recoverRemainingETH" bytes4(msg.data) != this.permit.selector && bytes4(msg.data) != this.recoverRemainingETH.selector ==> executionContext.areChecksDeferred();
+    /// #if_succeeds "checks must be deferred if not in permit" bytes4(msg.data) != this.permit.selector ==> executionContext.areChecksDeferred();
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,

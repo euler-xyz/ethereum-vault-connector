@@ -260,39 +260,20 @@ interface IEVC {
         bytes calldata signature
     ) external payable;
 
-    /// @notice Recovers any remaining ETH in the contract and sends it to the specified recipient.
-    /// @dev Only the owner or an operator of the recipient account can call this function. The recipient must be a
-    /// registered owner.
-    /// @param recipient The address to which the remaining ETH will be sent.
-    function recoverRemainingETH(address recipient) external payable;
-
-    /// @notice Calls back into the msg.sender with the context set as per data encoded.
-    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
-    /// are performed after the call.
-    /// @dev This function can be used to defer account and vault status checks by providing calldata and the context
-    /// with which the msg.sender will be called back.
-    /// @param onBehalfOfAccount The address of the account which will be set in the context. It assumes the msg.sender
-    /// has authenticated the account themselves.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
-    /// balance of the EVC contract will be forwarded.
-    /// @param data The encoded data which is called on the msg.sender
-    /// @return result The result of the call.
-    function callback(
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) external payable returns (bytes memory result);
-
     /// @notice Calls into a target contract as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
     /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
     /// are performed after the call.
-    /// @dev This function can be used to interact with any contract while checks deferred. Only the owner or an
-    /// operator of the account can call this function.
+    /// @dev This function can be used to interact with any contract while checks deferred. If the target contract is
+    /// the msg.sender, the msg.sender is called back with the calldata provided and the context set up according to the
+    /// account provided. If the target contract is not the msg.sender, only the owner or the operator of the account
+    /// provided can call this function.
+    /// @dev This function can be used to recover the remaining ETH from the EVC contract.
     /// @param targetContract The address of the contract to be called.
-    /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to
-    /// act on behalf.
+    /// @param onBehalfOfAccount  If the target contract is the msg.sender, the address of the account which will be set
+    /// in the context. It assumes the msg.sender has authenticated the account themselves. If the target contract is
+    /// not the msg.sender, the address of the account for which it is checked whether msg.sender is authorized to act
+    /// on behalf.
     /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
     /// balance of the EVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.

@@ -99,33 +99,6 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         inPermit = false;
     }
 
-    function callback(
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable override nonReentrant returns (bytes memory result) {
-        // copied function body with inserted assertion
-        if (address(this) == msg.sender) {
-            revert EVC_NotAuthorized();
-        }
-
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth();
-
-        // call back into the msg.sender with the context set
-        bool success;
-        (success, result) = callWithContextInternal(msg.sender, onBehalfOfAccount, value, data);
-
-        // verify if cached context value can be reused
-        assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
-
-        if (!success) {
-            revertBytes(result);
-        }
-
-        restoreExecutionContext(contextCache);
-    }
-
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -133,7 +106,7 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
         // copied function body with inserted assertion
-        if (address(this) == targetContract || address(this) == msg.sender) {
+        if (address(this) == targetContract) {
             revert EVC_InvalidAddress();
         }
 
@@ -141,7 +114,11 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         executionContext = contextCache.increaseCallDepth();
 
         bool success;
-        (success, result) = callInternal(targetContract, onBehalfOfAccount, value, data);
+        if (msg.sender == targetContract) {
+            (success, result) = callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
+        } else {
+            (success, result) = callInternal(targetContract, onBehalfOfAccount, value, data);
+        }
 
         // verify if cached context value can be reused
         assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
@@ -159,7 +136,7 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         uint256 value,
         bytes calldata data
     ) public payable override nonReentrant returns (bytes memory result) {
-        if (address(this) == targetCollateral || msg.sender == targetCollateral) {
+        if (address(this) == targetCollateral) {
             revert EVC_InvalidAddress();
         }
 
@@ -199,10 +176,10 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         // copied function body with inserted assertion
-        if (value > 0 && value != type(uint256).max && value > address(this).balance) {
-            revert EVC_InvalidValue();
-        } else if (value == type(uint256).max) {
+        if (value == type(uint256).max) {
             value = address(this).balance;
+        } else if (value > address(this).balance) {
+            revert EVC_InvalidValue();
         }
 
         EC contextCache = executionContext;
@@ -213,12 +190,16 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
 
         emit CallWithContext(msgSender, targetContract, onBehalfOfAccount, bytes4(data));
 
-        // set the onBehalfOfAccount in the execution context for the duration of the call.
-        // apart from a usual scenario, clear the operator authenticated flag
-        // if about to execute the permit self-call or a callback
+        // set the onBehalfOfAccount in the execution context for the duration of the external call.
+        // considering that the operatorAuthenticated is only meant to be observable by external
+        // contracts, it is sufficient to set it here rather than in the onlyOwner and onlyOwnerOrOperator
+        // modifiers.
+        // apart from the usual scenario (when an owner operates on behalf of its account),
+        // the operatorAuthenticated should be cleared when about to execute the permit self-call, callback (via call),
+        // or when the impersonation is in progress (in which case the operatorAuthenticated is not relevant)
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) || address(this) == targetContract
-                || msg.sender == targetContract
+                || msg.sender == targetContract || contextCache.isImpersonationInProgress()
         ) {
             executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount).clearOperatorAuthenticated();
         } else {

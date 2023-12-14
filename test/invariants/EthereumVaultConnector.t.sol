@@ -146,15 +146,6 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         super.disableController(account);
     }
 
-    function callback(
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable override returns (bytes memory result) {
-        deal(address(this), value);
-        result = super.callback(onBehalfOfAccount, value, data);
-    }
-
     function call(
         address targetContract,
         address onBehalfOfAccount,
@@ -164,9 +155,8 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this) || targetContract == msg.sender) {
-            return "";
-        }
+        if (targetContract == address(this)) return "";
+
         setup(onBehalfOfAccount, targetContract);
         deal(address(this), value);
 
@@ -200,9 +190,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
-        if (targetCollateral == address(this) || targetCollateral == msg.sender) {
-            return "";
-        }
+        if (targetCollateral == address(this)) return "";
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);
@@ -239,23 +227,13 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
-    function recoverRemainingETH(address recipient) public payable override {
-        if (haveCommonOwnerInternal(recipient, msg.sender)) return;
-        if (recipient == address(0)) return;
-        if (uint160(recipient) <= 10) return;
-
-        setup(recipient, address(0));
-
-        super.recoverRemainingETH(recipient);
-    }
-
     function batch(BatchItem[] calldata items) public payable override {
         if (items.length > Set.MAX_ELEMENTS) return;
 
         for (uint256 i = 0; i < items.length; i++) {
             if (uint160(items[i].value) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
-            if (items[i].targetContract == address(this)) return;
+            if (items[i].targetContract == address(this) || items[i].targetContract == msg.sender) return;
         }
 
         vm.deal(address(this), type(uint256).max);
