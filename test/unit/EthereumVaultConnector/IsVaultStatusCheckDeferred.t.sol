@@ -36,4 +36,13 @@ contract IsVaultStatusCheckDeferredTest is Test {
             evc.reset();
         }
     }
+
+    function test_RevertIfChecksInProgress_IsVaultStatusCheckDeferred(address vault) external {
+        evc.setChecksLock(false);
+        assertFalse(evc.isVaultStatusCheckDeferred(vault));
+
+        evc.setChecksLock(true);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.isVaultStatusCheckDeferred(vault);
+    }
 }

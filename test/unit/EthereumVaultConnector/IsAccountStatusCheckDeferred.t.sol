@@ -34,4 +34,13 @@ contract IsAccountStatusCheckDeferredTest is Test {
             evc.reset();
         }
     }
+
+    function test_RevertIfChecksInProgress_IsAccountStatusCheckDeferred(address account) external {
+        evc.setChecksLock(false);
+        assertFalse(evc.isAccountStatusCheckDeferred(account));
+
+        evc.setChecksLock(true);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.isAccountStatusCheckDeferred(account);
+    }
 }
