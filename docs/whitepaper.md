@@ -72,6 +72,7 @@ However, suppose a user wants to take out a borrow from a separate vault. In thi
 * Only the controller itself can call `disableController` on the EVC. This should typically happen upon an account repaying its debt in full. Vaults must be coded carefully to not have edge cases such as unrepayable dust, otherwise accounts could become permanently associated with a controller.
 * The order of an account's collateral set can be changed with `reorderCollaterals`. Because some controller vaults will loop over an account's collateral in sequence and return early if sufficient value is found, this can save considerable gas. This feature was inspired by Gearbox's `collateralHints`.
 
+Given that enabling a controller subjects the specified account to the rules encoded in the controller's code, users must only enable trusted, audited controllers. If the controller is malicious or incorrectly coded, it may result in the loss of the user's funds or even render the account unusable.
 
 ## Account Status Checks
 
@@ -83,7 +84,7 @@ Within the `checkAccountStatus` callback, vaults should inspect the provided lis
 
 Vaults have freedom to price all the assets according to their preference (both liability and recognized collaterals), without depending on potentially untrustworthy oracles.
 
-To encourage borrowing, it may be tempting to allow a large set of collateral assets. However, vault creators must be careful about which assets they accept. A malicious vault could lie about the amount of assets it holds, or reject liquidations when a user is in violation. For this reason, vaults should restrict allowed collaterals to a known-good set of audited addresses, or lookup the addresses in a registry or factory contract to ensure they were created by known-good, audited contracts.
+While it might be tempting for the controller to allow a broad range of collateral vaults to encourage borrowing, the controller vault creators must exercise caution when deciding which vaults to accept as collateral. A malicious or incorrectly coded vault could, among other things, misrepresent the amount of assets it holds, reject liquidations when a user is in violation, or fail to require account status checks when necessary. Therefore, vaults should limit allowed collaterals to a set of audited addresses known to be reliable, or verify the addresses in a registry or factory contract to ensure they were created by trustworthy, audited contracts.
 
 ### Execution Flow
 
@@ -255,7 +256,7 @@ An execution context will exist for the duration of the checks-deferrable call, 
 
 When the execution context ends, the address sets are iterated over:
 
-* For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied.
+* For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied. If no controller is installed, `checkAccountStatus` is not invoked and the account status is considered valid by default. Hence, [`disableController`](#controller) must be used with care.
 * For each address in `vaultStatusChecks`, call `checkVaultStatus` on the vault address stored in the set and ensure that the vault is satisfied.
 
 Additionally, the execution context contains some locks that protect critical regions from re-entrancy (see below).
