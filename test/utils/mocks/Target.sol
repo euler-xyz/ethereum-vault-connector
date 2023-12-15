@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 
 import "../../../src/EthereumVaultConnector.sol";
 
-// mock target contract that allows to test call(), callback() and impersonate() functions of the EVC
+// mock target contract that allows to test call() and impersonate() functions of the EVC
 contract Target {
     function callTest(
         address evc,

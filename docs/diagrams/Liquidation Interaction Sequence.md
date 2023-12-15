@@ -9,7 +9,7 @@ sequenceDiagram
     participant Price Oracle
 
     Liquidator->>Controller Vault: liquidate(violator, collateral vault)
-    Controller Vault->>EVC: callback(liquidate(violator, collateral vault))
+    Controller Vault->>EVC: call(liquidate(violator, collateral vault))
     EVC->>EVC: set the execution context
     EVC->>Controller Vault: liquidate(violator, collateral vault)
 

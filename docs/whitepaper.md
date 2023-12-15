@@ -18,7 +18,6 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [Checks-deferrable Call](#checks-deferrable-call)
     * [call](#call)
     * [impersonate](#impersonate)
-    * [callback](#callback)
     * [batch](#batch)
     * [permit](#permit)
         * [Nonce Namespaces](#nonce-namespaces)
@@ -92,7 +91,7 @@ Although the vaults themselves implement `checkAccountStatus`, there is no need 
 
 Upon a `requireAccountStatusCheck` call, the EVC will determine whether the current execution context is in a checks-deferrable call and if so, it will defer checking the status for this account until the end of the execution context. Otherwise, the account status check will be performed immediately.
 
-There is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
+There is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [call](#call) EVC function.
 
 ### Single Controller
 
@@ -141,14 +140,14 @@ In order to evaluate the vault status, `checkVaultStatus` may need access to a s
 * The vault should then call `requireVaultStatusCheck`
 * When the `checkVaultStatus` callback is invoked, it should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return a special magic success value, or revert if there is a violation.
 
-As with the account status check, there is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the EVC), if it calls `requireVaultStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkVaultStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
+As with the account status check, there is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the EVC), if it calls `requireVaultStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkVaultStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [call](#call) EVC function.
 
 
 ## Execution
 
 ### Checks-deferrable Call
 
-The EVC exposes multiple functions, each with its own characteristicts, that allow for the [Account Status Checks](#account-status-checks) and [Vault Status Checks](#vault-status-checks) to be deferred. [call](#call), [callback](#callback), [batch](#batch) and [impersonate](#impersonate) so called checks-deferrable call functions, can be nested and allow for the checks to be deferred until the end of the execution of the top-level function call.
+The EVC exposes multiple functions, each with its own characteristics, that allow for the [Account Status Checks](#account-status-checks) and [Vault Status Checks](#vault-status-checks) to be deferred. [call](#call), [batch](#batch) and [impersonate](#impersonate) so called checks-deferrable call functions, can be nested and allow for the checks to be deferred until the end of the execution of the top-level function call.
 
 ### call
 
@@ -156,13 +155,11 @@ The `call` function on the EVC allows users to invoke functions on vaults and ot
 
 `call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the EVC as `msg.sender`. For this reason, it is critical that the EVC itself never be given any special privileges, or hold any token or ETH balances (except for a few corner cases where it is temporarily safe, see the [EVC Contract Privileges](#evc-contract-privileges) section).
 
-### callback
+If the target contract *is NOT* `msg.sender`, the EVC will only allow the target contract to be called if the `msg.sender` is the owner or the operator of the `onBehalfOfAccount` provided. If that condition is met, the EVC will create a context and call into the target contract with the provided calldata and the `onBehalfOfAccount` account set in the context.
 
-Because vaults can be called directly without going through the EVC, checks may not be deferred when they are invoked. The EVC provides a function `callback` so that vaults can be coded in a way that assumes they are always executing within a checks deferred context.
+Because vaults can be called directly without going through the EVC, checks may not be deferred when they are invoked. In that case, vaults can use the `call` function so that they can assume that they are always executing within a checks deferred context. If the calling vault specifies the target contract to be their own address (target contract *is* `msg.sender`), the EVC will create a context and call back into the caller with the provided calldata and the `onBehalfOfAccount` account set to whatever was provided by the calling vault. The vault should use `msg.sender` as `onBehalfOfAccount`. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself. To use `call` in this manner, it is recommended that vaults use a special modifier [`routedThroughEVC`](/docs/specs.md#typical-implementation-pattern-of-the-evc-compliant-function-for-a-vault) before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
 
-`callback` will create a context, and call-back into the caller with the provided `msg.data`, forwarding the provided `value` (or full balance of the EVC if max `uint256` was specified). Inside the callback, the `onBehalfOfAccount` account will be set to whatever was provided by the calling vault. The vault should use `msg.sender` for this. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: Recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself.
-
-To use `callback`, it is recommended that vaults use a special modifier [`routedThroughEVC`](/docs/specs.md#typical-implementation-pattern-of-the-evc-compliant-function-for-a-vault) before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
+The `call` function also allows to forward the provided value (or full balance of the EVC if max `uint256` was specified). Therefore it can also be used to recover any remaining value in the EVC.
 
 ### batch
 
@@ -283,7 +280,7 @@ However, when interacting with complicated vaults that may invoke external contr
 
 In order to simplify the implementation of this check, the `impersonateLock` mutex is locked while invoking a collateral vault during the `impersonate` flow. While locked, no accounts' collateral or controller sets can be modified.
 
-Additionally, during an impersonation, the EVC cannot be re-entered via `call`, `batch`, `impersonate`, `callback`, `permit` or `recoverRemainingETH`.
+Additionally, during an impersonation, the EVC cannot be re-entered via `call`, `batch`, `impersonate` or `permit`.
 
 #### Extra Information
 
@@ -327,7 +324,7 @@ Because the EVC contract can be made to invoke any arbitrary target contract wit
 
 The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves ETH or tokens into the EVC, but a subsequent batch item moves it out, then as long as no untrusted code runs in between, it is safe. However, moving tokens to the EVC is often unnecessary because tokens can be moved immediately to their final destination with `transferFrom` and by setting various `recipient` parameters in contracts.
 
-One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit using `recoverRemainingETH` function).
+One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit using `call` function).
 
 One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the EVC doesn't attempt to comprehensively solve this, the ERC-1820 registry address is blocked and can not be invoked via `call` or batches.
 

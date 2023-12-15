@@ -8,7 +8,7 @@ sequenceDiagram
     participant Price Oracle
 
     User->>Any Vault: operation
-    Any Vault->>EVC: callback(operation)
+    Any Vault->>EVC: call(operation)
     EVC->>EVC: set the execution context
     EVC->>Any Vault: operation
     Any Vault->>EVC: getCurrentOnBehalfOfAccount(address(vault)/address(0))

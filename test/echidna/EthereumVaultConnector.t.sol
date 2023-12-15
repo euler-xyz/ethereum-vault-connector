@@ -68,11 +68,6 @@ contract VaultEchidna is IVault {
         try evc.disableController(account) {} catch {}
 
         hevm.prank(account);
-        try evc.recoverRemainingETH(account) {} catch {}
-
-        try evc.callback(account, 0, "") {} catch {}
-
-        hevm.prank(account);
         try evc.call(address(this), account, 0, "") {} catch {}
 
         hevm.prank(address(this));
@@ -82,7 +77,8 @@ contract VaultEchidna is IVault {
         items[0].targetContract = address(address(evc));
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
-        items[0].data = abi.encodeWithSelector(evc.callback.selector, account, 0, "");
+        items[0].data = abi.encodeWithSelector(evc.call.selector, address(this), account, 0, "");
+        hevm.prank(account);
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
@@ -142,11 +138,6 @@ contract VaultEchidna is IVault {
         try evc.disableController(account) {} catch {}
 
         hevm.prank(account);
-        try evc.recoverRemainingETH(account) {} catch {}
-
-        try evc.callback(account, 0, "") {} catch {}
-
-        hevm.prank(account);
         try evc.call(address(this), account, 0, "") {} catch {}
 
         hevm.prank(address(this));
@@ -157,7 +148,8 @@ contract VaultEchidna is IVault {
         items[0].targetContract = address(address(evc));
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
-        items[0].data = abi.encodeWithSelector(evc.callback.selector, account, 0, "");
+        items[0].data = abi.encodeWithSelector(evc.call.selector, address(this), account, 0, "");
+        hevm.prank(account);
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
@@ -217,9 +209,6 @@ contract VaultEchidna is IVault {
 
         hevm.prank(address(this));
         try evc.disableController(account) {} catch {}
-
-        hevm.prank(account);
-        try evc.recoverRemainingETH(account) {} catch {}
 
         hevm.prank(account);
         try evc.call(address(targetEchidna), account, 0, "") {} catch {}
@@ -316,18 +305,6 @@ contract EchidnaTest {
             data,
             signature
         );
-    }
-
-    function recoverRemainingETH(address recipient) public payable {
-        if (recipient == address(evc)) return;
-        hevm.prank(address(recipient));
-        evc.recoverRemainingETH(recipient);
-    }
-
-    function callback(address onBehalfOfAccount, bytes calldata data) public payable {
-        if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
-        hevm.prank(address(vaultEchidna));
-        evc.callback(onBehalfOfAccount, 0, data);
     }
 
     function call(address onBehalfOfAccount, bytes calldata data) public payable {

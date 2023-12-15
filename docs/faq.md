@@ -105,10 +105,8 @@ In essence, the `impersonate` function provides a mechanism for enforcing the ru
 
 ## How does the EVC interact with other smart contracts?
 
-The EVC interacts with other smart contracts, including vaults, through several key functions: `callback`, `call`,`batch`, `impersonate`, `recoverRemainingETH`.
+The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch` and `impersonate`.
 
-1. `callback`: The function allows the `msg.sender` to be called back by the EVC with specified calldata and the execution context set. The callback is executed with account and vault status checks deferred. This function is used when a vault is called directly and wants to imitate being called through the EVC.
-1. `call`: The function allows an Account Owner or an Account Operator to execute arbitrary calldata on behalf of a specified account. This function is used to interact with other smart contracts while deferring account and vault status checks.
+1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when remaining value needs to be recovered from the EVC.
 1. `batch`: The function allows for the execution of a list of operations atomically. This means that all operations either succeed together or fail together. This function is used when the EVC needs to interact with multiple smart contracts in a specific sequence.
 1. `impersonate`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
-1. `recoverRemainingETH`: The function allows an Account Owner or an Account Operator to recover remaining ETH left in the EVC on behalf of a specified receiver account. If the receiver is a smart contract, its `fallback`/`receive` gets triggered.
