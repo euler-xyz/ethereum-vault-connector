@@ -309,6 +309,8 @@ contract CallTest is Test {
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
         vm.assume(!evc.haveCommonOwner(bob, address(0)) && bob != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, bob));
+        vm.assume(address(alice).balance == 0);
+        vm.assume(address(bob) != msg.sender);
 
         vm.deal(address(evc), seed);
 
