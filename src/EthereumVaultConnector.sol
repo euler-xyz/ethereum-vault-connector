@@ -92,16 +92,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @dev The owner of an address prefix is an address that matches the address that has previously been recorded (or
     /// will be) as an owner in the ownerLookup. In case of the self-call in the permit() function, the EVC address
     /// becomes msg.sender hence the "true" caller address (that is permit message signer) is taken from the execution
-    /// context.
+    /// context via _msgSender() function.
     /// @param addressPrefix The address prefix for which it is checked whether the caller is the owner.
     modifier onlyOwner(uint152 addressPrefix) virtual {
         {
             // calculate a phantom address from the address prefix which can be used as an input to internal functions
             address account = address(uint160(addressPrefix) << 8);
-
-            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
-            // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender ? executionContext.getOnBehalfOfAccount() : msg.sender;
+            address msgSender = _msgSender();
 
             if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
@@ -124,14 +121,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// recorded (or will be) as an owner in the ownerLookup. An operator of an account is an address that has been
     /// authorized by the owner of an account to perform operations on behalf of the owner. In case of the self-call in
     /// the permit() function, the EVC address becomes msg.sender hence the "true" caller address (that is permit
-    /// message signer) is taken from the execution context.
+    /// message signer) is taken from the execution context via _msgSender() function.
     /// @param account The address of the account for which it is checked whether the caller is the owner or an
     /// operator.
     modifier onlyOwnerOrOperator(address account) virtual {
         {
-            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
-            // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender ? executionContext.getOnBehalfOfAccount() : msg.sender;
+            address msgSender = _msgSender();
 
             if (haveCommonOwnerInternal(account, msgSender)) {
                 address owner = getAccountOwnerInternal(account);
@@ -150,6 +145,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @notice A modifier checks whether msg.sender is the only controller for the account.
+    /// @dev The controller cannot use permit() function in conjunction with this modifier.
     modifier onlyController(address account) {
         {
             uint256 numOfControllers = accountControllers[account].numElements;
@@ -298,7 +294,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         nonceLookup[addressPrefix][nonceNamespace] = nonce;
-        emit NonceUsed(addressPrefix, nonce - 1);
+
+        unchecked {
+            nonce -= 1;
+        }
+
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
     }
 
     /// @inheritdoc IEVC
@@ -337,10 +338,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // must be storing the correct owner address
         address owner = haveCommonOwnerInternal(account, msg.sender) ? msg.sender : getAccountOwnerInternal(account);
 
-        // if EVC is msg.sender (during the self-call in the permit() function), it acts as if it
-        // was an owner, meaning it can authorize and deauthorize operators as per signed data.
-        // if it's an operator calling, it can only make changes for itself hence must be equal to msg.sender
-        if (owner != msg.sender && operator != msg.sender && address(this) != msg.sender) {
+        // In case of the self-call in the permit() function, the EVC address becomes msg.sender hence the "true" caller
+        // address (that is permit message signer) is taken from the execution context via _msgSender() function.
+        address msgSender = _msgSender();
+
+        // if it's an operator calling, it can only deauthorize itself
+        if (owner != msgSender && operator != msgSender) {
             revert EVC_NotAuthorized();
         }
 
@@ -466,10 +469,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
+
         if (currentNonce == type(uint256).max || currentNonce != nonce) {
             revert EVC_InvalidNonce();
         }
-        nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
+
+        unchecked {
+            nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
+        }
 
         if (deadline < block.timestamp) {
             revert EVC_InvalidTimestamp();
@@ -488,7 +495,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_NotAuthorized();
         }
 
-        emit NonceUsed(addressPrefix, nonce);
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
 
         // EVC address becomes msg.sender for the duration this self-call
         (bool success, bytes memory result) = callWithContextInternal(address(this), signer, value, data);
@@ -621,6 +628,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function isAccountStatusCheckDeferred(address account) external view returns (bool) {
+        if (executionContext.areChecksInProgress()) {
+            revert EVC_ChecksReentrancy();
+        }
+
         return accountStatusChecks.contains(account);
     }
 
@@ -659,6 +670,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function isVaultStatusCheckDeferred(address vault) external view returns (bool) {
+        if (executionContext.areChecksInProgress()) {
+            revert EVC_ChecksReentrancy();
+        }
+
         return vaultStatusChecks.contains(vault);
     }
 
@@ -708,17 +723,17 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual returns (bool success, bytes memory result) {
-        if (value > 0 && value != type(uint256).max && value > address(this).balance) {
-            revert EVC_InvalidValue();
-        } else if (value == type(uint256).max) {
+        if (value == type(uint256).max) {
             value = address(this).balance;
+        } else if (value > address(this).balance) {
+            revert EVC_InvalidValue();
         }
 
         EC contextCache = executionContext;
 
-        // EVC can only be msg.sender after the self-call in the permit() function. in that case,
-        // the "true" sender address (that is the permit message signer) is taken from the execution context
-        address msgSender = address(this) == msg.sender ? contextCache.getOnBehalfOfAccount() : msg.sender;
+        //In case of the self-call in the permit() function, the EVC address becomes msg.sender hence the "true" caller
+        // address (that is permit message signer) is taken from the execution context via _msgSender() function.
+        address msgSender = _msgSender();
 
         emit CallWithContext(msgSender, targetContract, onBehalfOfAccount, bytes4(data));
 
@@ -994,6 +1009,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     // Auxiliary functions
+
+    function _msgSender() internal view returns (address) {
+        // EVC can only be msg.sender during the self-call in the permit() function. in that case,
+        // the "true" sender address (that is the permit message signer) is taken from the execution context
+        return address(this) == msg.sender ? executionContext.getOnBehalfOfAccount() : msg.sender;
+    }
 
     function haveCommonOwnerInternal(address account, address otherAccount) internal pure returns (bool result) {
         assembly {

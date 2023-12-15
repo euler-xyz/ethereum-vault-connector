@@ -8,7 +8,7 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 contract SetNonceTest is Test {
     EthereumVaultConnectorHarness internal evc;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
 
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
@@ -21,8 +21,8 @@ contract SetNonceTest is Test {
         uint152 addressPrefix = evc.getAddressPrefix(alice);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), 0);
 
-        vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(addressPrefix, nonce - 1);
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce - 1);
         vm.prank(alice);
         evc.setNonce(addressPrefix, nonceNamespace, nonce);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), nonce);

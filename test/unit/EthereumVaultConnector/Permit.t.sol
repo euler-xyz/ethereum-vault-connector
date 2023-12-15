@@ -186,7 +186,7 @@ contract PermitTest is Test {
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
+    event NonceUsed(uint152 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
     event CallWithContext(
         address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
     );
@@ -230,8 +230,8 @@ contract PermitTest is Test {
 
         bytes memory signature = signerECDSA.signPermit(alice, nonceNamespace, nonce, deadline, value, data);
 
-        vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(evc.getAddressPrefix(alice), nonce);
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
         vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(address(this), address(evc), alice, bytes4(data));
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);
@@ -272,8 +272,8 @@ contract PermitTest is Test {
 
         SignerERC1271(alice).setPermitHash(alice, nonceNamespace, nonce, deadline, value, data);
 
-        vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(evc.getAddressPrefix(alice), nonce);
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
         vm.expectEmit(true, true, true, true, address(evc));
         emit CallWithContext(address(this), address(evc), alice, bytes4(data));
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);
@@ -943,7 +943,10 @@ contract PermitTest is Test {
 
         vm.assume(alice != address(0) && bob != address(0));
         vm.assume(operator != address(0) && operator != address(evc));
-        vm.assume(!evc.haveCommonOwner(alice, operator) && !evc.haveCommonOwner(bob, operator));
+        vm.assume(
+            !evc.haveCommonOwner(alice, operator) && !evc.haveCommonOwner(bob, operator)
+                && !evc.haveCommonOwner(alice, bob)
+        );
         vm.assume(subAccountId1 > 0 && subAccountId2 > 0 && subAccountId1 != subAccountId2);
         signerECDSA.setPrivateKey(privateKey);
 
@@ -951,6 +954,7 @@ contract PermitTest is Test {
 
         // encode the setAccountOperator to prove that it's possible to set an operator
         // on behalf of the signer or their accounts
+        // alice
         items[0].targetContract = address(evc);
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
@@ -981,6 +985,7 @@ contract PermitTest is Test {
         assertEq(evc.getOperator(addressPrefixAlice, operator), (1 << 0) | (1 << subAccountId1) | (1 << subAccountId2));
 
         // a call using ERC-1271 signature succeeds
+        // bob
         items[0].data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, bob, operator, true);
         items[1].data = abi.encodeWithSelector(
             IEVC.setAccountOperator.selector, address(uint160(bob) ^ subAccountId1), operator, true
@@ -1003,6 +1008,7 @@ contract PermitTest is Test {
         assertEq(evc.getOperator(addressPrefixBob, operator), (1 << 0) | (1 << subAccountId1) | (1 << subAccountId2));
 
         // if the operator tries to authorize some other operator directly, it's not possible
+        // alice
         vm.prank(operator);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.setOperator(addressPrefixAlice, operator, 0);
@@ -1015,6 +1021,7 @@ contract PermitTest is Test {
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.setAccountOperator(alice, otherOperator, true);
 
+        // bob
         vm.prank(operator);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.setOperator(addressPrefixBob, operator, 0);
@@ -1028,6 +1035,7 @@ contract PermitTest is Test {
         evc.setAccountOperator(bob, otherOperator, true);
 
         // but it succeeds if it's done using the signed data
+        // alice
         data = abi.encodeWithSelector(IEVC.setOperator.selector, addressPrefixAlice, otherOperator, 2);
 
         signature = signerECDSA.signPermit(alice, 0, 1, block.timestamp, 0, data);
@@ -1042,6 +1050,7 @@ contract PermitTest is Test {
         evc.permit(alice, 0, 2, block.timestamp, 0, data, signature);
         assertEq(evc.isAccountOperatorAuthorized(alice, otherOperator), true);
 
+        // bob
         data = abi.encodeWithSelector(IEVC.setOperator.selector, addressPrefixBob, otherOperator, 2);
 
         signature = bytes("bob's signature");
@@ -1062,6 +1071,7 @@ contract PermitTest is Test {
         assertEq(evc.isAccountOperatorAuthorized(bob, otherOperator), true);
 
         // when the operator is authorized, it can sign permit messages on behalf of the authorized account
+        // alice
         signerECDSA.setPrivateKey(privateKey + 1);
 
         data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
@@ -1070,21 +1080,99 @@ contract PermitTest is Test {
         evc.permit(operator, 0, 0, block.timestamp, 0, data, signature);
         assertEq(evc.isCollateralEnabled(alice, address(0)), true);
 
-        // and another one
-        data = abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), 0, alice, true);
+        // bob
+        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
 
         signature = signerECDSA.signPermit(operator, 0, 1, block.timestamp, 0, data);
         evc.permit(operator, 0, 1, block.timestamp, 0, data, signature);
+        assertEq(evc.isCollateralEnabled(bob, address(0)), true);
 
-        // but it cannot sign permit messages on behalf of other accounts for which it's not authorized
+        // and another one
+        // alice
+        data = abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), 0, alice, true);
+
+        signature = signerECDSA.signPermit(operator, 0, 2, block.timestamp, 0, data);
+        evc.permit(operator, 0, 2, block.timestamp, 0, data, signature);
+
+        // bob
+        data = abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), 0, bob, true);
+
+        signature = signerECDSA.signPermit(operator, 0, 3, block.timestamp, 0, data);
+        evc.permit(operator, 0, 3, block.timestamp, 0, data, signature);
+
+        // but it cannot execute a signed permit messages on behalf of other accounts for which it's not authorized
+        // alice
         vm.prank(operator);
         evc.setAccountOperator(address(uint160(alice) ^ subAccountId1), operator, false);
 
         data =
             abi.encodeWithSelector(IEVC.enableCollateral.selector, address(uint160(alice) ^ subAccountId1), address(0));
 
-        signature = signerECDSA.signPermit(operator, 0, 2, block.timestamp, 0, data);
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
-        evc.permit(operator, 0, 2, block.timestamp, 0, data, signature);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+
+        // bob
+        vm.prank(operator);
+        evc.setAccountOperator(address(uint160(bob) ^ subAccountId1), operator, false);
+
+        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, address(uint160(bob) ^ subAccountId1), address(0));
+
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+
+        // also, it cannot execute a signed permit messages to set other operators, even for accounts for which it's
+        // authorized
+        // alice
+        assertEq(evc.isAccountOperatorAuthorized(alice, otherOperator), true);
+
+        data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, alice, otherOperator, false);
+
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+
+        vm.prank(alice);
+        evc.setAccountOperator(alice, otherOperator, false);
+
+        data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, alice, otherOperator, true);
+
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+
+        // bob
+        assertEq(evc.isAccountOperatorAuthorized(bob, otherOperator), true);
+
+        data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, bob, otherOperator, false);
+
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+
+        vm.prank(bob);
+        evc.setAccountOperator(bob, otherOperator, false);
+
+        data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, bob, otherOperator, true);
+
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+
+        // but it can execute a signed permit message to deauthorize itself
+        // alice
+        data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, alice, operator, false);
+
+        signature = signerECDSA.signPermit(operator, 0, 4, block.timestamp, 0, data);
+        evc.permit(operator, 0, 4, block.timestamp, 0, data, signature);
+        assertEq(evc.isAccountOperatorAuthorized(alice, operator), false);
+
+        // bob
+        data = abi.encodeWithSelector(IEVC.setAccountOperator.selector, bob, operator, false);
+
+        signature = signerECDSA.signPermit(operator, 0, 5, block.timestamp, 0, data);
+        evc.permit(operator, 0, 5, block.timestamp, 0, data, signature);
+        assertEq(evc.isAccountOperatorAuthorized(bob, operator), false);
     }
 }
