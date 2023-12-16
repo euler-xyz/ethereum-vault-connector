@@ -140,15 +140,25 @@ contract ImpersonateTest is Test {
         vm.prank(alice);
         evc.enableController(alice, controller);
 
-        // target contract is the EVC
-        bytes memory data = abi.encodeWithSelector(
-            Target(address(evc)).impersonateTest.selector, address(evc), address(evc), seed, alice
-        );
+        bytes memory data =
+            abi.encodeWithSelector(Target.impersonateTest.selector, address(evc), address(evc), seed, alice);
 
-        vm.deal(alice, seed);
-        vm.prank(alice);
+        // target contract is the EVC
+        address targetContract = address(evc);
+        vm.deal(controller, seed);
+        vm.prank(controller);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.impersonate{value: seed}(address(evc), alice, seed, data);
+        evc.impersonate{value: seed}(targetContract, alice, seed, data);
+
+        // target contract is the ERC1820 registry
+        targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
+        vm.prank(alice);
+        evc.enableCollateral(alice, targetContract);
+
+        vm.deal(controller, seed);
+        vm.prank(controller);
+        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
+        evc.impersonate{value: seed}(targetContract, alice, seed, data);
     }
 
     function test_RevertIfNoControllerEnabled_Impersonate(address alice, uint256 seed) public {
