@@ -14,55 +14,20 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         result = EC.unwrap(executionContext) == EC.unwrap(context);
     }
 
-    modifier onlyOwner(uint152 addressPrefix) override {
-        assert(address(this) == msg.sender ? inPermit : true);
-
-        {
-            // calculate a phantom address from the address prefix which can be used as an input to internal functions
-            address account = address(uint160(addressPrefix) << 8);
-
-            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
-            // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender ? executionContext.getOnBehalfOfAccount() : msg.sender;
-
-            if (haveCommonOwnerInternal(account, msgSender)) {
-                address owner = getAccountOwnerInternal(account);
-
-                if (owner == address(0)) {
-                    setAccountOwnerInternal(account, msgSender);
-                } else if (owner != msgSender) {
-                    revert EVC_NotAuthorized();
-                }
-            } else {
-                revert EVC_NotAuthorized();
-            }
-        }
+    modifier checksDeferrableCall() override {
+        EC contextCache = executionContext;
+        executionContext = contextCache.increaseCallDepth();
 
         _;
-    }
 
-    modifier onlyOwnerOrOperator(address account) override {
-        assert(address(this) == msg.sender ? inPermit : true);
-
-        {
-            // EVC can only be msg.sender during the self-call in the permit() function. in that case,
-            // the "true" sender address (that is the permit message signer) is taken from the execution context
-            address msgSender = address(this) == msg.sender ? executionContext.getOnBehalfOfAccount() : msg.sender;
-
-            if (haveCommonOwnerInternal(account, msgSender)) {
-                address owner = getAccountOwnerInternal(account);
-
-                if (owner == address(0)) {
-                    setAccountOwnerInternal(account, msgSender);
-                } else if (owner != msgSender) {
-                    revert EVC_NotAuthorized();
-                }
-            } else if (!isAccountOperatorAuthorizedInternal(account, msgSender)) {
-                revert EVC_NotAuthorized();
-            }
+        // verify if cached context value can be reused
+        if (msg.sig == this.impersonate.selector) {
+            assert(isExecutionContextEqual(contextCache.increaseCallDepth().setImpersonationInProgress()));
+        } else {
+            assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
         }
 
-        _;
+        restoreExecutionContext(contextCache);
     }
 
     modifier nonReentrantChecks() override {
@@ -99,76 +64,6 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         inPermit = false;
     }
 
-    function call(
-        address targetContract,
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable override nonReentrant returns (bytes memory result) {
-        // copied function body with inserted assertion
-        if (address(this) == targetContract) {
-            revert EVC_InvalidAddress();
-        }
-
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth();
-
-        bool success;
-        if (msg.sender == targetContract) {
-            (success, result) = callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
-        } else {
-            (success, result) = callInternal(targetContract, onBehalfOfAccount, value, data);
-        }
-
-        // verify if cached context value can be reused
-        assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
-
-        if (!success) {
-            revertBytes(result);
-        }
-
-        restoreExecutionContext(contextCache);
-    }
-
-    function impersonate(
-        address targetCollateral,
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable override nonReentrant returns (bytes memory result) {
-        if (address(this) == targetCollateral) {
-            revert EVC_InvalidAddress();
-        }
-
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth().setImpersonationInProgress();
-
-        bool success;
-        (success, result) = impersonateInternal(targetCollateral, onBehalfOfAccount, value, data);
-
-        // verify if cached context value can be reused
-        assert(isExecutionContextEqual(contextCache.increaseCallDepth().setImpersonationInProgress()));
-
-        if (!success) {
-            revertBytes(result);
-        }
-
-        restoreExecutionContext(contextCache);
-    }
-
-    function batch(BatchItem[] calldata items) public payable override nonReentrant {
-        // copied function body with inserted assertion
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth();
-
-        batchInternal(items);
-
-        // verify if cached context value can be reused
-        assert(isExecutionContextEqual(contextCache.increaseCallDepth()));
-
-        restoreExecutionContext(contextCache);
-    }
-
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
@@ -176,6 +71,10 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         // copied function body with inserted assertion
+        if (targetContract == ERC1820_REGISTRY) {
+            revert EVC_InvalidAddress();
+        }
+
         if (value == type(uint256).max) {
             value = address(this).balance;
         } else if (value > address(this).balance) {
@@ -240,5 +139,10 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         }
 
         executionContext = contextCache;
+    }
+
+    function _msgSender() internal override view returns (address) {
+        assert(address(this) == msg.sender ? inPermit : true);
+        return super._msgSender();
     }
 }
