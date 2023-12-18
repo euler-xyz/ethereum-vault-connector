@@ -136,7 +136,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
-        super.enableCollateral(account, vault);
+        super.enableController(account, vault);
     }
 
     function disableController(address account) public payable override {
