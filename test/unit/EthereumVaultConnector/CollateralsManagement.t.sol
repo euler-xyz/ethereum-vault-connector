@@ -211,13 +211,13 @@ contract CollateralsManagementTest is Test {
         address vault1 = address(new Vault(evc));
         address vault2 = address(new Vault(evc));
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
         evc.enableCollateral(alice, vault1);
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
 
         vm.prank(alice);
         evc.enableCollateral(alice, vault1);
@@ -225,41 +225,41 @@ contract CollateralsManagementTest is Test {
         vm.prank(alice);
         evc.enableCollateral(alice, vault2);
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
         evc.reorderCollaterals(alice, 0, 1);
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
 
         vm.prank(alice);
         evc.reorderCollaterals(alice, 0, 1);
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
         evc.disableCollateral(alice, vault1);
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
 
         vm.prank(alice);
         evc.disableCollateral(alice, vault1);
     }
 
-    function test_RevertIfImpersonateReentrancy_CollateralsManagement(address alice) public {
+    function test_RevertIfControlCollateralReentrancy_CollateralsManagement(address alice) public {
         vm.assume(alice != address(evc));
         address vault1 = address(new Vault(evc));
         address vault2 = address(new Vault(evc));
 
-        evc.setImpersonateLock(true);
+        evc.setControlCollateralInProgress(true);
 
         vm.prank(alice);
-        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(Errors.EVC_ControlCollateralReentrancy.selector);
         evc.enableCollateral(alice, vault1);
 
-        evc.setImpersonateLock(false);
+        evc.setControlCollateralInProgress(false);
 
         vm.prank(alice);
         evc.enableCollateral(alice, vault1);
@@ -267,24 +267,24 @@ contract CollateralsManagementTest is Test {
         vm.prank(alice);
         evc.enableCollateral(alice, vault2);
 
-        evc.setImpersonateLock(true);
+        evc.setControlCollateralInProgress(true);
 
         vm.prank(alice);
-        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(Errors.EVC_ControlCollateralReentrancy.selector);
         evc.reorderCollaterals(alice, 0, 1);
 
-        evc.setImpersonateLock(false);
+        evc.setControlCollateralInProgress(false);
 
         vm.prank(alice);
         evc.reorderCollaterals(alice, 0, 1);
 
-        evc.setImpersonateLock(true);
+        evc.setControlCollateralInProgress(true);
 
         vm.prank(alice);
-        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(Errors.EVC_ControlCollateralReentrancy.selector);
         evc.disableCollateral(alice, vault1);
 
-        evc.setImpersonateLock(false);
+        evc.setControlCollateralInProgress(false);
 
         vm.prank(alice);
         evc.disableCollateral(alice, vault1);

@@ -140,7 +140,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     }
 
     function disableController(address account) public payable override {
-        if (account == address(0)) return;
+        if (account == address(0) || account == msg.sender) return;
         if (uint160(msg.sender) <= 10) return;
         setup(account, msg.sender);
         super.disableController(account);
@@ -163,22 +163,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         result = super.call(targetContract, onBehalfOfAccount, value, data);
     }
 
-    function callInternal(
-        address targetContract,
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) internal override returns (bool success, bytes memory result) {
-        if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) {
-            return (true, "");
-        }
-        if (uint160(targetContract) <= 10) return (true, "");
-        setup(onBehalfOfAccount, targetContract);
-
-        (success, result) = super.callInternal(targetContract, onBehalfOfAccount, value, data);
-    }
-
-    function impersonate(
+    function controlCollateral(
         address targetCollateral,
         address onBehalfOfAccount,
         uint256 value,
@@ -200,7 +185,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
-        result = super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
+        result = super.controlCollateral(targetCollateral, onBehalfOfAccount, value, data);
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
@@ -232,7 +217,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         for (uint256 i = 0; i < items.length; i++) {
             if (uint160(items[i].value) > type(uint128).max) return;
             if (uint160(items[i].targetContract) <= 10) return;
-            if (items[i].targetContract == address(this) || items[i].targetContract == msg.sender) return;
+            if (items[i].targetContract == address(this)) return;
         }
 
         vm.deal(address(this), type(uint256).max);
@@ -339,9 +324,9 @@ contract EthereumVaultConnectorInvariants is Test {
         evc.getCurrentOnBehalfOfAccount(address(0));
 
         assertEq(evc.getRawExecutionContext(), 1 << 200);
-        assertEq(evc.getCurrentCallDepth(), 0);
+        assertEq(evc.areChecksDeferred(), false);
         assertEq(evc.areChecksInProgress(), false);
-        assertEq(evc.isImpersonationInProgress(), false);
+        assertEq(evc.isControlCollateralInProgress(), false);
         assertEq(evc.isOperatorAuthenticated(), false);
         assertEq(evc.isSimulationInProgress(), false);
     }

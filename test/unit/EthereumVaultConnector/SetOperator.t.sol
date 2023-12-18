@@ -17,7 +17,7 @@ contract SetOperatorTest is Test {
 
     function test_WhenOwnerCalling_SetOperator(address alice, address operator, uint256 operatorBitField) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
         vm.assume(operatorBitField > 0);
 
@@ -75,7 +75,7 @@ contract SetOperatorTest is Test {
 
     function test_WhenOperatorCalling_SetOperator(address alice, address operator, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         for (uint256 i = 0; i < 256; ++i) {
@@ -128,7 +128,7 @@ contract SetOperatorTest is Test {
         uint256 operatorBitField
     ) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         uint152 addressPrefix = evc.getAddressPrefix(alice);
@@ -161,7 +161,7 @@ contract SetOperatorTest is Test {
     ) public {
         uint152 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
         vm.assume(addressPrefix != type(uint152).max);
         vm.assume(operatorBitField > 0);
@@ -188,7 +188,7 @@ contract SetOperatorTest is Test {
 
     function test_RevertIfSenderNotOwnerAndNotOperator_SetAccountOperator(address alice, address operator) public {
         vm.assume(alice != address(0) && alice != address(0xfe) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         address account = address(uint160(uint160(alice) ^ 256));
@@ -218,7 +218,7 @@ contract SetOperatorTest is Test {
         address operator
     ) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && address(uint160(operator) ^ 1) != address(0) && operator != address(evc));
+        vm.assume(!evc.haveCommonOwner(address(evc), operator));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         assertEq(evc.isAccountOperatorAuthorized(alice, operator), false);
@@ -253,14 +253,6 @@ contract SetOperatorTest is Test {
     function test_RevertIfOperatorIsInvalidAddress_SetOperator(address alice, uint8 subAccountId) public {
         vm.assume(alice != address(evc));
         uint152 addressPrefix = evc.getAddressPrefix(alice);
-
-        vm.prank(alice);
-        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.setOperator(addressPrefix, address(0), 0);
-
-        vm.prank(alice);
-        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.setAccountOperator(alice, address(0), true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);

@@ -146,16 +146,6 @@ contract CallTest is Test {
         assertEq(keccak256(result), keccak256(data));
     }
 
-    function test_RevertIfDepthExceeded_Call(address alice) external {
-        vm.assume(alice != address(0) && alice != address(evc));
-
-        evc.setCallDepth(10);
-
-        vm.prank(alice);
-        vm.expectRevert(ExecutionContext.CallDepthViolation.selector);
-        evc.call(address(0), alice, 0, "");
-    }
-
     function test_RevertIfCallbackInPermit_Call(address alice) public {
         vm.assume(alice != address(0));
         vm.assume(alice != address(evc));
@@ -197,7 +187,7 @@ contract CallTest is Test {
         address targetContract = address(new Target());
         vm.assume(targetContract != alice && targetContract != address(evc));
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector, address(evc), address(evc), seed, alice, false
@@ -209,13 +199,13 @@ contract CallTest is Test {
         evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
-    function test_RevertIfImpersonateReentrancy_Call(address alice, uint256 seed) public {
+    function test_RevertIfControlCollateralReentrancy_Call(address alice, uint256 seed) public {
         vm.assume(alice != address(evc));
 
         address targetContract = address(new Target());
         vm.assume(targetContract != alice && targetContract != address(evc));
 
-        evc.setImpersonateLock(true);
+        evc.setControlCollateralInProgress(true);
 
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector, address(evc), address(evc), seed, alice, false
@@ -223,7 +213,7 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.prank(alice);
-        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(Errors.EVC_ControlCollateralReentrancy.selector);
         evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
@@ -301,7 +291,11 @@ contract CallTest is Test {
     }
 
     function test_RecoverValue_Call(address alice, address bob, uint64 seed) public {
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && alice != address(evc)
+                && alice != 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D
+                && alice != 0x4e59b44847b379578588920cA78FbF26c0B4956C
+        );
         vm.assume(!evc.haveCommonOwner(bob, address(0)) && bob != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, bob));
         vm.assume(address(alice).balance == 0);

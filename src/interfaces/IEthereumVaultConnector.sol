@@ -14,7 +14,7 @@ interface IEVC {
         /// @notice The account on behalf of which the operation is to be performed. msg.sender must be authorized to
         /// act on behalf of this account. Must be address(0) if the target contract is the EVC itself.
         address onBehalfOfAccount;
-        /// @notice The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
+        /// @notice The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
         /// balance of the EVC contract will be forwarded. Must be 0 if the target contract is the EVC itself.
         uint256 value;
         /// @notice The encoded data which is called on the target contract.
@@ -46,10 +46,6 @@ interface IEVC {
     /// @return context Current raw execution context.
     function getRawExecutionContext() external view returns (uint256 context);
 
-    /// @notice Returns the current call depth.
-    /// @return The current call depth.
-    function getCurrentCallDepth() external view returns (uint256);
-
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the
     /// controllerToCheck is an enabled controller for that account.
     /// @dev When checks in progress, on behalf of account is always address(0). When address is zero, the function
@@ -67,13 +63,17 @@ interface IEVC {
         view
         returns (address onBehalfOfAccount, bool controllerEnabled);
 
+    /// @notice Checks if checks are deferred.
+    /// @return A boolean indicating whether checks are deferred.
+    function areChecksDeferred() external view returns (bool);
+
     /// @notice Checks if checks are in progress.
     /// @return A boolean indicating whether checks are in progress.
     function areChecksInProgress() external view returns (bool);
 
-    /// @notice Checks if there is an impersonation in progress.
-    /// @return A boolean indicating whether an impersonation is in progress.
-    function isImpersonationInProgress() external view returns (bool);
+    /// @notice Checks if control collateral is in progress.
+    /// @return A boolean indicating whether control collateral is in progress.
+    function isControlCollateralInProgress() external view returns (bool);
 
     /// @notice Checks if an operator is authenticated.
     /// @return A boolean indicating whether an operator is authenticated.
@@ -246,7 +246,7 @@ interface IEVC {
     /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the
     /// value currently stored and can take any value between 0 and type(uint256).max - 1.
     /// @param deadline The timestamp after which the permit is considered expired.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
+    /// @param value The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
     /// balance of the EVC contract will be forwarded.
     /// @param data The encoded data which is self-called on the EVC contract.
     /// @param signature The signature of the data signed by the signer.
@@ -261,20 +261,19 @@ interface IEVC {
     ) external payable;
 
     /// @notice Calls into a target contract as per data encoded.
-    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
-    /// are performed after the call.
+    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost
+    /// call ends, the account and vault status checks are performed.
     /// @dev This function can be used to interact with any contract while checks deferred. If the target contract is
     /// the msg.sender, the msg.sender is called back with the calldata provided and the context set up according to the
     /// account provided. If the target contract is not the msg.sender, only the owner or the operator of the account
     /// provided can call this function.
-    /// @dev This function can be used to recover the remaining ETH from the EVC contract.
+    /// @dev This function can be used to recover the remaining value from the EVC contract.
     /// @param targetContract The address of the contract to be called.
     /// @param onBehalfOfAccount  If the target contract is the msg.sender, the address of the account which will be set
     /// in the context. It assumes the msg.sender has authenticated the account themselves. If the target contract is
     /// not the msg.sender, the address of the account for which it is checked whether msg.sender is authorized to act
     /// on behalf.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
+    /// @param value The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
     /// balance of the EVC contract will be forwarded.
     /// @param data The encoded data which is called on the target contract.
     /// @return result The result of the call.
@@ -287,19 +286,18 @@ interface IEVC {
 
     /// @notice For a given account, calls into one of the enabled collateral vaults from the currently enabled
     /// controller vault as per data encoded.
-    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the call. If the initial call depth is 0, the account and vault status checks
-    /// are performed after the call.
+    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost
+    /// call ends, the account and vault status checks are performed.
     /// @dev This function can be used to interact with any contract while checks deferred as long as the contract is
     /// enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
     /// @param targetCollateral The collateral address to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to
     /// act on behalf.
-    /// @param value The amount of ETH to be forwarded with the call. If the value is type(uint256).max, the whole
+    /// @param value The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
     /// balance of the EVC contract will be forwarded.
-    /// @param data The encoded data which is called on the target contract.
+    /// @param data The encoded data which is called on the target collateral.
     /// @return result The result of the call.
-    function impersonate(
+    function controlCollateral(
         address targetCollateral,
         address onBehalfOfAccount,
         uint256 value,
@@ -307,9 +305,8 @@ interface IEVC {
     ) external payable returns (bytes memory result);
 
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
-    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call) and increases the
-    /// call depth for the duration of the calls. If the initial call depth is 0, the account and vault status checks
-    /// are performed after the calls.
+    /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost
+    /// call ends, the account and vault status checks are performed.
     /// @param items An array of batch items to be executed.
     function batch(BatchItem[] calldata items) external payable;
 
@@ -341,7 +338,7 @@ interface IEVC {
     function isAccountStatusCheckDeferred(address account) external view returns (bool);
 
     /// @notice Checks the status of an account and reverts if it is not valid.
-    /// @dev If checks deferred, the account is added to the set of accounts to be checked at the end of the top-level
+    /// @dev If checks deferred, the account is added to the set of accounts to be checked at the end of the outermost
     /// checks-deferrable call. Account status check is performed by calling into the selected controller vault and
     /// passing the array of currently enabled collaterals. If controller is not selected, the account is always
     /// considered valid.
@@ -375,7 +372,7 @@ interface IEVC {
     function isVaultStatusCheckDeferred(address vault) external view returns (bool);
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
-    /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the top-level
+    /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the outermost
     /// checks-deferrable call. This function can only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
 
@@ -400,7 +397,7 @@ interface IEVC {
 
     /// @notice Checks the status of an account and a vault and reverts if it is not valid.
     /// @dev If checks deferred, the account and the vault are added to the respective sets of accounts and vaults to be
-    /// checked at the end of the top-level checks-deferrable call. Account status check is performed by calling into
+    /// checked at the end of the outermost checks-deferrable call. Account status check is performed by calling into
     /// selected controller vault and passing the array of currently enabled collaterals. If controller is not selected,
     /// the account is always considered valid. This function can only be called by the vault itself.
     /// @param account The address of the account to be checked.

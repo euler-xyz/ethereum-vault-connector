@@ -49,15 +49,21 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         return expectedVaultsChecked;
     }
 
-    function setCallDepth(uint8 depth) external {
+    function setChecksDeferred(bool deferred) external {
         if (isFuzzSender()) return;
-        executionContext = EC.wrap((EC.unwrap(executionContext) & ~uint256(0xff)) | depth);
+
+        if (deferred) {
+            executionContext = executionContext.setChecksDeferred();
+        } else {
+            executionContext =
+                EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF0000000000000000000000000000000000000000));
+        }
     }
 
-    function setChecksLock(bool locked) external {
+    function setChecksInProgress(bool inProgress) external {
         if (isFuzzSender()) return;
 
-        if (locked) {
+        if (inProgress) {
             executionContext = executionContext.setChecksInProgress();
         } else {
             executionContext =
@@ -65,11 +71,11 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         }
     }
 
-    function setImpersonateLock(bool locked) external {
+    function setControlCollateralInProgress(bool inProgress) external {
         if (isFuzzSender()) return;
 
-        if (locked) {
-            executionContext = executionContext.setImpersonationInProgress();
+        if (inProgress) {
+            executionContext = executionContext.setControlCollateralInProgress();
         } else {
             executionContext =
                 EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF00000000000000000000000000000000000000000000));

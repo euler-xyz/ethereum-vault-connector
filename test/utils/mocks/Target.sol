@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 
 import "../../../src/EthereumVaultConnector.sol";
 
-// mock target contract that allows to test call() and impersonate() functions of the EVC
+// mock target contract that allows to test call() and controlCollateral() functions of the EVC
 contract Target {
     function callTest(
         address evc,
@@ -20,9 +20,9 @@ contract Target {
         }
         require(msg.sender == msgSender, "ct/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
-        require(IEVC(evc).getCurrentCallDepth() > 0, "ct/invalid-checks-deferred");
+        require(IEVC(evc).areChecksDeferred(), "ct/invalid-checks-deferred");
         require(!IEVC(evc).areChecksInProgress(), "ct/checks-lock");
-        require(!IEVC(evc).isImpersonationInProgress(), "ct/impersonate-lock");
+        require(!IEVC(evc).isControlCollateralInProgress(), "ct/controlCollateral-lock");
         require(
             operatorAuthenticated ? IEVC(evc).isOperatorAuthenticated() : !IEVC(evc).isOperatorAuthenticated(),
             "ct/operator-authenticated"
@@ -33,7 +33,7 @@ contract Target {
         return msg.value;
     }
 
-    function impersonateTest(
+    function controlCollateralTest(
         address evc,
         address msgSender,
         uint256 value,
@@ -46,9 +46,9 @@ contract Target {
         }
         require(msg.sender == msgSender, "it/invalid-sender");
         require(msg.value == value, "it/invalid-msg-value");
-        require(IEVC(evc).getCurrentCallDepth() > 0, "it/invalid-checks-deferred");
+        require(IEVC(evc).areChecksDeferred(), "it/invalid-checks-deferred");
         require(!IEVC(evc).areChecksInProgress(), "it/checks-lock");
-        require(IEVC(evc).isImpersonationInProgress(), "it/impersonate-lock");
+        require(IEVC(evc).isControlCollateralInProgress(), "it/controlCollateral-lock");
 
         IEVC(evc).requireAccountStatusCheck(onBehalfOfAccount);
         require(IEVC(evc).isAccountStatusCheckDeferred(onBehalfOfAccount), "it/account-status-checks-not-deferred");
@@ -69,10 +69,10 @@ contract Target {
         }
         require(msg.sender == msgSender, "cbt/invalid-sender");
         require(msg.value == value, "ct/invalid-msg-value");
-        require(IEVC(evc).getCurrentCallDepth() > 0, "cbt/invalid-checks-deferred");
+        require(IEVC(evc).areChecksDeferred(), "cbt/invalid-checks-deferred");
 
-        require(!IEVC(evc).areChecksInProgress(), "cbt/impersonate-lock");
-        require(!IEVC(evc).isImpersonationInProgress(), "cbt/impersonate-lock");
+        require(!IEVC(evc).areChecksInProgress(), "cbt/controlCollateral-lock");
+        require(!IEVC(evc).isControlCollateralInProgress(), "cbt/controlCollateral-lock");
         require(!IEVC(evc).isOperatorAuthenticated(), "cbt/operator-authenticated");
 
         IEVC(evc).requireAccountStatusCheck(onBehalfOfAccount);
@@ -101,9 +101,9 @@ contract TargetWithNesting {
         }
         require(msg.sender == msgSender, "nct/invalid-sender");
         require(msg.value == value, "nct/invalid-msg-value");
-        require(IEVC(evc).getCurrentCallDepth() > 0, "nct/invalid-checks-deferred");
+        require(IEVC(evc).areChecksDeferred(), "nct/invalid-checks-deferred");
         require(!IEVC(evc).areChecksInProgress(), "nct/checks-lock");
-        require(!IEVC(evc).isImpersonationInProgress(), "nct/impersonate-lock");
+        require(!IEVC(evc).isControlCollateralInProgress(), "nct/controlCollateral-lock");
         require(
             operatorAuthenticated ? IEVC(evc).isOperatorAuthenticated() : !IEVC(evc).isOperatorAuthenticated(),
             "nct/operator-authenticated"
@@ -122,8 +122,8 @@ contract TargetWithNesting {
         } catch {
             require(onBehalfOfAccount == address(0), "nct/invalid-on-behalf-of-account-4");
         }
-        require(IEVC(evc).getCurrentCallDepth() > 0, "nct/invalid-checks-deferred-2");
-        require(!IEVC(evc).isImpersonationInProgress(), "nct/impersonate-lock-2");
+        require(IEVC(evc).areChecksDeferred(), "nct/invalid-checks-deferred-2");
+        require(!IEVC(evc).isControlCollateralInProgress(), "nct/controlCollateral-lock-2");
         require(
             operatorAuthenticated ? IEVC(evc).isOperatorAuthenticated() : !IEVC(evc).isOperatorAuthenticated(),
             "nct/operator-authenticated-2"

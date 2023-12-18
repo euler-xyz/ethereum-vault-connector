@@ -87,7 +87,7 @@ contract AccountAndVaultStatusTest is Test {
         }
 
         for (uint256 i = 0; i < numberOfAddresses; i++) {
-            evc.setCallDepth(0);
+            evc.setChecksDeferred(false);
 
             address account = accounts[i];
             address controller = controllers[i];
@@ -99,7 +99,7 @@ contract AccountAndVaultStatusTest is Test {
             Vault(vault).setVaultStatusState(1);
 
             // status checks will be scheduled for later due to deferred state
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             // even though the account status state and the vault status state were
             // set to 1 which should revert, it doesn't because in checks deferral
@@ -127,13 +127,13 @@ contract AccountAndVaultStatusTest is Test {
 
         address vault = address(new Vault(evc));
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
         vm.prank(vault);
         evc.requireAccountAndVaultStatusCheck(accounts[index]);
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
         vm.prank(vault);
         evc.requireAccountAndVaultStatusCheck(accounts[index]);
     }

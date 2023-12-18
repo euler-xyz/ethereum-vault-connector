@@ -16,7 +16,7 @@
 * [What is the purpose of the `batch` function in the EVC?](#what-is-the-purpose-of-the-batch-function-in-the-evc)
 * [How does the EVC handle gasless transactions?](#how-does-the-evc-handle-gasless-transactions)
 * [How does the EVC support simulations?](#how-does-the-evc-support-simulations)
-* [What is the purpose of the `impersonate` function in the EVC?](#what-is-the-purpose-of-the-`impersonate`-function-in-the-evc)
+* [What is the purpose of the `controlCollateral` function in the EVC?](#what-is-the-purpose-of-the-`controlcollateral`-function-in-the-evc)
 * [How does the EVC interact with other smart contracts?](#how-does-the-evc-interact-with-other-smart-contracts)
 
 <!-- END OF TOC -->
@@ -71,9 +71,9 @@ Some vaults may have constraints that should be enforced globally. For example, 
 
 ## What are checks deferrals and how do they work?
 
-Checks deferrals is the EVC feature which allows for the deferral of account and vault status checks until the end of the top-level checks-deferrable call. This means that checks for account solvency and vault constraints, which are usually performed immediately, can be postponed until the end of the call.
+Checks deferrals is the EVC feature which allows for the deferral of account and vault status checks until the end of the outermost checks-deferrable call. This means that checks for account solvency and vault constraints, which are usually performed immediately, can be postponed until the end of the call.
 This feature is particularly useful in scenarios where multiple operations need to be performed in a specific sequence, and where the intermediate states of the account or vault might not meet the usual constraints. By deferring the checks, the EVC allows for a transient violation of account solvency or vault constraints, which can be useful in certain complex operations.
-However, it's important to note that the checks are still performed at the end of the top-level call, ensuring that the final state of the account and vault still meet the necessary constraints. If the final state does not meet these constraints, the entire operation will fail.
+However, it's important to note that the checks are still performed at the end of the outermost call, ensuring that the final state of the account and vault still meet the necessary constraints. If the final state does not meet these constraints, the entire operation will fail.
 
 ## What is an Operator?
 
@@ -86,27 +86,27 @@ Sub-accounts provide flexibility and control to the user. They can be used to ma
 
 ## What is the purpose of the `batch` function in the EVC?
 
-The `batch` function in the EVC allows for the execution of a list of operations atomically, meaning that all operations either succeed together or fail together, ensuring consistency. The `batch` function defers account and vault status checks until the end of the top-level call. This allows for a transient violation of account solvency or vault constraints, which not only saves gas but can be useful in certain complex operations.
+The `batch` function in the EVC allows for the execution of a list of operations atomically, meaning that all operations either succeed together or fail together, ensuring consistency. The `batch` function defers account and vault status checks until the end of the outermost call. This allows for a transient violation of account solvency or vault constraints, which not only saves gas but can be useful in certain complex operations.
 
 ## How does the EVC handle gasless transactions?
 
 The EVC handles gasless transactions, also known as meta-transactions, through a permit function.Permit function supports EIP-712 typed data messages that allow arbitrary calldata execution on the EVC on behalf of the signer (Account Owner or Account Operator) of the message. This means that a user can sign a message off-chain, which can then be sent to the EVC by another party who pays for the gas. 
-This feature is particularly useful in scenarios where a user might not have enough ETH to pay for gas, or in applications that want to abstract away the concept of gas for a better user experience.
+This feature is particularly useful in scenarios where a user might not have enough native currency to pay for gas, or in applications that want to abstract away the concept of gas for a better user experience.
 
 ## How does the EVC support simulations?
 
 The EVC supports simulations through a dedicated interface that allows for the execution of a batch of operations without actually modifying the state. This is particularly useful for inspecting the outcome of a batch before executing it, which can aid in decision-making and risk assessment.
 
-## What is the purpose of the `impersonate` function in the EVC?
+## What is the purpose of the `controlCollateral` function in the EVC?
 
-In the EVC, the `impersonate` function is a key mechanism that allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account.
-This function is particularly useful during the liquidation process. When a user's account becomes insolvent, a liquidator initiates the liquidation process. As part of this process, the Controller Vault, using the `impersonate` function, seizes the collateral from the enabled Collateral Vaults to repay the debt.
-In essence, the `impersonate` function provides a mechanism for enforcing the rules and conditions set by the Controller Vault, including the management of collateral during liquidations.
+In the EVC, the `controlCollateral` function is a key mechanism that allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account.
+This function is particularly useful during the liquidation process. When a user's account becomes insolvent, a liquidator initiates the liquidation process. As part of this process, the Controller Vault, using the `controlCollateral` function, seizes the collateral from the enabled Collateral Vaults to repay the debt.
+In essence, the `controlCollateral` function provides a mechanism for enforcing the rules and conditions set by the Controller Vault, including the management of collateral during liquidations.
 
 ## How does the EVC interact with other smart contracts?
 
-The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch` and `impersonate`.
+The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch` and `controlCollateral`.
 
 1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when remaining value needs to be recovered from the EVC.
 1. `batch`: The function allows for the execution of a list of operations atomically. This means that all operations either succeed together or fail together. This function is used when the EVC needs to interact with multiple smart contracts in a specific sequence.
-1. `impersonate`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
+1. `controlCollateral`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
