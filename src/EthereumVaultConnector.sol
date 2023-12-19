@@ -132,7 +132,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @notice A modifier that verifies whether account or vault status checks are re-entered as well as checks for
-    /// control collateral re-entrancy.
+    /// controlCollateral re-entrancy.
     modifier nonReentrantChecksAndControlCollateral() {
         {
             EC context = executionContext;
@@ -753,8 +753,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // considering that the operatorAuthenticated is only meant to be observable by external
         // contracts, it is sufficient to set it here rather than in the authentication functions.
         // apart from the usual scenario (when an owner operates on behalf of its account),
-        // the operatorAuthenticated should be cleared when about to execute the permit self-call, a callback,
-        // or when the control collateral is in progress (in which case the operatorAuthenticated is not relevant)
+        // the operatorAuthenticated should be cleared when about to execute the permit self-call, when
+        // target contract is equal to the msg.sender in call() and batch(), or when the control collateral is in
+        // progress (in which case the operatorAuthenticated is not relevant)
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) || targetContract == msg.sender
                 || targetContract == address(this) || contextCache.isControlCollateralInProgress()
@@ -790,7 +791,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             // to be able to perform authentication
             (success, result) = address(this).delegatecall(data);
         } else {
-            // callback does not require authentication
+            // when the target contract is equal to the msg.sender, both in call() and batch(), authentication is not required
             if (targetContract != msg.sender) {
                 authenticateOwnerOrOperator(onBehalfOfAccount);
             }

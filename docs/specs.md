@@ -102,7 +102,7 @@ NOTE: Because the EVC contract can be made to invoke any arbitrary target contra
 ## Vault Specification
 
 1. A Vault MAY either only allow to be called through the EVC or MAY allow to be called both through the EVC and directly. When the Vault is called though the EVC, it MUST rely on `getCurrentOnBehalfOfAccount` function for the currently authenticated Account on behalf of which the operation is being performed. The Vault MUST consider this the true value of `msg.sender` for authorization purposes. If the Vault is called directly, the Vault MAY perform the authentication itself and OPTIONALLY use the `call` function on the EVC.
-1. In more complex cases, to avoid status-check-related issues, it is advised to use the `call` function in the callback manner when the Vault is called directly. It will ensure the Account and Vault Status Checks are always deferred, at least until the end of the `call`.
+1. In more complex cases, to avoid status-check-related issues, it is advised to use the `call` function in the callback manner (meaning a Vault can call back itself using `call`) when the Vault is called directly. It will ensure the Account and Vault Status Checks are always deferred, at least until the end of the `call`.
 1. `call` function SHALL only be used if `msg.sender` is not the EVC, in other words, if the Vault is called directly.
 1. Before using `call` in the callback manner, the Vault is REQUIRED to authenticate the `msg.sender`. It is strongly advised to pass the `msg.sender` address as `onBehalfOfAccount` input of the `call` function unless there's a legitimate reason not to do so.
 1. In order to support sub-accounts, operators, collateral control and permits, a Vault MUST be invoked via the EVC.

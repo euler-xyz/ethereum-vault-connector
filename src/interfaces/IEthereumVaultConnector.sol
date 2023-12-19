@@ -307,6 +307,7 @@ interface IEVC {
     /// @notice Executes multiple calls into the target contracts while checks deferred as per batch items provided.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost
     /// call ends, the account and vault status checks are performed.
+    /// @dev The authentication rules for each batch item are the same as for the call function.
     /// @param items An array of batch items to be executed.
     function batch(BatchItem[] calldata items) external payable;
 
