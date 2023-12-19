@@ -791,7 +791,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             // to be able to perform authentication
             (success, result) = address(this).delegatecall(data);
         } else {
-            // when the target contract is equal to the msg.sender, both in call() and batch(), authentication is not required
+            // when the target contract is equal to the msg.sender, both in call() and batch(), authentication is not
+            // required
             if (targetContract != msg.sender) {
                 authenticateOwnerOrOperator(onBehalfOfAccount);
             }
