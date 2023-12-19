@@ -232,24 +232,6 @@ contract CallTest is Test {
         evc.call{value: seed}(targetContract, alice, seed, data);
     }
 
-    function test_RevertIfTargetContractInvalid_Call(address alice, uint256 seed) public {
-        // call setUp() explicitly for Diligence Fuzzing tool to pass
-        setUp();
-
-        vm.assume(alice != address(0));
-        vm.assume(alice != address(evc));
-
-        bytes memory data =
-            abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), seed, alice, false);
-
-        // target contract is the ERC1820 registry
-        address targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-        vm.deal(alice, seed);
-        vm.prank(alice);
-        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.call{value: seed}(targetContract, alice, seed, data);
-    }
-
     function test_RevertIfValueExceedsBalance_Call(address alice, uint64 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 0);

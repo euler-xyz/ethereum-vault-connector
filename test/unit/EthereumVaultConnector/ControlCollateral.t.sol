@@ -115,28 +115,6 @@ contract ControlCollateralTest is Test {
         evc.controlCollateral{value: seed}(collateral, alice, seed, data);
     }
 
-    function test_RevertIfTargetContractInvalid_ControlCollateral(address alice, uint256 seed) public {
-        vm.assume(alice != address(0) && alice != address(evc));
-
-        address controller = address(new Vault(evc));
-
-        vm.prank(alice);
-        evc.enableController(alice, controller);
-
-        bytes memory data =
-            abi.encodeWithSelector(Target.controlCollateralTest.selector, address(evc), address(evc), seed, alice);
-
-        // target contract is the ERC1820 registry
-        address targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-        vm.prank(alice);
-        evc.enableCollateral(alice, targetContract);
-
-        vm.deal(controller, seed);
-        vm.prank(controller);
-        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.controlCollateral{value: seed}(targetContract, alice, seed, data);
-    }
-
     function test_RevertIfNoControllerEnabled_ControlCollateral(address alice, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
 

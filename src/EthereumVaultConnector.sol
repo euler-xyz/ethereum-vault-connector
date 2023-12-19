@@ -34,8 +34,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     bytes32 internal constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    address internal constant ERC1820_REGISTRY = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-
     uint256 internal immutable CACHED_CHAIN_ID;
     bytes32 internal immutable CACHED_DOMAIN_SEPARATOR;
 
@@ -739,10 +737,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual returns (bool success, bytes memory result) {
-        if (targetContract == ERC1820_REGISTRY) {
-            revert EVC_InvalidAddress();
-        }
-
         if (value == type(uint256).max) {
             value = address(this).balance;
         } else if (value > address(this).balance) {

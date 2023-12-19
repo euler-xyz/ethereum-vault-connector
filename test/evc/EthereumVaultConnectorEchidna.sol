@@ -133,10 +133,6 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         // copied function body with inserted assertion
-        if (targetContract == ERC1820_REGISTRY) {
-            revert EVC_InvalidAddress();
-        }
-
         if (value == type(uint256).max) {
             value = address(this).balance;
         } else if (value > address(this).balance) {

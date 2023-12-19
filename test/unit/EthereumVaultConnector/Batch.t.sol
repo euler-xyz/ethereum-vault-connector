@@ -387,24 +387,6 @@ contract BatchTest is Test {
         evc.controlCollateral(collateral, alice, 0, abi.encodeWithSelector(VaultMalicious.callBatch.selector));
     }
 
-    function test_RevertIfTargetContractInvalid_Batch(address alice) external {
-        vm.assume(alice != address(0) && alice != address(evc) && !evc.haveCommonOwner(alice, address(this)));
-
-        // allow this contract to operate on behalf of alice
-        vm.prank(alice);
-        evc.setAccountOperator(alice, address(this), true);
-
-        // target contract is the ERC1820 registry
-        IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
-        items[0].onBehalfOfAccount = alice;
-        items[0].targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-        items[0].value = 0;
-        items[0].data = "";
-
-        vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.batch(items);
-    }
-
     function test_RevertIfValueExceedsBalance_Batch(address alice, uint128 seed) external {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 0);

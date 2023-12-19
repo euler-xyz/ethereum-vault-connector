@@ -155,7 +155,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this) || targetContract == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24) return "";
+        if (targetContract == address(this)) return "";
 
         setup(onBehalfOfAccount, targetContract);
         deal(address(this), value);
@@ -172,9 +172,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
-        if (targetCollateral == address(this) || targetCollateral == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24) {
-            return "";
-        }
+        if (targetCollateral == address(this)) return "";
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);

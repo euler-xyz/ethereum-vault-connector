@@ -59,7 +59,6 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. In Call and Batch, if the target is not `msg.sender`, only the Owner or an Operator of the specified Account MUST be allowed to perform Call and individual Batch operations on behalf of the Account.
 1. In Call and Batch, if the target is `msg.sender`, the caller MAY specify any Account address to be set in the Execution Context's on behalf of Account address. In that case, the authentication is not performed.
 1. In ControlCollateral, only the enabled Controller of the specified Account MUST be allowed to perform the operation on one of the enabled Collaterals on behalf of the Account. Neither the Controller nor Collateral Vault can be the EVC.
-1. EVC MUST NOT allow for low-level call to the ERC-1820 registry.
 1. The Controller Vault MUST NOT be allowed to use Permit message in order to use ControlCollateral.
 1. EVC MUST maintain the Execution Context and make it publicly observable.
 1. Execution Context MUST keep track of the Account on behalf of which current low-level calldata call is being performed.
