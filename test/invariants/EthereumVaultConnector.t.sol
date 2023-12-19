@@ -155,7 +155,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this)) return "";
+        if (targetContract == address(this) || targetContract == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24) return "";
 
         setup(onBehalfOfAccount, targetContract);
         deal(address(this), value);
@@ -173,9 +173,6 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
             return (true, "");
         }
         if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24) {
-            return (true, "");
-        }
         setup(onBehalfOfAccount, targetContract);
 
         (success, result) = super.callInternal(targetContract, onBehalfOfAccount, value, data);
@@ -190,7 +187,9 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
-        if (targetCollateral == address(this)) return "";
+        if (targetCollateral == address(this) || targetCollateral == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24) {
+            return "";
+        }
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);
@@ -338,7 +337,7 @@ contract EthereumVaultConnectorInvariants is Test {
     function invariant_ExecutionContext() external {
         vm.expectRevert(Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector);
         evc.getCurrentOnBehalfOfAccount(address(0));
-        
+
         assertEq(evc.getRawExecutionContext(), 1 << 200);
         assertEq(evc.getCurrentCallDepth(), 0);
         assertEq(evc.areChecksInProgress(), false);

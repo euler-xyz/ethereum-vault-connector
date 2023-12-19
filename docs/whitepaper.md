@@ -326,7 +326,7 @@ The only exception to this is mid-transaction inside of a batch. If one batch it
 
 One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit using `call` function).
 
-One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the EVC doesn't attempt to comprehensively solve this, the ERC-1820 registry address is blocked and can not be invoked via `call` or batches.
+One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the EVC doesn't attempt to comprehensively solve this, the ERC-1820 registry address is blocked.
 
 ### Read-only Re-entrancy
 

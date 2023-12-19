@@ -87,7 +87,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isImpersonationInProgress());
     /// #if_succeeds "only enabled controller can call into enabled collateral" getControllers(onBehalfOfAccount).length == 1 && isControllerEnabled(onBehalfOfAccount, msg.sender) && isCollateralEnabled(onBehalfOfAccount, targetCollateral);
-    /// #if_succeeds "the target can neither be this contract not itself" targetCollateral != address(this) && targetCollateral != msg.sender;
+    /// #if_succeeds "the target can neither be this contract nor ERC-1810 registry" targetCollateral != address(this) && targetCollateral != ERC1820_REGISTRY;
     function impersonate(
         address targetCollateral,
         address onBehalfOfAccount,

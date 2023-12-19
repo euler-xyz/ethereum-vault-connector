@@ -234,12 +234,11 @@ contract CallTest is Test {
         vm.assume(alice != address(0));
         vm.assume(alice != address(evc));
 
+        bytes memory data =
+            abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), seed, alice, false);
+
         // target contract is the EVC
         address targetContract = address(evc);
-        bytes memory data = abi.encodeWithSelector(
-            Target(targetContract).callTest.selector, address(evc), targetContract, seed, alice, false
-        );
-
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
@@ -247,10 +246,6 @@ contract CallTest is Test {
 
         // target contract is the ERC1820 registry
         targetContract = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
-        data = abi.encodeWithSelector(
-            Target(targetContract).callTest.selector, address(evc), address(evc), seed, alice, false
-        );
-
         vm.deal(alice, seed);
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);

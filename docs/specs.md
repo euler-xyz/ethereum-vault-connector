@@ -75,9 +75,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. Execution Context MUST return to its default state when the Checks-deferrable Call nesting depth counter is decreased back to the default value of 0.
 1. If the Checks-deferrable Call nesting depth counter is decreased to the value greater than 0, the Execution Context MAY not be in its default state.
 1. Execution Context's Account on behalf of which current low-level call is being performed MUST be storing address(0) when Account and Vault Status Checks are in progress.
-1. The Call target address MUST NOT be the EVC itself or the ERC-1820 registry.
+1. EVC MUST NOT allow for low-level call to the ERC-1820 registry.
 1. If the Call target is the `msg.sender`, the EVC MUST allow the caller to set the Execution Context's on behalf of Account address to any arbitrary value for the time of the Call allow to proceed without authentication.
-1. The Batch external call target MUST NOT be the EVC, ERC-1820 registry address or the msg.sender itself.
+1. The Batch external call target MUST NOT be the EVC the msg.sender.
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to Impersonate the Account's call into any of its enabled Collateral Vaults. Neither the Controller nor Collateral Vault can be the EVC.
 1. The Controller Vault MUST NOT be allowed to use Permit message in order to Impersonate.
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to forgive the Account Status Check if it's deferred.

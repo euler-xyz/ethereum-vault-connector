@@ -188,8 +188,8 @@ contract BatchTest is Test {
     }
 
     function test_RevertIfDepthExceeded_Batch(address alice) external {
-        vm.assume(alice != address(0) && alice != address(evc));
         address vault = address(new Vault(evc));
+        vm.assume(alice != address(0) && alice != address(evc) && alice != vault);
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](10);
 

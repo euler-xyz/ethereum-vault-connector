@@ -163,6 +163,18 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         _;
     }
 
+    /// @notice A modifier that increases the call depth in the execution context and restores the execution context
+    /// after the function call.
+    /// @dev Performs account and vault status checks after the function call if necessary.
+    modifier checksDeferrableCall() virtual {
+        EC contextCache = executionContext;
+        executionContext = contextCache.increaseCallDepth();
+
+        _;
+
+        restoreExecutionContext(contextCache);
+    }
+
     /// @notice A modifier that verifies whether account or vault status checks are re-entered as well as checks for
     /// impersonate re-entrancy.
     modifier nonReentrant() {
@@ -513,13 +525,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address onBehalfOfAccount,
         uint256 value,
         bytes calldata data
-    ) public payable virtual nonReentrant returns (bytes memory result) {
+    ) public payable virtual nonReentrant checksDeferrableCall returns (bytes memory result) {
         if (address(this) == targetContract) {
             revert EVC_InvalidAddress();
         }
-
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth();
 
         bool success;
         if (msg.sender == targetContract) {
@@ -531,8 +540,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (!success) {
             revertBytes(result);
         }
-
-        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc IEVC
@@ -541,13 +548,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address onBehalfOfAccount,
         uint256 value,
         bytes calldata data
-    ) public payable virtual nonReentrant returns (bytes memory result) {
+    ) public payable virtual nonReentrant checksDeferrableCall returns (bytes memory result) {
         if (address(this) == targetCollateral) {
             revert EVC_InvalidAddress();
         }
 
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth().setImpersonationInProgress();
+        executionContext = executionContext.setImpersonationInProgress();
 
         bool success;
         (success, result) = impersonateInternal(targetCollateral, onBehalfOfAccount, value, data);
@@ -555,18 +561,22 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (!success) {
             revertBytes(result);
         }
-
-        restoreExecutionContext(contextCache);
     }
 
     /// @inheritdoc IEVC
-    function batch(BatchItem[] calldata items) public payable virtual nonReentrant {
-        EC contextCache = executionContext;
-        executionContext = contextCache.increaseCallDepth();
+    function batch(BatchItem[] calldata items) public payable virtual nonReentrant checksDeferrableCall {
+        uint256 length = items.length;
+        for (uint256 i; i < length;) {
+            (bool success, bytes memory result) = callBatchItemInternal(items[i]);
 
-        batchInternal(items);
+            if (!success) {
+                revertBytes(result);
+            }
 
-        restoreExecutionContext(contextCache);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     // Simulations
@@ -585,7 +595,16 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         executionContext = contextCache.increaseCallDepth().setSimulationInProgress();
 
-        batchItemsResult = batchInternalWithResult(items);
+        uint256 length = items.length;
+        batchItemsResult = new BatchItemResult[](length);
+
+        for (uint256 i; i < length;) {
+            (batchItemsResult[i].success, batchItemsResult[i].result) = callBatchItemInternal(items[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
 
         executionContext = contextCache.setChecksInProgress();
 
@@ -723,6 +742,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual returns (bool success, bytes memory result) {
+        if (targetContract == ERC1820_REGISTRY) {
+            revert EVC_InvalidAddress();
+        }
+
         if (value == type(uint256).max) {
             value = address(this).balance;
         } else if (value > address(this).balance) {
@@ -764,10 +787,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) internal virtual onlyOwnerOrOperator(onBehalfOfAccount) returns (bool success, bytes memory result) {
-        if (targetContract == ERC1820_REGISTRY) {
-            revert EVC_InvalidAddress();
-        }
-
         (success, result) = callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
     }
 
@@ -803,38 +822,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             }
 
             (success, result) = callInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
-        }
-    }
-
-    function batchInternal(BatchItem[] calldata items) internal {
-        uint256 length = items.length;
-
-        for (uint256 i; i < length;) {
-            (bool success, bytes memory result) = callBatchItemInternal(items[i]);
-
-            if (!success) {
-                revertBytes(result);
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    function batchInternalWithResult(BatchItem[] calldata items)
-        internal
-        returns (BatchItemResult[] memory batchItemsResult)
-    {
-        uint256 length = items.length;
-        batchItemsResult = new BatchItemResult[](length);
-
-        for (uint256 i; i < length;) {
-            (batchItemsResult[i].success, batchItemsResult[i].result) = callBatchItemInternal(items[i]);
-
-            unchecked {
-                ++i;
-            }
         }
     }
 
@@ -1010,7 +997,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     // Auxiliary functions
 
-    function _msgSender() internal view returns (address) {
+    function _msgSender() internal virtual view returns (address) {
         // EVC can only be msg.sender during the self-call in the permit() function. in that case,
         // the "true" sender address (that is the permit message signer) is taken from the execution context
         return address(this) == msg.sender ? executionContext.getOnBehalfOfAccount() : msg.sender;
