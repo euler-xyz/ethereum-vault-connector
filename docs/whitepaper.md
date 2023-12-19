@@ -17,8 +17,8 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 * [Execution](#execution)
     * [Checks-deferrable Call](#checks-deferrable-call)
     * [call](#call)
-    * [controlCollateral](#controlcollateral)
     * [batch](#batch)
+    * [controlCollateral](#controlcollateral)
     * [permit](#permit)
         * [Nonce Namespaces](#nonce-namespaces)
     * [Authorisation](#authorisation)
@@ -151,9 +151,11 @@ The EVC exposes multiple functions, each with its own characteristics, that allo
 
 ### call
 
-The `call` function on the EVC allows users to invoke functions on vaults and other target smart contracts. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function rather than calling the vaults directly. This is because vaults themselves don't understand sub-accounts or operators, and defer their authorisation logic to the EVC (see the [Authentication By Vaults](#authentication-by-vaults) section).
+The `call` function on the EVC allows users to invoke functions on vaults and other target smart contracts, including the EVC itself. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function rather than calling the vaults directly. This is because vaults themselves don't understand sub-accounts or operators, and defer their authorisation logic to the EVC (see the [Authentication By Vaults](#authentication-by-vaults) section).
 
 `call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the EVC as `msg.sender`. For this reason, it is critical that the EVC itself never be given any special privileges, or hold any token or native currency balances (except for a few corner cases where it is temporarily safe, see the [EVC Contract Privileges](#evc-contract-privileges) section).
+
+If the target contract *is* the EVC, in order to preserve the `msg.sender`, the EVC will be self-`call`ed using the `delegatecall`.
 
 If the target contract *is NOT* `msg.sender`, the EVC will only allow the target contract to be called if the `msg.sender` is the owner or the operator of the `onBehalfOfAccount` provided. If that condition is met, the EVC will create a context and call into the target contract with the provided calldata and the `onBehalfOfAccount` account set in the context.
 
@@ -169,9 +171,9 @@ At the time of this writing, public/private key pair Ethereum accounts (EOAs) ca
 * Gas savings: If contracts are invoked multiple times, then the cost of "cold" access can be amortised across all of the invocations.
 * Status check deferrals: Sometimes multiple operations in a batch may require status checks or it is more convenient or efficient to perform some operation that would leave an account/vault in an invalid state, but fix this state in a subsequent operation in a batch. For example, you may want to perform withdrawal and borrow in one batch or borrow and swap *before* you deposit your collateral. With batches, these checks can be performed once at the end of a batch (which can also itself be more gas efficient).
 
-Batches can be composed of both calls to the EVC itself and external calls (when the `targetContract` is not the EVC). Calling the EVC is how users can enable collateral from within a batch, for example. In order to preserve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall`.
+Same as [`call`](#call), batches can be composed of both calls to the EVC itself and external calls. Calling the EVC is how users can enable collateral from within a batch, for example. In order to preserve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall`.
 
-Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault. Each batch item specifies `onBehalfOfAccount` for which the authentication rules are the same as for [`call`](#call) (with exception of EVC self-`call`s).
+Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault. Each batch item specifies `onBehalfOfAccount` for which the authentication rules are the same as for [`call`](#call).
 
 ### controlCollateral
 
@@ -195,7 +197,7 @@ There are two types of signature methods supported by permits: ECDSA, which is u
 
 After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC, forwarding the specified `value` (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
 
-Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via `batch`, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
+Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via `call` and `batch`, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
 
 #### Nonce Namespaces
 

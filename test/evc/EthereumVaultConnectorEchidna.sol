@@ -56,10 +56,6 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
         bytes calldata data
     ) public payable override nonReentrantChecksAndControlCollateral returns (bytes memory result) {
         // copied function body with inserted assertion
-        if (address(this) == targetContract) {
-            revert EVC_InvalidAddress();
-        }
-
         EC contextCache = executionContext;
         executionContext = contextCache.setChecksDeferred();
 

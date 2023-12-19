@@ -308,9 +308,15 @@ contract EchidnaTest {
     }
 
     function call(address onBehalfOfAccount, bytes calldata data) public payable {
-        if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
-        hevm.prank(onBehalfOfAccount);
-        evc.call(address(vaultEchidna), onBehalfOfAccount, 0, data);
+        if (onBehalfOfAccount == address(evc)) return;
+
+        if (onBehalfOfAccount == address(0)) {
+            evc.call(address(evc), onBehalfOfAccount, 0, data);
+            return;
+        } else {
+            hevm.prank(onBehalfOfAccount);
+            evc.call(address(vaultEchidna), onBehalfOfAccount, 0, data);
+        }
     }
 
     function controlCollateral(address onBehalfOfAccount, bytes calldata data) public payable {

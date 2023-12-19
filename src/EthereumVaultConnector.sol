@@ -475,10 +475,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 value,
         bytes calldata data
     ) public payable virtual nonReentrantChecksAndControlCollateral returns (bytes memory result) {
-        if (targetContract == address(this)) {
-            revert EVC_InvalidAddress();
-        }
-
         EC contextCache = executionContext;
         executionContext = contextCache.setChecksDeferred();
 

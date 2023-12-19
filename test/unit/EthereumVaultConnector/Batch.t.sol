@@ -32,7 +32,7 @@ contract BatchTest is Test {
     bytes32 internal expectedHash;
 
     fallback(bytes calldata data) external returns (bytes memory) {
-        require(keccak256(data) == expectedHash, "callBatch/expected-error");
+        require(keccak256(data) == expectedHash, "fallback-error");
         return data;
     }
 
