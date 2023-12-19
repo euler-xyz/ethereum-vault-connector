@@ -27,7 +27,7 @@ sequenceDiagram
     Controller Vault-->>Controller Vault: if Controller Vault == Collateral Vault, seize violator's collateral
 
     critical
-        Controller Vault-->>EVC: if Controller Vault != Collateral Vault, impersonate(collateral vault, violator, transfer(liquidator, collateral amount))
+        Controller Vault-->>EVC: if Controller Vault != Collateral Vault, controlCollateral(collateral vault, violator, transfer(liquidator, collateral amount))
         EVC->>Collateral Vault: transfer(liquidator, collateral amount)
         Collateral Vault->>EVC: getCurrentOnBehalfOfAccount(address(0))
         Collateral Vault-->>Collateral Vault: vault snapshot

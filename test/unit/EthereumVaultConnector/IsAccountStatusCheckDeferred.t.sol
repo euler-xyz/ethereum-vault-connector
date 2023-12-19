@@ -16,8 +16,7 @@ contract IsAccountStatusCheckDeferredTest is Test {
         vm.assume(numberOfAccounts <= Set.MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; ++i) {
-            // we're not in a batch thus the check will not get deferred
-            evc.setCallDepth(0);
+            evc.setChecksDeferred(false);
 
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             assertFalse(evc.isAccountStatusCheckDeferred(account));
@@ -25,8 +24,7 @@ contract IsAccountStatusCheckDeferredTest is Test {
             evc.requireAccountStatusCheck(account);
             assertFalse(evc.isAccountStatusCheckDeferred(account));
 
-            // simulate being in a batch
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             evc.requireAccountStatusCheck(account);
             assertTrue(evc.isAccountStatusCheckDeferred(account));
@@ -36,10 +34,10 @@ contract IsAccountStatusCheckDeferredTest is Test {
     }
 
     function test_RevertIfChecksInProgress_IsAccountStatusCheckDeferred(address account) external {
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
         assertFalse(evc.isAccountStatusCheckDeferred(account));
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
         evc.isAccountStatusCheckDeferred(account);
     }

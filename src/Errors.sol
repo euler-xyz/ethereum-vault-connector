@@ -18,7 +18,7 @@ contract Errors {
     error EVC_InvalidValue();
     error EVC_InvalidData();
     error EVC_ChecksReentrancy();
-    error EVC_ImpersonateReentrancy();
+    error EVC_ControlCollateralReentrancy();
     error EVC_ControllerViolation();
     error EVC_SimulationBatchNested();
     error EVC_RevertedBatchResult(

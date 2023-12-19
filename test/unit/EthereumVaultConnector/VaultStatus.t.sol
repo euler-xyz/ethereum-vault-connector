@@ -49,7 +49,7 @@ contract VaultStatusTest is Test {
             );
 
             Vault(vault).setVaultStatusState(1);
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             vm.prank(vault);
 
@@ -60,7 +60,7 @@ contract VaultStatusTest is Test {
 
             if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
                 // checks no longer deferred
-                evc.setCallDepth(0);
+                evc.setChecksDeferred(false);
 
                 vm.prank(vault);
                 vm.expectRevert(bytes("vault status violation"));
@@ -78,13 +78,13 @@ contract VaultStatusTest is Test {
             vaults[i] = address(new Vault(evc));
         }
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.prank(vaults[index]);
         vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
         evc.requireVaultStatusCheck();
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
         vm.prank(vaults[index]);
         evc.requireVaultStatusCheck();
     }
@@ -121,7 +121,7 @@ contract VaultStatusTest is Test {
 
             // first, schedule the check to be performed later to prove that after being performed on the fly
             // vault is no longer contained in the set to be performed later
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             vm.prank(vault);
             evc.requireVaultStatusCheck();
@@ -148,7 +148,7 @@ contract VaultStatusTest is Test {
 
         // schedule the checks to be performed later to prove that after being performed on the fly
         // vaults are no longer contained in the set to be performed later
-        evc.setCallDepth(1);
+        evc.setChecksDeferred(true);
         for (uint256 i = 0; i < vaultsNumber; i++) {
             address vault = vaults[i];
             vm.prank(vault);
@@ -185,12 +185,12 @@ contract VaultStatusTest is Test {
         for (uint256 i = 0; i < numberOfVaults; i++) {
             vaults[i] = address(new Vault(evc));
 
-            evc.setChecksLock(true);
+            evc.setChecksInProgress(true);
             vm.prank(vaults[i]);
             vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
             evc.requireVaultStatusCheckNow();
 
-            evc.setChecksLock(false);
+            evc.setChecksInProgress(false);
             vm.prank(vaults[i]);
             evc.requireVaultStatusCheckNow();
         }
@@ -202,7 +202,7 @@ contract VaultStatusTest is Test {
         for (uint256 i = 0; i < numberOfVaults; i++) {
             address vault = address(new VaultMalicious(evc));
 
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             vm.prank(vault);
             evc.requireVaultStatusCheck();
@@ -231,7 +231,7 @@ contract VaultStatusTest is Test {
             address vault = vaults[i];
 
             evc.reset();
-            evc.setCallDepth(0);
+            evc.setChecksDeferred(false);
 
             // check all the options: vault state is ok, vault state is violated with
             // vault returning false and reverting
@@ -239,7 +239,7 @@ contract VaultStatusTest is Test {
                 allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
             );
 
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             vm.prank(vault);
             evc.requireVaultStatusCheck();
@@ -268,7 +268,7 @@ contract VaultStatusTest is Test {
 
         evc.reset();
 
-        evc.setCallDepth(1);
+        evc.setChecksDeferred(true);
         for (uint256 i = 0; i < vaults.length; ++i) {
             vm.prank(vaults[i]);
             evc.requireVaultStatusCheck();
@@ -292,7 +292,7 @@ contract VaultStatusTest is Test {
     }
 
     function test_RevertIfChecksReentrancy_RequireAllVaultsStatusCheckNow(bool locked) external {
-        evc.setChecksLock(locked);
+        evc.setChecksInProgress(locked);
 
         if (locked) {
             vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
@@ -307,7 +307,7 @@ contract VaultStatusTest is Test {
         for (uint256 i = 0; i < numberOfVaults; i++) {
             vaults[i] = address(new VaultMalicious(evc));
 
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             vm.prank(vaults[i]);
             evc.requireVaultStatusCheck();
@@ -326,7 +326,7 @@ contract VaultStatusTest is Test {
             address vault = address(new Vault(evc));
 
             // vault status check will be scheduled for later due to deferred state
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             vm.prank(vault);
             evc.requireVaultStatusCheck();
@@ -339,7 +339,7 @@ contract VaultStatusTest is Test {
     }
 
     function test_RevertIfChecksReentrancy_ForgiveVaultStatusCheck(bool locked) external {
-        evc.setChecksLock(locked);
+        evc.setChecksInProgress(locked);
 
         if (locked) {
             vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));

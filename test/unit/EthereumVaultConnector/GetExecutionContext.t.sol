@@ -12,9 +12,8 @@ contract GetExecutionContextTest is Test {
         evc = new EthereumVaultConnectorHarness();
     }
 
-    function test_GetExecutionContext(address account, uint8 callDepth, uint8 seed) external {
+    function test_GetExecutionContext(address account, uint8 seed) external {
         vm.assume(account != address(0) && account != address(evc));
-        vm.assume(callDepth <= 10);
 
         address controller = address(new Vault(evc));
 
@@ -28,11 +27,10 @@ contract GetExecutionContextTest is Test {
             vm.prank(account);
             evc.enableController(account, controller);
         }
-
-        evc.setCallDepth(seed % 3 == 0 ? callDepth : 0);
+        evc.setChecksDeferred(seed % 3 == 0 ? true : false);
         evc.setOnBehalfOfAccount(account);
-        evc.setChecksLock(seed % 4 == 0 ? true : false);
-        evc.setImpersonateLock(seed % 5 == 0 ? true : false);
+        evc.setChecksInProgress(seed % 4 == 0 ? true : false);
+        evc.setControlCollateralInProgress(seed % 5 == 0 ? true : false);
         evc.setOperatorAuthenticated(seed % 6 == 0 ? true : false);
         evc.setSimulation(seed % 7 == 0 ? true : false);
 
@@ -42,12 +40,13 @@ contract GetExecutionContextTest is Test {
         assertEq(onBehalfOfAccount, account);
         assertEq(controllerEnabled, seed % 2 == 0 ? true : false);
         assertEq(
-            context & 0x00000000000000000000000000000000000000000000000000000000000000FF, seed % 3 == 0 ? callDepth : 0
+            context & 0x000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, uint256(uint160(account))
         );
-        assertEq(evc.getCurrentCallDepth(), seed % 3 == 0 ? callDepth : 0);
         assertEq(
-            context & 0x0000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00, uint256(uint160(account)) << 8
+            context & 0x0000000000000000000000FF0000000000000000000000000000000000000000 != 0,
+            seed % 3 == 0 ? true : false
         );
+        assertEq(evc.areChecksDeferred(), seed % 3 == 0 ? true : false);
         assertEq(
             context & 0x00000000000000000000FF000000000000000000000000000000000000000000 != 0,
             seed % 4 == 0 ? true : false
@@ -57,7 +56,7 @@ contract GetExecutionContextTest is Test {
             context & 0x000000000000000000FF00000000000000000000000000000000000000000000 != 0,
             seed % 5 == 0 ? true : false
         );
-        assertEq(evc.isImpersonationInProgress(), seed % 5 == 0 ? true : false);
+        assertEq(evc.isControlCollateralInProgress(), seed % 5 == 0 ? true : false);
         assertEq(
             context & 0x0000000000000000FF0000000000000000000000000000000000000000000000 != 0,
             seed % 6 == 0 ? true : false

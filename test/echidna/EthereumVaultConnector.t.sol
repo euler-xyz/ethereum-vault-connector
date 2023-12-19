@@ -71,7 +71,7 @@ contract VaultEchidna is IVault {
         try evc.call(address(this), account, 0, "") {} catch {}
 
         hevm.prank(address(this));
-        try evc.impersonate(address(this), account, 0, "") {} catch {}
+        try evc.controlCollateral(address(this), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0].targetContract = address(address(evc));
@@ -142,7 +142,7 @@ contract VaultEchidna is IVault {
 
         hevm.prank(address(this));
         evc.enableCollateral(account, address(this));
-        try evc.impersonate(address(this), account, 0, "") {} catch {}
+        try evc.controlCollateral(address(this), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0].targetContract = address(address(evc));
@@ -222,7 +222,7 @@ contract VaultEchidna is IVault {
         }
 
         hevm.prank(address(this));
-        try evc.impersonate(address(targetEchidna), account, 0, "") {} catch {}
+        try evc.controlCollateral(address(targetEchidna), account, 0, "") {} catch {}
 
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0].targetContract = address(targetEchidna);
@@ -308,12 +308,18 @@ contract EchidnaTest {
     }
 
     function call(address onBehalfOfAccount, bytes calldata data) public payable {
-        if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
-        hevm.prank(onBehalfOfAccount);
-        evc.call(address(vaultEchidna), onBehalfOfAccount, 0, data);
+        if (onBehalfOfAccount == address(evc)) return;
+
+        if (onBehalfOfAccount == address(0)) {
+            evc.call(address(evc), onBehalfOfAccount, 0, data);
+            return;
+        } else {
+            hevm.prank(onBehalfOfAccount);
+            evc.call(address(vaultEchidna), onBehalfOfAccount, 0, data);
+        }
     }
 
-    function impersonate(address onBehalfOfAccount, bytes calldata data) public payable {
+    function controlCollateral(address onBehalfOfAccount, bytes calldata data) public payable {
         if (onBehalfOfAccount == address(0) || onBehalfOfAccount == address(evc)) return;
 
         hevm.prank(onBehalfOfAccount);
@@ -323,7 +329,7 @@ contract EchidnaTest {
         evc.enableController(onBehalfOfAccount, address(vaultEchidna));
 
         hevm.prank(address(vaultEchidna));
-        evc.impersonate(address(vaultEchidna), onBehalfOfAccount, 0, data);
+        evc.controlCollateral(address(vaultEchidna), onBehalfOfAccount, 0, data);
     }
 
     function batch(IEVC.BatchItem[] calldata items) public payable {
