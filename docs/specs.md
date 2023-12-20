@@ -220,7 +220,7 @@ See the [diagrams](./diagrams) too!
 ### Typical implementation pattern of the EVC-compliant function for a vault
 
 ```solidity
-function func() external routedThroughEVC nonReentrant {
+function func() external callThroughEVC nonReentrant {
     // retrieve the "true" message sender from the EVC. whether _msgSender or _msgSenderForBorrow should be called,
     // depends whether it's a debt-related functionality
     address msgSender = _msgSender();    // or _msgSenderForBorrow();
@@ -250,11 +250,11 @@ function func() external routedThroughEVC nonReentrant {
 }
 ```
 
-where `routedThroughEVC` can be implemented as follows:
+where `callThroughEVC` can be implemented as follows:
 
 ```solidity
 /// @notice Ensures that the msg.sender is the EVC by using the EVC call functionality if necessary.
-modifier routedThroughEVC() {
+modifier callThroughEVC() {
     if (msg.sender == address(evc)) {
         _;
     } else {
