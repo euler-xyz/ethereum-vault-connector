@@ -120,7 +120,10 @@ interface IEVC {
     /// authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being retrieved.
     /// @param operator The address of the operator for which the bit field is being retrieved.
-    /// @return operatorBitField The bit field for the given address prefix and operator.
+    /// @return operatorBitField The bit field for the given address prefix and operator. The bit field defines which
+    /// accounts the operator is authorized for. It is 256-position binary array like 0...010...0, marking the account
+    /// positionally in a uint256. The position in the bit field corresponds to the account ID (0-255), where 0 is the
+    /// owner account's ID.
     function getOperator(uint152 addressPrefix, address operator) external view returns (uint256 operatorBitField);
 
     /// @notice Returns information whether given operator has been authorized for the account.
