@@ -27,17 +27,17 @@ The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitat
 
 ## How does the EVC work in principle?
 
-When a user wishes to borrow, they must link their accounts and collateral vaults to the borrowed-from vault via the EVC. The liability vault, also known as the "controller", is then consulted whenever a user wants to perform an action potentially impacting account's solvency, such as withdrawing collateral. The EVC is responsible for calling the controller which determines whether the action is allowed or if it should be blocked to prevent account insolvency.
+When users wish to borrow, they must link their accounts and collateral vaults to the borrowed-from vault via the EVC. The liability vault, also known as the "controller", is then consulted whenever a user wants to perform an action potentially impacting account's solvency, such as withdrawing collateral. The EVC is responsible for calling the controller to determine whether the action is allowed or should be blocked to prevent account insolvency.
 
 ## What are the benefits of building on the EVC?
 
-The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors such as pricing and risk management.
+The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors, such as pricing and risk management.
 
-The EVC helps create the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
+The EVC helps create the network effect by offering access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, the EVC supports batch operations, sub-accounts, checks deferrals, automation, gasless transactions and provides an interface for simulating operations.
 
 ## What can be built using the EVC?
 
-The EVC provides a robust and flexible framework for developers to build a variety of new products. These include but are not limited to:
+The EVC provides developers a robust and flexible framework to build various new products. These include but are not limited to:
 
 1. Traditional, overcollateralized lending products
 1. Uncollateralized lending products
@@ -50,15 +50,15 @@ The EVC provides a robust and flexible framework for developers to build a varie
 1. Novel interest rate models
 1. Transaction relayers
 1. Intent-based systems
-1. Automations (conditional orders, custom liquidation flows, strategies, position managers, optimizers, guardians etc.)
-1. Smart contract tooling (i.e. swap hubs using new dexes or new dex aggregators)
+1. Automations (conditional orders, custom liquidation flows, strategies, position managers, optimizers, guardians, etc.)
+1. Smart contract tooling (i.e., swap hubs using new dexes or new dex aggregators)
 1. Integrations
 
 These are just a few examples of what can be built using the EVC. The possibilities are vast and limited only by the creativity and ingenuity of the developer community.
 
 ## What is a Controller in the context of EVC?
 
-In the context of the EVC, a Controller is a type of Vault that a user enables in order to borrow from it. When a user enables a Controller Vault, they submit their account to the rules encoded in the Controller Vault's code. The Controller Vault indirectly controls all the funds in all the enabled Collateral Vaults of the user. Whenever a user wants to perform an action such as removing collateral, the Controller Vault is consulted to determine whether the action is allowed, or whether it should be blocked since it would make the account insolvent.
+In the context of the EVC, a Controller is a type of Vault that a user enables to borrow from it. When a user enables a Controller Vault, they submit their account to the rules encoded in the Controller Vault's code. The Controller Vault indirectly controls all the funds in all the enabled Collateral Vaults of the user. Whenever a user wants to perform an action such as removing collateral, the Controller Vault is consulted to determine whether the action is allowed or whether it should be blocked since it would make the account insolvent.
 The Controller Vault plays a crucial role in the liquidation process. If a user's account becomes insolvent, the Controller Vault is allowed to seize the collateral from the enabled Collateral Vaults to repay the debt.
 
 ## What are Account Status Checks?
@@ -67,26 +67,26 @@ Account status checks are implemented by vaults to enforce account solvency. Vau
 
 ## What are Vault Status Checks?
 
-Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maximum amount of assets that can be supplied or borrowed, as a risk minimisation. Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state.
+Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maximum amount of assets that can be supplied or borrowed as a risk minimisation. Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state.
 
-## What are checks deferrals and how do they work?
+## What are checks deferrals, and how do they work?
 
-Checks deferrals is the EVC feature which allows for the deferral of account and vault status checks until the end of the outermost checks-deferrable call. This means that checks for account solvency and vault constraints, which are usually performed immediately, can be postponed until the end of the call.
-This feature is particularly useful in scenarios where multiple operations need to be performed in a specific sequence, and where the intermediate states of the account or vault might not meet the usual constraints. By deferring the checks, the EVC allows for a transient violation of account solvency or vault constraints, which can be useful in certain complex operations.
-However, it's important to note that the checks are still performed at the end of the outermost call, ensuring that the final state of the account and vault still meet the necessary constraints. If the final state does not meet these constraints, the entire operation will fail.
+Checks deferrals are the EVC feature which allows for the deferral of account and vault status checks until the end of the outermost checks-deferrable call. This means that checks for account solvency and vault constraints, usually performed immediately, can be postponed until the end of the call.
+This feature is particularly useful in scenarios where multiple operations need to be performed in a specific sequence and where the intermediate states of the account or vault might not meet the usual constraints. By deferring the checks, the EVC allows for a transient violation of account solvency or vault constraints, which can be useful in certain complex operations.
+However, it's important to note that the checks are still performed at the end of the outermost call, ensuring that the final state of the account and vault still meet the necessary constraints. The entire operation will fail if the final state does not meet these constraints.
 
 ## What is an Operator?
 
-Operators are a more flexible and powerful version of approvals. These are EOAs or smart contracts that have been granted a permission to operate on behalf of the account. This includes interacting with vaults (i.e. withdrawing/borrowing funds), enabling vaults as collateral, etc. Because of this, it is recommended that only trusted and audited contracts, or EOAs held by a trusted individuals, be installed as operators. Operator concept can be used to build flexible products on top of the EVC, i.e. various automations, intents support, stop-loss/take-profit/trailing-stop/etc modifiers, position managers etc.
+Operators are a more flexible and powerful version of approvals. These are EOAs or smart contracts that have been granted a permission to operate on behalf of the account. This includes interacting with vaults (i.e. withdrawing/borrowing funds), enabling vaults as collateral, etc. Because of this, it is recommended that only trusted and audited contracts, or EOAs held by a trusted individuals, be installed as operators. Operator concept can be used to build flexible products on top of the EVC, i.e. various automations, intents support, stop-loss/take-profit/trailing-stop/etc modifiers, position managers, etc.
 
 ## What is the concept of sub-accounts in the EVC?
 
-In the EVC, a sub-account is a concept that allows users to create multiple isolated positions within their single owner account. The sub-accounts belonging to the same owner share the first 19 bytes of their address and differ only in the last byte. This allows for the creation of isolated positions, where each sub-account can have its own set of enabled collateral vaults and a controller vault. 
-Sub-accounts provide flexibility and control to the user. They can be used to manage different investment strategies or risk profiles within the same Ethereum address. Each sub-account can be independently liquidated without affecting the others, providing a level of risk isolation.
+In the EVC, a sub-account is a concept that allows users to create multiple isolated positions within their single owner account. The sub-accounts belonging to the same owner share the first 19 bytes of their address and differ only in the last byte. This allows for creating isolated positions, where each sub-account can have its own set of enabled collateral vaults and a controller vault. 
+Sub-accounts provide flexibility and control to the user. They can manage different investment strategies or risk profiles within the same Ethereum address. Each sub-account can be independently liquidated without affecting the others, providing a level of risk isolation.
 
 ## What is the purpose of the `batch` function in the EVC?
 
-The `batch` function in the EVC allows for the execution of a list of operations atomically, meaning that all operations either succeed together or fail together, ensuring consistency. The `batch` function defers account and vault status checks until the end of the outermost call. This allows for a transient violation of account solvency or vault constraints, which not only saves gas but can be useful in certain complex operations.
+The `batch` function in the EVC allows for the execution of a list of operations atomically, meaning that all operations either succeed together or fail together, ensuring consistency. The `batch` function defers account and vault status checks until the end of the outermost call. This allows for a transient violation of account solvency or vault constraints, which saves gas and can be useful in certain complex operations.
 
 ## How does the EVC handle gasless transactions?
 
@@ -100,13 +100,13 @@ The EVC supports simulations through a dedicated interface that allows for the e
 ## What is the purpose of the `controlCollateral` function in the EVC?
 
 In the EVC, the `controlCollateral` function is a key mechanism that allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account.
-This function is particularly useful during the liquidation process. When a user's account becomes insolvent, a liquidator initiates the liquidation process. As part of this process, the Controller Vault, using the `controlCollateral` function, seizes the collateral from the enabled Collateral Vaults to repay the debt.
+This function is particularly useful during the liquidation process. A liquidator initiates the liquidation process when a user's account becomes insolvent. As part of this process, the Controller Vault, using the `controlCollateral` function, seizes the collateral from the enabled Collateral Vaults to repay the debt.
 In essence, the `controlCollateral` function provides a mechanism for enforcing the rules and conditions set by the Controller Vault, including the management of collateral during liquidations.
 
 ## How does the EVC interact with other smart contracts?
 
 The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch` and `controlCollateral`.
 
-1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when remaining value needs to be recovered from the EVC.
+1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when the remaining value needs to be recovered from the EVC.
 1. `batch`: The function allows for the execution of a list of operations atomically. This means that all operations either succeed together or fail together. This function is used when the EVC needs to interact with multiple smart contracts in a specific sequence.
 1. `controlCollateral`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
