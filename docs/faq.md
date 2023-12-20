@@ -33,7 +33,7 @@ When a user wishes to borrow, they must link their accounts and collateral vault
 
 The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors such as pricing and risk management.
 
-The EVC helps create the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions, and provides an interface for simulating operations.
+The EVC helps create the network effect by offering the access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions and provides an interface for simulating operations.
 
 ## What can be built using the EVC?
 
@@ -69,11 +69,11 @@ Account status checks are implemented by vaults to enforce account solvency. Vau
 
 Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maximum amount of assets that can be supplied or borrowed, as a risk minimisation. Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state.
 
-## What are checks deferrals and how do they work?
+## What are checks deferrals, and how do they work?
 
-Checks deferrals is the EVC feature which allows for the deferral of account and vault status checks until the end of the outermost checks-deferrable call. This means that checks for account solvency and vault constraints, which are usually performed immediately, can be postponed until the end of the call.
+Checks deferrals are the EVC feature that allows for the deferral of account and vault status checks until the end of the outermost checks-deferrable call. This means that checks for account solvency and vault constraints, which are usually performed immediately, can be postponed until the end of the call.
 This feature is particularly useful in scenarios where multiple operations need to be performed in a specific sequence, and where the intermediate states of the account or vault might not meet the usual constraints. By deferring the checks, the EVC allows for a transient violation of account solvency or vault constraints, which can be useful in certain complex operations.
-However, it's important to note that the checks are still performed at the end of the outermost call, ensuring that the final state of the account and vault still meet the necessary constraints. If the final state does not meet these constraints, the entire operation will fail.
+However, it's important to note that the checks are still performed at the end of the outermost call, ensuring that the final state of the account and vault still meet the necessary constraints. The entire operation will fail if the final state does not meet these constraints.
 
 ## What is an Operator?
 
@@ -90,7 +90,7 @@ The `batch` function in the EVC allows for the execution of a list of operations
 
 ## How does the EVC handle gasless transactions?
 
-The EVC handles gasless transactions, also known as meta-transactions, through a permit function.Permit function supports EIP-712 typed data messages that allow arbitrary calldata execution on the EVC on behalf of the signer (Account Owner or Account Operator) of the message. This means that a user can sign a message off-chain, which can then be sent to the EVC by another party who pays for the gas. 
+The EVC handles gasless transactions, also known as meta-transactions, through a permit function. Permit function supports EIP-712 typed data messages that allow arbitrary calldata execution on the EVC on behalf of the signer (Account Owner or Account Operator) of the message. This means that a user can sign a message off-chain, which can then be sent to the EVC by another party who pays for the gas. 
 This feature is particularly useful in scenarios where a user might not have enough native currency to pay for gas, or in applications that want to abstract away the concept of gas for a better user experience.
 
 ## How does the EVC support simulations?
@@ -105,8 +105,8 @@ In essence, the `controlCollateral` function provides a mechanism for enforcing 
 
 ## How does the EVC interact with other smart contracts?
 
-The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch` and `controlCollateral`.
+The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch`, and `controlCollateral`.
 
-1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when remaining value needs to be recovered from the EVC.
+1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when the remaining value needs to be recovered from the EVC.
 1. `batch`: The function allows for the execution of a list of operations atomically. This means that all operations either succeed together or fail together. This function is used when the EVC needs to interact with multiple smart contracts in a specific sequence.
 1. `controlCollateral`: The function allows an enabled Controller Vault to execute arbitrary calldata on any of its enabled Collateral Vaults on behalf of a specified account. This function is particularly useful for liquidation flows, where the Controller Vault needs to interact with Collateral Vaults to seize collateral.
