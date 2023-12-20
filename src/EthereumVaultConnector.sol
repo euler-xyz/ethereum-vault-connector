@@ -278,7 +278,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function setOperator(uint152 addressPrefix, address operator, uint256 operatorBitField) public payable virtual {
         address msgSender = authenticateOwner(addressPrefix);
 
-        // the operator can neither be the EVC nor can belong to one of 256 accounts of the owner
+        // the operator can neither be the EVC nor can be one of 256 accounts of the owner
         if (operator == address(this) || haveCommonOwnerInternal(msgSender, operator)) {
             revert EVC_InvalidAddress();
         }
@@ -303,18 +303,25 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // storage
         address owner = haveCommonOwnerInternal(account, msgSender) ? msgSender : getAccountOwnerInternal(account);
 
-        // if it's an operator calling, it can only deauthorize itself
+        // if it's an operator calling, it can only act for itself and must not be able to change other operators status
         if (owner != msgSender && operator != msgSender) {
             revert EVC_NotAuthorized();
         }
 
-        // the operator can neither be the EVC nor can belong to one of 256 accounts of the owner
+        // the operator can neither be the EVC nor can be one of 256 accounts of the owner
         if (operator == address(this) || haveCommonOwnerInternal(owner, operator)) {
             revert EVC_InvalidAddress();
         }
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
+
+        // The bitMask defines which accounts the operator is authorized for. The bitMask is created from the account
+        // number which is a number up to 2^8 in binary, or 256. 1 << (uint160(owner) ^ uint160(account)) transforms
+        // that number in an 256-position binary array like 0...010...0, marking the account positionally in a uint256.
         uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
+
+        // The operatorBitField is a 256-position binary array, where each 1 signals by position the account that the
+        // operator is authorized for.
         uint256 oldOperatorBitField = operatorLookup[addressPrefix][operator];
         uint256 newOperatorBitField = authorized ? oldOperatorBitField | bitMask : oldOperatorBitField & ~bitMask;
 
@@ -1004,6 +1011,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (owner == address(0)) return false;
 
         uint152 addressPrefix = getAddressPrefixInternal(account);
+
+        // The bitMask defines which accounts the operator is authorized for. The bitMask is created from the account
+        // number which is a number up to 2^8 in binary, or 256. 1 << (uint160(owner) ^ uint160(account)) transforms
+        // that number in an 256-position binary array like 0...010...0, marking the account positionally in a uint256.
         uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
 
         return operatorLookup[addressPrefix][operator] & bitMask != 0;
