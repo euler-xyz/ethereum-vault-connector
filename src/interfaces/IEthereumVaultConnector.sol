@@ -337,6 +337,7 @@ interface IEVC {
         );
 
     /// @notice Checks whether the status check is deferred for a given account.
+    /// @dev This function reverts if the checks are in progress.
     /// @param account The address of the account for which it is checked whether the status check is deferred.
     /// @return A boolean flag that indicates whether the status check is deferred or not.
     function isAccountStatusCheckDeferred(address account) external view returns (bool);
@@ -371,6 +372,7 @@ interface IEVC {
     function forgiveAccountStatusCheck(address account) external payable;
 
     /// @notice Checks whether the status check is deferred for a given vault.
+    /// @dev This function reverts if the checks are in progress.
     /// @param vault The address of the vault for which it is checked whether the status check is deferred.
     /// @return A boolean flag that indicates whether the status check is deferred or not.
     function isVaultStatusCheckDeferred(address vault) external view returns (bool);
