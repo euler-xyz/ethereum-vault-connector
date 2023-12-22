@@ -90,7 +90,7 @@ The `batch` function in the EVC allows for the execution of a list of operations
 
 ## How does the EVC handle gasless transactions?
 
-The EVC handles gasless transactions, also known as meta-transactions, through a permit function. Permit function supports EIP-712 typed data messages that allow arbitrary calldata execution on the EVC on behalf of the signer (Account Owner or Account Operator) of the message. This means that a user can sign a message off-chain, which can then be sent to the EVC by another party who pays for the gas. 
+The EVC handles gasless transactions, also known as meta-transactions, through a `permit` function. Permit function supports EIP-712 typed data messages that allow arbitrary calldata execution on the EVC on behalf of the signer (Account Owner or Account Operator) of the message. This means that a user can sign a message off-chain, which can then be sent to the EVC by another party who pays for the gas. 
 This feature is particularly useful in scenarios where a user might not have enough native currency to pay for gas, or in applications that want to abstract away the concept of gas for a better user experience.
 
 ## How does the EVC support simulations?
@@ -105,7 +105,7 @@ In essence, the `controlCollateral` function provides a mechanism for enforcing 
 
 ## How does the EVC interact with other smart contracts?
 
-The EVC interacts with other smart contracts, including vaults, through several key functions: `call`,`batch`, and `controlCollateral`.
+The EVC interacts with other smart contracts, including vaults, through several key functions: `call`, `batch`, and `controlCollateral`.
 
 1. `call`: The function allows to execute arbitrary calldata on external smart contract with account and vault status checks deferred. If the target contract is `msg.sender`, the EVC execution context is set as per the account specified. If the target contract is not `msg.sender`, only the Account Owner or Account Operator are allowed to execute arbitrary calldata on behalf of the specified account. This function may also be used when a vault is called directly and wants to imitate being called through the EVC or when the remaining value needs to be recovered from the EVC.
 1. `batch`: The function allows for the execution of a list of operations atomically. This means that all operations either succeed together or fail together. This function is used when the EVC needs to interact with multiple smart contracts in a specific sequence.
