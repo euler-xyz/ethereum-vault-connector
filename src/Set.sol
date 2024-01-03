@@ -126,6 +126,7 @@ library Set {
             if (searchIndex == numElements) return false;
         }
 
+        // write full slot at once to avoid SLOAD and bit masking
         if (numElements == 1) {
             setStorage.numElements = 0;
             setStorage.firstElement = address(0);
@@ -138,6 +139,8 @@ library Set {
             lastIndex = numElements - 1;
         }
 
+        // set numElements for every execution path to avoid SSTORE and bit masking when the element removed is
+        // firstElement
         if (searchIndex != lastIndex) {
             if (searchIndex == 0) {
                 setStorage.firstElement = setStorage.elements[lastIndex].value;
