@@ -75,7 +75,7 @@ Given that enabling a controller subjects the specified account to the rules enc
 
 ## Account Status Checks
 
-Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return `true`. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkAccountStatus` method), otherwise throw an exception.
+Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return a special magic success value (the function selector for the `checkAccountStatus` method). Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state. If so, it should return the special magic success value, otherwise throw an exception.
 
 ### Collateral Validity
 

@@ -63,7 +63,7 @@ The Controller Vault plays a crucial role in the liquidation process. If a user'
 
 ## What are Account Status Checks?
 
-Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return true. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state.
+Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return a special magic success value. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state.
 
 ## What are Vault Status Checks?
 
