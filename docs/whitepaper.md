@@ -46,7 +46,7 @@ To illustrate the process of vault mediation, let's consider a straightforward e
 
 In addition to vault mediation, the EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. Here are some of the benefits of building on the EVC:
 
-* Network effect thanks to unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
+* Network effect thanks to unified liquidity and interoperability: Participating protocols can accept deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
 * Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, Real World Assets (RWAs), uncollateralised IOUs, or synthetics.
 * Standardized approach to account liquidity checks and vault global constraints enforcement: The EVC allows for deferral of the liquidity checks and vault status checks, preventing transient violations from causing a failure. The EVC exposes an interface which abstracts management of the checks away from the vault.
 * Batching: Multiple operations affecting multiple vaults and external smart contracts can be performed within a single batch operation. This is more convenient for UI users, more gas efficient, and allows deferring liquidity checks until the end of the batch.
@@ -81,7 +81,7 @@ Account status checks are implemented by vaults to enforce account solvency. Vau
 
 Within the `checkAccountStatus` callback, vaults should inspect the provided list of collaterals and determine whether or not they are acceptable. Vaults can limit themselves to a small set of collaterals, or can be more general-purpose and allow borrowing using any assets they can get prices for. Alternately, a vault could always fail, if it is only intended to be a collateral vault.
 
-Vaults have freedom to price all the assets according to their preference (both liability and recognized collaterals), without depending on potentially untrustworthy oracles.
+Vaults have the freedom to price all the assets according to their preference (both liability and accepted collaterals), without depending on potentially untrustworthy oracles.
 
 While it might be tempting for the controller to allow a broad range of collateral vaults to encourage borrowing, the controller vault creators must exercise caution when deciding which vaults to accept as collateral. A malicious or incorrectly coded vault could, among other things, misrepresent the amount of assets it holds, reject liquidations when a user is in violation, or fail to require account status checks when necessary. Therefore, vaults should limit allowed collaterals to a set of audited addresses known to be reliable, or verify the addresses in a registry or factory contract to ensure they were created by trustworthy, audited contracts.
 

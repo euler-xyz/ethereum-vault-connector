@@ -33,7 +33,7 @@ When users wish to borrow, they must link their accounts and collateral vaults t
 
 The EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. It provides a common base ecosystem and reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors such as pricing and risk management.
 
-The EVC helps create the network effect by offering access to unified liquidity and interoperability, allowing protocols to recognize deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions and provides an interface for simulating operations.
+The EVC helps create the network effect by offering access to unified liquidity and interoperability, allowing protocols to accept deposits in other vaults as collateral. It does not enforce specific properties about the assets and provides a standardized approach to account liquidity checks and vault constraints enforcement. Lastly, amongst others, the EVC supports batch operations, sub-accounts, checks deferrals, automations, gasless transactions and provides an interface for simulating operations.
 
 ## What can be built using the EVC?
 
