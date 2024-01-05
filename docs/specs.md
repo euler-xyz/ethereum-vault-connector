@@ -34,7 +34,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. Account Operator address MUST NOT belong to the Account Owner of the Account for which the Operator being is authorized.
 1. Account Operator MUST be allowed to deauthorize itself for the Account if it is authorized to operate on behalf of it.
 1. Only an Account Owner MUST be allowed to modify the Nonce for its Address Prefix and Nonce Namespace.
-1. New Nonce MUST NOT be lower than the currently stored.
+1. New Nonce MUST NOT be lower than or equal to the currently stored.
 1. Each Account MUST have at most 20 Collateral Vaults enabled at a time.
 1. Each Account MUST have at most one Controller Vault enabled at a time unless it's a transient state during a Checks-deferrable Call.
 1. Only an Account Owner or the Account Operator MUST be allowed to enable and disable Collateral Vaults for the Account.
