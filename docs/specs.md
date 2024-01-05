@@ -10,7 +10,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - Account Owner: An EOA or a smart contract Ethereum address, one of the 256 Accounts with Account ID 0, that has ownership over the whole group of Accounts.
 - Address Prefix: The first 19 bytes of the Ethereum address. Account Owner has a common Address Prefix with any of the Accounts that belong to them.
 - Account Operator: An EOA or smart contract Ethereum address that has been granted permission to operate on behalf of the Account. The permission can only be granted by the Account Owner.
-- Collateral Vault: A Vault which deposits are recognized as collateral for borrowing in other Vaults. An Account can enable multiple collaterals. Enabled collateral can be seized by the Controller Vault in case of liquidation.
+- Collateral Vault: A Vault which deposits are accepted as collateral for borrowing in other Vaults. An Account can enable multiple collaterals. Enabled collateral can be seized by the Controller Vault in case of liquidation.
 - Controller Vault: A Vault that may be enabled by a user in order to be able to borrow from it. Enabling Controller submits the specified Account to the rules encoded in the Controller Vault's code. All the funds in all the enabled Collateral Vaults are indirectly under the control of the enabled Controller Vault; hence, the Accounts MUST only enable trusted, audited Controllers. If the Controller is malicious or incorrectly coded, it may result in the loss of the user's funds or even render the account unusable. Whenever a user wants to perform an action such as removing collateral, the Controller Vault is consulted in order to determine whether the action is allowed or whether it should be blocked since it would make the Account insolvent. An Account can have only one Controller Vault enabled at a time unless it's a transient state during checks deferral.
 - Nonce Namespace: A value used in conjunction with Nonce to prevent replaying Permit messages and for sequencing. Each Nonce Namespace provides a uint256 Nonce that has to be used sequentially. There's no requirement to use all the Nonces for a given Nonce Namespace before moving to the next one, which allows using Permit messages in a non-sequential manner.
 - Nonce: A value used to prevent replaying Permit messages and for sequencing. It is associated with a specific Nonce Namespace and an Address Prefix. The Nonce must be used sequentially within its Nonce Namespace. To invalidate signed Permit messages, set the Nonce for a given Nonce Namespace accordingly. To invalidate all the Permit messages for a given Nonce Namespace, set the Nonce to type(uint).max.
@@ -34,7 +34,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. Account Operator address MUST NOT belong to the Account Owner of the Account for which the Operator being is authorized.
 1. Account Operator MUST be allowed to deauthorize itself for the Account if it is authorized to operate on behalf of it.
 1. Only an Account Owner MUST be allowed to modify the Nonce for its Address Prefix and Nonce Namespace.
-1. New Nonce MUST NOT be lower than the currently stored.
+1. New Nonce MUST NOT be lower than or equal to the currently stored.
 1. Each Account MUST have at most 20 Collateral Vaults enabled at a time.
 1. Each Account MUST have at most one Controller Vault enabled at a time unless it's a transient state during a Checks-deferrable Call.
 1. Only an Account Owner or the Account Operator MUST be allowed to enable and disable Collateral Vaults for the Account.
@@ -186,7 +186,7 @@ See the [diagrams](./diagrams) too!
 1. Check whether the liquidator has enabled the vault as a controller
 1. Ensure that the liquidator is not liquidating itself
 1. Ensure that the violator does not have the Account Status Check deferred
-1. Ensure that the collateral to be liquidated is recognized and trusted
+1. Ensure that the collateral to be liquidated is accepted and trusted
 1. Take the snapshot of the initial vault state if not taken yet in this context
 1. Ensure that the violator is indeed in violation
 1. Perform the operation

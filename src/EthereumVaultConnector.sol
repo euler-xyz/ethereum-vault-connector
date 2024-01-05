@@ -756,10 +756,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         // set the onBehalfOfAccount in the execution context for the duration of the external call.
         // considering that the operatorAuthenticated is only meant to be observable by external
-        // contracts, it is sufficient to set it here rather than in the authentication functions.
+        // contracts, it is sufficient to set it here rather than in the authentication function.
         // apart from the usual scenario (when an owner operates on behalf of its account),
         // the operatorAuthenticated should be cleared when about to execute the permit self-call, when
-        // target contract is equal to the msg.sender in call() and batch(), or when the control collateral is in
+        // target contract is equal to the msg.sender in call() and batch(), or when the controlCollateral is in
         // progress (in which case the operatorAuthenticated is not relevant)
         if (
             haveCommonOwnerInternal(onBehalfOfAccount, msgSender) || targetContract == msg.sender

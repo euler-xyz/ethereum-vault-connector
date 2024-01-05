@@ -19,7 +19,7 @@ sequenceDiagram
     Controller Vault->>Controller Vault: controller must be enabled
     Controller Vault->>EVC: isAccountStatusCheckDeferred(violator)
     Controller Vault->>Controller Vault: account status check cannot be deferred
-    Controller Vault-->>Controller Vault: is the requested collateral recognized and trusted?
+    Controller Vault-->>Controller Vault: is the requested collateral accepted and trusted?
     Controller Vault->>Controller Vault: is the violator indeed in violation?
     Controller Vault-->>Controller Vault: vault snapshot
     Controller Vault->>Controller Vault: liquidation logic
