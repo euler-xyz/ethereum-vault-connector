@@ -67,10 +67,13 @@ library Set {
     /// @return A boolean value that indicates whether the element was inserted or not. If the element was already in
     /// the set storage, it returns false.
     function insert(SetStorage storage setStorage, address element) internal returns (bool) {
-        address firstElement = setStorage.firstElement;
-        uint256 numElements = setStorage.numElements;
+        (bool found, uint256 searchIndex, uint256 numElements) = traverse(setStorage, element);
 
-        if (numElements == 0) {
+        if (found) return false;
+        if (!found && numElements == MAX_ELEMENTS) revert TooManyElements();
+
+        // if the set is empty, insert the element as the first element
+        if (!found && numElements == 0) {
             // gas optimization:
             // on the first element insertion, set the stamp to non-zero value to keep the storage slot non-zero when
             // the element is removed. when a new element is inserted after the removal, it should be cheaper
@@ -80,19 +83,7 @@ library Set {
             return true;
         }
 
-        if (firstElement == element) return false;
-
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
-            if (setStorage.elements[i].value == element) return false;
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        if (numElements == MAX_ELEMENTS) revert TooManyElements();
-
-        setStorage.elements[numElements].value = element;
+        setStorage.elements[searchIndex].value = element;
 
         unchecked {
             setStorage.numElements = uint8(numElements + 1);
@@ -107,27 +98,12 @@ library Set {
     /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set
     /// storage, it returns false.
     function remove(SetStorage storage setStorage, address element) internal returns (bool) {
-        address firstElement = setStorage.firstElement;
-        uint256 numElements = setStorage.numElements;
+        (bool found, uint256 searchIndex, uint256 numElements) = traverse(setStorage, element);
 
-        if (numElements == 0) return false;
-
-        uint256 searchIndex;
-        if (firstElement != element) {
-            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements;) {
-                if (setStorage.elements[searchIndex].value == element) {
-                    break;
-                }
-                unchecked {
-                    ++searchIndex;
-                }
-            }
-
-            if (searchIndex == numElements) return false;
-        }
+        if (!found) return false;
 
         // write full slot at once to avoid SLOAD and bit masking
-        if (numElements == 1) {
+        if (found && searchIndex == 0 && numElements == 1) {
             setStorage.numElements = 0;
             setStorage.firstElement = address(0);
             setStorage.stamp = DUMMY_STAMP;
@@ -141,7 +117,9 @@ library Set {
 
         // set numElements for every execution path to avoid SSTORE and bit masking when the element removed is
         // firstElement
-        if (searchIndex != lastIndex) {
+        if (searchIndex == lastIndex) {
+            setStorage.numElements = uint8(lastIndex);
+        } else {
             if (searchIndex == 0) {
                 setStorage.firstElement = setStorage.elements[lastIndex].value;
                 setStorage.numElements = uint8(lastIndex);
@@ -149,8 +127,6 @@ library Set {
                 setStorage.elements[searchIndex].value = setStorage.elements[lastIndex].value;
                 setStorage.numElements = uint8(lastIndex);
             }
-        } else {
-            setStorage.numElements = uint8(lastIndex);
         }
 
         setStorage.elements[lastIndex].value = address(0);
@@ -205,21 +181,38 @@ library Set {
     /// @param element The address of the element to be checked.
     /// @return A boolean value that indicates whether the set storage includes the element or not.
     function contains(SetStorage storage setStorage, address element) internal view returns (bool) {
+        (bool found,,) = traverse(setStorage, element);
+        return found;
+    }
+
+    /// @notice Traverses the set storage and checks if it contains a given element.
+    /// @param setStorage The set storage to be traversed.
+    /// @param element The address of the element to be checked.
+    /// @return found A boolean value indicating whether the element is found.
+    /// @return searchIndex The index at which the element was found. If not found, returns the first empty index.
+    /// @return numElements The number of elements in the set.
+    function traverse(
+        SetStorage storage setStorage,
+        address element
+    ) internal view returns (bool found, uint256 searchIndex, uint256 numElements) {
         address firstElement = setStorage.firstElement;
-        uint256 numElements = setStorage.numElements;
+        numElements = setStorage.numElements;
 
-        if (numElements == 0) return false;
-        if (firstElement == element) return true;
+        if (numElements > 0) {
+            if (firstElement == element) {
+                return (true, searchIndex, numElements);
+            }
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
-            if (setStorage.elements[i].value == element) return true;
+            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements;) {
+                if (setStorage.elements[searchIndex].value == element) {
+                    return (true, searchIndex, numElements);
+                }
 
-            unchecked {
-                ++i;
+                unchecked {
+                    ++searchIndex;
+                }
             }
         }
-
-        return false;
     }
 
     /// @notice Iterates over each element in the set and applies the callback function to it.
