@@ -67,7 +67,7 @@ Account status checks are implemented by vaults to enforce account solvency. Vau
 
 ## What are Vault Status Checks?
 
-Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maximum amount of assets that can be supplied or borrowed, as a risk minimisation. Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state.
+Some vaults may have constraints that should be enforced globally. For example, supply and/or borrow caps that restrict the maximum amount of assets that can be supplied or borrowed, as a risk minimisation. Vaults may expose an external `checkVaultStatus` function in which application-specific logic should be evaluated to determine whether or not the vault is in an acceptable state.
 
 ## What are checks deferrals, and how do they work?
 
