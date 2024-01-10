@@ -116,7 +116,7 @@ It does not necessarily make sense to enforce these checks when checking account
 
 Secondly, some types of checks require an initial snapshot of the vault state before any operations have been performed. In the case of a borrow cap, it could be that the borrow cap has been exceeded for some reason (perhaps due to a price movement, or the borrow cap itself was reduced). The vault would still want to permit repaying debts, even if the repay was insufficient to bring the total borrows below the borrow cap.
 
-Vaults may expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
+If vaults have constraints that need to be enforced globally, they may expose an external `checkVaultStatus` function. In that function, the vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
 
 Although the vaults themselves implement `checkVaultStatus`, there is no need for them to invoke this function directly. It will be called by the EVC when necessary. Instead, after performing any operation that could affect the vault's status, a vault should invoke `requireVaultStatusCheck` on the EVC to schedule a future callback.
 
