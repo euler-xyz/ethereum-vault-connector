@@ -82,19 +82,12 @@ contract VaultEchidna is IVault {
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
-        try evc.requireAccountStatusCheckNow(account) {} catch {}
-        try evc.requireAllAccountsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
         try evc.forgiveAccountStatusCheck(account) {} catch {}
 
         hevm.prank(address(this));
         try evc.requireVaultStatusCheck() {} catch {}
-
-        hevm.prank(address(this));
-        try evc.requireVaultStatusCheckNow() {} catch {}
-
-        try evc.requireAllVaultsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
         try evc.forgiveVaultStatusCheck() {} catch {}
@@ -153,19 +146,12 @@ contract VaultEchidna is IVault {
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
-        try evc.requireAccountStatusCheckNow(account) {} catch {}
-        try evc.requireAllAccountsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
         try evc.forgiveAccountStatusCheck(account) {} catch {}
 
         hevm.prank(address(this));
         try evc.requireVaultStatusCheck() {} catch {}
-
-        hevm.prank(address(this));
-        try evc.requireVaultStatusCheckNow() {} catch {}
-
-        try evc.requireAllVaultsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
         try evc.forgiveVaultStatusCheck() {} catch {}
@@ -233,19 +219,12 @@ contract VaultEchidna is IVault {
         try evc.batch(items) {} catch {}
 
         try evc.requireAccountStatusCheck(account) {} catch {}
-        try evc.requireAccountStatusCheckNow(account) {} catch {}
-        try evc.requireAllAccountsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
         try evc.forgiveAccountStatusCheck(account) {} catch {}
 
         hevm.prank(address(this));
         try evc.requireVaultStatusCheck() {} catch {}
-
-        hevm.prank(address(this));
-        try evc.requireVaultStatusCheckNow() {} catch {}
-
-        try evc.requireAllVaultsStatusCheckNow() {} catch {}
 
         hevm.prank(address(this));
         try evc.forgiveVaultStatusCheck() {} catch {}
@@ -358,28 +337,12 @@ contract EchidnaTest {
         evc.requireAccountStatusCheck(account);
     }
 
-    function requireAccountStatusCheckNow(address account) public payable {
-        evc.requireAccountStatusCheckNow(account);
-    }
-
-    function requireAllAccountsStatusCheckNow() public payable {
-        evc.requireAllAccountsStatusCheckNow();
-    }
-
     function forgiveAccountStatusCheck(address account) public payable {
         evc.forgiveAccountStatusCheck(account);
     }
 
     function requireVaultStatusCheck() public payable {
         evc.requireVaultStatusCheck();
-    }
-
-    function requireVaultStatusCheckNow() public payable {
-        evc.requireVaultStatusCheckNow();
-    }
-
-    function requireAllVaultsStatusCheckNow() public payable {
-        evc.requireAllVaultsStatusCheckNow();
     }
 
     function forgiveVaultStatusCheck() public payable {

@@ -119,18 +119,6 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "account is never added to the set or it's removed if previously present" !accountStatusChecks.contains(account);
-    function requireAccountStatusCheckNow(address account) public payable virtual override {
-        super.requireAccountStatusCheckNow(account);
-    }
-
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "the set is empty after calling this" accountStatusChecks.numElements == 0;
-    function requireAllAccountsStatusCheckNow() public payable virtual override {
-        super.requireAllAccountsStatusCheckNow();
-    }
-
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is never present in the set after calling this" !accountStatusChecks.contains(account);
     function forgiveAccountStatusCheck(address account) public payable virtual override {
         super.forgiveAccountStatusCheck(account);
@@ -140,18 +128,6 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "vault is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> vaultStatusChecks.contains(msg.sender);
     function requireVaultStatusCheck() public payable virtual override {
         super.requireVaultStatusCheck();
-    }
-
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "vault is never added to the set or it's removed if previously present" !vaultStatusChecks.contains(msg.sender);
-    function requireVaultStatusCheckNow() public payable virtual override {
-        super.requireVaultStatusCheckNow();
-    }
-
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
-    /// #if_succeeds "the set is empty after calling this" vaultStatusChecks.numElements == 0;
-    function requireAllVaultsStatusCheckNow() public payable virtual override {
-        super.requireAllVaultsStatusCheckNow();
     }
 
     /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());

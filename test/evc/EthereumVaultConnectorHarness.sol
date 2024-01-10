@@ -114,33 +114,10 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         expectedAccountsChecked.push(account);
     }
 
-    function requireAccountStatusCheckNow(address account) public payable override {
-        super.requireAccountStatusCheckNow(account);
-        expectedAccountsChecked.push(account);
-    }
-
-    function requireAllAccountsStatusCheckNow() public payable override {
-        address[] memory accounts = accountStatusChecks.get();
-
-        super.requireAllAccountsStatusCheckNow();
-
-        for (uint256 i = 0; i < accounts.length; ++i) {
-            expectedAccountsChecked.push(accounts[i]);
-        }
-    }
-
     function requireVaultStatusCheck() public payable override {
         super.requireVaultStatusCheck();
 
         expectedVaultsChecked.push(msg.sender);
-    }
-
-    function requireVaultStatusCheckNow() public payable override {
-        if (vaultStatusChecks.contains(msg.sender)) {
-            expectedVaultsChecked.push(msg.sender);
-        }
-
-        super.requireVaultStatusCheckNow();
     }
 
     function requireAccountAndVaultStatusCheck(address account) public payable override {

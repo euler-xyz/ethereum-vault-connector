@@ -634,17 +634,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function requireAccountStatusCheckNow(address account) public payable virtual nonReentrantChecks {
-        accountStatusChecks.remove(account);
-        requireAccountStatusCheckInternal(account);
-    }
-
-    /// @inheritdoc IEVC
-    function requireAllAccountsStatusCheckNow() public payable virtual nonReentrantChecks {
-        checkStatusAll(SetType.Account);
-    }
-
-    /// @inheritdoc IEVC
     function forgiveAccountStatusCheck(address account)
         public
         payable
@@ -673,17 +662,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         } else {
             requireVaultStatusCheckInternal(msg.sender);
         }
-    }
-
-    /// @inheritdoc IEVC
-    function requireVaultStatusCheckNow() public payable virtual nonReentrantChecks {
-        vaultStatusChecks.remove(msg.sender);
-        requireVaultStatusCheckInternal(msg.sender);
-    }
-
-    /// @inheritdoc IEVC
-    function requireAllVaultsStatusCheckNow() public payable virtual nonReentrantChecks {
-        checkStatusAll(SetType.Vault);
     }
 
     /// @inheritdoc IEVC
