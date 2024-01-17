@@ -448,10 +448,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidNonce();
         }
 
-        unchecked {
-            nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
-        }
-
         if (deadline < block.timestamp) {
             revert EVC_InvalidTimestamp();
         }
@@ -467,6 +463,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
                 && !isValidERC1271Signature(signer, permitHash, signature)
         ) {
             revert EVC_NotAuthorized();
+        }
+
+        unchecked {
+            nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
         }
 
         emit NonceUsed(addressPrefix, nonceNamespace, nonce);
