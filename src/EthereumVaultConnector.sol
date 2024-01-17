@@ -786,7 +786,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function restoreExecutionContext(EC contextCache) internal virtual {
         if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
+            executionContext = contextCache.setChecksInProgress().setOnBehalfOfAccount(address(0));
 
             checkStatusAll(SetType.Account);
             checkStatusAll(SetType.Vault);

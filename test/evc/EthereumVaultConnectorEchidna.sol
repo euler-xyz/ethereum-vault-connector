@@ -186,13 +186,13 @@ contract EthereumVaultConnectorEchidna is EthereumVaultConnectorScribble {
     function restoreExecutionContext(EC contextCache) internal override {
         // copied function body with inserted assertion
         if (!contextCache.areChecksDeferred()) {
-            executionContext = contextCache.setChecksInProgress();
+            executionContext = contextCache.setChecksInProgress().setOnBehalfOfAccount(address(0));
 
             checkStatusAll(SetType.Account);
             checkStatusAll(SetType.Vault);
 
             // verify if cached context value can be reused
-            assert(isExecutionContextEqual(contextCache.setChecksInProgress()));
+            assert(isExecutionContextEqual(contextCache.setChecksInProgress().setOnBehalfOfAccount(address(0))));
         }
 
         executionContext = contextCache;

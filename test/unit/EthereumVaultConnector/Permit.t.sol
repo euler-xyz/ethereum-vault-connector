@@ -3,7 +3,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
-import "../../utils/mocks/Target.sol";
+import "../../utils/mocks/Vault.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
 import "openzeppelin/utils/cryptography/ECDSA.sol";
 import {ShortStrings, ShortString} from "openzeppelin/utils/ShortStrings.sol";
@@ -686,7 +686,7 @@ contract PermitTest is Test {
         );
         address alice = vm.addr(privateKey);
         address bob = address(new SignerERC1271(evc));
-        address target = address(new Target());
+        address target = address(new Vault(evc));
 
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, bob));
         vm.deal(address(this), type(uint128).max);
@@ -724,7 +724,7 @@ contract PermitTest is Test {
         evc.permit(bob, 0, 1, block.timestamp, 0, data, signature);
 
         // encode a call that needs authentication to prove it cannot be signed by anyone
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, bob, address(target));
 
         // a call using ECDSA signature fails because alice signed on behalf of bob
         signature = signerECDSA.signPermit(alice, 0, 2, block.timestamp, 0, data);
@@ -732,7 +732,7 @@ contract PermitTest is Test {
         evc.permit(alice, 0, 2, block.timestamp, 0, data, signature);
 
         // a call using ERC1271 signature fails because bob signed on behalf of alice
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, alice, address(target));
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 2, block.timestamp, 0, data);
@@ -740,7 +740,7 @@ contract PermitTest is Test {
         evc.permit(bob, 0, 2, block.timestamp, 0, data, signature);
 
         // encode a call that needs authentication wrapped in a batch
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, bob, address(target));
         items[0].targetContract = address(evc);
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
@@ -753,7 +753,7 @@ contract PermitTest is Test {
         evc.permit(alice, 0, 2, block.timestamp, 0, data, signature);
 
         // a call using ERC1271 signature fails because bob signed on behalf of alice
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, alice, address(target));
         items[0].targetContract = address(evc);
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
@@ -767,14 +767,14 @@ contract PermitTest is Test {
         evc.permit(bob, 0, 2, block.timestamp, 0, data, signature);
 
         // encode a call that needs authentication
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, alice, address(target));
 
         // a call using ECDSA signature succeeds because alice signed on behalf of herself
         signature = signerECDSA.signPermit(alice, 0, 2, block.timestamp, 0, data);
         evc.permit(alice, 0, 2, block.timestamp, 0, data, signature);
 
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, bob, address(target));
 
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
@@ -782,7 +782,7 @@ contract PermitTest is Test {
         evc.permit(bob, 0, 2, block.timestamp, 0, data, signature);
 
         // encode a call that needs authentication wrapped in a batch
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, alice, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, alice, address(target));
         items[0].targetContract = address(evc);
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
@@ -794,7 +794,7 @@ contract PermitTest is Test {
         evc.permit(alice, 0, 3, block.timestamp, 0, data, signature);
 
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
-        data = abi.encodeWithSelector(IEVC.enableCollateral.selector, bob, address(0));
+        data = abi.encodeWithSelector(IEVC.enableController.selector, bob, address(target));
         items[0].targetContract = address(evc);
         items[0].onBehalfOfAccount = address(0);
         items[0].value = 0;
