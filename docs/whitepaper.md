@@ -99,17 +99,6 @@ At the time of the account status check, an account can have at most one control
 
 Although having more than one controller is disallowed when the account status check is performed, multiple controllers can be transiently attached while these checks are deferred. As long as all or all but one controllers release themselves during the execution of the [checks-deferrable call](#checks-deferrable-call), the account status check will succeed.
 
-### Require Immediate
-
-Inside a checks-deferrable call, account status checks are deferred and only checked at the end. However, in some cases it is desirable to immediately check an account's status using `requireAccountStatusCheckNow`. If the specified account has a controller, this vault's `checkAccountStatus` is immediately invoked to determine if the account has a valid status.
-
-If valid, the account is removed from the account status deferral set (if present), so it will not be checked again at the end of the checks-deferrable call. However, any future operations in the same checks-deferrable call that require a (non-immediate) status check will re-add it to the set, and the status will be checked at the end of the call.
-
-Some use-cases are:
-
-* If a vault wants to prevent providing flash loans for whatever reason, it can require the account be healthy immediately following a borrow.
-* If a batch creator believes there is a possibility that an account will be unhealthy after an operation (perhaps because of changes to chain state between transaction creation and inclusion times), it may make sense to check this account's health immediately, before performing other operations. This will save gas by failing the transaction early.
-
 ### Forgiveness
 
 If a controller wants to waive the liquidity check for an account it is controlling, it can "forgive" an account. This removes it from the set of accounts that will be checked at the end of the call. Controllers can only forgive accounts that they are the sole controller of.
@@ -127,7 +116,7 @@ It does not necessarily make sense to enforce these checks when checking account
 
 Secondly, some types of checks require an initial snapshot of the vault state before any operations have been performed. In the case of a borrow cap, it could be that the borrow cap has been exceeded for some reason (perhaps due to a price movement, or the borrow cap itself was reduced). The vault would still want to permit repaying debts, even if the repay was insufficient to bring the total borrows below the borrow cap.
 
-Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
+If vaults have constraints that need to be enforced globally, they may expose an external `checkVaultStatus` function. In that function, the vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
 
 Although the vaults themselves implement `checkVaultStatus`, there is no need for them to invoke this function directly. It will be called by the EVC when necessary. Instead, after performing any operation that could affect the vault's status, a vault should invoke `requireVaultStatusCheck` on the EVC to schedule a future callback.
 

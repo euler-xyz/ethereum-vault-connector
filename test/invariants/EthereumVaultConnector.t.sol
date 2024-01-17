@@ -140,7 +140,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     }
 
     function disableController(address account) public payable override {
-        if (account == address(0) || account == msg.sender) return;
+        if (account == address(0) || account == msg.sender || address(this) == msg.sender) return;
         if (uint160(msg.sender) <= 10) return;
         setup(account, msg.sender);
         super.disableController(account);

@@ -350,20 +350,6 @@ interface IEVC {
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) external payable;
 
-    /// @notice Immediately checks the status of an account and reverts if it is not valid.
-    /// @dev Account status check is performed on the fly regardless of the current execution context state. If account
-    /// status check was previously deferred, it is removed from the set. If controller is not selected, the account is
-    /// always considered valid.
-    /// @param account The address of the account to be checked.
-    function requireAccountStatusCheckNow(address account) external payable;
-
-    /// @notice Immediately checks the status of all the accounts for which the checks were deferred and reverts if any
-    /// of them is not valid.
-    /// @dev Account status checks are performed on the fly regardless of the current execution context state. The
-    /// deferred accounts set is cleared. If controller is not selected for a given, the account is always considered
-    /// valid.
-    function requireAllAccountsStatusCheckNow() external payable;
-
     /// @notice Forgives previously deferred account status check.
     /// @dev Account address is removed from the set of addresses for which status checks are deferred. This function
     /// can only be called by the currently enabled controller of a given account. Depending on the vault
@@ -381,20 +367,6 @@ interface IEVC {
     /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the outermost
     /// checks-deferrable call. This function can only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
-
-    /// @notice Immediately checks the status of a vault. It reverts if status is not valid.
-    /// @dev Vault status check is performed on the fly regardless of the current execution context state. If vault
-    /// status check was previously deferred, it is removed from the set. This function can only be called by the vault
-    /// itself. If checking the vault status is a two-step process, i.e. the vault requires its prior state snapshot,
-    /// this function should be called after the snapshot is taken. When this function is called and the snapshot is not
-    /// available, the vault should handle this situation by reverting.
-    function requireVaultStatusCheckNow() external payable;
-
-    /// @notice Immediately checks the status of all vaults for which the checks were deferred and reverts if any of
-    /// them is not valid.
-    /// @dev Vault status checks are performed on the fly regardless of the current execution context state. The
-    /// deferred vaults set is cleared.
-    function requireAllVaultsStatusCheckNow() external payable;
 
     /// @notice Forgives previously deferred vault status check.
     /// @dev Vault address is removed from the set of addresses for which status checks are deferred. This function can
