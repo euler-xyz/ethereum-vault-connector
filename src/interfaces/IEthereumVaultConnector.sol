@@ -166,8 +166,7 @@ interface IEVC {
 
     /// @notice Returns an array of collaterals enabled for an account.
     /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
-    /// controller vault. The array returned is ordered by the order in which the collaterals were enabled (not
-    /// accounting for duplicates).
+    /// controller vault.
     /// @param account The address of the account whose collaterals are being queried.
     /// @return An array of addresses that are enabled collaterals for the account.
     function getCollaterals(address account) external view returns (address[] memory);
@@ -191,12 +190,14 @@ interface IEVC {
     /// @notice Disables a collateral for an account.
     /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. Disabling a collateral
-    /// might change the order of collaterals in storage. Account status checks are performed.
+    /// might change the order of collaterals in the array obtained using getCollaterals function. Account status checks
+    /// are performed.
     /// @param account The account address for which the collateral is being disabled.
     /// @param vault The address of a collateral being disabled.
     function disableCollateral(address account, address vault) external payable;
 
-    /// @notice Reorders the set of collaterals for a given account.
+    /// @notice Swaps the position of two collaterals so that they appear switched in the array of collaterals for a
+    /// given account obtained by calling getCollaterals function.
     /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. The order of collaterals
     /// can be changed by specifying the indices of the two collaterals to be swapped. Indices are zero-based and must
@@ -210,8 +211,7 @@ interface IEVC {
     /// @notice Returns an array of enabled controllers for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account's balances
     /// in the enabled collaterals vaults. A user can have multiple controllers during a call execution, but at most one
-    /// can be selected when the account status check is performed. The array returned is ordered by the order in which
-    /// the controllers were enabled (not accounting for duplicates).
+    /// can be selected when the account status check is performed.
     /// @param account The address of the account whose controllers are being queried.
     /// @return An array of addresses that are the enabled controllers for the account.
     function getControllers(address account) external view returns (address[] memory);
@@ -235,7 +235,8 @@ interface IEVC {
     /// @notice Disables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s
     /// balances in the enabled collaterals vaults. Only the vault itself can call this function. Disabling a controller
-    /// might change the order of controllers in storage. Account status checks are performed.
+    /// might change the order of controllers in the array obtained using getControllers function. Account status checks
+    /// are performed.
     /// @param account The address for which the calling controller is being disabled.
     function disableController(address account) external payable;
 

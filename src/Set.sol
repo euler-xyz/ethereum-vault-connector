@@ -40,7 +40,7 @@ library Set {
     error InvalidIndex();
 
     uint8 public constant MAX_ELEMENTS = 20; // must not exceed 255
-    uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be other than 1
+    uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be 1
     uint8 internal constant DUMMY_STAMP = 1;
 
     /// @notice Initializes the set by setting the stamp field of the SetStorage and the stamp field of elements to
@@ -102,6 +102,7 @@ library Set {
     }
 
     /// @notice Removes an element and returns information whether the element was removed or not.
+    /// @dev This operation may affect the order of elements in the array of elements obtained using get() function.
     /// @param setStorage The set storage from which the element will be removed.
     /// @param element The address of the element to be removed.
     /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set
@@ -158,6 +159,13 @@ library Set {
         return true;
     }
 
+    /// @notice Swaps the position of two elements so that they appear switched in the array of elements obtained using
+    /// get() function.
+    /// @dev The first index must not be greater than or equal to the second index. Indices must not be out of bounds.
+    /// The function will revert if the indices are invalid.
+    /// @param setStorage The set storage for which the elements will be swapped.
+    /// @param index1 The index of the first element to be swapped.
+    /// @param index2 The index of the second element to be swapped.
     function reorder(SetStorage storage setStorage, uint8 index1, uint8 index2) internal {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
@@ -175,10 +183,10 @@ library Set {
         }
     }
 
-    /// @notice Returns a copy of the set storage as a memory array.
-    /// @dev The order of the elements in the memory array is not preserved.
-    /// @param setStorage The set storage to be copied.
-    /// @return A memory array that contains the same elements as the set storage.
+    /// @notice Returns an array of elements contained in the storage.
+    /// @dev The order of the elements in the array may be affected by performing operations on the set.
+    /// @param setStorage The set storage to be processed.
+    /// @return An array that contains the same elements as the set storage.
     function get(SetStorage storage setStorage) internal view returns (address[] memory) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
