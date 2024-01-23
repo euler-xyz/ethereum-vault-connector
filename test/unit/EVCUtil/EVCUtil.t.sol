@@ -73,10 +73,15 @@ contract EVCUtilTest is Test {
             uint256 result = evcClient.calledThroughEVCUint(input);
             assertEq(result, input);
         }
-        
+
         {
             // call through EVC
-            bytes memory result = evc.call(address(evcClient), address(this), 0, abi.encodeWithSelector(evcClient.calledThroughEVCUint.selector, input));
+            bytes memory result = evc.call(
+                address(evcClient),
+                address(this),
+                0,
+                abi.encodeWithSelector(evcClient.calledThroughEVCUint.selector, input)
+            );
             assertEq(abi.decode(result, (uint256)), input);
         }
     }
@@ -91,11 +96,16 @@ contract EVCUtilTest is Test {
             assertEq(result, input);
             assertEq(address(evcClient).balance, balance + value);
         }
-        
+
         {
             // call through EVC
             uint256 balance = address(evcClient).balance;
-            bytes memory result = evc.call{value: value}(address(evcClient), address(this), value, abi.encodeWithSelector(evcClient.calledThroughEVCPayableUint.selector, input));
+            bytes memory result = evc.call{value: value}(
+                address(evcClient),
+                address(this),
+                value,
+                abi.encodeWithSelector(evcClient.calledThroughEVCPayableUint.selector, input)
+            );
             assertEq(abi.decode(result, (uint256)), input);
             assertEq(address(evcClient).balance, balance + value);
         }
@@ -107,10 +117,15 @@ contract EVCUtilTest is Test {
             bytes memory result = evcClient.calledThroughEVCBytes(input);
             assertEq(result, input);
         }
-        
+
         {
             // call through EVC
-            bytes memory result = evc.call(address(evcClient), address(this), 0, abi.encodeWithSelector(evcClient.calledThroughEVCBytes.selector, input));
+            bytes memory result = evc.call(
+                address(evcClient),
+                address(this),
+                0,
+                abi.encodeWithSelector(evcClient.calledThroughEVCBytes.selector, input)
+            );
             assertEq(abi.decode(result, (bytes)), input);
         }
     }
@@ -125,11 +140,16 @@ contract EVCUtilTest is Test {
             assertEq(result, input);
             assertEq(address(evcClient).balance, balance + value);
         }
-        
+
         {
             // call through EVC
             uint256 balance = address(evcClient).balance;
-            bytes memory result = evc.call{value: value}(address(evcClient), address(this), value, abi.encodeWithSelector(evcClient.calledThroughEVCPayableBytes.selector, input));
+            bytes memory result = evc.call{value: value}(
+                address(evcClient),
+                address(this),
+                value,
+                abi.encodeWithSelector(evcClient.calledThroughEVCPayableBytes.selector, input)
+            );
             assertEq(abi.decode(result, (bytes)), input);
             assertEq(address(evcClient).balance, balance + value);
         }
@@ -165,7 +185,8 @@ contract EVCUtilTest is Test {
 
         // msg.sender is EVC
         vm.prank(caller);
-        bytes memory result = evc.call(address(evcClient), caller, 0, abi.encodeWithSelector(evcClient.msgSender.selector));
+        bytes memory result =
+            evc.call(address(evcClient), caller, 0, abi.encodeWithSelector(evcClient.msgSender.selector));
         assertEq(abi.decode(result, (address)), caller);
     }
 
@@ -181,7 +202,7 @@ contract EVCUtilTest is Test {
         vm.prank(caller);
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.ControllerDisabled.selector));
         evc.call(address(evcClient), caller, 0, abi.encodeWithSelector(evcClient.msgSenderForBorrow.selector));
-        
+
         // enable controller
         vm.prank(caller);
         evc.enableController(caller, address(evcClient));
@@ -192,7 +213,8 @@ contract EVCUtilTest is Test {
 
         // msg.sender is EVC and controller enabled
         vm.prank(caller);
-        bytes memory result = evc.call(address(evcClient), caller, 0, abi.encodeWithSelector(evcClient.msgSenderForBorrow.selector));
+        bytes memory result =
+            evc.call(address(evcClient), caller, 0, abi.encodeWithSelector(evcClient.msgSenderForBorrow.selector));
         assertEq(abi.decode(result, (address)), caller);
     }
 
