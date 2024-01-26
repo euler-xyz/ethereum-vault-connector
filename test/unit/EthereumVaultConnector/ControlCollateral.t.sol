@@ -29,7 +29,11 @@ contract ControlCollateralTest is Test {
     EthereumVaultConnectorHandler internal evc;
 
     event CallWithContext(
-        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
+        address indexed caller,
+        uint152 indexed onBehalfOfAddressPrefix,
+        address onBehalfOfAccount,
+        address indexed targetContract,
+        bytes4 selector
     );
 
     function setUp() public {
@@ -56,7 +60,9 @@ contract ControlCollateralTest is Test {
 
         vm.deal(controller, seed);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(controller, collateral, alice, Target.controlCollateralTest.selector);
+        emit CallWithContext(
+            controller, evc.getAddressPrefix(alice), alice, collateral, Target.controlCollateralTest.selector
+        );
         vm.prank(controller);
         bytes memory result = evc.handlerControlCollateral{value: seed}(collateral, alice, seed, data);
         assertEq(abi.decode(result, (uint256)), seed);

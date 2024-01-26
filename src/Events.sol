@@ -12,6 +12,10 @@ contract Events {
     event CollateralStatus(address indexed account, address indexed collateral, bool enabled);
     event ControllerStatus(address indexed account, address indexed controller, bool enabled);
     event CallWithContext(
-        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
+        address indexed caller,
+        uint152 indexed onBehalfOfAddressPrefix,
+        address onBehalfOfAccount,
+        address indexed targetContract,
+        bytes4 selector
     );
 }

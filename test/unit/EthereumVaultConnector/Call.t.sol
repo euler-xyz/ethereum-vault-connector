@@ -35,7 +35,11 @@ contract CallTest is Test {
     EthereumVaultConnectorHandler internal evc;
 
     event CallWithContext(
-        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
+        address indexed caller,
+        uint152 indexed onBehalfOfAddressPrefix,
+        address onBehalfOfAccount,
+        address indexed targetContract,
+        bytes4 selector
     );
 
     function setUp() public {
@@ -82,7 +86,9 @@ contract CallTest is Test {
 
             vm.deal(targetContract, seed);
             vm.expectEmit(true, true, true, true, address(evc));
-            emit CallWithContext(targetContract, targetContract, account, Target.callbackTest.selector);
+            emit CallWithContext(
+                targetContract, evc.getAddressPrefix(account), account, targetContract, Target.callbackTest.selector
+            );
 
             if (seed % 2 == 0) {
                 assertEq(evc.isAccountOperatorAuthorized(account, targetContract), false);
@@ -97,7 +103,9 @@ contract CallTest is Test {
 
             vm.deal(alice, seed);
             vm.expectEmit(true, true, true, true, address(evc));
-            emit CallWithContext(alice, targetContract, account, Target.callTest.selector);
+            emit CallWithContext(
+                alice, evc.getAddressPrefix(account), account, targetContract, Target.callTest.selector
+            );
 
             // tests call functionality
             vm.prank(alice);
@@ -122,9 +130,21 @@ contract CallTest is Test {
 
         vm.deal(alice, seed);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(alice, nestedTargetContract, account, TargetWithNesting.nestedCallTest.selector);
+        emit CallWithContext(
+            alice,
+            evc.getAddressPrefix(account),
+            account,
+            nestedTargetContract,
+            TargetWithNesting.nestedCallTest.selector
+        );
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(nestedTargetContract, targetContract, nestedTargetContract, Target.callTest.selector);
+        emit CallWithContext(
+            nestedTargetContract,
+            evc.getAddressPrefix(nestedTargetContract),
+            nestedTargetContract,
+            targetContract,
+            Target.callTest.selector
+        );
         vm.prank(alice);
         result = evc.handlerCall{value: seed}(nestedTargetContract, account, seed, data);
         assertEq(abi.decode(result, (uint256)), seed);
@@ -153,7 +173,7 @@ contract CallTest is Test {
 
         vm.deal(msgSender, seed);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(msgSender, targetContract, alice, bytes4(data));
+        emit CallWithContext(msgSender, evc.getAddressPrefix(alice), alice, targetContract, bytes4(data));
 
         vm.prank(msgSender);
         bytes memory result = evc.call{value: seed}(targetContract, alice, seed, data);

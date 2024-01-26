@@ -748,7 +748,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             executionContext = contextCache.setOnBehalfOfAccount(onBehalfOfAccount).setOperatorAuthenticated();
         }
 
-        emit CallWithContext(msgSender, targetContract, onBehalfOfAccount, bytes4(data));
+        emit CallWithContext(
+            msgSender, getAddressPrefixInternal(onBehalfOfAccount), onBehalfOfAccount, targetContract, bytes4(data)
+        );
 
         (success, result) = targetContract.call{value: value}(data);
 
