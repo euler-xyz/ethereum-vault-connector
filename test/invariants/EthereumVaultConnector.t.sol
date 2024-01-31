@@ -63,22 +63,22 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         vm.etch(vault, vaultMock.code);
     }
 
-    function setNonce(uint152 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
+    function setNonce(bytes19 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
         if (msg.sender == address(this)) return;
         if (nonceLookup[addressPrefix][nonceNamespace] == type(uint256).max) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
-        setAccountOwnerInternal(address(uint160(addressPrefix) << 8), msg.sender);
+        setAccountOwnerInternal(address(uint160(uint152(addressPrefix)) << 8), msg.sender);
         nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
         super.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
-    function setOperator(uint152 addressPrefix, address operator, uint256 operatorBitField) public payable override {
+    function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) public payable override {
         if (msg.sender == address(this)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         if (operatorLookup[addressPrefix][operator] == operatorBitField) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
-        setAccountOwnerInternal(address(uint160(addressPrefix) << 8), msg.sender);
+        setAccountOwnerInternal(address(uint160(uint152(addressPrefix)) << 8), msg.sender);
         super.setOperator(addressPrefix, operator, operatorBitField);
     }
 

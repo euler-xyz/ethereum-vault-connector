@@ -36,7 +36,7 @@ contract CallTest is Test {
 
     event CallWithContext(
         address indexed caller,
-        uint152 indexed onBehalfOfAddressPrefix,
+        bytes19 indexed onBehalfOfAddressPrefix,
         address onBehalfOfAccount,
         address indexed targetContract,
         bytes4 selector

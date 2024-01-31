@@ -94,8 +94,8 @@ interface IEVC {
     /// @notice Returns the address prefix of the specified account.
     /// @dev The address prefix is the first 19 bytes of the account address.
     /// @param account The address of the account whose address prefix is being retrieved.
-    /// @return A uint152 value that represents the address prefix of the account.
-    function getAddressPrefix(address account) external pure returns (uint152);
+    /// @return A bytes19 value that represents the address prefix of the account.
+    function getAddressPrefix(address account) external pure returns (bytes19);
 
     /// @notice Returns the owner for the specified account.
     /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial
@@ -112,7 +112,7 @@ interface IEVC {
     /// @param addressPrefix The address prefix for which the nonce is being retrieved.
     /// @param nonceNamespace The nonce namespace for which the nonce is being retrieved.
     /// @return nonce The current nonce for the given address prefix and nonce namespace.
-    function getNonce(uint152 addressPrefix, uint256 nonceNamespace) external view returns (uint256 nonce);
+    function getNonce(bytes19 addressPrefix, uint256 nonceNamespace) external view returns (uint256 nonce);
 
     /// @notice Returns the bit field for a given address prefix and operator.
     /// @dev The bit field is used to store information about authorized operators for a given address prefix. Each bit
@@ -124,7 +124,7 @@ interface IEVC {
     /// accounts the operator is authorized for. It is 256-position binary array like 0...010...0, marking the account
     /// positionally in a uint256. The position in the bit field corresponds to the account ID (0-255), where 0 is the
     /// owner account's ID.
-    function getOperator(uint152 addressPrefix, address operator) external view returns (uint256 operatorBitField);
+    function getOperator(bytes19 addressPrefix, address operator) external view returns (uint256 operatorBitField);
 
     /// @notice Returns information whether given operator has been authorized for the account.
     /// @param account The address of the account whose operator is being checked.
@@ -141,7 +141,7 @@ interface IEVC {
     /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
     /// @param nonce The new nonce for the given address prefix and nonce namespace.
-    function setNonce(uint152 addressPrefix, uint256 nonceNamespace, uint256 nonce) external payable;
+    function setNonce(bytes19 addressPrefix, uint256 nonceNamespace, uint256 nonce) external payable;
 
     /// @notice Sets the bit field for a given address prefix and operator.
     /// @dev This function can only be called by the owner of the address prefix. Each bit in the bit field corresponds
@@ -151,7 +151,7 @@ interface IEVC {
     /// nor EVC, nor an address belonging to the same address prefix.
     /// @param operatorBitField The new bit field for the given address prefix and operator. Reverts if provided value
     /// is equal to the currently stored.
-    function setOperator(uint152 addressPrefix, address operator, uint256 operatorBitField) external payable;
+    function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) external payable;
 
     /// @notice Authorizes or deauthorizes an operator for the account.
     /// @dev Only the owner or authorized operator of the account can call this function. An operator is an address that
