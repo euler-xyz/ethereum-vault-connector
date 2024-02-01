@@ -186,9 +186,13 @@ contract PermitTest is Test {
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
+    event NonceUsed(bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
     event CallWithContext(
-        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
+        address indexed caller,
+        bytes19 indexed onBehalfOfAddressPrefix,
+        address onBehalfOfAccount,
+        address indexed targetContract,
+        bytes4 selector
     );
 
     function setUp() public {
@@ -209,7 +213,7 @@ contract PermitTest is Test {
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
 
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
@@ -233,7 +237,7 @@ contract PermitTest is Test {
         vm.expectEmit(true, true, false, true, address(evc));
         emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(address(this), address(evc), alice, bytes4(data));
+        emit CallWithContext(address(this), evc.getAddressPrefix(alice), alice, address(evc), bytes4(data));
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);
         assertTrue(evc.fallbackCalled());
 
@@ -251,7 +255,7 @@ contract PermitTest is Test {
         uint16 value
     ) public {
         address alice = address(new SignerERC1271(evc));
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
 
         vm.assume(!evc.haveCommonOwner(alice, address(0)));
@@ -275,7 +279,7 @@ contract PermitTest is Test {
         vm.expectEmit(true, true, false, true, address(evc));
         emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(address(this), address(evc), alice, bytes4(data));
+        emit CallWithContext(address(this), evc.getAddressPrefix(alice), alice, address(evc), bytes4(data));
         evc.permit{value: address(this).balance}(alice, nonceNamespace, nonce, deadline, value, data, signature);
         assertTrue(evc.fallbackCalled());
 
@@ -298,7 +302,7 @@ contract PermitTest is Test {
         );
         address alice = vm.addr(privateKey);
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data2 = abi.encode(keccak256(data2));
         vm.assume(nonce > 0 && nonce < type(uint256).max - 1);
 
@@ -331,7 +335,7 @@ contract PermitTest is Test {
         bytes calldata signature
     ) public {
         alice = address(uint160(bound(uint160(alice), 0, 0xFF)));
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.warp(deadline);
@@ -355,7 +359,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
         vm.assume(nonce < type(uint256).max);
@@ -387,7 +391,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
@@ -417,7 +421,7 @@ contract PermitTest is Test {
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
@@ -450,7 +454,7 @@ contract PermitTest is Test {
         uint256 value,
         bytes calldata signature
     ) public {
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.warp(deadline);
@@ -479,7 +483,7 @@ contract PermitTest is Test {
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         signerECDSA.setPrivateKey(privateKey);
 
@@ -523,7 +527,7 @@ contract PermitTest is Test {
         vm.assume(!evc.haveCommonOwner(signer, address(0)) && signer != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
-        uint152 addressPrefix = evc.getAddressPrefix(signer);
+        bytes19 addressPrefix = evc.getAddressPrefix(signer);
         data = abi.encode(keccak256(data));
 
         vm.warp(deadline);
@@ -874,9 +878,9 @@ contract PermitTest is Test {
         // a call using ECDSA signature succeeds because alice signed on behalf of herself
         signature = signerECDSA.signPermit(alice, 0, 4, block.timestamp, type(uint256).max, data);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(address(this), address(evc), alice, bytes4(data));
+        emit CallWithContext(address(this), evc.getAddressPrefix(alice), alice, address(evc), bytes4(data));
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(alice, target, alice, Target.callTest.selector);
+        emit CallWithContext(alice, evc.getAddressPrefix(alice), alice, target, Target.callTest.selector);
         evc.permit{value: 123}(alice, 0, 4, block.timestamp, type(uint256).max, data, signature);
 
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
@@ -891,9 +895,9 @@ contract PermitTest is Test {
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 4, block.timestamp, type(uint256).max, data);
-        emit CallWithContext(address(this), address(evc), bob, bytes4(data));
+        emit CallWithContext(address(this), evc.getAddressPrefix(bob), bob, address(evc), bytes4(data));
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(bob, target, bob, Target.callTest.selector);
+        emit CallWithContext(bob, evc.getAddressPrefix(bob), bob, target, Target.callTest.selector);
         evc.permit{value: 123}(bob, 0, 4, block.timestamp, type(uint256).max, data, signature);
 
         // encode a call to an external target contract wrapped in a batch
@@ -907,9 +911,9 @@ contract PermitTest is Test {
         // a call using ECDSA signature succeeds because alice signed on behalf of herself
         signature = signerECDSA.signPermit(alice, 0, 5, block.timestamp, 456, data);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(address(this), address(evc), alice, bytes4(data));
+        emit CallWithContext(address(this), evc.getAddressPrefix(alice), alice, address(evc), bytes4(data));
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(alice, target, alice, Target.callTest.selector);
+        emit CallWithContext(alice, evc.getAddressPrefix(alice), alice, target, Target.callTest.selector);
         evc.permit{value: 456}(alice, 0, 5, block.timestamp, 456, data, signature);
 
         // a call using ERC1271 signature succeeds because bob signed on behalf of himself
@@ -923,9 +927,9 @@ contract PermitTest is Test {
         signature = bytes("bob's signature");
         SignerERC1271(bob).setSignatureHash(signature);
         SignerERC1271(bob).setPermitHash(bob, 0, 5, block.timestamp, 456, data);
-        emit CallWithContext(address(this), address(evc), bob, bytes4(data));
+        emit CallWithContext(address(this), evc.getAddressPrefix(bob), bob, address(evc), bytes4(data));
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(bob, target, bob, Target.callTest.selector);
+        emit CallWithContext(bob, evc.getAddressPrefix(bob), bob, target, Target.callTest.selector);
         evc.permit{value: 456}(bob, 0, 5, block.timestamp, 456, data, signature);
     }
 
@@ -936,8 +940,8 @@ contract PermitTest is Test {
         );
         address alice = vm.addr(privateKey);
         address bob = address(new SignerERC1271(evc));
-        uint152 addressPrefixAlice = evc.getAddressPrefix(alice);
-        uint152 addressPrefixBob = evc.getAddressPrefix(bob);
+        bytes19 addressPrefixAlice = evc.getAddressPrefix(alice);
+        bytes19 addressPrefixBob = evc.getAddressPrefix(bob);
         address operator = vm.addr(privateKey + 1);
         address otherOperator = vm.addr(privateKey + 2);
 

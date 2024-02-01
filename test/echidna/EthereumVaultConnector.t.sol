@@ -39,7 +39,7 @@ contract VaultEchidna is IVault {
     function checkAccountStatus(address account, address[] calldata) public returns (bytes4) {
         // try to reenter the EVC
 
-        uint152 prefix = uint152(uint160(account) >> 8);
+        bytes19 prefix = bytes19(uint152(uint160(account) >> 8));
         uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}
@@ -102,7 +102,7 @@ contract VaultEchidna is IVault {
         // try to reenter the EVC
         address account = address(1);
 
-        uint152 prefix = uint152(uint160(account) >> 8);
+        bytes19 prefix = bytes19(uint152(uint160(account) >> 8));
         uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}
@@ -168,7 +168,7 @@ contract VaultEchidna is IVault {
         // try to reenter the EVC
         address account = address(2);
 
-        uint152 prefix = uint152(uint160(account) >> 8);
+        bytes19 prefix = bytes19(uint152(uint160(account) >> 8));
         uint256 nextNonce = evc.getNonce(prefix, 0);
         hevm.prank(account);
         try evc.setNonce(prefix, 0, nextNonce) {} catch {}

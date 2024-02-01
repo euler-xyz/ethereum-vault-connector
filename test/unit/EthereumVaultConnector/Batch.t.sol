@@ -37,7 +37,11 @@ contract BatchTest is Test {
     }
 
     event CallWithContext(
-        address indexed caller, address indexed targetContract, address indexed onBehalfOfAccount, bytes4 selector
+        address indexed caller,
+        bytes19 indexed onBehalfOfAddressPrefix,
+        address onBehalfOfAccount,
+        address indexed targetContract,
+        bytes4 selector
     );
 
     function setUp() public {
@@ -95,11 +99,13 @@ contract BatchTest is Test {
 
         vm.deal(alice, seed);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(alice, otherVault, alicesSubAccount, Vault.requireChecks.selector);
+        emit CallWithContext(
+            alice, evc.getAddressPrefix(alicesSubAccount), alicesSubAccount, otherVault, Vault.requireChecks.selector
+        );
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(alice, controller, alice, Vault.call.selector);
+        emit CallWithContext(alice, evc.getAddressPrefix(alice), alice, controller, Vault.call.selector);
         vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(alice, otherVault, alice, Target.callTest.selector);
+        emit CallWithContext(alice, evc.getAddressPrefix(alice), alice, otherVault, Target.callTest.selector);
         vm.prank(alice);
         evc.handlerBatch{value: seed}(items);
 
@@ -147,15 +153,15 @@ contract BatchTest is Test {
         items[3].value = 0;
         items[3].data = abi.encodeWithSelector(Target.callTest.selector, address(evc), address(evc), 0, alice, true);
 
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(bob, evc.getAddressPrefix(alice), alice, controller, Vault.disableController.selector);
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(bob, evc.getAddressPrefix(bob), bob, controller, Vault.requireChecks.selector);
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(bob, evc.getAddressPrefix(bob), bob, otherVault, Vault.requireChecks.selector);
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(bob, evc.getAddressPrefix(alice), alice, otherVault, Target.callTest.selector);
         vm.prank(bob);
-        vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(bob, controller, alice, Vault.disableController.selector);
-        vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(bob, controller, bob, Vault.requireChecks.selector);
-        vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(bob, otherVault, bob, Vault.requireChecks.selector);
-        vm.expectEmit(true, true, true, true, address(evc));
-        emit CallWithContext(bob, otherVault, alice, Target.callTest.selector);
         evc.handlerBatch(items);
         assertFalse(evc.isControllerEnabled(alice, controller));
 
