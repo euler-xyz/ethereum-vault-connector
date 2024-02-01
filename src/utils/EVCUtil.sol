@@ -20,6 +20,8 @@ abstract contract EVCUtil {
 
     /// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
     /// @dev Optional to use for functions requiring account and vault status checks to enforce predictable bahvior.
+    /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
+    /// modifier of the function.
     modifier callThroughEVC() {
         if (msg.sender == address(evc)) {
             _;
@@ -34,6 +36,8 @@ abstract contract EVCUtil {
 
     /// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
     /// @dev Optional to use for functions requiring account and vault status checks to enforce predictable bahvior.
+    /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
+    /// modifier of the function.
     /// @dev This modifier is used for payable functions because it forwards the value to the EVC.
     modifier callThroughEVCPayable() {
         if (msg.sender == address(evc)) {
