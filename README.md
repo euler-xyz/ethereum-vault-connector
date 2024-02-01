@@ -14,6 +14,8 @@ For more information, visit the EVC [website](https://evc.wtf/) or refer to the 
 │   ├── IERC1271.sol
 │   ├── IEthereumVaultConnector.sol
 │   └── IVault.sol
+├── utils
+│   └── EVCUtil.sol
 ├── Errors.sol
 ├── EthereumVaultConnector.sol
 ├── Events.sol
