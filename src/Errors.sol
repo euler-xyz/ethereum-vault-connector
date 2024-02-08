@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "./interfaces/IEthereumVaultConnector.sol";
 
@@ -18,13 +18,13 @@ contract Errors {
     error EVC_InvalidValue();
     error EVC_InvalidData();
     error EVC_ChecksReentrancy();
-    error EVC_ImpersonateReentrancy();
+    error EVC_ControlCollateralReentrancy();
     error EVC_ControllerViolation();
     error EVC_SimulationBatchNested();
     error EVC_RevertedBatchResult(
         IEVC.BatchItemResult[] batchItemsResult,
-        IEVC.BatchItemResult[] accountsStatusResult,
-        IEVC.BatchItemResult[] vaultsStatusResult
+        IEVC.StatusCheckResult[] accountsStatusResult,
+        IEVC.StatusCheckResult[] vaultsStatusResult
     );
     error EVC_BatchPanic();
     error EVC_EmptyError();

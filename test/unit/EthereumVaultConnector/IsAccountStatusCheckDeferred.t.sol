@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -16,8 +16,7 @@ contract IsAccountStatusCheckDeferredTest is Test {
         vm.assume(numberOfAccounts <= Set.MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; ++i) {
-            // we're not in a batch thus the check will not get deferred
-            evc.setCallDepth(0);
+            evc.setChecksDeferred(false);
 
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             assertFalse(evc.isAccountStatusCheckDeferred(account));
@@ -25,13 +24,21 @@ contract IsAccountStatusCheckDeferredTest is Test {
             evc.requireAccountStatusCheck(account);
             assertFalse(evc.isAccountStatusCheckDeferred(account));
 
-            // simulate being in a batch
-            evc.setCallDepth(1);
+            evc.setChecksDeferred(true);
 
             evc.requireAccountStatusCheck(account);
             assertTrue(evc.isAccountStatusCheckDeferred(account));
 
             evc.reset();
         }
+    }
+
+    function test_RevertIfChecksInProgress_IsAccountStatusCheckDeferred(address account) external {
+        evc.setChecksInProgress(false);
+        assertFalse(evc.isAccountStatusCheckDeferred(account));
+
+        evc.setChecksInProgress(true);
+        vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
+        evc.isAccountStatusCheckDeferred(account);
     }
 }

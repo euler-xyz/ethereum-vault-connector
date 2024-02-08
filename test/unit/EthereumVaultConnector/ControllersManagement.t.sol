@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -134,52 +134,52 @@ contract ControllersManagementTest is Test {
 
         address vault = address(new Vault(evc));
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
         evc.enableController(alice, vault);
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
 
         vm.prank(alice);
         evc.enableController(alice, vault);
 
-        evc.setChecksLock(true);
+        evc.setChecksInProgress(true);
 
         vm.prank(vault);
         vm.expectRevert(Errors.EVC_ChecksReentrancy.selector);
         evc.disableController(alice);
 
-        evc.setChecksLock(false);
+        evc.setChecksInProgress(false);
 
         vm.prank(vault);
         evc.disableController(alice);
     }
 
-    function test_RevertIfImpersonateReentrancy_ControllersManagement(address alice) public {
+    function test_RevertIfControlCollateralReentrancy_ControllersManagement(address alice) public {
         vm.assume(alice != address(evc));
 
         address vault = address(new Vault(evc));
 
-        evc.setImpersonateLock(true);
+        evc.setControlCollateralInProgress(true);
 
         vm.prank(alice);
-        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(Errors.EVC_ControlCollateralReentrancy.selector);
         evc.enableController(alice, vault);
 
-        evc.setImpersonateLock(false);
+        evc.setControlCollateralInProgress(false);
 
         vm.prank(alice);
         evc.enableController(alice, vault);
 
-        evc.setImpersonateLock(true);
+        evc.setControlCollateralInProgress(true);
 
         vm.prank(vault);
-        vm.expectRevert(Errors.EVC_ImpersonateReentrancy.selector);
+        vm.expectRevert(Errors.EVC_ControlCollateralReentrancy.selector);
         evc.disableController(alice);
 
-        evc.setImpersonateLock(false);
+        evc.setControlCollateralInProgress(false);
 
         vm.prank(vault);
         evc.disableController(alice);

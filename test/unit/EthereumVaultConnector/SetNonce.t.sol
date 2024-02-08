@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -8,22 +8,21 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 contract SetNonceTest is Test {
     EthereumVaultConnectorHarness internal evc;
 
-    event NonceUsed(uint152 indexed addressPrefix, uint256 nonce);
+    event NonceUsed(bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
 
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
     }
 
-    function test_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce, uint8 iterations) public {
+    function test_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(iterations > 0 && iterations < 5);
-        vm.assume(nonce > 0 && nonce <= type(uint256).max - 256 * iterations);
+        vm.assume(nonce > 0);
 
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), 0);
 
-        vm.expectEmit(true, false, false, true, address(evc));
-        emit NonceUsed(addressPrefix, ++nonce);
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce - 1);
         vm.prank(alice);
         evc.setNonce(addressPrefix, nonceNamespace, nonce);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), nonce);
@@ -35,17 +34,17 @@ contract SetNonceTest is Test {
         uint256 nonceNamespace,
         uint256 nonce
     ) public {
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(addressPrefix != type(uint152).max);
-        vm.assume(operator != address(0));
+        vm.assume(addressPrefix != bytes19(type(uint152).max));
+        vm.assume(operator != address(0) && operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
-        vm.assume(nonce > 0 && nonce < type(uint256).max);
+        vm.assume(nonce > 0);
 
         // fails if address prefix does not belong to an owner
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
-        evc.setNonce(addressPrefix + 1, nonceNamespace, nonce);
+        evc.setNonce(bytes19(uint152(addressPrefix) + 1), nonceNamespace, nonce);
 
         // succeeds if address prefix belongs to an owner
         vm.prank(alice);
@@ -69,7 +68,7 @@ contract SetNonceTest is Test {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(nonce > 0);
 
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
 
         // fails if invalid nonce
         vm.prank(alice);

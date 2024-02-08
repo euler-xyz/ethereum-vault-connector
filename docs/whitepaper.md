@@ -17,9 +17,8 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 * [Execution](#execution)
     * [Checks-deferrable Call](#checks-deferrable-call)
     * [call](#call)
-    * [impersonate](#impersonate)
-    * [callback](#callback)
     * [batch](#batch)
+    * [controlCollateral](#controlcollateral)
     * [permit](#permit)
         * [Nonce Namespaces](#nonce-namespaces)
     * [Authorisation](#authorisation)
@@ -28,7 +27,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [Execution Contexts](#execution-contexts)
         * [Nested Execution Contexts](#nested-execution-contexts)
         * [checksInProgress](#checksinprogress)
-        * [impersonationInProgress](#impersonationinprogress)
+        * [controlCollateralInProgress](#controlcollateralinprogress)
         * [Extra Information](#extra-information)
     * [Simulations](#simulations)
 * [Transient Storage](#transient-storage)
@@ -41,14 +40,14 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 
 ## Introduction
 
-The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the ERC-4626 interface and contain additional logic for interfacing with other vaults. The EVC not only provides a common base ecosystem but also reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors.
+The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the [ERC-4626](https://ethereum.org/en/developers/docs/standards/tokens/erc-4626/) interface and contain additional logic for interfacing with other vaults. The EVC not only provides a common base ecosystem but also reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors.
 
 To illustrate the process of vault mediation, let's consider a straightforward example. When a user wishes to borrow, they must link their accounts and collateral vaults to the borrowed-from vault via the EVC. The liability vault, also known as the "controller", is then consulted whenever a user wants to perform an action potentially impacting account's solvency, such as withdrawing collateral. The EVC is responsible for calling the controller which determines whether the action is allowed or if it should be blocked to prevent account insolvency.
 
 In addition to vault mediation, the EVC contains the functionality required to build flexible products, both for EOAs and smart contracts. Here are some of the benefits of building on the EVC:
 
-* Unified liquidity and interoperability: Participating protocols can recognize deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
-* Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, uncollateralised IOUs, or synthetics.
+* Network effect thanks to unified liquidity and interoperability: Participating protocols can accept deposits in other vaults as collateral suitable for their vaults, providing convenience for users who no longer need to move their collateral assets from one protocol to another.
+* Flexibility in asset properties: The EVC does not enforce specific properties about the assets used as collateral or liabilities, allowing users to create vaults backed by irregular asset classes, such as NFTs, Real World Assets (RWAs), uncollateralised IOUs, or synthetics.
 * Standardized approach to account liquidity checks and vault global constraints enforcement: The EVC allows for deferral of the liquidity checks and vault status checks, preventing transient violations from causing a failure. The EVC exposes an interface which abstracts management of the checks away from the vault.
 * Batching: Multiple operations affecting multiple vaults and external smart contracts can be performed within a single batch operation. This is more convenient for UI users, more gas efficient, and allows deferring liquidity checks until the end of the batch.
 * Sub-accounts: A feature that allows users to create multiple isolated positions within their single owner account, and easily rebalance collateral/liabilities between them without the need for approvals and without requiring any special logic to be implemented by the vaults.
@@ -66,21 +65,25 @@ The primary task of the EVC is to maintain a user's voluntary associations with 
 
 After simply depositing and enabling collaterals, users are not obligated or bound in any way by the EVC, and could freely withdraw funds from the vaults and/or call `disableCollateral` to remove the vaults from the account's collateral set.
 
-However, suppose a user wants to take out a borrow from a separate vault. In this case, the user must call `enableController` to add this vault to the account's controller set. This is a significant action because the user is now entirely submitting the account to the rules encoded in the controller vault's code. All the funds in all the collateral vaults are now indirectly under control of the controller vault. In particular, if a user attempts to withdraw collateral or `disableCollateral` to remove a vault from the collateral set, the controller could cause the transaction to fail. Moreover, the controller can allow the collateral to be seized in order to repay the debt, using [impersonate](#impersonate).
+However, suppose a user wants to take out a borrow from a separate vault. In this case, the user must call `enableController` to add this vault to the account's controller set. This is a significant action because the user is now entirely submitting the account to the rules encoded in the controller vault's code. All the funds in all the collateral vaults are now indirectly under control of the controller vault. In particular, if a user attempts to withdraw collateral or `disableCollateral` to remove a vault from the collateral set, the controller could cause the transaction to fail. Moreover, the controller can allow the collateral to be seized in order to repay the debt, using [`controlCollateral`](#controlcollateral).
 
 * When requested to perform an action such as borrow, a liability vault must call into the EVC's `isControllerEnabled` function to ensure that the account has in fact enabled the vault as a controller.
 * Only the controller itself can call `disableController` on the EVC. This should typically happen upon an account repaying its debt in full. Vaults must be coded carefully to not have edge cases such as unrepayable dust, otherwise accounts could become permanently associated with a controller.
+* The order of an account's collateral set can be changed with `reorderCollaterals`. Because some controller vaults will loop over an account's collateral in sequence and return early if sufficient value is found, this can save considerable gas. This feature was inspired by Gearbox's `collateralHints`.
 
+Given that enabling a controller subjects the specified account to the rules encoded in the controller's code, users must only enable trusted, audited controllers. If the controller is malicious or incorrectly coded, it may result in the loss of the user's funds or even render the account unusable.
 
 ## Account Status Checks
 
-Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return `true`. Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkAccountStatus` method), otherwise throw an exception.
+Account status checks are implemented by vaults to enforce account solvency. Vaults must expose an external `checkAccountStatus` function that will receive an account's address and this account's list of enabled collateral vaults. If the account has not borrowed anything from this vault then the function should return a special magic success value (the function selector for the `checkAccountStatus` method). Otherwise, the vault should evaluate application-specific logic to determine whether or not the account is in an acceptable state. If so, it should return the special magic success value, otherwise throw an exception.
 
 ### Collateral Validity
 
 Within the `checkAccountStatus` callback, vaults should inspect the provided list of collaterals and determine whether or not they are acceptable. Vaults can limit themselves to a small set of collaterals, or can be more general-purpose and allow borrowing using any assets they can get prices for. Alternately, a vault could always fail, if it is only intended to be a collateral vault.
 
-To encourage borrowing, it may be tempting to allow a large set of collateral assets. However, vault creators must be careful about which assets they accept. A malicious vault could lie about the amount of assets it holds, or reject liquidations when a user is in violation. For this reason, vaults should restrict allowed collaterals to a known-good set of audited addresses, or lookup the addresses in a registry or factory contract to ensure they were created by known-good, audited contracts.
+Vaults have the freedom to price all the assets according to their preference (both liability and accepted collaterals), without depending on potentially untrustworthy oracles.
+
+While it might be tempting for the controller to allow a broad range of collateral vaults to encourage borrowing, the controller vault creators must exercise caution when deciding which vaults to accept as collateral. A malicious or incorrectly coded vault could, among other things, misrepresent the amount of assets it holds, reject liquidations when a user is in violation, or fail to require account status checks when necessary. Therefore, vaults should limit allowed collaterals to a set of audited addresses known to be reliable, or verify the addresses in a registry or factory contract to ensure they were created by trustworthy, audited contracts.
 
 ### Execution Flow
 
@@ -88,7 +91,7 @@ Although the vaults themselves implement `checkAccountStatus`, there is no need 
 
 Upon a `requireAccountStatusCheck` call, the EVC will determine whether the current execution context is in a checks-deferrable call and if so, it will defer checking the status for this account until the end of the execution context. Otherwise, the account status check will be performed immediately.
 
-There is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal reentrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
+There is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* account status checks being deferred (ie, directly, not via the EVC), if it calls `requireAccountStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkAccountStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [call](#call) EVC function.
 
 ### Single Controller
 
@@ -96,22 +99,11 @@ At the time of the account status check, an account can have at most one control
 
 Although having more than one controller is disallowed when the account status check is performed, multiple controllers can be transiently attached while these checks are deferred. As long as all or all but one controllers release themselves during the execution of the [checks-deferrable call](#checks-deferrable-call), the account status check will succeed.
 
-### Require Immediate
-
-Inside a checks-deferrable call, account status checks are deferred and only checked at the end. However, in some cases it is desirable to immediately check an account's status using `requireAccountStatusCheckNow`. If the specified account has a controller, this vault's `checkAccountStatus` is immediately invoked to determine if the account has a valid status.
-
-If valid, the account is removed from the account status deferral set (if present), so it will not be checked again at the end of the checks-deferrable call. However, any future operations in the same checks-deferrable call that require a (non-immediate) status check will re-add it to the set, and the status will be checked at the end of the call.
-
-Some use-cases are:
-
-* If a vault wants to prevent providing flash loans for whatever reason, it can require the account be healthy immediately following a borrow.
-* If a batch creator believes there is a possibility that an account will be unhealthy after an operation (perhaps because of changes to chain state between transaction creation and inclusion times), it may make sense to check this account's health immediately, before performing other operations. This will save gas by failing the transaction early.
-
 ### Forgiveness
 
 If a controller wants to waive the liquidity check for an account it is controlling, it can "forgive" an account. This removes it from the set of accounts that will be checked at the end of the call. Controllers can only forgive accounts that they are the sole controller of.
 
-Needless to say, this functionality should be used with care. It should only be necessary in certain advanced liquidation flows where an unhealthy account is impersonated but the seizure of funds is still not enough to bring the account to a sufficiently healthy level to pass the account status check.
+Needless to say, this functionality should be used with care. It should only be necessary in certain advanced liquidation flows where the collateral is seized from an unhealthy account but the seizure of funds is still not enough to bring the account to a sufficiently healthy level to pass the account status check.
 
 When doing so, it is important that vaults verify that no *other* collaterals have unexpectedly been withdrawn during the seizure, in the event that a vault makes any unexpected external calls in its transfer/withdraw/etc method.
 
@@ -124,7 +116,7 @@ It does not necessarily make sense to enforce these checks when checking account
 
 Secondly, some types of checks require an initial snapshot of the vault state before any operations have been performed. In the case of a borrow cap, it could be that the borrow cap has been exceeded for some reason (perhaps due to a price movement, or the borrow cap itself was reduced). The vault would still want to permit repaying debts, even if the repay was insufficient to bring the total borrows below the borrow cap.
 
-Vaults must expose an external `checkVaultStatus` function. The vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
+If vaults have constraints that need to be enforced globally, they may expose an external `checkVaultStatus` function. In that function, the vault should evaluate application-specific logic to determine whether or not the vault is in an acceptable state. If so, it should return a special magic success value (the function selector for the `checkVaultStatus` method), otherwise throw an exception.
 
 Although the vaults themselves implement `checkVaultStatus`, there is no need for them to invoke this function directly. It will be called by the EVC when necessary. Instead, after performing any operation that could affect the vault's status, a vault should invoke `requireVaultStatusCheck` on the EVC to schedule a future callback.
 
@@ -137,60 +129,46 @@ In order to evaluate the vault status, `checkVaultStatus` may need access to a s
 * The vault should then call `requireVaultStatusCheck`
 * When the `checkVaultStatus` callback is invoked, it should evaluate the vault status by unpacking the snapshot data stored in transient storage and compare it against the current state of the vault, and return a special magic success value, or revert if there is a violation.
 
-As with the account status check, there is a subtle complication that vault implementations should consider if they use reentrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the EVC), if it calls `requireVaultStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkVaultStatus` function. A normal reentrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [callback](#callback) EVC function.
+As with the account status check, there is a subtle complication that vault implementations should consider if they use re-entrancy guards (which is recommended). When a vault is invoked *without* vault status checks being deferred (ie, directly, not via the EVC), if it calls `requireVaultStatusCheck` on the EVC, the EVC will immediately call back into the vault's `checkVaultStatus` function. A normal re-entrancy guard would fail upon re-entering at this point. To avoid this, vaults may wish to use the [call](#call) EVC function.
 
 
 ## Execution
 
 ### Checks-deferrable Call
 
-The EVC exposes multiple functions, each with its own characteristicts, that allow for the [Account Status Checks](#account-status-checks) and [Vault Status Checks](#vault-status-checks) to be deferred. [call](#call), [impersonate](#impersonate), [callback](#callback) and [batch](#batch), so called checks-deferrable call functions, can be nested and allow for the checks to be deferred until the end of the execution of the top-level function call.
+The EVC exposes multiple functions, each with its own characteristics, that allow for the [Account Status Checks](#account-status-checks) and [Vault Status Checks](#vault-status-checks) to be deferred. [call](#call), [batch](#batch) and [controlCollateral](#controlcollateral) so called checks-deferrable call functions, can be nested and allow for the checks to be deferred until the end of the execution of the outermost function call.
 
 ### call
 
-The `call` function on the EVC allows users to invoke functions on vaults and other target smart contracts. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function rather than calling the vaults directly. This is because vaults themselves don't understand sub-accounts or operators, and defer their authorisation logic to the EVC (see the [Authentication By Vaults](#authentication-by-vaults) section).
+The `call` function on the EVC allows users to invoke functions on vaults and other target smart contracts, including the EVC itself. Unless the `msg.sender` is the same as the `onBehalfOfAccount`, users *must* go through this function rather than calling the vaults directly. This is because vaults themselves don't understand sub-accounts or operators, and defer their authorisation logic to the EVC (see the [Authentication By Vaults](#authentication-by-vaults) section).
 
-`call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the EVC as `msg.sender`. For this reason, it is critical that the EVC itself never be given any special privileges, or hold any token or ETH balances (except for a few corner cases where it is temporarily safe, see the [EVC Contract Privileges](#evc-contract-privileges) section).
+`call` also allows users to invoke arbitrary contracts, with arbitrary calldata. These other contracts will see the EVC as `msg.sender`. For this reason, it is critical that the EVC itself never be given any special privileges, or hold any token or native currency balances (except for a few corner cases where it is temporarily safe, see the [EVC Contract Privileges](#evc-contract-privileges) section).
 
-### impersonate
+If the target contract *is* the EVC, in order to preserve the `msg.sender`, the EVC will be self-`call`ed using the `delegatecall`.
 
-The `impersonate` function can only be used in one specific case: When a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some collateral assets to repay the debt.
+If the target contract *is NOT* `msg.sender`, the EVC will only allow the target contract to be called if the `msg.sender` is the owner or the operator of the `onBehalfOfAccount` provided. If that condition is met, the EVC will create a context and call into the target contract with the provided calldata and the `onBehalfOfAccount` account set in the context.
 
-This is accomplished by the controller vault calling `impersonate`. It passes in the collateral vault as the target collateral and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
+Because vaults can be called directly without going through the EVC, checks may not be deferred when they are invoked. In that case, vaults can use the `call` function so that they can assume that they are always executing within a checks deferred context. If the calling vault specifies the target contract to be their own address (target contract *is* `msg.sender`), the EVC will create a context and call back into the caller with the provided calldata and the `onBehalfOfAccount` account set to whatever was provided by the calling vault. The vault should use `msg.sender` as `onBehalfOfAccount`. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself. To use `call` in this manner, it is recommended that vaults use a special modifier [`callThroughEVC`](/docs/specs.md#typical-implementation-pattern-of-the-evc-compliant-function-for-a-vault) before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
 
-### callback
-
-Because vaults can be called directly without going through the EVC, checks may not be deferred when they are invoked. The EVC provides a function `callback` so that vaults can be coded in a way that assumes they are always executing within a checks deferred context.
-
-`callback` will create a context, and call-back into the caller with the provided `msg.data`, forwarding the provided `value` (or full balance of the EVC if max `uint256` was specified). Inside the callback, the `onBehalfOfAccount` account will be set to whatever was provided by the calling vault. The vault should use `msg.sender` for this. In theory a vault could supply any address, but the only other contract that will see this `onBehalfOfAccount` is the vault itself: Recall that the `onBehalfOfAccount` should only be trusted when `msg.sender` is the EVC itself.
-
-To use `callback`, it is recommended that vaults use a special modifier `routedThroughEVC` before its re-entrancy guard modifier. This will take care of routing the calls through the EVC, and the vault can operate under the assumption that the checks are always deferred.
-
-```
-modifier routedThroughEVC() {
-    if (msg.sender == address(evc)) {
-        _;
-    } else {
-        bytes memory result = evc.callback{value: msg.value}(msg.sender, msg.value, msg.data);
-
-        assembly {
-            return(add(32, result), mload(result))
-        }
-    }
-}
-```
+The `call` function also allows to forward the provided value (or full balance of the EVC if max `uint256` was specified). Therefore it can also be used to recover any remaining value in the EVC.
 
 ### batch
 
-At the time of this writing, public/private keypair Ethereum accounts (EOAs) cannot directly perform multiple operations within a single transaction, except by invoking a smart contract that will do so on their behalf. The EVC exposes a `batch` function that allows multiple operations to be executed together. This has several advantages for users:
+At the time of this writing, public/private key pair Ethereum accounts (EOAs) cannot directly perform multiple operations within a single transaction, except by invoking a smart contract that will do so on their behalf. The EVC exposes a `batch` function that allows multiple operations to be executed together. This has several advantages for users:
 
 * Atomicity: The user knows that either all of the operations in a batch will execute, or none of them will, so there is no risk of being left with partial or inconsistent positions.
 * Gas savings: If contracts are invoked multiple times, then the cost of "cold" access can be amortised across all of the invocations.
 * Status check deferrals: Sometimes multiple operations in a batch may require status checks or it is more convenient or efficient to perform some operation that would leave an account/vault in an invalid state, but fix this state in a subsequent operation in a batch. For example, you may want to perform withdrawal and borrow in one batch or borrow and swap *before* you deposit your collateral. With batches, these checks can be performed once at the end of a batch (which can also itself be more gas efficient).
 
-Batches can be composed of both calls to the EVC itself and external calls (when the `targetContract` is not the EVC). Calling the EVC is how users can enable collateral from within a batch, for example. In order to preserve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall` (except for [permit](#permit)).
+Same as [`call`](#call), batches can be composed of both calls to the EVC itself and external calls. Calling the EVC is how users can enable collateral from within a batch, for example. In order to preserve `msg.sender`, EVC self-`call`s are in fact done with `delegatecall`.
 
-Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault.
+Batches will often be a mixture of external calls, some of which call vaults and some of which call other unrelated contracts. For example, a user might withdraw from one vault, then perform a swap on Uniswap, and then deposit into another vault. Each batch item specifies `onBehalfOfAccount` for which the authentication rules are the same as for [`call`](#call).
+
+### controlCollateral
+
+The `controlCollateral` function can only be used in one specific case: when a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some collateral assets to repay the debt.
+
+This is accomplished by the controller vault calling `controlCollateral`. It passes in the collateral vault as the target collateral and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
 
 ### permit
 
@@ -201,25 +179,25 @@ Permits are EIP-712 typed data messages with the following fields:
 * `signer`: The address to execute the operation on behalf of.
 * `nonceNamespace` and `nonce`: Values used to prevent replaying permit messages, and for sequencing (see below)
 * `deadline`: A timestamp after which the permit becomes invalid.
-* `value`: The value of ETH that is expected to be sent to the EVC
+* `value`: The value of native currency that is expected to be sent to the EVC
 * `data`: Arbitrary calldata that will be used to invoke the EVC. Typically this will contain an invocation of the `batch` method.
 
 There are two types of signature methods supported by permits: ECDSA, which is used by EOAs, and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) which is used by smart contract wallets. In both cases, the `permit` method can be invoked by any unprivileged address, such as a keeper. If the signature is exactly 65 bytes long, an `ecrecover` is attempted. If the recovered address does not match `signer`, or for signature lengths other than 65, then an ERC-1271 verification is attempted, by staticcalling `isValidSignature` on `signer`.
 
-After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC, forwarding the specified `value` of ETH (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
+After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC, forwarding the specified `value` (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
 
-Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via `batch`, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
+Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via `call` and `batch`, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
 
 #### Nonce Namespaces
 
 With nonces, Ethereum transactions enforce that transactions cannot be mined multiple times, and that they are included in the same sequence they were created (with no gaps).
 
-`permit` messages contain two `uint256` fields that can be used to enforce the same restrictions: `nonceNamespace` and `nonce`. Each account owner has a mapping that maps from `nonceNamespace` to `nonce`. In order for a permit message to be valid, the `nonce` value inside the specified `nonceNamespace` must be one less than the `nonce` field in the permit message. Using the permit increments the nonce by one.
+`permit` messages contain two `uint256` fields that can be used to enforce the same restrictions: `nonceNamespace` and `nonce`. Each account owner has a mapping that maps from `nonceNamespace` to `nonce`. In order for a permit message to be valid, the `nonce` value inside the specified `nonceNamespace` must be equal to the `nonce` field in the permit message. Using the permit increments the nonce by one.
 
 The separation of `nonceNamespace` and `nonce` allows users to optionally relax the sequencing restrictions. There are several ways that an owner may choose to use the namespaces:
 
 * Always set `nonceNamespace` to `0`, and sign sequentially increasing `nonce`s. These permit messages will function like Ethereum transactions, and must be mined in order, with no gaps.
-* Derive the `nonceNamespace` deterministically from the permit message (for example, a hash of the message fields, excluding `nonceNamespace`), and always set the `nonce` to `1`. These permit messages can be mined in any order, and some may never be mined.
+* Derive the `nonceNamespace` deterministically from the permit message (for example, a hash of the message fields, excluding `nonceNamespace`), and always set the `nonce` to `0`. These permit messages can be mined in any order, and some may never be mined.
 * Some combination of the two approaches. For example, a user could have "regular" and "high priority" namespaces. Normal orders would be included in the regular sequence, while high priority permits are allowed to bypass this queue.
 
 Note that any time sequencing restrictions are relaxed, users should be aware that different orderings of their transactions can have different MEV potential, and they should prepare for their transactions executing in the least favourable order (for them).
@@ -266,7 +244,7 @@ An execution context will exist for the duration of the checks-deferrable call, 
 
 When the execution context ends, the address sets are iterated over:
 
-* For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied.
+* For each address in `accountStatusChecks`, confirm that at most one controller is installed (its `accountControllers` set is of size 0 or 1). If a controller is installed, invoke `checkAccountStatus` on the controller for this account and ensure that the controller is satisfied. If no controller is installed, `checkAccountStatus` is not invoked and the account status is considered valid by default. Hence, [`disableController`](#controller) must be used with care.
 * For each address in `vaultStatusChecks`, call `checkVaultStatus` on the vault address stored in the set and ensure that the vault is satisfied.
 
 Additionally, the execution context contains some locks that protect critical regions from re-entrancy (see below).
@@ -275,7 +253,7 @@ Additionally, the execution context contains some locks that protect critical re
 
 If a vault or other contract is invoked via the EVC, and that contract in turn re-invokes the EVC to call another vault/contract, then the execution context is considered nested. The execution context is however *not* treated as a stack. The sets of deferred account and vault status checks are added to, and only after unwinding the final execution context will they be validated.
 
-Internally, the execution context stores a *call depth* value that increases each time a checks-deferrable call is started and decreases when it ends. Only once it decreases to the initial value of `0` do the deferred checks get performed. Nesting calls is useful because otherwise calling contracts via the EVC that themselves want to call other contracts through the EVC would be more complicated.
+Internally, the execution context stores a `checksDeferred` flag that is set each time a checks-deferrable call is started and cleared only when its value before the call was `false`. Once the flag is cleared, the deferred checks get performed. Nesting calls is useful because otherwise calling contracts via the EVC that themselves want to call other contracts through the EVC would be more complicated.
 
 The previous value of `onBehalfOfAccount` is stored in a local "cache" variable and is subsequently restored after invoking the target contract. This ensures that contracts can rely on the `onBehalfOfAccount` at all times when `msg.sender` is the EVC (see [Authentication by Vaults](#authentication-by-vaults)). However, when `msg.sender` is not the EVC, vaults cannot rely on `onBehalfOfAccount` because it could have been changed by a nested context.
 
@@ -285,15 +263,15 @@ The EVC invokes the `checkAccountStatus` and `checkVaultStatus` callbacks using 
 
 Because of this, the EVC's execution context maintains a `checksInProgress` mutex that is acquired before unwinding the sets of accounts and vaults that need checking. This mutex is also checked during operations that alter these sets. If it did not do this, then information cached by the higher-level unwinding function (such as the sizes of the sets) could become inconsistent with the underlying storage, which could be used to bypass these critical checks.
 
-#### impersonationInProgress
+#### controlCollateralInProgress
 
-The typical use-case for impersonation is for a liability vault to seize collateral assets during a liquidation flow.
+The typical use-case for collateral control is for a liability vault to seize collateral assets during a liquidation flow.
 
 However, when interacting with complicated vaults that may invoke external contracts during a withdraw/transfer, a liability vault may want to ensure that no *other* collaterals are removed during the seizure.
 
-In order to simplify the implementation of this check, the `impersonateLock` mutex is locked while invoking a collateral vault during the `impersonate` flow. While locked, no accounts' collateral or controller sets can be modified.
+In order to simplify the implementation of this check, the `controlCollateralInProgress` mutex is locked while invoking a collateral vault during the `controlCollateral` flow. While locked, no accounts' collateral or controller sets can be modified.
 
-Additionally, during an impersonation, the EVC cannot be re-entered via `call`, `batch`, `impersonate`, `callback` or `permit`.
+Additionally, during collateral control, the EVC cannot be re-entered via `call`, `batch`, `controlCollateral` or `permit`.
 
 #### Extra Information
 
@@ -324,7 +302,7 @@ In order to take advantage of transient storage, the contracts have been structu
 
 Vaults out-source their authentication to the EVC, but are responsible for authorisation themselves.
 
-In order to support sub-accounts, operators, and impersonating (ie, liquidations), vaults can be invoked via the EVC's `call`, `batch`, or `impersonate` functions, which will then execute the desired operations on the vault. However, the vault will see the EVC as the `msg.sender`.
+In order to support sub-accounts, operators, and being able to control collateral (ie, in liquidations), vaults can be invoked via the EVC's `call`, `batch`, or `controlCollateral` functions, which will then execute the desired operations on the vault. However, the vault will see the EVC as the `msg.sender`.
 
 When a vault detects that `msg.sender` is the EVC, it should call back into the EVC to retrieve the current execution context using `getCurrentOnBehalfOfAccount`. This will tell the vault two things:
 
@@ -333,13 +311,13 @@ When a vault detects that `msg.sender` is the EVC, it should call back into the 
 
 ### EVC Contract Privileges
 
-Because the EVC contract can be made to invoke any arbitrary target contract with any arbitrary calldata, it should never be given any privileges, or hold any ETH or tokens.
+Because the EVC contract can be made to invoke any arbitrary target contract with any arbitrary calldata, it should never be given any privileges, or hold any native currency or tokens.
 
-The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves ETH or tokens into the EVC, but a subsequent batch item moves it out, then as long as no untrusted code runs in between, it is safe. However, moving tokens to the EVC is often unnecessary because tokens can be moved immediately to their final destination with `transferFrom` and by setting various `recipient` parameters in contracts.
+The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves value or tokens into the EVC, but a subsequent batch item moves it out, then as long as no untrusted code runs in between, it is safe. However, moving tokens to the EVC is often unnecessary because tokens can be moved immediately to their final destination with `transferFrom` and by setting various `recipient` parameters in contracts.
 
-One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit).
+One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit using `call` function).
 
-One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. Although the EVC doesn't attempt to comprehensively solve this, the ERC-1820 registry address is blocked and can not be invoked via `call` or batches.
+One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. The EVC doesn't attempt to solve this issue and care should be taken when interacting with contracts which implement hooks/callbacks.
 
 ### Read-only Re-entrancy
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../src/interfaces/IERC1271.sol";
@@ -13,7 +13,7 @@ contract VaultMock is IVault {
         evc = _evc;
     }
 
-    function disableController(address account) public override {}
+    function disableController() public override {}
 
     function checkAccountStatus(address, address[] memory) external pure override returns (bytes4) {
         return this.checkAccountStatus.selector;
@@ -63,21 +63,22 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         vm.etch(vault, vaultMock.code);
     }
 
-    function setNonce(uint152 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
+    function setNonce(bytes19 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
         if (msg.sender == address(this)) return;
+        if (nonceLookup[addressPrefix][nonceNamespace] == type(uint256).max) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
-        setAccountOwnerInternal(address(uint160(addressPrefix) << 8), msg.sender);
+        setAccountOwnerInternal(address(uint160(uint152(addressPrefix)) << 8), msg.sender);
         nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
         super.setNonce(addressPrefix, nonceNamespace, nonce);
     }
 
-    function setOperator(uint152 addressPrefix, address operator, uint256 operatorBitField) public payable override {
+    function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) public payable override {
         if (msg.sender == address(this)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         if (operatorLookup[addressPrefix][operator] == operatorBitField) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
-        setAccountOwnerInternal(address(uint160(addressPrefix) << 8), msg.sender);
+        setAccountOwnerInternal(address(uint160(uint152(addressPrefix)) << 8), msg.sender);
         super.setOperator(addressPrefix, operator, operatorBitField);
     }
 
@@ -112,6 +113,22 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         super.disableCollateral(account, vault);
     }
 
+    function reorderCollaterals(address account, uint8 index1, uint8 index2) public payable override {
+        if (msg.sender == address(this)) return;
+        if (haveCommonOwnerInternal(account, msg.sender)) return;
+        if (account == address(0)) return;
+
+        account = msg.sender;
+
+        if (index1 >= index2 || int256(uint256(index2)) >= int256(uint256(accountCollaterals[account].numElements)) - 2)
+        {
+            return;
+        }
+
+        setAccountOwnerInternal(account, msg.sender);
+        super.reorderCollaterals(account, index1, index2);
+    }
+
     function enableController(address account, address vault) public payable override {
         if (msg.sender == address(this)) return;
         if (haveCommonOwnerInternal(account, msg.sender)) return;
@@ -119,23 +136,14 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(vault) <= 10) return;
         if (vault == address(this)) return;
         setup(account, vault);
-        super.enableCollateral(account, vault);
+        super.enableController(account, vault);
     }
 
     function disableController(address account) public payable override {
-        if (account == address(0)) return;
+        if (account == address(0) || account == msg.sender || address(this) == msg.sender) return;
         if (uint160(msg.sender) <= 10) return;
         setup(account, msg.sender);
         super.disableController(account);
-    }
-
-    function callback(
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) public payable override returns (bytes memory result) {
-        deal(address(this), value);
-        result = super.callback(onBehalfOfAccount, value, data);
     }
 
     function call(
@@ -147,34 +155,15 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
-        if (targetContract == address(this) || targetContract == msg.sender) {
-            return "";
-        }
+        if (targetContract == address(this)) return "";
+
         setup(onBehalfOfAccount, targetContract);
         deal(address(this), value);
 
         result = super.call(targetContract, onBehalfOfAccount, value, data);
     }
 
-    function callInternal(
-        address targetContract,
-        address onBehalfOfAccount,
-        uint256 value,
-        bytes calldata data
-    ) internal override returns (bool success, bytes memory result) {
-        if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) {
-            return (true, "");
-        }
-        if (uint160(targetContract) <= 10) return (true, "");
-        if (targetContract == 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24) {
-            return (true, "");
-        }
-        setup(onBehalfOfAccount, targetContract);
-
-        (success, result) = super.callInternal(targetContract, onBehalfOfAccount, value, data);
-    }
-
-    function impersonate(
+    function controlCollateral(
         address targetCollateral,
         address onBehalfOfAccount,
         uint256 value,
@@ -183,9 +172,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
-        if (targetCollateral == address(this) || targetCollateral == msg.sender) {
-            return "";
-        }
+        if (targetCollateral == address(this)) return "";
 
         setup(onBehalfOfAccount, msg.sender);
         deal(address(this), value);
@@ -196,7 +183,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
-        result = super.impersonate(targetCollateral, onBehalfOfAccount, value, data);
+        result = super.controlCollateral(targetCollateral, onBehalfOfAccount, value, data);
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
@@ -212,10 +199,12 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         bytes calldata signature
     ) public payable override {
         if (uint160(signer) <= 255 || signer == address(this)) return;
+        if (nonce == type(uint256).max) return;
+        if (value > type(uint128).max) return;
         if (data.length == 0) return;
         vm.etch(signer, signerMock.code);
         deal(address(this), value);
-        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace] + 1;
+        nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace];
         deadline = block.timestamp;
         super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
     }
@@ -243,12 +232,11 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         override
         returns (
             BatchItemResult[] memory batchItemsResult,
-            BatchItemResult[] memory accountsStatusResult,
-            BatchItemResult[] memory vaultsStatusResult
+            StatusCheckResult[] memory accountsStatusCheckResult,
+            StatusCheckResult[] memory vaultsStatusCheckResult
         )
     {
-        BatchItemResult[] memory x = new BatchItemResult[](0);
-        return (x, x, x);
+        return (new BatchItemResult[](0), new StatusCheckResult[](0), new StatusCheckResult[](0));
     }
 
     function forgiveAccountStatusCheck(address account) public payable override {
@@ -330,13 +318,13 @@ contract EthereumVaultConnectorInvariants is Test {
     }
 
     function invariant_ExecutionContext() external {
-        //vm.expectRevert(Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector);
-        //evc.getCurrentOnBehalfOfAccount(address(0));
+        vm.expectRevert(Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector);
+        evc.getCurrentOnBehalfOfAccount(address(0));
 
         assertEq(evc.getRawExecutionContext(), 1 << 200);
-        assertEq(evc.getCurrentCallDepth(), 0);
+        assertEq(evc.areChecksDeferred(), false);
         assertEq(evc.areChecksInProgress(), false);
-        assertEq(evc.isImpersonationInProgress(), false);
+        assertEq(evc.isControlCollateralInProgress(), false);
         assertEq(evc.isOperatorAuthenticated(), false);
         assertEq(evc.isSimulationInProgress(), false);
     }
@@ -350,12 +338,12 @@ contract EthereumVaultConnectorInvariants is Test {
         ) = evc.exposeAccountAndVaultStatusCheck();
 
         assertTrue(accountStatusChecksNumElements == 0);
-        for (uint256 i = 0; i < accountStatusChecks.length; i++) {
+        for (uint256 i = 0; i < accountStatusChecks.length; ++i) {
             assertTrue(accountStatusChecks[i] == address(0));
         }
 
         assertTrue(vaultStatusChecksNumElements == 0);
-        for (uint256 i = 0; i < vaultStatusChecks.length; i++) {
+        for (uint256 i = 0; i < vaultStatusChecks.length; ++i) {
             assertTrue(vaultStatusChecks[i] == address(0));
         }
     }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
@@ -8,8 +8,8 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 contract SetOperatorTest is Test {
     EthereumVaultConnectorHarness internal evc;
 
-    event OperatorStatus(uint152 indexed addressPrefix, address indexed operator, uint256 operatorBitField);
-    event OwnerRegistered(uint152 indexed addressPrefix, address indexed owner);
+    event OperatorStatus(bytes19 indexed addressPrefix, address indexed operator, uint256 operatorBitField);
+    event OwnerRegistered(bytes19 indexed addressPrefix, address indexed owner);
 
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
@@ -17,11 +17,11 @@ contract SetOperatorTest is Test {
 
     function test_WhenOwnerCalling_SetOperator(address alice, address operator, uint256 operatorBitField) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
         vm.assume(operatorBitField > 0);
 
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.expectRevert(Errors.EVC_AccountOwnerNotRegistered.selector);
         evc.getAccountOwner(alice);
 
@@ -75,12 +75,12 @@ contract SetOperatorTest is Test {
 
     function test_WhenOperatorCalling_SetOperator(address alice, address operator, uint256 seed) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         for (uint256 i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
-            uint152 addressPrefix = evc.getAddressPrefix(account);
+            bytes19 addressPrefix = evc.getAddressPrefix(account);
             assertEq(evc.isAccountOperatorAuthorized(account, operator), false);
 
             if (i == 0) {
@@ -128,10 +128,10 @@ contract SetOperatorTest is Test {
         uint256 operatorBitField
     ) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
 
         if (operatorBitField > 0) {
             vm.prank(alice);
@@ -159,17 +159,17 @@ contract SetOperatorTest is Test {
         address operator,
         uint256 operatorBitField
     ) public {
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
-        vm.assume(addressPrefix != type(uint152).max);
+        vm.assume(addressPrefix != bytes19(type(uint152).max));
         vm.assume(operatorBitField > 0);
 
         // fails if address prefix does not belong to an owner
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
-        evc.setOperator(addressPrefix + 1, operator, operatorBitField);
+        evc.setOperator(bytes19(uint152(addressPrefix) + 1), operator, operatorBitField);
 
         // succeeds if address prefix belongs to an owner
         vm.prank(alice);
@@ -188,7 +188,7 @@ contract SetOperatorTest is Test {
 
     function test_RevertIfSenderNotOwnerAndNotOperator_SetAccountOperator(address alice, address operator) public {
         vm.assume(alice != address(0) && alice != address(0xfe) && alice != address(evc));
-        vm.assume(operator != address(0));
+        vm.assume(operator != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         address account = address(uint160(uint160(alice) ^ 256));
@@ -218,7 +218,7 @@ contract SetOperatorTest is Test {
         address operator
     ) public {
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(operator != address(0) && address(uint160(operator) ^ 1) != address(0) && operator != address(evc));
+        vm.assume(!evc.haveCommonOwner(address(evc), operator));
         vm.assume(!evc.haveCommonOwner(alice, operator));
 
         assertEq(evc.isAccountOperatorAuthorized(alice, operator), false);
@@ -252,15 +252,15 @@ contract SetOperatorTest is Test {
 
     function test_RevertIfOperatorIsInvalidAddress_SetOperator(address alice, uint8 subAccountId) public {
         vm.assume(alice != address(evc));
-        uint152 addressPrefix = evc.getAddressPrefix(alice);
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.setOperator(addressPrefix, address(0), 0);
+        evc.setOperator(addressPrefix, address(evc), 0);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);
-        evc.setAccountOperator(alice, address(0), true);
+        evc.setAccountOperator(alice, address(evc), true);
 
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_InvalidAddress.selector);

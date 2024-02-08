@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../../src/Set.sol";
@@ -111,7 +111,6 @@ contract SetGasTest is Test {
     /**
      *
      */
-
     function testGas_contains_size00_notFound() public view {
         size00.contains(ELEMENT_1);
     }
@@ -177,7 +176,6 @@ contract SetGasTest is Test {
     /**
      *
      */
-
     function testGas_remove_size00_notFound() public {
         size00.remove(ELEMENT_1);
     }

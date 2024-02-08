@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "./EthereumVaultConnectorScribble.sol";
 import "../utils/mocks/Vault.sol";
@@ -49,15 +49,21 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         return expectedVaultsChecked;
     }
 
-    function setCallDepth(uint8 depth) external {
+    function setChecksDeferred(bool deferred) external {
         if (isFuzzSender()) return;
-        executionContext = EC.wrap((EC.unwrap(executionContext) & ~uint256(0xff)) | depth);
+
+        if (deferred) {
+            executionContext = executionContext.setChecksDeferred();
+        } else {
+            executionContext =
+                EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF0000000000000000000000000000000000000000));
+        }
     }
 
-    function setChecksLock(bool locked) external {
+    function setChecksInProgress(bool inProgress) external {
         if (isFuzzSender()) return;
 
-        if (locked) {
+        if (inProgress) {
             executionContext = executionContext.setChecksInProgress();
         } else {
             executionContext =
@@ -65,11 +71,11 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         }
     }
 
-    function setImpersonateLock(bool locked) external {
+    function setControlCollateralInProgress(bool inProgress) external {
         if (isFuzzSender()) return;
 
-        if (locked) {
-            executionContext = executionContext.setImpersonationInProgress();
+        if (inProgress) {
+            executionContext = executionContext.setControlCollateralInProgress();
         } else {
             executionContext =
                 EC.wrap(EC.unwrap(executionContext) & ~uint256(0xFF00000000000000000000000000000000000000000000));
@@ -108,33 +114,10 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         expectedAccountsChecked.push(account);
     }
 
-    function requireAccountStatusCheckNow(address account) public payable override {
-        super.requireAccountStatusCheckNow(account);
-        expectedAccountsChecked.push(account);
-    }
-
-    function requireAllAccountsStatusCheckNow() public payable override {
-        address[] memory accounts = accountStatusChecks.get();
-
-        super.requireAllAccountsStatusCheckNow();
-
-        for (uint256 i = 0; i < accounts.length; ++i) {
-            expectedAccountsChecked.push(accounts[i]);
-        }
-    }
-
     function requireVaultStatusCheck() public payable override {
         super.requireVaultStatusCheck();
 
         expectedVaultsChecked.push(msg.sender);
-    }
-
-    function requireVaultStatusCheckNow() public payable override {
-        if (vaultStatusChecks.contains(msg.sender)) {
-            expectedVaultsChecked.push(msg.sender);
-        }
-
-        super.requireVaultStatusCheckNow();
     }
 
     function requireAccountAndVaultStatusCheck(address account) public payable override {

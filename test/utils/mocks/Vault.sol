@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "./Target.sol";
 import "../../../src/interfaces/IVault.sol";
@@ -55,8 +55,14 @@ contract Vault is IVault, Target {
         return accountStatusChecked;
     }
 
-    function disableController(address account) external virtual override {
-        evc.disableController(account);
+    function disableController() external virtual override {
+        address msgSender = msg.sender;
+        if (msgSender == address(evc)) {
+            (address onBehalfOfAccount,) = evc.getCurrentOnBehalfOfAccount(address(0));
+            msgSender = onBehalfOfAccount;
+        }
+
+        evc.disableController(msgSender);
     }
 
     function checkVaultStatus() external virtual override returns (bytes4 magicValue) {

@@ -2,7 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-solc = "0.8.20"
+solc = "0.8.19"
 optimizer_runs = 10000
 ignored_error_codes = ["unreachable"]
 gas_reports = [
@@ -38,6 +38,12 @@ wrap_comments = true
 ignore = [
     "test/evc/EthereumVaultConnectorScribble.sol"
 ]
+
+
+[profile.default.doc]
+out = "forgedoc"
+title = "Ethereum Vault Connector (EVC)"
+repository = "https://github.com/euler-xyz/ethereum-vault-connector"
 
 
 [profile.smt.model_checker]
