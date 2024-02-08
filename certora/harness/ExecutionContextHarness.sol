@@ -21,9 +21,10 @@ contract ExecutionContextHarness {
         result = ExecutionContext.areChecksDeferred(context);
     }
 
-    function getCallDepth(EC context) external pure returns (uint8 result) {
-        result = ExecutionContext.getCallDepth(context);
-    }
+    // Call Depth appears to be depricated
+    // function getCallDepth(EC context) external pure returns (uint8 result) {
+    //     result = ExecutionContext.getCallDepth(context);
+    // }
 
     function increaseCallDepth(EC context) external pure returns (EC result) {
         result = ExecutionContext.increaseCallDepth(context);

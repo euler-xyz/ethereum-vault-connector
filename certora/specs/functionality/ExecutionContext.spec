@@ -12,7 +12,8 @@ methods {
     function STAMP_DUMMY_VALUE() external returns (uint) envfree;
 
     function areChecksDeferred(ExecutionContextHarness.EC context) external returns (bool) envfree;
-    function getCallDepth(ExecutionContextHarness.EC context) external returns (uint8) envfree;
+    // getCallDepth appears depricated
+    // function getCallDepth(ExecutionContextHarness.EC context) external returns (uint8) envfree;
     function increaseCallDepth(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
     function getOnBehalfOfAccount(ExecutionContextHarness.EC context) external returns (address) envfree;
     function setOnBehalfOfAccount(ExecutionContextHarness.EC context, address account) external returns (ExecutionContextHarness.EC) envfree;
@@ -78,21 +79,22 @@ rule check_bitmasks_offsets() {
     assert(STAMP_MASK() & require_uint256((1 << STAMP_OFFSET()) - 1) == 0);
 }
 
-/// check basic functionality of getCallDepth and increaseCallDepth
-rule check_call_depth(uint ec) {
-    uint8 before = getCallDepth(ec);
-    uint newec = increaseCallDepth(ec);
-    assert(to_mathint(getCallDepth(newec)) == before + 1);
-}
-
-rule check_call_depth_maximum(uint ec) {
-    uint8 newCallDepth = require_uint8(getCallDepth(ec) + 2);
-    // TODO: CALL_DEPTH_MAX suggests that the value itself is still valid. It is not.
-    require(require_uint256(newCallDepth) < CALL_DEPTH_MAX());
-    uint ec2 = increaseCallDepth(ec);
-    uint ec3 = increaseCallDepth(ec2);
-    assert(newCallDepth == getCallDepth(ec3));
-}
+// Call Depth appears depricated
+// /// check basic functionality of getCallDepth and increaseCallDepth
+// rule check_call_depth(uint ec) {
+//     uint8 before = getCallDepth(ec);
+//     uint newec = increaseCallDepth(ec);
+//     assert(to_mathint(getCallDepth(newec)) == before + 1);
+// }
+// 
+// rule check_call_depth_maximum(uint ec) {
+//     uint8 newCallDepth = require_uint8(getCallDepth(ec) + 2);
+//     // TODO: CALL_DEPTH_MAX suggests that the value itself is still valid. It is not.
+//     require(require_uint256(newCallDepth) < CALL_DEPTH_MAX());
+//     uint ec2 = increaseCallDepth(ec);
+//     uint ec3 = increaseCallDepth(ec2);
+//     assert(newCallDepth == getCallDepth(ec3));
+// }
 
 /// check basic functionality of getOnBehalfOfAccount and setOnBehalfOfAccount
 rule check_on_behalf_of_account(uint ec, address adr) {

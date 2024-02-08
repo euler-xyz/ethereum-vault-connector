@@ -13,9 +13,10 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return EC.unwrap(ExecutionContext.initialize());
     }
 
-    function getExecutionContextCallDepth() external view returns (uint8) {
-        return executionContext.getCallDepth();
-    }
+    // getCallDepth appears depricated
+    // function getExecutionContextCallDepth() external view returns (uint8) {
+    //     return executionContext.getCallDepth();
+    // }
 
     function getExecutionContextAreChecksDeferred() external view returns (bool) {
         return executionContext.areChecksDeferred();
