@@ -1,6 +1,6 @@
 
 methods{
-    function getAddressPrefix(address) external returns (uint152) envfree;
+    function getAddressPrefix(address) external returns (bytes19) envfree;
     function haveCommonOwner(address, address) external returns (bool) envfree;
 }
 
@@ -8,8 +8,8 @@ methods{
 rule check_have_commonPrefix(){
     address x;
     address y;
-    uint152 prefixX = getAddressPrefix(x);
-    uint152 prefixY = getAddressPrefix(y);
+    bytes19 prefixX = getAddressPrefix(x);
+    bytes19 prefixY = getAddressPrefix(y);
 
     bool haveCommonOwner = haveCommonOwner(x,y);
 

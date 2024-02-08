@@ -8,7 +8,7 @@ import "../utils/IsMustRevertFunction.spec";
 methods {
     function getRawExecutionContext() external returns (uint256) envfree;
     function getExecutionContextDefault() external returns (uint256) envfree;
-    function getExecutionContextCallDepth() external returns (uint8) envfree;
+    // function getExecutionContextCallDepth() external returns (uint8) envfree;
     function areAccountStatusChecksEmpty() external returns (bool) envfree;
     function areVaultStatusChecksEmpty() external returns (bool) envfree;
     function getCurrentOnBehalfOfAccount(address) external returns (address,bool) envfree;

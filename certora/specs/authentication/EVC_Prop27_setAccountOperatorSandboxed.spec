@@ -6,8 +6,8 @@
  * Verification report: https://prover.certora.com/output/65266/f5679749c8e44f979cb48ef89dfef608?anonymousKey=3303ccb55f2b00608cbb86b73eb90623113a5014
  */
 methods {
-    function getOperator(uint152, address) external returns (uint256) envfree;
-    function getAddressPrefix(address) external returns (uint152) envfree;
+    function getOperator(bytes19, address) external returns (uint256) envfree;
+    function getAddressPrefix(address) external returns (bytes19) envfree;
 }
 
 rule setAccountOperatorSandboxed(address account, address operator, bool authorized) {
@@ -15,7 +15,7 @@ rule setAccountOperatorSandboxed(address account, address operator, bool authori
     address otherOperator;
     env e;
 
-    uint152 addressPrefix = getAddressPrefix(otherAccount);
+    bytes19 addressPrefix = getAddressPrefix(otherAccount);
     // either otherAccount is from another prefix, or the operator is different
     require(getAddressPrefix(account) != addressPrefix || operator != otherOperator);
 

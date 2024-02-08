@@ -1,9 +1,9 @@
 import "../utils/IsMustRevertFunction.spec";
 
 methods {
-    function getOwnerOf(uint152) external returns (address) envfree;
-    function getOperator(uint152, address) external returns (uint256) envfree;
-    function getAddressPrefix(address) external returns (uint152) envfree;
+    function getOwnerOf(bytes19) external returns (address) envfree;
+    function getOperator(bytes19, address) external returns (uint256) envfree;
+    function getAddressPrefix(address) external returns (bytes19) envfree;
     function haveCommonOwner(address account, address otherAccount) external returns (bool) envfree;
 }
 
@@ -20,7 +20,7 @@ methods {
 rule onlyOwnerCanCallSetOperator() {
     env e;
 
-    uint152 addressPrefix;
+    bytes19 addressPrefix;
     address operator;
     uint256 operatorBitField;
 
@@ -47,20 +47,20 @@ rule onlyOwnerCanCallSetOperator() {
 }
 
 // a copy of the internal ownerLookup
-ghost mapping(uint152 => address) ownerLookupGhost {
-    init_state axiom forall uint152 prefix. ownerLookupGhost[prefix] == 0;
+ghost mapping(bytes19 => address) ownerLookupGhost {
+    init_state axiom forall bytes19 prefix. ownerLookupGhost[prefix] == 0;
 }
 // makes sure the ownerLookupGhost is updated properly
-hook Sstore EthereumVaultConnectorHarness.ownerLookup[KEY uint152 prefix] address value STORAGE {
+hook Sstore EthereumVaultConnectorHarness.ownerLookup[KEY bytes19 prefix] address value STORAGE {
     ownerLookupGhost[prefix] = value;
 }
 // makes sure that reads from ownerLookup after havocs are correct
-hook Sload address value EthereumVaultConnectorHarness.ownerLookup[KEY uint152 prefix] STORAGE {
+hook Sload address value EthereumVaultConnectorHarness.ownerLookup[KEY bytes19 prefix] STORAGE {
     require(ownerLookupGhost[prefix] == value);
 }
 
 // check that an owner of a prefix is always from that prefix
-invariant OwnerIsFromPrefix(uint152 prefix)
+invariant OwnerIsFromPrefix(bytes19 prefix)
     getOwnerOf(prefix) == 0 || getAddressPrefix(getOwnerOf(prefix)) == prefix
     filtered { f -> !isMustRevertFunction(f) }
 
@@ -76,7 +76,7 @@ rule theOwnerCanCallSetOperator() {
     // this in an interesting way to revert... *shrug*
     require(e.msg.value < nativeBalances[e.msg.sender]);
 
-    uint152 addressPrefix;
+    bytes19 addressPrefix;
     address operator;
     uint256 operatorBitField;
 

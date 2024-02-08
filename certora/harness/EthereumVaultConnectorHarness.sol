@@ -30,7 +30,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return executionContext.getOnBehalfOfAccount();
     }
 
-    function getOwnerOf(uint152 prefix) public view returns (address) {
+    function getOwnerOf(bytes19 prefix) public view returns (address) {
         return ownerLookup[prefix];
     }
 
