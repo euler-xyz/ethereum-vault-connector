@@ -22,7 +22,7 @@ methods {
  * ignore getCurrentOnBehalfOfAccount() as it always revers on call depth zero.
  */
 invariant topLevelFunctionDontChangeTransientStorage()
-    getExecutionContextCallDepth() == 0 &&
+    // getExecutionContextCallDepth() == 0 &&
     areAccountStatusChecksEmpty() && areVaultStatusChecksEmpty() &&
     getRawExecutionContext() == getExecutionContextDefault()
     filtered { f ->

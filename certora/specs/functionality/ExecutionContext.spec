@@ -1,26 +1,22 @@
 methods {
-    function CALL_DEPTH_MASK() external returns (uint) envfree;
-    function ON_BEHALF_OF_ACCOUNT_MASK() external returns (uint) envfree;
-    function CHECKS_LOCK_MASK() external returns (uint) envfree;
-    function IMPERSONATE_LOCK_MASK() external returns (uint) envfree;
-    function OPERATOR_AUTHENTICATED_MASK() external returns (uint) envfree;
-    function SIMULATION_MASK() external returns (uint) envfree;
-    function STAMP_MASK() external returns (uint) envfree;
-    function ON_BEHALF_OF_ACCOUNT_OFFSET() external returns (uint) envfree;
-    function STAMP_OFFSET() external returns (uint) envfree;
-    function CALL_DEPTH_MAX() external returns (uint) envfree;
-    function STAMP_DUMMY_VALUE() external returns (uint) envfree;
+    // TODO Redo for real masks
+    // function CALL_DEPTH_MASK() external returns (uint) envfree;
+    // function ON_BEHALF_OF_ACCOUNT_MASK() external returns (uint) envfree;
+    // function CHECKS_LOCK_MASK() external returns (uint) envfree;
+    // function IMPERSONATE_LOCK_MASK() external returns (uint) envfree;
+    // function OPERATOR_AUTHENTICATED_MASK() external returns (uint) envfree;
+    // function SIMULATION_MASK() external returns (uint) envfree;
+    // function STAMP_MASK() external returns (uint) envfree;
+    // function ON_BEHALF_OF_ACCOUNT_OFFSET() external returns (uint) envfree;
+    // function STAMP_OFFSET() external returns (uint) envfree;
+    // function CALL_DEPTH_MAX() external returns (uint) envfree;
+    // function STAMP_DUMMY_VALUE() external returns (uint) envfree;
 
     function areChecksDeferred(ExecutionContextHarness.EC context) external returns (bool) envfree;
-    // getCallDepth appears depricated
-    // function getCallDepth(ExecutionContextHarness.EC context) external returns (uint8) envfree;
-    function increaseCallDepth(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
     function getOnBehalfOfAccount(ExecutionContextHarness.EC context) external returns (address) envfree;
     function setOnBehalfOfAccount(ExecutionContextHarness.EC context, address account) external returns (ExecutionContextHarness.EC) envfree;
     function areChecksInProgress(ExecutionContextHarness.EC context) external returns (bool) envfree;
     function setChecksInProgress(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
-    function isImpersonationInProgress(ExecutionContextHarness.EC context) external returns (bool) envfree;
-    function setImpersonationInProgress(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
     function isOperatorAuthenticated(ExecutionContextHarness.EC context) external returns (bool) envfree;
     function setOperatorAuthenticated(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
     function clearOperatorAuthenticated(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
@@ -30,54 +26,58 @@ methods {
 }
 
 /// check that bitmasks are pairwise disjoint
-rule check_bitmasks_disjoint() {
-    assert(CALL_DEPTH_MASK() & ON_BEHALF_OF_ACCOUNT_MASK() == 0);
-    assert(CALL_DEPTH_MASK() & CHECKS_LOCK_MASK() == 0);
-    assert(CALL_DEPTH_MASK() & IMPERSONATE_LOCK_MASK() == 0);
-    assert(CALL_DEPTH_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
-    assert(CALL_DEPTH_MASK() & SIMULATION_MASK() == 0);
-    assert(CALL_DEPTH_MASK() & STAMP_MASK() == 0);
-
-    assert(ON_BEHALF_OF_ACCOUNT_MASK() & CHECKS_LOCK_MASK() == 0);
-    assert(ON_BEHALF_OF_ACCOUNT_MASK() & IMPERSONATE_LOCK_MASK() == 0);
-    assert(ON_BEHALF_OF_ACCOUNT_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
-    assert(ON_BEHALF_OF_ACCOUNT_MASK() & SIMULATION_MASK() == 0);
-    assert(ON_BEHALF_OF_ACCOUNT_MASK() & STAMP_MASK() == 0);
-
-    assert(CHECKS_LOCK_MASK() & IMPERSONATE_LOCK_MASK() == 0);
-    assert(CHECKS_LOCK_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
-    assert(CHECKS_LOCK_MASK() & SIMULATION_MASK() == 0);
-    assert(CHECKS_LOCK_MASK() & STAMP_MASK() == 0);
-
-    assert(IMPERSONATE_LOCK_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
-    assert(IMPERSONATE_LOCK_MASK() & SIMULATION_MASK() == 0);
-    assert(IMPERSONATE_LOCK_MASK() & STAMP_MASK() == 0);
-
-    assert(OPERATOR_AUTHENTICATED_MASK() & SIMULATION_MASK() == 0);
-    assert(OPERATOR_AUTHENTICATED_MASK() & STAMP_MASK() == 0);
-
-    assert(SIMULATION_MASK() & STAMP_MASK() == 0);
-}
+// NOTE: redo this for updated bit masks
+// rule check_bitmasks_disjoint() {
+//     // NOTE: need to make this complete for new masks
+//     // assert(CALL_DEPTH_MASK() & ON_BEHALF_OF_ACCOUNT_MASK() == 0);
+//     // assert(CALL_DEPTH_MASK() & CHECKS_LOCK_MASK() == 0);
+//     // assert(CALL_DEPTH_MASK() & IMPERSONATE_LOCK_MASK() == 0);
+//     // assert(CALL_DEPTH_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
+//     // assert(CALL_DEPTH_MASK() & SIMULATION_MASK() == 0);
+//     // assert(CALL_DEPTH_MASK() & STAMP_MASK() == 0);
+// 
+//     assert(ON_BEHALF_OF_ACCOUNT_MASK() & CHECKS_LOCK_MASK() == 0);
+//     // assert(ON_BEHALF_OF_ACCOUNT_MASK() & IMPERSONATE_LOCK_MASK() == 0);
+//     assert(ON_BEHALF_OF_ACCOUNT_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
+//     assert(ON_BEHALF_OF_ACCOUNT_MASK() & SIMULATION_MASK() == 0);
+//     assert(ON_BEHALF_OF_ACCOUNT_MASK() & STAMP_MASK() == 0);
+// 
+//     assert(CHECKS_LOCK_MASK() & IMPERSONATE_LOCK_MASK() == 0);
+//     assert(CHECKS_LOCK_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
+//     assert(CHECKS_LOCK_MASK() & SIMULATION_MASK() == 0);
+//     assert(CHECKS_LOCK_MASK() & STAMP_MASK() == 0);
+// 
+//     assert(IMPERSONATE_LOCK_MASK() & OPERATOR_AUTHENTICATED_MASK() == 0);
+//     assert(IMPERSONATE_LOCK_MASK() & SIMULATION_MASK() == 0);
+//     assert(IMPERSONATE_LOCK_MASK() & STAMP_MASK() == 0);
+// 
+//     assert(OPERATOR_AUTHENTICATED_MASK() & SIMULATION_MASK() == 0);
+//     assert(OPERATOR_AUTHENTICATED_MASK() & STAMP_MASK() == 0);
+// 
+//     assert(SIMULATION_MASK() & STAMP_MASK() == 0);
+// }
 
 /// check that the bitmasks cover all the bits
-rule check_bitmasks_coverall() {
-    assert(
-        CALL_DEPTH_MASK() |
-        ON_BEHALF_OF_ACCOUNT_MASK() |
-        CHECKS_LOCK_MASK() |
-        IMPERSONATE_LOCK_MASK() |
-        OPERATOR_AUTHENTICATED_MASK() |
-        SIMULATION_MASK() |
-        STAMP_MASK() == ~require_uint256(0)
-    );
-}
+// NOTE: redo for current masks
+// rule check_bitmasks_coverall() {
+//     assert(
+//         CALL_DEPTH_MASK() |
+//         ON_BEHALF_OF_ACCOUNT_MASK() |
+//         CHECKS_LOCK_MASK() |
+//         IMPERSONATE_LOCK_MASK() |
+//         OPERATOR_AUTHENTICATED_MASK() |
+//         SIMULATION_MASK() |
+//         STAMP_MASK() == ~require_uint256(0)
+//     );
+// }
 
 /// check that the offsets are right
-rule check_bitmasks_offsets() {
-    assert(CALL_DEPTH_MASK() <= (1 << ON_BEHALF_OF_ACCOUNT_OFFSET()));
-    assert(ON_BEHALF_OF_ACCOUNT_MASK() & require_uint256((1 << ON_BEHALF_OF_ACCOUNT_OFFSET()) - 1) == 0);
-    assert(STAMP_MASK() & require_uint256((1 << STAMP_OFFSET()) - 1) == 0);
-}
+// NOTE: redo for current masks
+// rule check_bitmasks_offsets() {
+//     assert(CALL_DEPTH_MASK() <= (1 << ON_BEHALF_OF_ACCOUNT_OFFSET()));
+//     assert(ON_BEHALF_OF_ACCOUNT_MASK() & require_uint256((1 << ON_BEHALF_OF_ACCOUNT_OFFSET()) - 1) == 0);
+//     assert(STAMP_MASK() & require_uint256((1 << STAMP_OFFSET()) - 1) == 0);
+// }
 
 // Call Depth appears depricated
 // /// check basic functionality of getCallDepth and increaseCallDepth
