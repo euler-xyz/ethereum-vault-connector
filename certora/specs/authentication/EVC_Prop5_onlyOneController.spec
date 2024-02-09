@@ -14,7 +14,6 @@ certoraMutate --prover_conf certora/conf/authentication/EVC_onlyOneController.co
 
 methods {
     function numOfController(address account) external returns(uint8) envfree;
-    // function getCurrentCallDepth() external returns(uint256) envfree;
 }
 
 // Helper method: the call depth is always zero (while no method is running)
@@ -38,4 +37,3 @@ invariant onlyOneController(address a)
     filtered { // TODO: make this work for batch as well
         f -> f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
     }
-    // { preserved { requireInvariant callDepthIsZero(); } }
