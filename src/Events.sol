@@ -18,4 +18,6 @@ contract Events {
         address indexed targetContract,
         bytes4 selector
     );
+    event AccountStatusCheck(address indexed account, address indexed controller);
+    event VaultStatusCheck(address indexed vault);
 }

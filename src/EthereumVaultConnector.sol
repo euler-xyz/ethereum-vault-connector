@@ -810,6 +810,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         isValid = success && result.length == 32
             && abi.decode(result, (bytes32)) == bytes32(IVault.checkAccountStatus.selector);
+
+        emit AccountStatusCheck(account, controller);
     }
 
     function requireAccountStatusCheckInternal(address account) internal virtual {
@@ -826,6 +828,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         isValid =
             success && result.length == 32 && abi.decode(result, (bytes32)) == bytes32(IVault.checkVaultStatus.selector);
+
+        emit VaultStatusCheck(vault);
     }
 
     function requireVaultStatusCheckInternal(address vault) internal virtual {
