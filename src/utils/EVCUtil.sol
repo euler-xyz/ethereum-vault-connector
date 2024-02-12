@@ -22,7 +22,7 @@ abstract contract EVCUtil {
     /// @dev Optional to use for functions requiring account and vault status checks to enforce predictable bahvior.
     /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
     /// modifier of the function.
-    modifier callThroughEVC() {
+    modifier callThroughEVC() virtual {
         if (msg.sender == address(evc)) {
             _;
         } else {
@@ -39,7 +39,7 @@ abstract contract EVCUtil {
     /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
     /// modifier of the function.
     /// @dev This modifier is used for payable functions because it forwards the value to the EVC.
-    modifier callThroughEVCPayable() {
+    modifier callThroughEVCPayable() virtual {
         if (msg.sender == address(evc)) {
             _;
         } else {
@@ -53,7 +53,7 @@ abstract contract EVCUtil {
 
     /// @notice Ensures that the caller is the EVC in the appropriate context.
     /// @dev Should be used for checkAccountStatus and checkVaultStatus functions.
-    modifier onlyEVCWithChecksInProgress() {
+    modifier onlyEVCWithChecksInProgress() virtual {
         if (msg.sender != address(evc) || !evc.areChecksInProgress()) {
             revert NotAuthorized();
         }
@@ -65,7 +65,7 @@ abstract contract EVCUtil {
     /// @dev This function returns the account on behalf of which the current operation is being performed, which is
     /// either msg.sender or the account authenticated by the EVC.
     /// @return The address of the message sender.
-    function _msgSender() internal view returns (address) {
+    function _msgSender() internal view virtual returns (address) {
         address sender = msg.sender;
 
         if (sender == address(evc)) {
@@ -80,7 +80,7 @@ abstract contract EVCUtil {
     /// either msg.sender or the account authenticated by the EVC. This function reverts if this contract is not enabled
     /// as a controller for the account on behalf of which the operation is being executed.
     /// @return The address of the message sender.
-    function _msgSenderForBorrow() internal view returns (address) {
+    function _msgSenderForBorrow() internal view virtual returns (address) {
         address sender = msg.sender;
         bool controllerEnabled;
 
@@ -101,7 +101,7 @@ abstract contract EVCUtil {
     /// @dev Use with care. If the account is not registered on the EVC yet, the queried account address is returned.
     /// @param account The address of the account.
     /// @return owner The address of the account owner.
-    function _getAccountOwner(address account) internal view returns (address owner) {
+    function _getAccountOwner(address account) internal view virtual returns (address owner) {
         try evc.getAccountOwner(account) returns (address _owner) {
             owner = _owner;
         } catch {
