@@ -72,11 +72,12 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
     assert(executingContract != currentContract || addr != currentContract);
 }
 
-// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
+// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function or controlCollateral". Expected to fail on permit() function.
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
   filtered {f -> 
     !isMustRevertFunction(f) &&
-    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector
+    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector &&
+    f.selector != sig:EthereumVaultConnectorHarness.controlCollateral(address, address, uint256, bytes).selector
   }{
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
