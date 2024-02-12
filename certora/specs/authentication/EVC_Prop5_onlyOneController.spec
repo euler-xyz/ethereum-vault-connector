@@ -16,9 +16,6 @@ methods {
     function numOfController(address account) external returns(uint8) envfree;
 }
 
-// Helper method: the call depth is always zero (while no method is running)
-// invariant callDepthIsZero() getCurrentCallDepth() == 0;
-
 /**
  * Check that we never have more than one controller.
  *
