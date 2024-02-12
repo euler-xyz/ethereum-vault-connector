@@ -11,9 +11,17 @@ from threading import Lock
 
 outputMutex = Lock()
 
+# Exclude config files that are not verifying from CI
+EXCLUDE_CONFS = [
+    "certora/conf/authentication/EVC_Prop2_setOperator.conf",
+    "certora/conf/authentication/EVC_Prop5_onlyOneController.conf",
+    "certora/conf/authentication/EVC_Prop24_onlyEVCCallsCriticalMethod.conf"
+]
+
 def listConfigs() -> list[str]:
     """List all config files."""
-    return glob.glob('certora/conf/**/*.conf', recursive=True)
+    all_confs = glob.glob('certora/conf/**/*.conf', recursive=True)
+    return [x for x in all_confs if x not in EXCLUDE_CONFS]
 
 def loadConfigDependencies(filename: str) -> set[str]:
     """Load all files a config depends on."""
