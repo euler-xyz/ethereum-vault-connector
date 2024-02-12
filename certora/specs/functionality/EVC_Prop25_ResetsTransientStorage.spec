@@ -8,7 +8,6 @@ import "../utils/IsMustRevertFunction.spec";
 methods {
     function getRawExecutionContext() external returns (uint256) envfree;
     function getExecutionContextDefault() external returns (uint256) envfree;
-    // function getExecutionContextCallDepth() external returns (uint8) envfree;
     function areAccountStatusChecksEmpty() external returns (bool) envfree;
     function areVaultStatusChecksEmpty() external returns (bool) envfree;
     function getCurrentOnBehalfOfAccount(address) external returns (address,bool) envfree;
@@ -22,7 +21,6 @@ methods {
  * ignore getCurrentOnBehalfOfAccount() as it always revers on call depth zero.
  */
 invariant topLevelFunctionDontChangeTransientStorage()
-    // getExecutionContextCallDepth() == 0 &&
     areAccountStatusChecksEmpty() && areVaultStatusChecksEmpty() &&
     getRawExecutionContext() == getExecutionContextDefault()
     filtered { f ->
