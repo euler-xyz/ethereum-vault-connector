@@ -39,4 +39,8 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         return operatorLookup[addressPrefix][operator];
     }
+    function getAccountController(address account) public view returns (address) {
+        return accountControllers[account].firstElement;
+
+    }
 }

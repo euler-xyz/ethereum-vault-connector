@@ -5,6 +5,10 @@ import "../utils/IsMustRevertFunction.spec";
  */
 import "../utils/CallOpSanity.spec";
 
+methods {
+    function getAccountController(address account) external returns (address) envfree;
+}
+
 ////////////////////////////////////////////////////////////////
 //                                                            //
 //           Account Controllers (Ghost and Hooks)            //
@@ -72,7 +76,9 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
     assert(executingContract != currentContract || addr != currentContract);
 }
 
-// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function or controlCollateral". Expected to fail on permit() function.
+// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function. Expected to fail on permit() function.
+// To prove this for controlCollateral, we need the additionl assumption
+// that the EVC can never become an account controller. (See the rule after this one)
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
   filtered {f -> 
     !isMustRevertFunction(f) &&
@@ -81,10 +87,23 @@ rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
   }{
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
-
     f(e,args);
 
     assert(true);
 }
 
+// For onlyController we need the additional assumption that
+// the EVC ("currentContract") can never become a controller.
+rule onlyEVCCanCallCriticalMethodOnlyController {
+    env e;
+    address targetCollateral;
+    address onBehalfOfAccount;
+    uint256 value;
+    bytes data;
 
+    require(e.msg.sender != currentContract);
+    require getAccountController(onBehalfOfAccount) != currentContract;
+    controlCollateral(e, targetCollateral, onBehalfOfAccount, value, data);
+
+    assert(true);
+}
