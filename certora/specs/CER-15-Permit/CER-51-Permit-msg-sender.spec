@@ -94,6 +94,8 @@ rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
 
 // For onlyController we need the additional assumption that
 // the EVC ("currentContract") can never become a controller.
+// NOTE: We will eventually prove this assumption to satisfy
+// https://linear.app/euler-labs/issue/CER-81/controllers-restrictions
 rule onlyEVCCanCallCriticalMethodOnlyController {
     env e;
     address targetCollateral;
