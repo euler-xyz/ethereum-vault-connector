@@ -23,9 +23,9 @@ methods {
  *   we make sure that we run the account status checks for
  *   all accounts registered for a status check.
  * 
- * For enableController we can prove this invariant holds directly when checks 
- * are not deferred, but not of they are deferred. We show that when checks
- * are deferred, enableController enqueues a status check. 
+ * We prove this separately for enableController as we need to break it into
+ * cases (when checks are deferred vs not). This is done in the 3 rules that
+ * follow this one.
  */
 invariant onlyOneController(address a)
     numOfController(a) <= 1
