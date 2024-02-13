@@ -8,6 +8,8 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 contract VaultStatusTest is Test {
     EthereumVaultConnectorHarness internal evc;
 
+    event VaultStatusCheck(address indexed vault);
+
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
     }
@@ -25,11 +27,15 @@ contract VaultStatusTest is Test {
             );
 
             vm.prank(vault);
-            if (!(allStatusesValid || uint160(vault) % 3 == 0)) {
+            if (allStatusesValid || uint160(vault) % 3 == 0) {
+                vm.expectEmit(true, false, false, false, address(evc));
+                emit VaultStatusCheck(vault);
+            } else {
                 vm.expectRevert(
                     uint160(vault) % 3 == 1 ? bytes("vault status violation") : abi.encode(bytes4(uint32(1)))
                 );
             }
+
             evc.requireVaultStatusCheck();
             evc.verifyVaultStatusChecks();
             evc.clearExpectedChecks();
