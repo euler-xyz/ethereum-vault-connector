@@ -43,4 +43,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return accountControllers[account].firstElement;
 
     }
+    function isAccountController(address account, address controller) public view returns (bool) {
+        return accountControllers[account].contains(controller);
+    }
 }

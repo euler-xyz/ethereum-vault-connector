@@ -7,6 +7,9 @@ import "../utils/CallOpSanity.spec";
 
 methods {
     function getAccountController(address account) external returns (address) envfree;
+    function isCollateralEnabled(address account, address vault) external returns (bool) envfree;
+    function isAccountController(address account, address controller) external returns (bool) envfree;
+
 }
 
 ////////////////////////////////////////////////////////////////
@@ -93,9 +96,9 @@ rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
 }
 
 // For onlyController we need the additional assumption that
-// the EVC ("currentContract") can never become a controller.
+// the EVC ("currentContract") can never become a collateral for any address.
 // NOTE: We will eventually prove this assumption to satisfy
-// https://linear.app/euler-labs/issue/CER-81/controllers-restrictions
+// CER-80: https://linear.app/euler-labs/issue/CER-80/collaterals-restrictions
 rule onlyEVCCanCallCriticalMethodOnlyController {
     env e;
     address targetCollateral;
@@ -104,7 +107,7 @@ rule onlyEVCCanCallCriticalMethodOnlyController {
     bytes data;
 
     require(e.msg.sender != currentContract);
-    require getAccountController(onBehalfOfAccount) != currentContract;
+    require !isCollateralEnabled(onBehalfOfAccount, currentContract);
     controlCollateral(e, targetCollateral, onBehalfOfAccount, value, data);
 
     assert(true);
