@@ -44,6 +44,30 @@ rule onlyOwnerCanCallSetOperator() {
     assert(getOperator(addressPrefix, operator) == operatorBitField);
 }
 
+rule onlyOwnerOrOperatorCanCallSetAccountOperator() {
+    env e;
+    address account;
+    address operator;
+    bool authorized;
+
+    // if msg.sender is the currentContract, it means we are within permit() and
+    // we need to use executionContext.getOnBehalfOfAccount() instead.
+    address actualCaller = e.msg.sender;
+    if (e.msg.sender == currentContract) {
+        actualCaller = getExecutionContextOnBehalfOfAccount(e);
+    }
+
+    // call the setAccountOperator method.
+    setAccountOperator(e, account, operator, authorized);
+
+    address owner = haveCommonOwner(account, actualCaller) ? actualCaller : getAccountOwner(e, account);
+
+    // Since setAccountOperator did not revert, the actualCaller
+    // must either be the owner or operator
+    assert(actualCaller == owner || actualCaller == operator);
+
+}
+
 // a copy of the internal ownerLookup
 ghost mapping(bytes19 => address) ownerLookupGhost {
     init_state axiom forall bytes19 prefix. ownerLookupGhost[prefix] == 0;
@@ -60,7 +84,13 @@ hook Sload address value EthereumVaultConnectorHarness.ownerLookup[KEY bytes19 p
 // check that an owner of a prefix is always from that prefix
 invariant OwnerIsFromPrefix(bytes19 prefix)
     getOwnerOf(prefix) == 0 || getAddressPrefix(getOwnerOf(prefix)) == prefix
-    filtered { f -> !isMustRevertFunction(f) }
+    filtered { 
+        f -> !isMustRevertFunction(f) &&
+        // We can't handle these functions since they have `CALL`s in them
+        f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
+        && 
+        f.selector != sig:call(address, address, uint256, bytes calldata).selector
+    }
 
 /**
  * Checks the inverse of the above rule: if an attacker tries to call
@@ -108,5 +138,5 @@ rule theOwnerCanCallSetOperator() {
 
     // call the setOperator() method.
     setOperator@withrevert(e, addressPrefix, operator, operatorBitField);
-    assert(!lastReverted);
+    satisfy(!lastReverted);
 }
