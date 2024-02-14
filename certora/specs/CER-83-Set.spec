@@ -96,6 +96,9 @@ invariant mirrorIsCorrect(uint8 i)
 /** @title Elements are unique in the set.
 Proving this is together with proving that each element has a single index 
 **/
+// CER-93 Set insert: must insert an element into the set unless it's a 
+// duplicate or the set is full. This is covered by a combination of
+// containsIntegrity() and validSet().
 invariant validSet() 
     // inverse
     ( forall mathint i. ( i <= ghostLength && i > 1) => 
@@ -134,14 +137,15 @@ invariant containsIntegrity(address v )
             }
         }
 
-/** @title after insert the element is contained in the list */
+// CER-86 Set insert: contains must return true iff an element is present in 
+// the set. (This is specified in combination with validSet/containsIntegrity)
 rule contained_if_inserted(address a) {
     env e;
     insert(a);
     assert(contains(a));
 }
 
-/** @title after remove the element is not contained in the list */
+// CER-91: set library MUST remove an element from the set if it's present
 rule not_contained_if_removed(address a) {
     env e;
     requireInvariant validSet();
@@ -153,7 +157,9 @@ rule not_contained_if_removed(address a) {
     assert(!contains(a));
 }
 
-/** @title remove succeed if the element was contained in the list */
+// CER-90: remove must return true if an element was successfully removed from 
+// the set.remove must return false if an element was not removed from the set.
+// (In other words it returns true if and only if an element is removed).
 rule removed_iff_not_contained(address a) {
     env e;
     requireInvariant validSet();
