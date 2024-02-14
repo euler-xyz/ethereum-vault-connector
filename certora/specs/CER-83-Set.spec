@@ -1,14 +1,6 @@
 
 /*
 Verification of Set.sol 
-
-Verification result: https://prover.certora.com/output/40726/a85d57c5250442bf975413dc00614c6d/?anonymousKey=43671eccead733abf7154b4168eaf8f6e6eebeb8
-run command:
-  certoraRun certora/conf/Set.conf 
-
-Mutation run: https://mutation-testing.certora.com/?id=c2450727-bc24-41a4-b0b6-defbc1c60e28&anonymousKey=59c9f66c-a875-41f3-927e-97de8446769a
-to run mutation:
- certoraMutate --prover_conf certora/conf/Set.conf --mutation_conf setMutate.conf
 */
 
 methods {
@@ -137,7 +129,7 @@ invariant containsIntegrity(address v )
             }
         }
 
-// CER-86 Set insert: contains must return true iff an element is present in 
+// CER-86 Set insert: contains must return true if an element is present in 
 // the set. (This is specified in combination with validSet/containsIntegrity)
 rule contained_if_inserted(address a) {
     env e;
