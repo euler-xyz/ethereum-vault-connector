@@ -8,8 +8,6 @@ methods {
 }
 
 /**
- * EVC Spec #2
- *
  * Check that `setOperator(addressPrefix, ...)` can only be called if msg.sender
  * is the owner of the address prefix. Technically, we check that
  * - msg.sender is from the prefix itself and thus a plausible owner
@@ -101,12 +99,7 @@ rule theOwnerCanCallSetOperator() {
         require(owner == 0 || owner == e.msg.sender);
     }
 
-    // the operator can not be zero
-    // [TODO] this could be part of the interface documentation, but maybe not necessary
-    require(operator != 0);
-
     // the operator can not be from the prefix either
-    // [TODO] this is not part of the interface documentation yet
     require(getAddressPrefix(operator) != getAddressPrefix(caller));
 
     // the current bitfield must be different from what we try to set

@@ -1,9 +1,7 @@
 
 /**
- * EVC Spec #27
  * Calling setAccountOperator does not affect the state for any operator
  * other than the target of the function call.
- * Verification report: https://prover.certora.com/output/65266/f5679749c8e44f979cb48ef89dfef608?anonymousKey=3303ccb55f2b00608cbb86b73eb90623113a5014
  */
 methods {
     function getOperator(bytes19, address) external returns (uint256) envfree;
