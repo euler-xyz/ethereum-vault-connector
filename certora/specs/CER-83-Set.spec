@@ -2,13 +2,14 @@
 /*
 Verification of Set.sol 
 */
+using SetHarness as Set;
 
 methods {
-    function insert(address element) external returns (bool) envfree;
-    function remove(address element) external returns (bool) envfree;
-    function get(uint8 index) external returns (address) envfree;
-    function contains(address element) external returns (bool) envfree;
-    function length() external returns (uint8) envfree;
+    function Set.insert(address element) external returns (bool) envfree;
+    function Set.remove(address element) external returns (bool) envfree;
+    function Set.get(uint8 index) external returns (address) envfree;
+    function Set.contains(address element) external returns (bool) envfree;
+    function Set.length() external returns (uint8) envfree;
 }
 
 
@@ -42,7 +43,7 @@ ghost address ghostFirst {
 }
 
 // Store and load hooks to synchronize ghostValues .
-hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) STORAGE {
+hook Sstore Set.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) STORAGE {
     mathint index = to_mathint(_index)+1;
     require ghostValues[index] == oldValue;
     require ghostIndexes[oldValue] == index;
@@ -53,28 +54,28 @@ hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value addr
     
 }
 
-hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value STORAGE {
+hook Sload address v Set.setStorage.elements[INDEX uint256 index].value STORAGE {
     require ghostIndexes[v] == to_mathint(index+1);
     require ghostValues[index+1] == v;
 }
 
 // Store and load hooks to sync length
-hook Sstore currentContract.setStorage.numElements uint8 newValue (uint8 oldValue) STORAGE {
+hook Sstore Set.setStorage.numElements uint8 newValue (uint8 oldValue) STORAGE {
     // make sure we were mirroring before
     require ghostLength == to_mathint(oldValue);
     ghostLength = to_mathint(newValue);
 }
 
-hook Sload uint8 value currentContract.setStorage.numElements STORAGE {
+hook Sload uint8 value Set.setStorage.numElements STORAGE {
     require ghostLength == to_mathint(value);
 }
 
 // Store and load hooks to sync firstElement
-hook Sstore currentContract.setStorage.firstElement address newValue STORAGE {
+hook Sstore Set.setStorage.firstElement address newValue STORAGE {
     ghostFirst = newValue;
 }
 
-hook Sload address value currentContract.setStorage.firstElement STORAGE {
+hook Sload address value Set.setStorage.firstElement STORAGE {
     require ghostFirst == value;
 }
 
