@@ -24,10 +24,7 @@ methods {
  * - the account status checks verifies that there is only a single controller.
  * - the only place that adds a controller issues an account status check for
  *   the respective account, either immediately or by registering it to the set.
- * - whenever `executionContext` is written to in a way that could set the call
- *   depth back to zero, we make sure that we run the account status checks for
- *   all accounts registered for a status check.
- * - at the end of batch(), the execution context is restored to call depth zero.
+ * - at the end of batch(), the execution context is restored.
  */
 invariant onlyOneController(address a)
     numOfController(a) <= 1

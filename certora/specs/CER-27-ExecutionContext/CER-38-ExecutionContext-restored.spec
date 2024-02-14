@@ -10,6 +10,10 @@ import "../utils/CallOpSanity.spec";
 
 methods {
     function getRawExecutionContext() external returns (uint256) envfree;
+    function getExecutionContextDefault() external returns (uint256) envfree;
+    function areAccountStatusChecksEmpty() external returns (bool) envfree;
+    function areVaultStatusChecksEmpty() external returns (bool) envfree;
+    function getCurrentOnBehalfOfAccount(address) external returns (address,bool) envfree;
 }
 
 /**
@@ -24,4 +28,31 @@ rule noFunctionChangesExecutionContext(method f) filtered {f -> !isMustRevertFun
     uint256 preEC = getRawExecutionContext();
     f(e, args);
     assert(preEC == getRawExecutionContext());
+}
+
+/**
+ * Verify that after any function call, both account and
+ * vault status checks are empty, and the execution context is set back to its
+ * default value.
+ * We ignore must-revert functions to avoid sanity issues. Additionally, we
+ * ignore getCurrentOnBehalfOfAccount() as it always reverts.
+ */
+invariant topLevelFunctionDontChangeTransientStorage()
+    areAccountStatusChecksEmpty() && areVaultStatusChecksEmpty() &&
+    getRawExecutionContext() == getExecutionContextDefault()
+    filtered { f ->
+        !isMustRevertFunction(f) &&
+        f.selector != sig:getCurrentOnBehalfOfAccount(address).selector
+    }
+
+/**
+ * Check that `getCurrentOnBehalfOfAccount` always reverts in case the invariant holds.
+ * This justifies the filter applied to the invariant above. 
+ */
+rule getCurrentOnBehalfOfAccountAlwaysReverts() {
+    requireInvariant topLevelFunctionDontChangeTransientStorage();
+    env e;
+    address controllerToCheck;
+    getCurrentOnBehalfOfAccount@withrevert(controllerToCheck);
+    assert(lastReverted);
 }
