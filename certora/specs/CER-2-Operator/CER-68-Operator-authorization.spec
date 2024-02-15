@@ -93,10 +93,9 @@ invariant OwnerIsFromPrefix(bytes19 prefix)
     }
 
 /**
- * Checks the inverse of the above rule: if an attacker tries to call
- * `setOperator()`, the call reverts. We consider the caller an attacker if
- * either if the prefix has no owner yet, but the caller is not from this prefix
- * or if the prefix has an owner that is not the caller.
+  * Checks a liveness property that the owner of an account
+  * can succesfully set an operator (under a few assumptions
+  * that are spelled out with the "require" statements).
  */
 rule theOwnerCanCallSetOperator() {
     env e;
@@ -114,6 +113,7 @@ rule theOwnerCanCallSetOperator() {
     // the actual caller (either msg.sender or the onBehalfOfAccount)
     address caller = e.msg.sender;
 
+    // This is a permit self-call:
     if (e.msg.sender == currentContract) {
         // we are within permit() and should use getOnBehalfOfAccount() instead
         caller = getExecutionContextOnBehalfOfAccount(e);
@@ -121,6 +121,7 @@ rule theOwnerCanCallSetOperator() {
         require(owner == caller && owner != 0 && owner != currentContract);
         // the owner has the proper prefix
         require(getAddressPrefix(owner) == addressPrefix);
+    // This is the normal case where the caller is msg.sender:
     } else {
         // just a regular call from msg.sender
         // msg.sender is from the proper prefix
@@ -129,14 +130,19 @@ rule theOwnerCanCallSetOperator() {
         require(owner == 0 || owner == e.msg.sender);
     }
 
+    // The function will revert if any of these assumptions do not hold:
+    require !(operator == currentContract);
+    require !(haveCommonOwner(caller, operator));
+    require operator != 0;
+
     // the operator can not be from the prefix either
     require(getAddressPrefix(operator) != getAddressPrefix(caller));
 
     // the current bitfield must be different from what we try to set
-    // [TODO] this is not part of the interface documentation yet
     require(getOperator(addressPrefix, operator) != operatorBitField);
 
     // call the setOperator() method.
     setOperator@withrevert(e, addressPrefix, operator, operatorBitField);
-    satisfy(!lastReverted);
+    // check that it does not revert under these assumptions
+    assert(!lastReverted);
 }
