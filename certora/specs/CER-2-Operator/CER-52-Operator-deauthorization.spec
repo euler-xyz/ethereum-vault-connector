@@ -19,15 +19,13 @@ rule operatorDeauthorizationSetOperator {
     address operator;
     uint256 operatorBitField;
 
-    address owner = getOwnerOf(addressPrefix);
     address caller = actualCaller(e);
-    require owner != 0; // rule does not succeed without this
 
     // call the setOperator() method giving 0 as the bit field to deauthorize
     setOperator(e, addressPrefix, operator, 0);
     // since the function did not revert the caller must be
     // the owner or the operator mentioned
-    assert caller == owner || caller == operator;
+    assert caller == getOwnerOf(addressPrefix) || caller == operator;
 }
 
 rule operatorDeauthorizationSetAccountOperator() {
