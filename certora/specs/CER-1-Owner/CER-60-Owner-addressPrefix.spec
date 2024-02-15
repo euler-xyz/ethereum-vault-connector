@@ -4,7 +4,7 @@ methods{
     function haveCommonOwner(address, address) external returns (bool) envfree;
 }
 
-//check that to addresses with the same prefix also have a common owner
+//check that two addresses with the same prefix also have a common owner
 rule check_have_commonPrefix(){
     address x;
     address y;
