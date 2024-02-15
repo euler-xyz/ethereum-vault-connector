@@ -49,20 +49,6 @@ rule onlyOwnerCanCallSetOperator() {
     assert(getOperator(addressPrefix, operator) == operatorBitField);
 }
 
-
-// a copy of the internal ownerLookup
-ghost mapping(bytes19 => address) ownerLookupGhost {
-    init_state axiom forall bytes19 prefix. ownerLookupGhost[prefix] == 0;
-}
-// makes sure the ownerLookupGhost is updated properly
-hook Sstore EthereumVaultConnectorHarness.ownerLookup[KEY bytes19 prefix] address value STORAGE {
-    ownerLookupGhost[prefix] = value;
-}
-// makes sure that reads from ownerLookup after havocs are correct
-hook Sload address value EthereumVaultConnectorHarness.ownerLookup[KEY bytes19 prefix] STORAGE {
-    require(ownerLookupGhost[prefix] == value);
-}
-
 // check that an owner of a prefix is always from that prefix
 invariant OwnerIsFromPrefix(bytes19 prefix)
     getOwnerOf(prefix) == 0 || getAddressPrefix(getOwnerOf(prefix)) == prefix
