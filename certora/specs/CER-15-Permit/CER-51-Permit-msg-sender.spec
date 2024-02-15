@@ -81,7 +81,9 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
 
 // This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function. Expected to fail on permit() function.
 // To prove this for controlCollateral, we need the additionl assumption
-// that the EVC can never become an account controller. (See the rule after this one)
+// that the EVC can never become an account controller. (See the rule after this one). We also prove this assumption
+// CER-80: https://linear.app/euler-labs/issue/CER-80/collaterals-restrictions
+
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
   filtered {f -> 
     !isMustRevertFunction(f) &&
