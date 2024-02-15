@@ -1,5 +1,5 @@
 import "../utils/IsMustRevertFunction.spec";
-import "../utils/ActualCaller.spec"
+import "../utils/ActualCaller.spec";
 
 methods {
     function getOwnerOf(bytes19) external returns (address) envfree;
