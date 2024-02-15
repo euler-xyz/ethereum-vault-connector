@@ -13,7 +13,7 @@
 
 hook CALLCODE(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
 {
-    assert(executingContract != currentContract || false,
+    assert(executingContract != currentContract,
         "we should not use `callcode`"
     );
 }
