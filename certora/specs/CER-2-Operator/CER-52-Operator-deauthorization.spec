@@ -8,9 +8,42 @@ methods {
     function haveCommonOwner(address account, address otherAccount) external returns (bool) envfree;
 }
 
-rule operatorDeauthorization {
-    // TODO WIP need to find how deauthorization works
+// CER-52 Account Operator that is authorized to operate on behalf the Account MUST only be allowed to be deauthorized by:
+// - the Account Owner, or
+// - the Account Operator itself (one Account Operator MUST NOT be able to deauthorize the other Account Operator)
+
+rule operatorDeauthorizationSetOperator {
     env e;
-    assert true;
+
+    bytes19 addressPrefix;
+    address operator;
+    uint256 operatorBitField;
+
+    address owner = getOwnerOf(addressPrefix);
+    address caller = actualCaller(e);
+
+    // call the setOperator() method giving 0 as the bit field to deauthorize
+    setOperator(e, addressPrefix, operator, 0);
+    // since the function did not revert the caller must be
+    // the owner or the operator mentioned
+    assert caller == owner || caller == operator;
+}
+
+rule operatorDeauthorizationSetAccountOperator() {
+    env e;
+    address account;
+    address operator;
+
+    address caller = actualCaller(e);
+
+    // call the setAccountOperator method giving false 
+    // as last parameter to deauthorize
+    setAccountOperator(e, account, operator, false);
+
+    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
+
+    // Since setAccountOperator did not revert, the actualCaller
+    // must either be the owner or operator being deauthorized
+    assert caller == owner || caller == operator;
 
 }
