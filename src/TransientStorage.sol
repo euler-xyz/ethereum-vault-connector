@@ -11,6 +11,7 @@ import "./Set.sol";
 /// @dev All the variables in this contract are considered transient meaning that their state does not change between
 /// transactions.
 abstract contract TransientStorage {
+    using ExecutionContext for EC;
     using Set for SetStorage;
 
     enum SetType {
@@ -25,7 +26,7 @@ abstract contract TransientStorage {
     constructor() {
         // set the execution context to non-zero value to always keep the storage slot in non-zero state.
         // it allows for cheaper SSTOREs when the execution context is in its default state
-        executionContext = ExecutionContext.initialize();
+        executionContext = executionContext.initialize();
 
         // there are two types of data that are stored using SetStorage type:
         // - the data that is transient in nature (accountStatusChecks and vaultStatusChecks)

@@ -39,7 +39,7 @@ library Set {
     error TooManyElements();
     error InvalidIndex();
 
-    uint8 public constant MAX_ELEMENTS = 20; // must not exceed 255
+    uint8 internal constant MAX_ELEMENTS = 20; // must not exceed 255
     uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be 1
     uint8 internal constant DUMMY_STAMP = 1;
 

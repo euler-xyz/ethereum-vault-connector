@@ -80,7 +80,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         CACHED_DOMAIN_SEPARATOR = calculateDomainSeparator();
     }
 
-    receive() external payable {}
+    receive() external payable {
+        // only receives value, no need to do anything here
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
@@ -685,8 +687,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     function authenticateCaller(address account, bool allowOperator) internal virtual returns (address) {
-        bool authenticated = false;
         address msgSender = _msgSender();
+        bool authenticated;
 
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
