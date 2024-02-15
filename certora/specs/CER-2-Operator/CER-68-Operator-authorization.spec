@@ -113,7 +113,8 @@ rule theOwnerCanCallSetOperator() {
     assert(!lastReverted);
 }
 
-// Only the owner or operator of an account can set the operator of that account
+// Only the owner of an account can set the operator of that account
+// if it is called with authenticated=true
 rule onlyOwnerOrOperatorCanCallSetAccountOperator() {
     env e;
     address account;
@@ -128,41 +129,6 @@ rule onlyOwnerOrOperatorCanCallSetAccountOperator() {
 
     // Since setAccountOperator did not revert, the actualCaller
     // must either be the owner or operator
-    assert(caller == owner || caller == operator);
+    assert(caller == owner);
 
-}
-
-// A liveness property: an owner or operator of an account
-// can successfully call setAccountOperator without it reverting
-// (under a few other assumptions which are spelled out with requires)
-rule ownerOrOperatorSetAccountOperatorLiveness() {
-    env e;
-    address account;
-    address operator;
-
-    address caller = actualCaller(e);
-
-    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
-
-    // Assuming the caller is either the owner or operator of the account...
-    require caller == owner || caller == operator;
-
-    // And some other assumptions that if violated,
-    // will cause the code to revert:
-    require(e.msg.value < nativeBalances[e.msg.sender]);
-    require operator != 0;
-    require !(operator == currentContract);
-    require !(haveCommonOwner(caller, operator));
-
-    // This assumption is not quite enough to prevent the revert,
-    // although it seems exactly the same as the code. 
-    uint256 bitMask = 1 << assert_uint256(require_uint160(owner) ^ require_uint160(account));
-    uint256 oldOperatorBitField = getOperatorFromAddress(e, account, operator);
-    uint256 newOperatorBitField = oldOperatorBitField | bitMask;
-    require newOperatorBitField != oldOperatorBitField;
-
-    //  Call setOperator
-    setAccountOperator@withrevert(e, account, operator, true);
-    // Check that it does not revert under these conditions
-    assert !lastReverted;
 }
