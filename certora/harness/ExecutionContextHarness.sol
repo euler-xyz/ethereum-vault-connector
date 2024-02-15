@@ -55,4 +55,5 @@ contract ExecutionContextHarness {
     function initialize() external pure returns (EC result) {
         result = ExecutionContext.initialize();
     }
+
 }

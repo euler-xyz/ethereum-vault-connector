@@ -7,6 +7,16 @@ methods {
     function haveCommonOwner(address account, address otherAccount) external returns (bool) envfree;
 }
 
+// if msg.sender is the currentContract, it means we are within permit() and
+// we need to use executionContext.getOnBehalfOfAccount() instead.
+function actualCaller(env e) returns address {
+    if(e.msg.sender == currentContract) {
+        return getExecutionContextOnBehalfOfAccount(e);
+    } else {
+        return e.msg.sender;
+    }
+}
+
 /**
  * Check that `setOperator(addressPrefix, ...)` can only be called if msg.sender
  * is the owner of the address prefix. Technically, we check that
@@ -24,49 +34,21 @@ rule onlyOwnerCanCallSetOperator() {
 
     address ownerBefore = getOwnerOf(addressPrefix);
 
-    // if msg.sender is the currentContract, it means we are within permit() and
-    // we need to use executionContext.getOnBehalfOfAccount() instead.
-    address actualCaller = e.msg.sender;
-    if (e.msg.sender == currentContract) {
-        actualCaller = getExecutionContextOnBehalfOfAccount(e);
-    }
+    address caller = actualCaller(e);
 
     // call the setOperator() method.
     setOperator(e, addressPrefix, operator, operatorBitField);
 
     // sender is from the prefix itself and thus plausible to be the owner
-    assert(getAddressPrefix(actualCaller) == addressPrefix);
+    assert(getAddressPrefix(caller) == addressPrefix);
     // the owner before the call was either not set or actualCaller already
-    assert(ownerBefore == 0 || ownerBefore == actualCaller);
+    assert(ownerBefore == 0 || ownerBefore == caller);
     // sender is stored as the owner of the address prefix
-    assert(actualCaller == getOwnerOf(addressPrefix));
+    assert(caller == getOwnerOf(addressPrefix));
     // make sure the right bitfield was set
     assert(getOperator(addressPrefix, operator) == operatorBitField);
 }
 
-rule onlyOwnerOrOperatorCanCallSetAccountOperator() {
-    env e;
-    address account;
-    address operator;
-    bool authorized;
-
-    // if msg.sender is the currentContract, it means we are within permit() and
-    // we need to use executionContext.getOnBehalfOfAccount() instead.
-    address actualCaller = e.msg.sender;
-    if (e.msg.sender == currentContract) {
-        actualCaller = getExecutionContextOnBehalfOfAccount(e);
-    }
-
-    // call the setAccountOperator method.
-    setAccountOperator(e, account, operator, authorized);
-
-    address owner = haveCommonOwner(account, actualCaller) ? actualCaller : getAccountOwner(e, account);
-
-    // Since setAccountOperator did not revert, the actualCaller
-    // must either be the owner or operator
-    assert(actualCaller == owner || actualCaller == operator);
-
-}
 
 // a copy of the internal ownerLookup
 ghost mapping(bytes19 => address) ownerLookupGhost {
@@ -100,9 +82,6 @@ invariant OwnerIsFromPrefix(bytes19 prefix)
 rule theOwnerCanCallSetOperator() {
     env e;
 
-    // this in an interesting way to revert... *shrug*
-    require(e.msg.value < nativeBalances[e.msg.sender]);
-
     bytes19 addressPrefix;
     address operator;
     uint256 operatorBitField;
@@ -111,7 +90,7 @@ rule theOwnerCanCallSetOperator() {
     requireInvariant OwnerIsFromPrefix(addressPrefix);
 
     // the actual caller (either msg.sender or the onBehalfOfAccount)
-    address caller = e.msg.sender;
+    address caller = actualCaller(e);
 
     // This is a permit self-call:
     if (e.msg.sender == currentContract) {
@@ -131,9 +110,10 @@ rule theOwnerCanCallSetOperator() {
     }
 
     // The function will revert if any of these assumptions do not hold:
+    require(e.msg.value < nativeBalances[e.msg.sender]);
+    require operator != 0;
     require !(operator == currentContract);
     require !(haveCommonOwner(caller, operator));
-    require operator != 0;
 
     // the operator can not be from the prefix either
     require(getAddressPrefix(operator) != getAddressPrefix(caller));
@@ -145,4 +125,56 @@ rule theOwnerCanCallSetOperator() {
     setOperator@withrevert(e, addressPrefix, operator, operatorBitField);
     // check that it does not revert under these assumptions
     assert(!lastReverted);
+}
+
+// Only the owner or operator of an account can set the operator of that account
+rule onlyOwnerOrOperatorCanCallSetAccountOperator() {
+    env e;
+    address account;
+    address operator;
+
+    address caller = actualCaller(e);
+
+    // call the setAccountOperator method.
+    setAccountOperator(e, account, operator, true);
+
+    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
+
+    // Since setAccountOperator did not revert, the actualCaller
+    // must either be the owner or operator
+    assert(caller == owner || caller == operator);
+
+}
+
+// A liveness property: an owner or operator of an account
+// can successfully call setAccountOperator without it reverting
+// (under a few other assumptions which are spelled out with requires)
+rule ownerOrOperatorSetAccountOperatorLiveness() {
+    env e;
+    address account;
+    address operator;
+
+    address caller = actualCaller(e);
+
+    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
+
+    // Assuming the caller is either the owner or operator of the account...
+    require caller == owner || caller == operator;
+
+    // And some other assumptions that if violated,
+    // will cause the code to revert:
+    require(e.msg.value < nativeBalances[e.msg.sender]);
+    require operator != 0;
+    require !(operator == currentContract);
+    require !(haveCommonOwner(caller, operator));
+
+    uint256 bitMask = 1 << require_uint256(require_uint160(owner) ^ require_uint160(account));
+    uint256 oldOperatorBitField = getOperatorFromAddress(e, account, operator);
+    uint256 newOperatorBitField = oldOperatorBitField | bitMask;
+    require newOperatorBitField != oldOperatorBitField;
+
+    //  Call setOperator
+    setAccountOperator@withrevert(e, account, operator, true);
+    // Check that it does not revert under these conditions
+    assert !lastReverted;
 }
