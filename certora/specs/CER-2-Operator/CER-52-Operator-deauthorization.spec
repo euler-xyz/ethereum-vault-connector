@@ -21,6 +21,7 @@ rule operatorDeauthorizationSetOperator {
 
     address owner = getOwnerOf(addressPrefix);
     address caller = actualCaller(e);
+    require owner != 0; // rule does not succeed without this
 
     // call the setOperator() method giving 0 as the bit field to deauthorize
     setOperator(e, addressPrefix, operator, 0);
@@ -35,12 +36,12 @@ rule operatorDeauthorizationSetAccountOperator() {
     address operator;
 
     address caller = actualCaller(e);
+    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
 
     // call the setAccountOperator method giving false 
     // as last parameter to deauthorize
     setAccountOperator(e, account, operator, false);
 
-    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
 
     // Since setAccountOperator did not revert, the actualCaller
     // must either be the owner or operator being deauthorized
