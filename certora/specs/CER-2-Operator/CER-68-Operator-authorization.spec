@@ -168,7 +168,9 @@ rule ownerOrOperatorSetAccountOperatorLiveness() {
     require !(operator == currentContract);
     require !(haveCommonOwner(caller, operator));
 
-    uint256 bitMask = 1 << require_uint256(require_uint160(owner) ^ require_uint160(account));
+    // This assumption is not quite enough to prevent the revert,
+    // although it seems exactly the same as the code. 
+    uint256 bitMask = 1 << assert_uint256(require_uint160(owner) ^ require_uint160(account));
     uint256 oldOperatorBitField = getOperatorFromAddress(e, account, operator);
     uint256 newOperatorBitField = oldOperatorBitField | bitMask;
     require newOperatorBitField != oldOperatorBitField;
