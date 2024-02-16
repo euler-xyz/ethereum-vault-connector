@@ -21,3 +21,20 @@ rule account_operator_owner() {
     // must not have the same owner.
     assert !haveCommonOwner(account, operator);
 }
+
+rule setOperator_owner() {
+    env e;
+
+    bytes19 addressPrefix;
+    address operator;
+    uint256 operatorBitField;
+
+    // call the setOperator() method.
+    setOperator(e, addressPrefix, operator, operatorBitField);
+    // For any address "addr" with prefix "addressPrefix"
+    address addr;
+    require getAddressPrefix(addr) == addressPrefix;
+    // Since we did not revert, no such "addr" can have a common owner 
+    // with operator
+    assert !haveCommonOwner(addr, operator);
+}

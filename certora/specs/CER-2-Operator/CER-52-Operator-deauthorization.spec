@@ -25,7 +25,8 @@ rule operatorDeauthorizationSetOperator {
     setOperator(e, addressPrefix, operator, 0);
     // since the function did not revert the caller must be
     // the owner or the operator mentioned
-    assert caller == getOwnerOf(addressPrefix) || caller == operator;
+    assert caller != operator;
+    assert caller == getOwnerOf(addressPrefix);
 }
 
 rule operatorDeauthorizationSetAccountOperator() {
