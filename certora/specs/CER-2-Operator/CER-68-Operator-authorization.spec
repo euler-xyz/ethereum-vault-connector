@@ -93,8 +93,6 @@ rule theOwnerCanCallSetOperator() {
 
     // This is a permit self-call:
     if (e.msg.sender == currentContract) {
-        // we are within permit() and should use getOnBehalfOfAccount() instead
-        caller = getExecutionContextOnBehalfOfAccount(e);
         // the owner is already set, not zero and not EVC
         require(owner == caller && owner != 0 && owner != currentContract);
         // the owner has the proper prefix
@@ -110,7 +108,6 @@ rule theOwnerCanCallSetOperator() {
 
     // The function will revert if any of these assumptions do not hold:
     require(e.msg.value < nativeBalances[e.msg.sender]);
-    require operator != 0;
     require !(operator == currentContract);
     require !(haveCommonOwner(caller, operator));
 
@@ -141,7 +138,7 @@ rule onlyOwnerOrOperatorCanCallSetAccountOperator() {
     address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
 
     // Since setAccountOperator did not revert, the actualCaller
-    // must either be the owner or operator
+    // must either be the owner
     assert(caller == owner);
 
 }
