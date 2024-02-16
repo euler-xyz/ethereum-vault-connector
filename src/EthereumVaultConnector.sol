@@ -310,7 +310,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address owner = haveCommonOwnerInternal(account, msgSender) ? msgSender : getAccountOwnerInternal(account);
 
         // if it's an operator calling, it can only act for itself and must not be able to change other operators status
-        if (owner != msgSender && operator != msgSender) {
+        if (owner != msgSender && operator != msgSender && address(this) != msg.sender) {
             revert EVC_NotAuthorized();
         }
 
