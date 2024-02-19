@@ -23,8 +23,7 @@ rule operatorDeauthorizationSetOperator {
 
     // call the setOperator() method giving 0 as the bit field to deauthorize
     setOperator(e, addressPrefix, operator, 0);
-    // since the function did not revert the caller must be
-    // the owner or the operator mentioned
+    // since the function did not revert the caller must be the owner
     assert caller != operator;
     assert caller == getOwnerOf(addressPrefix);
 }
