@@ -27,12 +27,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
     bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
-    bytes32 internal constant PERMIT_TYPEHASH = keccak256(
-        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
-    );
-
     bytes32 internal constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    bytes32 internal constant PERMIT_TYPE_HASH = keccak256(
+        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,address sentinel,uint256 value,bytes data)"
+    );
+
+    bytes32 internal constant PERMIT_SENTINEL_TYPE_HASH = keccak256("PermitSentinel(address sentinel,bytes signature)");
 
     uint256 internal immutable CACHED_CHAIN_ID;
     bytes32 internal immutable CACHED_DOMAIN_SEPARATOR;
@@ -64,6 +66,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     mapping(bytes19 addressPrefix => address owner) internal ownerLookup;
 
     mapping(bytes19 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
+
+    mapping(bytes19 addressPrefix => mapping(address sentinel => bool authorized)) internal sentinelLookup;
 
     mapping(bytes19 addressPrefix => mapping(uint256 nonceNamespace => uint256 nonce)) internal nonceLookup;
 
@@ -257,6 +261,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
+    function isSentinelAuthorized(bytes19 addressPrefix, address sentinel) external view returns (bool) {
+        return sentinelLookup[addressPrefix][sentinel];
+    }
+
+    /// @inheritdoc IEVC
     function setNonce(
         bytes19 addressPrefix,
         uint256 nonceNamespace,
@@ -337,6 +346,27 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             operatorLookup[addressPrefix][operator] = newOperatorBitField;
 
             emit OperatorStatus(addressPrefix, operator, newOperatorBitField);
+        }
+    }
+
+    /// @inheritdoc IEVC
+    function setSentinel(
+        bytes19 addressPrefix,
+        address sentinel,
+        bool authorized
+    ) public payable virtual onlyOwner(addressPrefix) {
+        // it is prohibited to authorize the sentinel within the self-call of the permit() or within a checks-deferrable
+        // call
+        if (authorized && (address(this) == msg.sender || executionContext.areChecksDeferred())) {
+            revert EVC_NotAuthorized();
+        }
+
+        if (sentinelLookup[addressPrefix][sentinel] == authorized) {
+            revert EVC_InvalidSentinelStatus();
+        } else {
+            sentinelLookup[addressPrefix][sentinel] = authorized;
+
+            emit SentinelStatus(addressPrefix, sentinel, authorized);
         }
     }
 
@@ -422,45 +452,45 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Permit
 
     /// @inheritdoc IEVC
-    function permit(
-        address signer,
-        uint256 nonceNamespace,
-        uint256 nonce,
-        uint256 deadline,
-        uint256 value,
-        bytes calldata data,
-        bytes calldata signature
-    ) public payable virtual nonReentrantChecksAndControlCollateral {
+    function permit(PermitPayload calldata payload) public payable virtual nonReentrantChecksAndControlCollateral {
         // cannot be called within the self-call of the permit(); can occur for nested permit() calls
         if (address(this) == msg.sender) {
             revert EVC_NotAuthorized();
         }
 
-        bytes19 addressPrefix = getAddressPrefixInternal(signer);
+        address signer = payload.signer;
 
         if (signer == address(0) || !isSignerValid(signer)) {
             revert EVC_InvalidAddress();
         }
 
+        bytes19 addressPrefix = getAddressPrefixInternal(signer);
+        uint256 nonceNamespace = payload.nonceNamespace;
         uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
 
-        if (currentNonce == type(uint256).max || currentNonce != nonce) {
+        if (currentNonce == type(uint256).max || currentNonce != payload.nonce) {
             revert EVC_InvalidNonce();
         }
 
-        if (deadline < block.timestamp) {
+        address sentinel = payload.sentinel;
+
+        if (sentinel == address(0) || !sentinelLookup[addressPrefix][sentinel]) {
+            revert EVC_InvalidSentinelStatus();
+        }
+
+        if (payload.deadline < block.timestamp) {
             revert EVC_InvalidTimestamp();
         }
 
-        if (data.length == 0) {
+        if (payload.data.length == 0) {
             revert EVC_InvalidData();
         }
 
-        bytes32 permitHash = getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        (bytes32 permitHash, bytes32 permitSentinelHash) = getPermitHashes(payload);
 
         if (
-            signer != recoverECDSASigner(permitHash, signature)
-                && !isValidERC1271Signature(signer, permitHash, signature)
+            signer != recoverECDSASigner(permitHash, payload.signature)
+                && !isValidERC1271Signature(signer, permitHash, payload.signature)
         ) {
             revert EVC_NotAuthorized();
         }
@@ -469,10 +499,18 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
         }
 
-        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
+        emit NonceUsed(addressPrefix, nonceNamespace, currentNonce);
+
+        if (
+            sentinel != recoverECDSASigner(permitSentinelHash, payload.sentinelSignature)
+                && !isValidERC1271Signature(sentinel, permitSentinelHash, payload.sentinelSignature)
+        ) {
+            revert EVC_SentinelViolation();
+        }
 
         // EVC address becomes msg.sender for the duration this self-call, no authentication is required
-        (bool success, bytes memory result) = callWithContextInternal(address(this), signer, value, data);
+        (bool success, bytes memory result) =
+            callWithContextInternal(address(this), signer, payload.value, payload.data);
 
         if (!success) revertBytes(result);
     }
@@ -878,27 +916,39 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         return !haveCommonOwnerInternal(signer, address(0));
     }
 
-    function getPermitHash(
-        address signer,
-        uint256 nonceNamespace,
-        uint256 nonce,
-        uint256 deadline,
-        uint256 value,
-        bytes calldata data
-    ) internal view returns (bytes32 permitHash) {
+    function getPermitHashes(PermitPayload calldata payload)
+        internal
+        view
+        returns (bytes32 permitHash, bytes32 permitSentinelHash)
+    {
         bytes32 domainSeparator =
             block.chainid == CACHED_CHAIN_ID ? CACHED_DOMAIN_SEPARATOR : calculateDomainSeparator();
 
-        bytes32 structHash =
-            keccak256(abi.encode(PERMIT_TYPEHASH, signer, nonceNamespace, nonce, deadline, value, keccak256(data)));
+        bytes32 structHashPermit = keccak256(
+            abi.encode(
+                PERMIT_TYPE_HASH,
+                payload.signer,
+                payload.nonceNamespace,
+                payload.nonce,
+                payload.deadline,
+                payload.sentinel,
+                payload.value,
+                keccak256(payload.data)
+            )
+        );
+
+        bytes32 structHashPermitSentinel =
+            keccak256(abi.encode(PERMIT_SENTINEL_TYPE_HASH, payload.sentinel, keccak256(payload.signature)));
 
         // This code overwrites the two most significant bytes of the free memory pointer,
         // and restores them to 0 after
         assembly ("memory-safe") {
             mstore(0x00, "\x19\x01")
             mstore(0x02, domainSeparator)
-            mstore(0x22, structHash)
+            mstore(0x22, structHashPermit)
             permitHash := keccak256(0x00, 0x42)
+            mstore(0x22, structHashPermitSentinel)
+            permitSentinelHash := keccak256(0x00, 0x42)
             mstore(0x22, 0)
         }
     }

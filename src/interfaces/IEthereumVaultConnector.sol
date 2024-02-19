@@ -6,6 +6,32 @@ pragma solidity ^0.8.19;
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This interface defines the methods for the Ethereum Vault Connector.
 interface IEVC {
+    // @notice A struct representing permit function payload
+    struct PermitPayload {
+        /// @notice The address signing the permit message (ECDSA) or verifying the permit message signature (ERC-1271).
+        /// It's also the owner or the operator of all the accounts for which authentication will be needed during the
+        /// execution of the arbitrary data call.
+        address signer;
+        /// @notice The nonce namespace for which the nonce is being used.
+        uint256 nonceNamespace;
+        /// @notice The nonce for the given account and nonce namespace. A valid nonce value is considered to be the
+        /// value currently stored and can take any value between 0 and type(uint256).max - 1.
+        uint256 nonce;
+        /// @notice The timestamp after which the permit is considered expired.
+        uint256 deadline;
+        /// @notice The address of the sentinel responsible for additional verification of the permit.
+        address sentinel;
+        /// @notice The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
+        /// balance of the EVC contract will be forwarded.
+        uint256 value;
+        /// @notice The encoded data which is self-called on the EVC contract.
+        bytes data;
+        /// @notice The signature of the data signed by the signer.
+        bytes signature;
+        /// @notice The signature of the sentinel for additional verification of the permit.
+        bytes sentinelSignature;
+    }
+
     /// @notice A struct representing a batch item.
     /// @dev Each batch item represents a single operation to be performed within a checks deferred context.
     struct BatchItem {
@@ -132,6 +158,12 @@ interface IEVC {
     /// @return authorized A boolean value that indicates whether the operator is authorized for the account.
     function isAccountOperatorAuthorized(address account, address operator) external view returns (bool authorized);
 
+    /// @notice Checks if a sentinel is authorized for a given address prefix.
+    /// @param addressPrefix The address prefix for which the sentinel authorization is being checked.
+    /// @param sentinel The address of the sentinel whose authorization status is being checked.
+    /// @return A boolean value indicating whether the sentinel is authorized for the given address prefix.
+    function isSentinelAuthorized(bytes19 addressPrefix, address sentinel) external view returns (bool);
+
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit
     /// nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce namespace
@@ -163,6 +195,14 @@ interface IEVC {
     /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
     /// Reverts if provided value is equal to the currently stored.
     function setAccountOperator(address account, address operator, bool authorized) external payable;
+
+    /// @notice Authorizes or deauthorizes a sentinel for a given address prefix.
+    /// @dev This function can only be called by the owner of the address prefix. It is not possible to authorize the
+    /// sentinel from within the permit or checks-deferrable call context.
+    /// @param addressPrefix The address prefix for which the sentinel is being set.
+    /// @param sentinel The address of the sentinel.
+    /// @param authorized A boolean value that indicates whether the sentinel is being authorized or deauthorized.
+    function setSentinel(bytes19 addressPrefix, address sentinel, bool authorized) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
     /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
@@ -243,26 +283,8 @@ interface IEVC {
     /// @notice Executes signed arbitrary data by self-calling into the EVC.
     /// @dev Low-level call function is used to execute the arbitrary data signed by the owner or the operator on the
     /// EVC contract. During that call, EVC becomes msg.sender.
-    /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature
-    /// (ERC-1271). It's also the owner or the operator of all the accounts for which authentication will be needed
-    /// during the execution of the arbitrary data call.
-    /// @param nonceNamespace The nonce namespace for which the nonce is being used.
-    /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the
-    /// value currently stored and can take any value between 0 and type(uint256).max - 1.
-    /// @param deadline The timestamp after which the permit is considered expired.
-    /// @param value The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
-    /// balance of the EVC contract will be forwarded.
-    /// @param data The encoded data which is self-called on the EVC contract.
-    /// @param signature The signature of the data signed by the signer.
-    function permit(
-        address signer,
-        uint256 nonceNamespace,
-        uint256 nonce,
-        uint256 deadline,
-        uint256 value,
-        bytes calldata data,
-        bytes calldata signature
-    ) external payable;
+    /// @param payload The permit payload containing all necessary data for executing the permit.
+    function permit(PermitPayload calldata payload) external payable;
 
     /// @notice Calls into a target contract as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost

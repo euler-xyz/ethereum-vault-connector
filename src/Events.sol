@@ -8,6 +8,7 @@ pragma solidity ^0.8.19;
 contract Events {
     event OwnerRegistered(bytes19 indexed addressPrefix, address indexed owner);
     event NonceUsed(bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
+    event SentinelStatus(bytes19 indexed addressPrefix, address indexed sentinel, bool sentinelAuthorized);
     event OperatorStatus(bytes19 indexed addressPrefix, address indexed operator, uint256 accountOperatorAuthorized);
     event CollateralStatus(address indexed account, address indexed collateral, bool enabled);
     event ControllerStatus(address indexed account, address indexed controller, bool enabled);

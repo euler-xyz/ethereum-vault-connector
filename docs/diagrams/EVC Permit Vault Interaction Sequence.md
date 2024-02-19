@@ -1,14 +1,22 @@
 ```mermaid
 sequenceDiagram
+    actor Signer
+    Note right of Signer: Dotted lines mean optional
+    actor Sentinel
     actor Signature Holder
-    Note right of Signature Holder: Dotted lines mean optional
     participant EVC
     participant Any Vault
     participant Controller Vault
     participant Price Oracle
 
-    Signature Holder->>EVC: permit(signer, signature, EVC calldata)
-    EVC->>EVC: signature verification
+    Signer->>Signer: sign permit message
+    Signer->>Sentinel: send signature
+    Sentinel->>Sentinel: simulate permit
+    Sentinel->>Sentinel: approve permit message
+    Sentinel->>Signature Holder: send signatures
+    Signer->>EVC: setSentinel(sentinel)
+    Signature Holder->>EVC: permit(signer, signature, sentinel, sentinelSignature, EVC calldata)
+    EVC->>EVC: signatures verification
     EVC->>EVC: set the execution context
     EVC->>EVC: address(this).call(EVC calldata)
 

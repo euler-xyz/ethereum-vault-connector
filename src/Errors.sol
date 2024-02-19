@@ -11,6 +11,7 @@ contract Errors {
     error EVC_NotAuthorized();
     error EVC_AccountOwnerNotRegistered();
     error EVC_OnBehalfOfAccountNotAuthenticated();
+    error EVC_InvalidSentinelStatus();
     error EVC_InvalidOperatorStatus();
     error EVC_InvalidNonce();
     error EVC_InvalidAddress();
@@ -19,6 +20,7 @@ contract Errors {
     error EVC_InvalidData();
     error EVC_ChecksReentrancy();
     error EVC_ControlCollateralReentrancy();
+    error EVC_SentinelViolation();
     error EVC_ControllerViolation();
     error EVC_SimulationBatchNested();
     error EVC_RevertedBatchResult(
