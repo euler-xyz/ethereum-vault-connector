@@ -29,6 +29,11 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return ownerLookup[prefix];
     }
 
+    function checkAccountStatus(address account) public returns (bool) {
+        (bool status, ) = checkAccountStatusInternal(account);
+        return status;
+    }
+
     function areAccountStatusChecksEmpty() public view returns (bool) {
         return accountStatusChecks.numElements == 0;
     }
