@@ -66,4 +66,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         (bool success, ) = address(this).call{value: value}(data);
         return success;
     }
+    function ecGetOnBehalfOfAccount(EC context) external pure returns (address result) {
+        result = ExecutionContext.getOnBehalfOfAccount(context);
+    }
 }
