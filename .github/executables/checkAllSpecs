@@ -13,7 +13,6 @@ outputMutex = Lock()
 
 # Exclude config files that are not verifying from CI
 EXCLUDE_CONFS = [
-    "certora/conf/CER-11-Controllers/CER-12-Controllers-number.conf",
     "certora/conf/CER-15-Permit/CER-51-Permit-msg-sender.conf"
 ]
 

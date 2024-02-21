@@ -14,8 +14,7 @@ methods {
 /**
  * Check that we never have more than one controller.
  *
- * It does not work for batch() or call(), as it requires rather complex reasoning. Some
- * pieces necessary for this reasoning:
+ * It does not work for batch() or call(), as it requires rather complex reasoning. Some pieces necessary for this reasoning:
  * - the account status checks verifies that there is only a single controller.
  * - the only place that adds a controller issues an account status check for
  *   the respective account, either immediately or by registering it to the set.
@@ -27,25 +26,33 @@ methods {
  * cases (when checks are deferred vs not). This is done in the 3 rules that
  * follow this one.
  */
-invariant onlyOneController(address a)
-    numOfController(a) <= 1
-    filtered { // TODO: make this work for batch as well
-        f -> f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
-            && f.selector != sig:call(address, address, uint256, bytes calldata).selector
-            && f.selector != sig:enableController(address, address).selector
-    }
+rule onlyOneController(method f) filtered { f->
+     f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
+    && f.selector != sig:call(address, address, uint256, bytes calldata).selector
+    && f.selector != sig:enableController(address, address).selector
+} {
+    env e;
+    calldataarg args;
+    address a;
+    require numOfController(a) <= 1;
+    f(e, args);
+    assert numOfController(a) <= 1;
+}
 
-// For enableController, we can only check this invariant directly if 
+// For enableController, we can only check this rule directly if 
 // account status checks are not deferred. To cover the deferred case,
 // we check that when account checks are deferred, the enableController
 // call will enqueue a check for the relevant account using the rule
 // `enableControllerEnqueuesStatusCheckWhenDeferred`
-invariant onlyOneControllerEnableController(address a)
-    numOfController(a) <= 1 && !getExecutionContextAreChecksDeferred()
-    filtered {
-        f -> f.selector == sig:enableController(address, address).selector
-    }
-
+rule onlyOneControllerEnableController {
+    env e;
+    address account;
+    address vault;
+    require !getExecutionContextAreChecksDeferred();
+    require numOfController(account) <= 1;
+    enableController(e, account, vault);
+    assert numOfController(account) <= 1;
+}
 
 // This ensures enableController will enqueue a status
 // check when status checks are deferred
