@@ -6,6 +6,14 @@ pragma solidity ^0.8.19;
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This interface defines the methods for the Ethereum Vault Connector.
 interface IEVC {
+    /// @notice Struct to hold operator target status information.
+    struct TargetStatus {
+        /// @notice The address of the target contract.
+        address targetContract;
+        /// @notice The bit field representing whether an operator is authorized to interact with the target contract.
+        uint256 operatorTargetBitField;
+    }
+
     /// @notice A struct representing a batch item.
     /// @dev Each batch item represents a single operation to be performed within a checks deferred context.
     struct BatchItem {
@@ -132,6 +140,34 @@ interface IEVC {
     /// @return authorized A boolean value that indicates whether the operator is authorized for the account.
     function isAccountOperatorAuthorized(address account, address operator) external view returns (bool authorized);
 
+    /// @notice Retrieves the authorization status of a target contract for a given operator under a specific address
+    /// prefix.
+    /// @param addressPrefix The address prefix for which the operator's target authorization status is being queried.
+    /// @param operator The address of the operator whose authorization status for the target contract is being checked.
+    /// @param targetContract The address of the target contract for which the authorization status is being queried.
+    /// @return operatorTargetBitField The bit field for the given address prefix, operator and target contract. The bit
+    /// field defines which accounts authorized the operator to interact with a given target contract. It is
+    /// 256-position binary array like 0...010...0, marking the account positionally in a uint256. The position in the
+    /// bit field corresponds to the account ID (0-255), where 0 is the owner account's ID.
+    function getOperatorTarget(
+        bytes19 addressPrefix,
+        address operator,
+        address targetContract
+    ) external view returns (uint256 operatorTargetBitField);
+
+    /// @notice Checks if an operator is authorized to interact with a specific target contract on behalf of an account.
+    /// @param account The address of the account for which the authorization is being checked.
+    /// @param operator The address of the operator whose authorization status is being checked.
+    /// @param targetContract The address of the target contract for which the operator's authorization is being
+    /// checked.
+    /// @return authorized A boolean value indicating whether the operator is authorized to interact with the target
+    /// contract on behalf of the account.
+    function isOperatorTargetAuthorized(
+        address account,
+        address operator,
+        address targetContract
+    ) external view returns (bool authorized);
+
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit
     /// nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce namespace
@@ -163,6 +199,20 @@ interface IEVC {
     /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
     /// Reverts if provided value is equal to the currently stored.
     function setAccountOperator(address account, address operator, bool authorized) external payable;
+
+    /// @notice Sets the authorization status for an array of target contracts for a given operator under a specific
+    /// address prefix.
+    /// @dev Target contract of address(0) is a special value that overrides all the other settings and allows any
+    /// target contract to be called by the operator.
+    /// @param addressPrefix The address prefix for which the operator's target authorization status is being updated.
+    /// @param operator The address of the operator whose authorization status for the target contracts is being set.
+    /// @param statuses An array of `TargetStatus` structs, each representing the target contract and the desired
+    /// authorization status.
+    function setOperatorTargets(
+        bytes19 addressPrefix,
+        address operator,
+        TargetStatus[] calldata statuses
+    ) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
     /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
