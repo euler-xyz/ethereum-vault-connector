@@ -1,9 +1,9 @@
 /**
-
-Verification of: 
+CER-12:
 Each Account can have at most one Controller Vault enabled at a time unless it's a transient state during a Checks-deferrable Call. This is how single-liability-per-account is enforced.
-
 **/
+
+import "../utils/IsMustRevertFunction.spec";
 
 methods {
     function numOfController(address account) external returns(uint8) envfree;
@@ -27,7 +27,8 @@ methods {
  * follow this one.
  */
 rule onlyOneController(method f) filtered { f->
-     f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
+    !isMustRevertFunction(f)
+    && f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
     && f.selector != sig:call(address, address, uint256, bytes calldata).selector
     && f.selector != sig:enableController(address, address).selector
 } {
