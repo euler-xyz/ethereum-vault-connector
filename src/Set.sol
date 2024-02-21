@@ -51,12 +51,8 @@ library Set {
     function initialize(SetStorage storage setStorage) internal {
         setStorage.stamp = DUMMY_STAMP;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < MAX_ELEMENTS;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < MAX_ELEMENTS; ++i) {
             setStorage.elements[i].stamp = DUMMY_STAMP;
-
-            unchecked {
-                ++i;
-            }
         }
     }
 
@@ -82,12 +78,8 @@ library Set {
 
         if (firstElement == element) return false;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             if (setStorage.elements[i].value == element) return false;
-
-            unchecked {
-                ++i;
-            }
         }
 
         if (numElements == MAX_ELEMENTS) revert TooManyElements();
@@ -115,13 +107,8 @@ library Set {
 
         uint256 searchIndex;
         if (firstElement != element) {
-            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements;) {
-                if (setStorage.elements[searchIndex].value == element) {
-                    break;
-                }
-                unchecked {
-                    ++searchIndex;
-                }
+            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements; ++searchIndex) {
+                if (setStorage.elements[searchIndex].value == element) break;
             }
 
             if (searchIndex == numElements) return false;
@@ -196,12 +183,8 @@ library Set {
 
         output[0] = firstElement;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             output[i] = setStorage.elements[i].value;
-
-            unchecked {
-                ++i;
-            }
         }
 
         return output;
@@ -219,12 +202,8 @@ library Set {
         if (numElements == 0) return false;
         if (firstElement == element) return true;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             if (setStorage.elements[i].value == element) return true;
-
-            unchecked {
-                ++i;
-            }
         }
 
         return false;
@@ -246,15 +225,11 @@ library Set {
 
         callback(firstElement);
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             address element = setStorage.elements[i].value;
             setStorage.elements[i].value = address(0);
 
             callback(element);
-
-            unchecked {
-                ++i;
-            }
         }
     }
 
@@ -282,16 +257,12 @@ library Set {
         (bool success, bytes memory result) = callback(firstElement);
         results[0] = abi.encode(firstElement, success, result);
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             address element = setStorage.elements[i].value;
             setStorage.elements[i].value = address(0);
 
             (success, result) = callback(element);
             results[i] = abi.encode(element, success, result);
-
-            unchecked {
-                ++i;
-            }
         }
 
         return results;
