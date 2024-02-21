@@ -39,4 +39,9 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         return operatorLookup[addressPrefix][operator];
     }
+
+    function selfCallSuccessCheck(uint256 value, bytes calldata data) external returns (bool) {
+        (bool success, ) = address(this).call{value: value}(data);
+        return success;
+    }
 }
