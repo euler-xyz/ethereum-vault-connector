@@ -5,6 +5,7 @@
 using VaultMock as vault;
 
 methods {
+    function _.checkAccountStatus(address account, address[] collaterals) external => DISPATCHER(true);
     function VaultMock.shouldRevert(address account, address[] calldata collaterals) internal returns (bool) => CVLShouldRevert(account);
     function numOfController(address account) external returns (uint8) envfree;
 }
