@@ -5,6 +5,7 @@
 
 methods {
     function areChecksDeferred() external returns (bool) envfree;
+    function getExecutionContextAreChecksDeferred() external returns (bool) envfree;
 }
 
 // persistent ghost bool checksDeferredGhost;
@@ -16,14 +17,16 @@ methods {
 // is still how it works because of how uninitialized variables work in 
 // solidity)
 
-function restoreChecksDeferred_call {
+rule restoreChecksDeferred_call {
     env e;
     address targetContract;
     address onBehalfOfAccount;
     uint256 value;
     bytes data;
 
-    require !areChecksDeferred();
+    bool checksDeferredBefore = getExecutionContextAreChecksDeferred();
+    require checksDeferredBefore == false;
     call(e, targetContract, onBehalfOfAccount, value, data);
-    assert !areChecksDeferred();
+    bool checksDeferredAfter = getExecutionContextAreChecksDeferred();
+    assert checksDeferredAfter == false;
 }
