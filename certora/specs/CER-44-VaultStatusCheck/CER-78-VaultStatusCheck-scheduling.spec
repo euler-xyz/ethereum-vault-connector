@@ -4,33 +4,6 @@ import "../utils/IsMustRevertFunction.spec";
 // Only the Vault is allowed require the check for itself
 methods {
     function EthereumVaultConnector.requireVaultStatusCheckInternal(address vault) internal with (env e) => requireVaultStatusCheckOnlyCalledBySelf(e, vault);
-    // This summarization does not work see note
-    // function EthereumVaultConnector.callWithContextInternal(address targetContract, address onBehalfOfAccount, uint256 value, bytes calldata data) internal returns (bool, bytes memory) => NONDET;
-    // function EthereumVaultConnector.callWithContextInternal(address targetContract, address onBehalfOfAccount, uint256 value, bytes calldata data) internal returns (bool, bytes memory) => CallWithContextInternalSummary(targetContract, onBehalfOfAccount, value, data);
-
-}
-
-/*
- * This summarization does not work:
- CRITICAL: [main] ERROR ALWAYS - Error in spec file (CER-78-VaultStatusCheck-scheduling.spec:15:9): could not type expression "CallResult(targetContract, onBehalfOfAccount, value, convert_hashblob(data))", message: Expected type bytes in return position 2 of CVL function CallWithContextInternalSummary, but CallResult(targetContract, onBehalfOfAccount, value, convert_hashblob(data)) is of type hashblob
-*/
-// function CallWithContextInternalSummary(address targetContract, address onBehalfOfAccount, uint256 value, bytes data) returns (bool, bytes) {
-//     return (
-//         CallSuccess(targetContract, onBehalfOfAccount, value, data),
-//         CallResult(targetContract, onBehalfOfAccount, value, data)
-//     );
-// }
-// ghost CallSuccess(address, address, uint256, bytes) returns bool;
-// ghost CallResult(address, address, uint256, bytes) returns bytes;
-
-
-// NOTE: not used. delete or refactor if it becomes used
-function actualCaller(env e) returns address {
-    if(e.msg.sender == currentContract) {
-        return getExecutionContextOnBehalfOfAccount(e);
-    } else {
-        return e.msg.sender;
-    }
 }
 
 // In all contexts where requireVaultStatusCheckInternal is called,
@@ -50,12 +23,15 @@ rule vault_status_check_scheduling (method f) filtered { f ->
 }{
     env e;
     calldataarg args;
-    require onlyVault;
     // The point of this rule is to check that in all contexts in which 
-    // requireVaultStatusCheck is called, the vault is the message sender
+    // requireVaultStatusCheck is called, the vault is the message sender.
     // If requireVaultStatusCheck is reachable from the function called
-    // it will invoke the assertion in requireVaultStatusCheckOnlyCalledBySelf
+    // it will modify the ghost if this is not true.
+    // Assume initially the ghost variable is false
+    require onlyVault;
+    // Run the function which may reach requireVaultStatusCheck 
+    // invoking the summary.
     f(e, args);
-    // This is just here to make this a valid rule
+    // Check: we have never run requireVaultStatusCheck with the wrong sender.
     assert onlyVault;
 }
