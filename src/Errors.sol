@@ -11,6 +11,9 @@ contract Errors {
     error EVC_NotAuthorized();
     error EVC_AccountOwnerNotRegistered();
     error EVC_OnBehalfOfAccountNotAuthenticated();
+    error EVC_InvalidPermitOnlyModeStatus();
+    error EVC_InvalidSentinelDisabledModeStatus();
+    error EVC_InvalidLockdownModeStatus();
     error EVC_InvalidSentinelStatus();
     error EVC_InvalidOperatorStatus();
     error EVC_InvalidNonce();
@@ -18,6 +21,8 @@ contract Errors {
     error EVC_InvalidTimestamp();
     error EVC_InvalidValue();
     error EVC_InvalidData();
+    error EVC_LockdownMode();
+    error EVC_PermitOnlyMode();
     error EVC_ChecksReentrancy();
     error EVC_ControlCollateralReentrancy();
     error EVC_SentinelViolation();

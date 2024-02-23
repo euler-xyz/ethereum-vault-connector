@@ -131,6 +131,21 @@ interface IEVC {
     /// the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
+    /// @notice Checks if only permit-based operations are allowed for a given address prefix (permit-only mode)
+    /// @param addressPrefix The address prefix to check for permit-only mode.
+    /// @return A boolean indicating whether only permit-based operations are allowed.
+    function isPermitOnlyMode(bytes19 addressPrefix) external view returns (bool);
+
+    /// @notice Determines if sentinel checks are bypassed for a specific address prefix.
+    /// @param addressPrefix The address prefix to evaluate for sentinel bypass status.
+    /// @return A boolean indicating if sentinel checks are bypassed.
+    function isSentinelDisabledMode(bytes19 addressPrefix) external view returns (bool);
+
+    /// @notice Checks if lockdown mode is enabled for a given address prefix.
+    /// @param addressPrefix The address prefix to check for lockdown mode status.
+    /// @return A boolean indicating whether lockdown mode is enabled.
+    function isLockdownMode(bytes19 addressPrefix) external view returns (bool);
+
     /// @notice Returns the current nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used sequentially. There's no requirement to use
     /// all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in
@@ -163,6 +178,21 @@ interface IEVC {
     /// @param sentinel The address of the sentinel whose authorization status is being checked.
     /// @return A boolean value indicating whether the sentinel is authorized for the given address prefix.
     function isSentinelAuthorized(bytes19 addressPrefix, address sentinel) external view returns (bool);
+
+    /// @notice Enables or disables permit-only mode for a given address prefix.
+    /// @param addressPrefix The address prefix for which the permit-only mode is being set.
+    /// @param enabled A boolean indicating whether to enable or disable permit-only mode.
+    function setPermitOnlyMode(bytes19 addressPrefix, bool enabled) external payable;
+
+    /// @notice Toggles the sentinel checks' bypass status for a specified address prefix.
+    /// @param addressPrefix The address prefix targeted for sentinel checks' bypass configuration.
+    /// @param enabled True to bypass sentinel checks, false to enforce them.
+    function setSentinelDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
+
+    /// @notice Enables or disables lockdown mode for a given address prefix.
+    /// @param addressPrefix The address prefix for which the lockdown mode is being set.
+    /// @param enabled A boolean indicating whether to enable or disable lockdown mode.
+    function setLockdownMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit

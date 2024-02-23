@@ -33,6 +33,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [Simulations](#simulations)
 * [Transient Storage](#transient-storage)
 * [Security Considerations](#security-considerations)
+    * [Safety Modes](#safety-modes)
     * [Authentication by Vaults](#authentication-by-vaults)
     * [EVC Contract Privileges](#evc-contract-privileges)
     * [Read-only Re-entrancy](#read-only-re-entrancy)
@@ -224,7 +225,7 @@ Sentinels can act as security gatekeepers, allowing permit operations to proceed
 
 Sentinels may be conservative signers and only allow the permit messages which contain a payload they are able to successfully assess. To avoid potential censorship of transactions by overly cautious sentinels, users have the flexibility to set an unlimited number of sentinel addresses, enabling them to select the most appropriate one for each permit message.
 
-For users who prefer not to depend on external sentinel services, they have the option to designate their own address or an address under their control as the sentinel. This approach guarantees complete control over which transactions are approved, thus providing a layer of censorship resistance.
+For users who prefer not to depend on external sentinel services, they have an option to disable the feature. This approach guarantees complete control over which transactions are approved, thus providing a layer of censorship resistance. It must be emphasized however that with sentinel disabled, users must remain even more vigilant and careful about the messages they sign.
 
 Sentinels may also play a crucial role in mitigating gasless transaction DOS attacks. A relayer may mandate the use of a trusted sentinel to simulate the transaction, ensuring its correctness (i.e., it does not revert) and profitability for the relayer. If a trusted sentinel is used, the relayer can verify its signature off-chain, providing assurance that the transaction aligns with the relayer's expectations before broadcasting it.
 
@@ -317,6 +318,14 @@ In order to take advantage of transient storage, the contracts have been structu
 
 
 ## Security Considerations
+
+### Safety Modes
+
+To enhance user security, the EVC implements three distinct safety modes that influence its behavior across all sub-accounts associated with an owner:
+
+* `PERMIT-ONLY MODE`: In this mode, use of certain functions, as well as executing calls to external smart contracts via the EVC, is allowed exclusively through the `permit` function. This leverages the role of permit sentinels within the system to enhance security. It's important to note that this mode does not impact the actions of operators acting on an account's behalf.
+* `SENTINEL-DISABLED MODE`: In this mode, the permit sentinels are bypassed and do not participate in the signature verification of the permit message. This mode is designed for scenarios where the sentinel mechanism needs to be temporarily circumvented (i.e. due to censorship concerns).
+* `LOCKDOWN MODE`: This is the most restrictive mode, certain functions, as well as calls to external smart contracts through the EVC, are disabled. This mode is particularly useful in emergency situations, such as when a malicious operator has been added or a harmful permit message has been signed, necessitating immediate action to safeguard the owner's assets.
 
 ### Authentication by Vaults
 
