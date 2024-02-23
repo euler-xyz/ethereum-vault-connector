@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import "../../src/EthereumVaultConnector.sol";
 import "../../src/ExecutionContext.sol";
+import "../../src/Set.sol";
 
 contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     using ExecutionContext for EC;
@@ -41,9 +42,16 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     }
     function getAccountController(address account) public view returns (address) {
         return accountControllers[account].firstElement;
-
     }
     function isAccountController(address account, address controller) public view returns (bool) {
         return accountControllers[account].contains(controller);
+    }
+    function containsStatusCheckFor(address account) public view returns (bool) {
+        return accountStatusChecks.contains(account);
+    }
+    function checkAccountStatus(address account) public returns (bool)
+    {
+        (bool isValid, ) = checkAccountStatusInternal(account);
+        return isValid;
     }
 }
