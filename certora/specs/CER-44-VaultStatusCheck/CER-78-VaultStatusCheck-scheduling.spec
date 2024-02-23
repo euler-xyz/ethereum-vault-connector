@@ -35,8 +35,9 @@ function actualCaller(env e) returns address {
 
 // In all contexts where requireVaultStatusCheckInternal is called,
 // the caller should be the vault. 
+persistent ghost bool onlyVault;
 function requireVaultStatusCheckOnlyCalledBySelf(env e, address vault) {
-    assert e.msg.sender == vault;
+    onlyVault = onlyVault &&  e.msg.sender == vault;
 }
 
 rule vault_status_check_scheduling (method f) filtered { f ->
@@ -49,11 +50,12 @@ rule vault_status_check_scheduling (method f) filtered { f ->
 }{
     env e;
     calldataarg args;
+    require onlyVault;
     // The point of this rule is to check that in all contexts in which 
     // requireVaultStatusCheck is called, the vault is the message sender
     // If requireVaultStatusCheck is reachable from the function called
     // it will invoke the assertion in requireVaultStatusCheckOnlyCalledBySelf
     f(e, args);
     // This is just here to make this a valid rule
-    satisfy true;
+    assert onlyVault;
 }
