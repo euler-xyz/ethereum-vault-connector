@@ -43,10 +43,6 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return accountStatusChecks.numElements == 0;
     }
     
-    function areVaultStatusChecksEmpty() public view returns (bool) {
-        return vaultStatusChecks.numElements == 0;
-    }
-    
     function getOperatorFromAddress(address account, address operator) external view returns (uint256) {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         return operatorLookup[addressPrefix][operator];
@@ -60,9 +56,4 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return accountStatusChecks.contains(account);
     }
     
-    function checkAccountStatus(address account) public returns (bool)
-    {
-        (bool isValid, ) = checkAccountStatusInternal(account);
-        return isValid;
-    }
 }
