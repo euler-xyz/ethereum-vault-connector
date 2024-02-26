@@ -2,31 +2,31 @@
 // specify any Account address to be set in the Execution Context's on behalf of
 // Account address. In that case, the authentication is not performed
 
+methods {
+    function _.authenticateCaller(address account, bool allowOperator) internal with (env e) => 
+        reachedAuthCaller(e, account, allowOperator) expect (address);
+}
+
+persistent ghost bool didAuth;
+function reachedAuthCaller(env e, address addr, bool allowOperator) returns address {
+    // set didAuth if authenticateCaller is ever reached
+    didAuth = didAuth || true;
+    // this is not relevant to the rule
+    // but mirrors the returned value of the summarized function
+    return currentContract == e.msg.sender ? getExecutionContextOnBehalfOfAccount(e) : e.msg.sender;
+}
 
 rule call_authentication_skip {
     env e;
     address targetContract;
-    address onBehalfOfAccount1;
-    address onBehalfOfAccount2;
+    address onBehalfOfAccount;
     uint256 value;
     bytes data;
 
-    // We assume e.msg.sender == targetContract
-    // and compare between two executions with possibly
-    // different onBehalfOfAccount values. We show that
-    // the choice of onBehalfOfAccount does not effect
-    // whether or not the call reverts (i.e. it is not
-    // used during authorization).
+    require !didAuth;
     require e.msg.sender == targetContract;
-    require targetContract != currentContract;
-    storage stateBeforeCall = lastStorage;
-    
-    call@withrevert(e, targetContract, onBehalfOfAccount1, value, data);
-    bool reverts1 = lastReverted;
-    // wind back execution start from the same initial state and give
-    // the other onBehalfOfAccount value
-    call@withrevert(e, targetContract, onBehalfOfAccount2, value, data) at stateBeforeCall;
-    bool reverts2 = lastReverted;
-    assert reverts1 == reverts2;
-
+    call(e, targetContract, onBehalfOfAccount, value, data);
+    assert !didAuth;
 }
+
+// TODO need similar implementation for batch
