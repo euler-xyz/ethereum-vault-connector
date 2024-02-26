@@ -21,6 +21,12 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function numOfController(address account) public view returns (uint8) {
         return accountControllers[account].numElements;
     }
+    function getAccountController(address account) public view returns (address) {
+        return accountControllers[account].firstElement;
+    }
+    function accountCollateralsContains(address account, address collateral) public view returns (bool) {
+        return accountCollaterals[account].contains(collateral);
+    }
 
     function getExecutionContextOnBehalfOfAccount() external view returns (address) {
         return executionContext.getOnBehalfOfAccount();
