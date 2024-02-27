@@ -18,6 +18,9 @@ methods {
 // persistent ghost address callTarget;
 // persistent ghost address savedOnBehalf;
 persistent ghost bool callTargetCorrect;
+// This is just initialized to e.msg.sender within the rule
+// so it can be accessed in the hook
+persistent ghost address msgSenderSavedForHook;
 
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
 {
@@ -25,6 +28,7 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
     // savedOnBehalf = getExecutionContextOnBehalfOfAccount();
     callTargetCorrect = callTargetCorrect && (
         addr == getExecutionContextOnBehalfOfAccount() ||
+        addr == msgSenderSavedForHook ||
         addr == currentContract);
 }
 
@@ -34,6 +38,7 @@ hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint r
     // savedOnBehalf = getExecutionContextOnBehalfOfAccount();
     callTargetCorrect = callTargetCorrect && (
         addr == getExecutionContextOnBehalfOfAccount() ||
+        addr == msgSenderSavedForHook ||
         addr == currentContract);   
 }
 
@@ -48,6 +53,7 @@ rule execution_context_tracks_account_for_calls (method f) filtered { f->
     // We prove this is true aside from in the context of permit
     // with CER-51
     require e.msg.sender != currentContract;
+    require msgSenderSavedForHook == e.msg.sender;
     // initialize ghosts
     require callTargetCorrect;
     f(e, args);
