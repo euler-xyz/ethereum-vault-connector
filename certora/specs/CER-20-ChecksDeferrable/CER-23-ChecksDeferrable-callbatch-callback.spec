@@ -3,8 +3,8 @@
 // Account address. In that case, the authentication is not performed
 
 methods {
-    function _.authenticateCaller(address account, bool allowOperator) internal with (env e) => 
-        reachedAuthCaller(e, account, allowOperator) expect (address);
+    function EthereumVaultConnector.authenticateCaller(address account, bool allowOperator) internal returns (address) with (env e) => 
+        reachedAuthCaller(e, account, allowOperator);
 }
 
 persistent ghost bool didAuth;
