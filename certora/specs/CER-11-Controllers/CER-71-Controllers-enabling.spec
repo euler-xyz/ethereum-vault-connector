@@ -37,9 +37,9 @@ rule owners_or_operators_can_enable_controller {
     // Assume: EVC cannot be the caller of enableController.
     // This assumption is proved in CER-51.
     require e.msg.sender != currentContract;
-    // Caller is either an owner or operator of the account
-    require haveCommonOwner(account, e.msg.sender) || isAccountOperatorAuthorized(account, e.msg.sender);
-    // it is possible for this caller to succesfully enable a controller.
-    enableController@withrevert(e, account, vault);
-    satisfy !lastReverted;
+    // it is possible for this caller to succesfully enable a controller ...
+    enableController(e, account, vault);
+    // if caller is either an owner or operator of the account
+    satisfy haveCommonOwner(account, e.msg.sender);
+    satisfy isAccountOperatorAuthorized(account, e.msg.sender);
 }
