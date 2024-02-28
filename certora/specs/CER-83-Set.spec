@@ -7,11 +7,11 @@ methods {
     function insert(address element) external returns (bool) envfree;
     function remove(address element) external returns (bool) envfree;
     function get(uint8 index) external returns (address) envfree;
+    function get() external returns (address[]) envfree;
     function contains(address element) external returns (bool) envfree;
     function length() external returns (uint8) envfree;
+    function reorder(uint8 index1, uint8 index2) external envfree;
 }
-
-
 
 // GHOST COPIES:
 // For every storage variable we add a ghost field that is kept synchronized by hooks.
@@ -34,7 +34,8 @@ ghost mapping(address => mathint) ghostIndexes {
 ghost mathint ghostLength {
     init_state axiom  ghostLength == 0;
     // assumption: it's infeasible to grow the list to these many elements.
-    axiom ghostLength < max_uint256;
+    // Also note the operations with indexing use uint8
+    axiom ghostLength < max_uint8;
 }
 
 ghost address ghostFirst {
@@ -84,6 +85,11 @@ invariant mirrorIsCorrect(uint8 i)
     get(1) == ghostFirst &&
     ghostLength == to_mathint(length());
 
+invariant setGetCorrect(uint8 i)
+    (i > 1 => get()[i] == ghostValues[i]) &&
+    get()[1] == ghostFirst &&
+    ghostLength == to_mathint(length());
+
 
 /** @title Elements are unique in the set.
 Proving this is together with proving that each element has a single index 
@@ -115,7 +121,7 @@ invariant validSet()
                     uint8 _length = assert_uint8(ghostLength);
                     requireInvariant mirrorIsCorrect(_length); 
                 }
-        }
+    }
 
 invariant containsIntegrity(address v ) 
     v!=0 => ( contains(v) <=> ( v == ghostFirst  || 
@@ -159,6 +165,57 @@ rule removed_iff_not_contained(address a) {
     bool succ = remove(a);
     assert(succ <=> containsBefore);
 }
+
+// CER-83: Set get. Set library MUST return an array of all the elements 
+// contained in the set
+rule get_array {
+    requireInvariant validSet();
+    /// For any element in the set...
+    address elt;
+    require contains(elt);
+    //... there is some index for which this element
+    // is at that index in the result of get()
+    address[] result = get();
+    // Ideally make these require_uints assert_uints
+    uint8 uintLength = require_uint8(ghostLength);
+    assert require_uint8(result.length) == uintLength;
+    assert (exists uint8 i. i <= uintLength && result[i] == elt);
+}
+
+// rule get_array_flipped {
+//     requireInvariant validSet
+// }
+
+// rule get_array_index {
+//     requireInvariant validSet();
+//     address elt;
+//     require contains(elt);
+//     // uint8 uintLength = assert_uint8(ghostLength);
+//     // cannot write solidity calls under quantification
+//     assert (exists uint8 i. get(i) == elt);
+// }
+
+// CER-89: Reorder: Set library MUST swap the position of two elements so 
+// that they appear switched in the array obtained using the get function.
+rule reorder_swaps {
+    env e;
+    requireInvariant validSet();
+    uint8 index1;
+    uint8 index2;
+    uint8 uintLength = require_uint8(ghostLength);
+    // require index1 != 0; // makes rule vacuous
+    require uintLength >= 3;
+    // require index2 < uintLength;
+    address elt1Before = get(index1);
+    address elt2Before = get(index2);
+    reorder(index1, index2);
+    address elt1After = get(index1);
+    address elt2After = get(index2);
+    // satisfy true;
+    assert elt1After == elt2Before;
+    assert elt2After == elt1Before;
+}
+
 
 /** @title remove decreases the number of elements by one */
 rule removed_then_length_decrease(address a) {
