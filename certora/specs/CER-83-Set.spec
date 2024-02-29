@@ -175,11 +175,24 @@ rule get_array {
     require contains(elt);
     //... there is some index for which this element
     // is at that index in the result of get()
+    // arrays are not allowed in quantifiers 
     address[] result = get();
     // Ideally make these require_uints assert_uints
     uint8 uintLength = require_uint8(ghostLength);
-    assert require_uint8(result.length) == uintLength;
     assert (exists uint8 i. i <= uintLength && result[i] == elt);
+}
+
+rule get_array_individual {
+    requireInvariant validSet();
+
+    uint8 uintLength = require_uint8(ghostLength);
+    uint8 i;
+    require i < uintLength;
+    // require i != 0; // also makes rule vacuous
+    requireInvariant mirrorIsCorrect(i);
+    requireInvariant setGetCorrect(i);
+    address[] result = get();
+    assert ghostValues[i] == result[i];
 }
 
 // rule get_array_flipped {
@@ -205,6 +218,8 @@ rule reorder_swaps {
     uint8 uintLength = require_uint8(ghostLength);
     // require index1 != 0; // makes rule vacuous
     require uintLength >= 3;
+    requireInvariant mirrorIsCorrect(index1);
+    requireInvariant mirrorIsCorrect(index2);
     // require index2 < uintLength;
     address elt1Before = get(index1);
     address elt2Before = get(index2);
@@ -216,6 +231,21 @@ rule reorder_swaps {
     assert elt2After == elt1Before;
 }
 
+rule reorder_swaps_ghost {
+    requireInvariant validSet();
+    uint8 index1;
+    uint8 index2;
+    requireInvariant mirrorIsCorrect(index1);
+    requireInvariant mirrorIsCorrect(index2);
+    uint8 uintLength = require_uint8(ghostLength);
+    address elt1Before = ghostValues[index1];
+    address elt2Before = ghostValues[index2];
+    reorder(index1, index2);
+    address elt1After = ghostValues[index1];
+    address elt2After = ghostValues[index2];
+    assert elt1After == elt2Before;
+    assert elt2After == elt1Before;
+}
 
 /** @title remove decreases the number of elements by one */
 rule removed_then_length_decrease(address a) {
