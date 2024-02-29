@@ -21,9 +21,8 @@ contract SetHarness {
     }
 
     function get(uint8 index) external view returns (address ) {
-        if (index==0) return address(0);
-        if (index == 1) return setStorage.firstElement;
-        return setStorage.elements[index-1].value;
+        if (index==0) return setStorage.firstElement;
+        return setStorage.elements[index].value;
 
     }
 

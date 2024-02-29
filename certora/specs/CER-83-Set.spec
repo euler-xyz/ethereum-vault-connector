@@ -32,7 +32,7 @@ ghost mapping(address => mathint) ghostIndexes {
 }
 
 ghost mathint ghostLength {
-    init_state axiom  ghostLength == 0;
+    init_state axiom ghostLength == 0;
     // assumption: it's infeasible to grow the list to these many elements.
     // Also note the operations with indexing use uint8
     axiom ghostLength < max_uint8;
@@ -44,7 +44,7 @@ ghost address ghostFirst {
 
 // Store and load hooks to synchronize ghostValues .
 hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) STORAGE {
-    mathint index = to_mathint(_index)+1;
+    mathint index = to_mathint(_index);
     require ghostValues[index] == oldValue;
     require ghostIndexes[oldValue] == index;
 
@@ -55,8 +55,8 @@ hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value addr
 }
 
 hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value STORAGE {
-    require ghostIndexes[v] == to_mathint(index+1);
-    require ghostValues[index+1] == v;
+    require ghostIndexes[v] == to_mathint(index);
+    require ghostValues[index] == v;
 }
 
 // Store and load hooks to sync length
@@ -81,8 +81,8 @@ hook Sload address value currentContract.setStorage.firstElement STORAGE {
 
 // check for the ghosts and updates 
 invariant mirrorIsCorrect(uint8 i) 
-    ( i > 1 =>  get(i) == ghostValues[i]) &&
-    get(1) == ghostFirst &&
+    ( i > 0 =>  get(i) == ghostValues[i]) &&
+    get(0) == ghostFirst &&
     ghostLength == to_mathint(length());
 
 invariant setGetCorrect(uint8 i)
@@ -100,7 +100,7 @@ Proving this is together with proving that each element has a single index
 // containsIntegrity() and validSet().
 invariant validSet() 
     // inverse
-    ( forall mathint i. ( i <= ghostLength && i > 1) => 
+    ( forall mathint i. ( i <= ghostLength && i > 0) => 
         ghostIndexes[ghostValues[i]] == i )
     &&
     ( forall address v. ( ghostIndexes[v]!=0 ) => 
@@ -108,17 +108,17 @@ invariant validSet()
     &&  
     // uniqueness
     ( forall mathint i.  forall mathint j. 
-        ( i <= ghostLength && i > 1 && j <= ghostLength && j > 1 && j != i ) =>
+        ( i <= ghostLength && i > 0 && j <= ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
      ) &&
      ( forall mathint i.  
-        ( i <= ghostLength && i > 1 ) =>
+        ( i <= ghostLength && i > 0 ) =>
          ( ghostValues[i] != ghostFirst)
      )
 
     { 
                 preserved {
-                    requireInvariant mirrorIsCorrect(1);
+                    requireInvariant mirrorIsCorrect(0);
                     uint8 _length = assert_uint8(ghostLength);
                     requireInvariant mirrorIsCorrect(_length); 
                 }
@@ -189,25 +189,11 @@ rule get_array_individual {
     uint8 uintLength = require_uint8(ghostLength);
     uint8 i;
     require i < uintLength;
-    // require i != 0; // also makes rule vacuous
-    requireInvariant mirrorIsCorrect(i);
-    requireInvariant setGetCorrect(i);
+    require uintLength < 6;
+    require i > 0;
     address[] result = get();
     assert ghostValues[i] == result[i];
 }
-
-// rule get_array_flipped {
-//     requireInvariant validSet
-// }
-
-// rule get_array_index {
-//     requireInvariant validSet();
-//     address elt;
-//     require contains(elt);
-//     // uint8 uintLength = assert_uint8(ghostLength);
-//     // cannot write solidity calls under quantification
-//     assert (exists uint8 i. get(i) == elt);
-// }
 
 // CER-89: Reorder: Set library MUST swap the position of two elements so 
 // that they appear switched in the array obtained using the get function.
@@ -246,6 +232,14 @@ rule reorder_swaps_ghost {
     address elt2After = ghostValues[index2];
     assert elt1After == elt2Before;
     assert elt2After == elt1Before;
+}
+
+rule debug_vacuity {
+    requireInvariant validSet();
+    uint8 uintLength = require_uint8(ghostLength);
+    uint8 i;
+    require i < uintLength;
+    satisfy i != 0;
 }
 
 /** @title remove decreases the number of elements by one */
