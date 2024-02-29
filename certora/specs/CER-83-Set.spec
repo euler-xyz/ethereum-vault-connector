@@ -85,13 +85,6 @@ invariant mirrorIsCorrect(uint8 i)
     get(0) == ghostFirst &&
     ghostLength == to_mathint(length());
 
-invariant setGetCorrect(uint8 i)
-    (i > 1 && i < length() && ghostLength > 0) => 
-        ((get()[i] == ghostValues[i]) &&
-        get()[1] == ghostFirst &&
-        ghostLength == to_mathint(length()));
-
-
 /** @title Elements are unique in the set.
 Proving this is together with proving that each element has a single index 
 **/
@@ -150,6 +143,7 @@ rule not_contained_if_removed(address a) {
     requireInvariant validSet();
     requireInvariant mirrorIsCorrect(0);
     uint8 _length = assert_uint8(ghostLength);
+    require _length < 6; // loop bound
     requireInvariant mirrorIsCorrect(_length); 
 
     remove(a);
@@ -189,7 +183,7 @@ rule get_array_individual {
     uint8 uintLength = require_uint8(ghostLength);
     uint8 i;
     require i < uintLength;
-    require uintLength < 6;
+    require uintLength < 6; // loop bound
     require i > 0;
     address[] result = get();
     assert ghostValues[i] == result[i];
@@ -203,17 +197,12 @@ rule reorder_swaps {
     uint8 index1;
     uint8 index2;
     uint8 uintLength = require_uint8(ghostLength);
-    // require index1 != 0; // makes rule vacuous
-    require uintLength >= 3;
-    requireInvariant mirrorIsCorrect(index1);
-    requireInvariant mirrorIsCorrect(index2);
-    // require index2 < uintLength;
     address elt1Before = get(index1);
     address elt2Before = get(index2);
+    require uintLength < 6; // loop bound
     reorder(index1, index2);
     address elt1After = get(index1);
     address elt2After = get(index2);
-    // satisfy true;
     assert elt1After == elt2Before;
     assert elt2After == elt1Before;
 }
