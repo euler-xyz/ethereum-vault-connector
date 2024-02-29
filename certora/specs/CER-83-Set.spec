@@ -100,7 +100,7 @@ Proving this is together with proving that each element has a single index
 // containsIntegrity() and validSet().
 invariant validSet() 
     // inverse
-    ( forall mathint i. ( i <= ghostLength && i > 0) => 
+    ( forall mathint i. ( i < ghostLength && i > 0) => 
         ghostIndexes[ghostValues[i]] == i )
     &&
     ( forall address v. ( ghostIndexes[v]!=0 ) => 
@@ -108,11 +108,11 @@ invariant validSet()
     &&  
     // uniqueness
     ( forall mathint i.  forall mathint j. 
-        ( i <= ghostLength && i > 0 && j <= ghostLength && j > 0 && j != i ) =>
+        ( i < ghostLength && i > 0 && j < ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
      ) &&
      ( forall mathint i.  
-        ( i <= ghostLength && i > 0 ) =>
+        ( i < ghostLength && i > 0 ) =>
          ( ghostValues[i] != ghostFirst)
      )
 
@@ -126,11 +126,11 @@ invariant validSet()
 
 invariant containsIntegrity(address v ) 
     v!=0 => ( contains(v) <=> ( v == ghostFirst  || 
-                    ( ghostIndexes[v] <= ghostLength && ghostIndexes[v] > 1 ))) 
+                    ( ghostIndexes[v] < ghostLength && ghostIndexes[v] > 0 ))) 
         {
             preserved {
                 requireInvariant validSet();
-                requireInvariant mirrorIsCorrect(1);
+                requireInvariant mirrorIsCorrect(0);
                 uint8 _length = assert_uint8(ghostLength);
                 requireInvariant mirrorIsCorrect(_length); 
             }
@@ -148,7 +148,7 @@ rule contained_if_inserted(address a) {
 rule not_contained_if_removed(address a) {
     env e;
     requireInvariant validSet();
-    requireInvariant mirrorIsCorrect(1);
+    requireInvariant mirrorIsCorrect(0);
     uint8 _length = assert_uint8(ghostLength);
     requireInvariant mirrorIsCorrect(_length); 
 
