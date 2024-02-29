@@ -86,9 +86,10 @@ invariant mirrorIsCorrect(uint8 i)
     ghostLength == to_mathint(length());
 
 invariant setGetCorrect(uint8 i)
-    (i > 1 => get()[i] == ghostValues[i]) &&
-    get()[1] == ghostFirst &&
-    ghostLength == to_mathint(length());
+    (i > 1 && i < length() && ghostLength > 0) => 
+        ((get()[i] == ghostValues[i]) &&
+        get()[1] == ghostFirst &&
+        ghostLength == to_mathint(length()));
 
 
 /** @title Elements are unique in the set.
