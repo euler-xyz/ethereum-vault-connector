@@ -140,9 +140,11 @@ rule not_contained_if_removed(address a) {
     uint8 _length = assert_uint8(ghostLength);
     require _length < 6; // loop bound
     requireInvariant mirrorIsCorrect(_length); 
+    requireInvariant containsIntegrity(a);
+    requireInvariant containsIntegrity(ghostFirst);
 
     // This is the case we can't handle with our invariants
-    require ghostFirst != a;
+    // require ghostFirst != a;
 
     remove(a);
     assert(!contains(a));
