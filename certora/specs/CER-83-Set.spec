@@ -51,6 +51,7 @@ hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value addr
     ghostValues[index] = newValue;
     ghostIndexes[oldValue] = 0;
     ghostIndexes[newValue] = index;
+    
 }
 
 hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value STORAGE {
@@ -70,24 +71,17 @@ hook Sload uint8 value currentContract.setStorage.numElements STORAGE {
 }
 
 // Store and load hooks to sync firstElement
-hook Sstore currentContract.setStorage.firstElement address newValue (address oldValue) STORAGE {
-    require ghostValues[0] == oldValue;
-    require ghostIndexes[oldValue] == 0;
-
+hook Sstore currentContract.setStorage.firstElement address newValue STORAGE {
     ghostFirst = newValue;
-    ghostValues[0] = newValue;
-    ghostIndexes[newValue] = 0;
 }
 
 hook Sload address value currentContract.setStorage.firstElement STORAGE {
     require ghostFirst == value;
-    require ghostIndexes[value] == 0;
-    require ghostValues[0] == value;
 }
 
 // check for the ghosts and updates 
 invariant mirrorIsCorrect(uint8 i) 
-    (get(i) == ghostValues[i]) &&
+    ( i > 0 =>  get(i) == ghostValues[i]) &&
     get(0) == ghostFirst &&
     ghostLength == to_mathint(length());
 
@@ -99,7 +93,7 @@ Proving this is together with proving that each element has a single index
 // containsIntegrity() and validSet().
 invariant validSet() 
     // inverse
-    ( forall mathint i. ( i < ghostLength) => 
+    ( forall mathint i. ( i < ghostLength && i > 0) => 
         ghostIndexes[ghostValues[i]] == i )
     &&
     ( forall address v. ( ghostIndexes[v]!=0 ) => 
@@ -107,7 +101,7 @@ invariant validSet()
     &&  
     // uniqueness
     ( forall mathint i.  forall mathint j. 
-        ( i < ghostLength && j < ghostLength && j != i ) =>
+        ( i < ghostLength && i > 0 && j < ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
     ) 
     { 
@@ -148,7 +142,7 @@ rule not_contained_if_removed(address a) {
     requireInvariant mirrorIsCorrect(_length); 
 
     // This is the case we can't handle with our invariants
-    // require ghostFirst != a;
+    require ghostFirst != a;
 
     remove(a);
     assert(!contains(a));
