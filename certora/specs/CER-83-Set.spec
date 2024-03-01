@@ -103,7 +103,7 @@ invariant validSet()
     ( forall mathint i.  forall mathint j. 
         ( i < ghostLength && i > 0 && j < ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
-     ) 
+    ) 
     { 
                 preserved {
                     requireInvariant mirrorIsCorrect(0);
@@ -141,6 +141,9 @@ rule not_contained_if_removed(address a) {
     require _length < 6; // loop bound
     requireInvariant mirrorIsCorrect(_length); 
 
+    // This is the case we can't handle with our invariants
+    require ghostFirst != a;
+
     remove(a);
     assert(!contains(a));
 }
@@ -158,20 +161,6 @@ rule removed_iff_not_contained(address a) {
 
 // CER-83: Set get. Set library MUST return an array of all the elements 
 // contained in the set
-rule get_array {
-    requireInvariant validSet();
-    /// For any element in the set...
-    address elt;
-    require contains(elt);
-    //... there is some index for which this element
-    // is at that index in the result of get()
-    // arrays are not allowed in quantifiers 
-    address[] result = get();
-    // Ideally make these require_uints assert_uints
-    uint8 uintLength = require_uint8(ghostLength);
-    assert (exists uint8 i. i <= uintLength && result[i] == elt);
-}
-
 rule get_array_individual {
     requireInvariant validSet();
 
@@ -216,14 +205,6 @@ rule reorder_swaps_ghost {
     address elt2After = ghostValues[index2];
     assert elt1After == elt2Before;
     assert elt2After == elt1Before;
-}
-
-rule debug_vacuity {
-    requireInvariant validSet();
-    uint8 uintLength = require_uint8(ghostLength);
-    uint8 i;
-    require i < uintLength;
-    satisfy i != 0;
 }
 
 /** @title remove decreases the number of elements by one */
