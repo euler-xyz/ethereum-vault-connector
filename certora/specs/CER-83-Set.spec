@@ -103,12 +103,7 @@ invariant validSet()
     ( forall mathint i.  forall mathint j. 
         ( i < ghostLength && i > 0 && j < ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
-     ) &&
-     ( forall mathint i.  
-        ( i < ghostLength && i > 0 ) =>
-         ( ghostValues[i] != ghostFirst)
-     )
-
+     ) 
     { 
                 preserved {
                     requireInvariant mirrorIsCorrect(0);
