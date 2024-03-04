@@ -171,7 +171,7 @@ rule removed_iff_not_contained(address a) {
     assert(succ <=> containsBefore);
 }
 
-// CER-83: Set get. Set library MUST return an array of all the elements 
+// CER-87: Set get. Set library MUST return an array of all the elements 
 // contained in the set
 rule get_array_individual {
     requireInvariant validSet();
