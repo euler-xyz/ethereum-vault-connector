@@ -103,7 +103,12 @@ invariant validSet()
     ( forall mathint i.  forall mathint j. 
         ( i < ghostLength && i > 0 && j < ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
-    ) 
+    )
+    // &&
+    // // uniqueness ghostFirst
+    // (forall mathint i. (i < ghostLength && i > 0) =>
+    //     (ghostValues[i] != ghostFirst) &&
+    //     (ghostIndexes[ghostFirst] != i))
     { 
                 preserved {
                     requireInvariant mirrorIsCorrect(0);
@@ -143,8 +148,13 @@ rule not_contained_if_removed(address a) {
     requireInvariant containsIntegrity(a);
     requireInvariant containsIntegrity(ghostFirst);
 
-    // This is the case we can't handle with our invariants
-    // require ghostFirst != a;
+    // Unrolled up to length fixed for loop bound
+    requireInvariant mirrorIsCorrect(0);
+    requireInvariant mirrorIsCorrect(1);
+    requireInvariant mirrorIsCorrect(2);
+    requireInvariant mirrorIsCorrect(3);
+    requireInvariant mirrorIsCorrect(4);
+    requireInvariant mirrorIsCorrect(5);
 
     remove(a);
     assert(!contains(a));
