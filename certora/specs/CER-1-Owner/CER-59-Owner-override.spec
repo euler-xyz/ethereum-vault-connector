@@ -1,0 +1,24 @@
+// CER-59: EVC MUST NOT override the already stored Owner for a 
+// given addressPrefix
+import "../utils/IsMustRevertFunction.spec";
+
+persistent ghost bool overwroteOwner {
+    init_state axiom overwroteOwner == false;
+}
+
+hook Sstore currentContract.ownerLookup[KEY bytes19 address_prefix] address newValue (address oldValue) STORAGE {
+    if (oldValue != 0 && newValue != oldValue) {
+        overwroteOwner = overwroteOwner || true;
+    }
+}
+
+rule neverOverwriteOwner (method f) filtered {f ->
+    !isMustRevertFunction(f) &&
+    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector
+}{
+    env e;
+    calldataarg args;
+    require overwroteOwner == false;
+    f(e, args);
+    assert !overwroteOwner;
+}
