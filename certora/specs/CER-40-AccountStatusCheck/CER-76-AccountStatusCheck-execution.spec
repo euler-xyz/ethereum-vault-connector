@@ -21,8 +21,18 @@ rule account_status_check_execution {
     address account;
     address[] collaterals = getAccountCollaterals(e, account);
     bool vaultStatus = CVLShouldRevert(account);
+    uint8 numControllers = numOfController(account);
     requireAccountStatusCheckInternalHarness@withrevert(e, account);
-    assert lastReverted == vaultStatus;
-    assert !lastReverted => numOfController(account) <= 1;
+    bool statusCheckReverted = lastReverted;
+    if(numControllers == 1) {
+        // if there is exactly one controller,
+        // whether or not there is a revert
+        // is decided by the vault implementation
+        assert statusCheckReverted == vaultStatus;
+    } if(numControllers == 0)
+        assert !statusCheckReverted;
+    else {
+        assert statusCheckReverted;
+    }
 
 }
