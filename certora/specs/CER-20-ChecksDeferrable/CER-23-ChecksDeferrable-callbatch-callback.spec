@@ -23,10 +23,18 @@ rule call_authentication_skip {
     uint256 value;
     bytes data;
 
-    require !didAuth;
     require e.msg.sender == targetContract;
+    require !didAuth;
     call(e, targetContract, onBehalfOfAccount, value, data);
     assert !didAuth;
 }
 
-// TODO need similar implementation for batch
+rule batch_authentication_skip {
+    env e;
+    IEVC.BatchItem[] items;
+    require items.length == 1;
+    require e.msg.sender == items[0].targetContract;
+    require !didAuth;
+    batch(e, items);
+    assert !didAuth;
+}
