@@ -15,51 +15,63 @@ methods {
     // CER-77 checks properties of EVC's handling of checkVaultStatus
     function EthereumVaultConnector.requireVaultStatusCheckInternal(address vault) internal => NONDET;
     function EthereumVaultConnector.checkStatusAll(TransientStorage.SetType setType) internal => NONDET;
-    // May not be needed / does not help, try deleting
-    // function _.restoreExecutionContext(uint256) internal => NONDET;
 }
 
-// persistent ghost address callTarget;
-// persistent ghost address savedOnBehalf;
-persistent ghost bool callTargetCorrect;
-// This is just initialized to e.msg.sender within the rule
-// so it can be accessed in the hook
-persistent ghost address msgSenderSavedForHook;
+persistent ghost bool onBehalfOfCorrect;
+persistent ghost address savedOnBehalfOfAccount;
 
 hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
 {
-    // callTarget = addr;
-    // savedOnBehalf = getExecutionContextOnBehalfOfAccount();
-    callTargetCorrect = callTargetCorrect && (
-        addr == getExecutionContextOnBehalfOfAccount() ||
-        addr == msgSenderSavedForHook ||
-        addr == currentContract);
+    if(addr != currentContract) {
+        onBehalfOfCorrect = onBehalfOfCorrect &&
+            (savedOnBehalfOfAccount == getExecutionContextOnBehalfOfAccount());
+    }
 }
 
 hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
 {
-    // callTarget = addr;
-    // savedOnBehalf = getExecutionContextOnBehalfOfAccount();
-    callTargetCorrect = callTargetCorrect && (
-        addr == getExecutionContextOnBehalfOfAccount() ||
-        addr == msgSenderSavedForHook ||
-        addr == currentContract);   
+    if(addr != currentContract) {
+        onBehalfOfCorrect = onBehalfOfCorrect &&
+            (savedOnBehalfOfAccount == getExecutionContextOnBehalfOfAccount());
+    }
 }
 
-// Run each of the functions that do low-level calls.
-// During the low-level calls, the hooks in this spec check whether
-// the execution context was used to get the target address.
-rule execution_context_tracks_account_for_calls (method f) filtered { f->
-    isLowLevelCallFunction(f)
-}{
+// Note: these rules are not parametric because we need
+// to initialize savedOnBehalfOfAccount to that parameter
+rule execution_context_tracks_account_for_call {
     env e;
-    calldataarg args;
-    // We prove this is true aside from in the context of permit
-    // with CER-51
+    address targetContract;
+    address onBehalfOfAccount;
+    uint256 value;
+    bytes data;
+
     require e.msg.sender != currentContract;
-    // initialize ghosts
-    require msgSenderSavedForHook == e.msg.sender;
-    require callTargetCorrect;
-    f(e, args);
-    assert callTargetCorrect;
+    require savedOnBehalfOfAccount == onBehalfOfAccount;
+    require onBehalfOfCorrect;
+    call(e, targetContract, onBehalfOfAccount, value, data);
+    assert onBehalfOfCorrect;
+}
+
+rule execution_context_tracks_account_for_batch{
+    env e;
+    IEVC.BatchItem[] items;
+    require e.msg.sender != currentContract;
+    require items.length == 1;
+    require savedOnBehalfOfAccount == items[0].onBehalfOfAccount;
+    require onBehalfOfCorrect;
+    batch(e, items);
+    assert onBehalfOfCorrect;
+}
+
+rule execution_context_tracks_account_for_controlCollateral {
+    env e;
+    address targetCollateral;
+    address onBehalfOfAccount;
+    uint256 value;
+    bytes data;
+    require e.msg.sender != currentContract;
+    require savedOnBehalfOfAccount == onBehalfOfAccount;
+    require onBehalfOfCorrect;
+    controlCollateral(e, targetCollateral, onBehalfOfAccount, value, data);
+    assert onBehalfOfCorrect;
 }
