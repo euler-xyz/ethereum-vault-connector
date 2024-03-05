@@ -8,9 +8,13 @@ methods {
     // an external vault contract as the target. We want to exclude
     // this low-level CALL from these rules, and this is the point
     // of the following summary, which excludes the CALL but models
-    // an arbitrary implementation of this function.
-    // CER-76 checks properties of EVC's handling of checkAccountStatusInternal
+    // an arbitrary implementation of this function. Similar for
+    // checkVaultStatusInternal
+    // CER-76 checks properties of EVC's handling of checkAccountStatus
     function EthereumVaultConnector.requireAccountStatusCheckInternal(address account) internal => NONDET;
+    // CER-77 checks properties of EVC's handling of checkVaultStatus
+    function EthereumVaultConnector.requireVaultStatusCheckInternal(address vault) internal => NONDET;
+    function EthereumVaultConnector.checkStatusAll(TransientStorage.SetType setType) internal => NONDET;
     // May not be needed / does not help, try deleting
     // function _.restoreExecutionContext(uint256) internal => NONDET;
 }
@@ -53,8 +57,8 @@ rule execution_context_tracks_account_for_calls (method f) filtered { f->
     // We prove this is true aside from in the context of permit
     // with CER-51
     require e.msg.sender != currentContract;
-    require msgSenderSavedForHook == e.msg.sender;
     // initialize ghosts
+    require msgSenderSavedForHook == e.msg.sender;
     require callTargetCorrect;
     f(e, args);
     assert callTargetCorrect;
