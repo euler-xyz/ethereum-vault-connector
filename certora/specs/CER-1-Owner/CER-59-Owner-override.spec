@@ -8,7 +8,7 @@ persistent ghost bool overwroteOwner {
 
 hook Sstore currentContract.ownerLookup[KEY bytes19 address_prefix] address newValue (address oldValue) STORAGE {
     if (oldValue != 0 && newValue != oldValue) {
-        overwroteOwner = overwroteOwner || true;
+        overwroteOwner = true;
     }
 }
 
@@ -18,7 +18,7 @@ rule neverOverwriteOwner (method f) filtered {f ->
 }{
     env e;
     calldataarg args;
-    require overwroteOwner == false;
+    require !overwroteOwner;
     f(e, args);
     assert !overwroteOwner;
 }
