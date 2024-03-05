@@ -2,6 +2,12 @@
 // controller enabled for an Account at the time of the Check. The Status is
 // determined as per data obtained from the called Controller.
 
+// This spec file checks that thet status is determined as per data from
+// the called controller. The other part of the spec, "there Must be only one
+// controller enabled for an Account at the time of Check" is covered by
+// CER-76b -- this needs to be in a separate file because we need to
+// summarize a function in a different way.
+
 using VaultMock as vault;
 
 methods {
@@ -13,7 +19,8 @@ methods {
 // This uninterpreted function is used to model a vault that 
 // can choose any function to decide if the account status is valid.
 // This assumes only that this function will return the same values for the 
-// same parameters.
+// same parameters. Ideally we would also include the collaterals parameter,
+// but CVL does not support ghost functions with arguments of type address[].
 ghost CVLShouldRevert(address) returns bool;
 
 rule account_status_check_execution {
@@ -28,7 +35,8 @@ rule account_status_check_execution {
         // if there is exactly one controller,
         // whether or not there is a revert
         // is decided by the vault implementation
-        assert statusCheckReverted == vaultStatus;
+        // (based on the address parameter it receives)
+        assert vaultStatus => statusCheckReverted;
     } if(numControllers == 0)
         assert !statusCheckReverted;
     else {
