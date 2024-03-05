@@ -44,8 +44,10 @@ rule execution_context_tracks_account_for_call {
     address onBehalfOfAccount;
     uint256 value;
     bytes data;
-
+    // We prove this is true aside from in the context of permit
+    // with CER-51
     require e.msg.sender != currentContract;
+    // initialize ghosts
     require savedOnBehalfOfAccount == onBehalfOfAccount;
     require onBehalfOfCorrect;
     call(e, targetContract, onBehalfOfAccount, value, data);
@@ -55,7 +57,10 @@ rule execution_context_tracks_account_for_call {
 rule execution_context_tracks_account_for_batch{
     env e;
     IEVC.BatchItem[] items;
+    // We prove this is true aside from in the context of permit
+    // with CER-51
     require e.msg.sender != currentContract;
+    // initialize ghosts
     require items.length == 1;
     require savedOnBehalfOfAccount == items[0].onBehalfOfAccount;
     require onBehalfOfCorrect;
@@ -69,7 +74,10 @@ rule execution_context_tracks_account_for_controlCollateral {
     address onBehalfOfAccount;
     uint256 value;
     bytes data;
+    // We prove this is true aside from in the context of permit
+    // with CER-51
     require e.msg.sender != currentContract;
+    // initialize ghosts
     require savedOnBehalfOfAccount == onBehalfOfAccount;
     require onBehalfOfCorrect;
     controlCollateral(e, targetCollateral, onBehalfOfAccount, value, data);
