@@ -6,6 +6,7 @@ import "./Set.sol";
 import "./Events.sol";
 import "./Errors.sol";
 import "./OwnerBitField.sol";
+import "./OperatorBitField.sol";
 import "./TransientStorage.sol";
 import "./interfaces/IEthereumVaultConnector.sol";
 import "./interfaces/IVault.sol";
@@ -16,7 +17,8 @@ import "./interfaces/IERC1271.sol";
 /// @notice This contract implements the Ethereum Vault Connector.
 contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     using ExecutionContext for EC;
-    using OwnerBitField for OBF;
+    using OwnerBitField for OWBF;
+    using OperatorBitField for OPBF;
     using Set for SetStorage;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,10 +35,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     bytes32 internal constant PERMIT_TYPE_HASH = keccak256(
-        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,address sentinel,uint256 value,bytes data)"
+        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,address attester,uint256 value,bytes data)"
     );
 
-    bytes32 internal constant PERMIT_SENTINEL_TYPE_HASH = keccak256("PermitSentinel(address sentinel,bytes signature)");
+    bytes32 internal constant PERMIT_ATTESTER_TYPE_HASH = keccak256("PermitAttester(address attester,bytes signature)");
 
     uint256 internal immutable CACHED_CHAIN_ID;
     bytes32 internal immutable CACHED_DOMAIN_SEPARATOR;
@@ -65,11 +67,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // of succeeding per guess. It has to be admitted that the EVC model is weaker because finding a private key for
     // an owner gives access to all accounts, but there is still a very comfortable security margin.
 
-    mapping(bytes19 addressPrefix => OBF ownerBitField) internal ownerLookup;
+    mapping(bytes19 addressPrefix => OWBF ownerBitField) internal ownerLookup;
 
-    mapping(bytes19 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
+    mapping(bytes19 addressPrefix => mapping(address operator => OPBF operatorBitField)) internal operatorLookup;
 
-    mapping(bytes19 addressPrefix => mapping(address sentinel => bool authorized)) internal sentinelLookup;
+    mapping(bytes19 addressPrefix => mapping(address attester => uint256 deadline)) internal attesterLookup;
 
     mapping(bytes19 addressPrefix => mapping(uint256 nonceNamespace => uint256 nonce)) internal nonceLookup;
 
@@ -253,8 +255,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function isSentinelDisabledMode(bytes19 addressPrefix) external view returns (bool) {
-        return ownerLookup[addressPrefix].isSentinelDisabledMode();
+    function isAttesterDisabledMode(bytes19 addressPrefix) external view returns (bool) {
+        return ownerLookup[addressPrefix].isAttesterDisabledMode();
     }
 
     /// @inheritdoc IEVC
@@ -269,7 +271,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function getOperator(bytes19 addressPrefix, address operator) external view returns (uint256) {
-        return operatorLookup[addressPrefix][operator];
+        return OPBF.unwrap(operatorLookup[addressPrefix][operator]);
     }
 
     /// @inheritdoc IEVC
@@ -278,8 +280,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function isSentinelAuthorized(bytes19 addressPrefix, address sentinel) external view returns (bool) {
-        return sentinelLookup[addressPrefix][sentinel];
+    function isAttesterAuthorized(bytes19 addressPrefix, address attester) external view returns (bool) {
+        return attesterLookup[addressPrefix][attester] >= block.timestamp;
     }
 
     /// @inheritdoc IEVC
@@ -302,7 +304,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function setSentinelDisabledMode(
+    function setAttesterDisabledMode(
         bytes19 addressPrefix,
         bool enabled
     ) external payable virtual onlyOwner(addressPrefix) {
@@ -312,14 +314,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_NotAuthorized();
         }
 
-        if (ownerLookup[addressPrefix].isSentinelDisabledMode() == enabled) {
-            revert EVC_InvalidSentinelDisabledModeStatus();
+        if (ownerLookup[addressPrefix].isAttesterDisabledMode() == enabled) {
+            revert EVC_InvalidAttesterDisabledModeStatus();
         } else {
             ownerLookup[addressPrefix] = enabled
-                ? ownerLookup[addressPrefix].setSentinelDisabledMode()
-                : ownerLookup[addressPrefix].clearSentinelDisabledMode();
+                ? ownerLookup[addressPrefix].setAttesterDisabledMode()
+                : ownerLookup[addressPrefix].clearAttesterDisabledMode();
 
-            emit SentinelDisabledModeStatus(addressPrefix, enabled);
+            emit AttesterDisabledModeStatus(addressPrefix, enabled);
         }
     }
 
@@ -374,10 +376,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidAddress();
         }
 
-        if (operatorLookup[addressPrefix][operator] == operatorBitField) {
+        if (OPBF.unwrap(operatorLookup[addressPrefix][operator]) == operatorBitField) {
             revert EVC_InvalidOperatorStatus();
         } else {
-            operatorLookup[addressPrefix][operator] = operatorBitField;
+            operatorLookup[addressPrefix][operator] = OPBF.wrap(operatorBitField);
 
             emit OperatorStatus(addressPrefix, operator, operatorBitField);
         }
@@ -405,44 +407,39 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         bytes19 addressPrefix = getAddressPrefixInternal(account);
+        OPBF operatorBitField = operatorLookup[addressPrefix][operator];
+        bool operatorAuthorized = operatorBitField.isBitSet(owner, account);
 
-        // The bitMask defines which accounts the operator is authorized for. The bitMask is created from the account
-        // number which is a number up to 2^8 in binary, or 256. 1 << (uint160(owner) ^ uint160(account)) transforms
-        // that number in an 256-position binary array like 0...010...0, marking the account positionally in a uint256.
-        uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
-
-        // The operatorBitField is a 256-position binary array, where each 1 signals by position the account that the
-        // operator is authorized for.
-        uint256 oldOperatorBitField = operatorLookup[addressPrefix][operator];
-        uint256 newOperatorBitField = authorized ? oldOperatorBitField | bitMask : oldOperatorBitField & ~bitMask;
-
-        if (oldOperatorBitField == newOperatorBitField) {
+        if ((authorized && operatorAuthorized) || (!authorized && !operatorAuthorized)) {
             revert EVC_InvalidOperatorStatus();
         } else {
-            operatorLookup[addressPrefix][operator] = newOperatorBitField;
+            operatorBitField =
+                authorized ? operatorBitField.setBit(owner, account) : operatorBitField.clearBit(owner, account);
 
-            emit OperatorStatus(addressPrefix, operator, newOperatorBitField);
+            operatorLookup[addressPrefix][operator] = operatorBitField;
+
+            emit OperatorStatus(addressPrefix, operator, OPBF.unwrap(operatorBitField));
         }
     }
 
     /// @inheritdoc IEVC
-    function setSentinel(
+    function setAttester(
         bytes19 addressPrefix,
-        address sentinel,
-        bool authorized
+        address attester,
+        uint40 deadline
     ) public payable virtual onlyOwner(addressPrefix) {
-        // it is prohibited to authorize the sentinel within the self-call of the permit() or within a checks-deferrable
+        // it is prohibited to authorize the attester within the self-call of the permit() or within a checks-deferrable
         // call
-        if (authorized && (inPermitSelfCall() || executionContext.areChecksDeferred())) {
+        if ((deadline >= block.timestamp) && (inPermitSelfCall() || executionContext.areChecksDeferred())) {
             revert EVC_NotAuthorized();
         }
 
-        if (sentinelLookup[addressPrefix][sentinel] == authorized) {
-            revert EVC_InvalidSentinelStatus();
+        if (attesterLookup[addressPrefix][attester] == deadline) {
+            revert EVC_InvalidAttesterStatus();
         } else {
-            sentinelLookup[addressPrefix][sentinel] = authorized;
+            attesterLookup[addressPrefix][attester] = deadline;
 
-            emit SentinelStatus(addressPrefix, sentinel, authorized);
+            emit AttesterStatus(addressPrefix, attester, deadline);
         }
     }
 
@@ -548,17 +545,18 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidNonce();
         }
 
-        bool sentinelDisabled = ownerLookup[addressPrefix].isSentinelDisabledMode();
-        address sentinel = payload.sentinel;
+        bool attesterDisabled = ownerLookup[addressPrefix].isAttesterDisabledMode();
+        address attester = payload.attester;
 
-        // if sentinel is disabled, it must be address(0); if sentinel is not disabled, it must be authorized
-        if (
-            !(
-                (sentinelDisabled && sentinel == address(0))
-                    || (!sentinelDisabled && sentinel != address(0) && sentinelLookup[addressPrefix][sentinel])
-            )
-        ) {
-            revert EVC_InvalidSentinelStatus();
+        // if attester is disabled, it must be address(0); if attester is not disabled, it must be authorized
+        if (attesterDisabled) {
+            if (attester != address(0)) {
+                revert EVC_InvalidAttesterStatus();
+            }
+        } else {
+            if (attester == address(0) || attesterLookup[addressPrefix][attester] < block.timestamp) {
+                revert EVC_InvalidAttesterStatus();
+            }
         }
 
         if (payload.deadline < block.timestamp) {
@@ -569,7 +567,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidData();
         }
 
-        (bytes32 permitHash, bytes32 permitSentinelHash) = getPermitHashes(payload);
+        (bytes32 permitHash, bytes32 permitAttesterHash) = getPermitHashes(payload);
 
         if (
             signer != recoverECDSASigner(permitHash, payload.signature)
@@ -584,17 +582,17 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         emit NonceUsed(addressPrefix, nonceNamespace, currentNonce);
 
-        // if sentinel disabled, the sentinel signature must be empty; if sentinel is not disabled, the sentinel
+        // if attester disabled, the attester signature must be empty; if attester is not disabled, the attester
         // signature
         // must be valid
         if (
-            (sentinelDisabled && payload.sentinelSignature.length > 0)
+            (attesterDisabled && payload.attesterSignature.length > 0)
                 || (
-                    !sentinelDisabled && sentinel != recoverECDSASigner(permitSentinelHash, payload.sentinelSignature)
-                        && !isValidERC1271Signature(sentinel, permitSentinelHash, payload.sentinelSignature)
+                    !attesterDisabled && attester != recoverECDSASigner(permitAttesterHash, payload.attesterSignature)
+                        && !isValidERC1271Signature(attester, permitAttesterHash, payload.attesterSignature)
                 )
         ) {
-            revert EVC_SentinelViolation();
+            revert EVC_AttesterViolation();
         }
 
         // EVC address becomes msg.sender for the duration this self-call, no authentication is required
@@ -819,7 +817,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bool authenticated = false;
         address msgSender = _msgSender();
         bytes19 addressPrefix = getAddressPrefixInternal(account);
-        OBF ownerBitFieldCache = ownerLookup[addressPrefix];
+        OWBF ownerBitFieldCache = ownerLookup[addressPrefix];
 
         // check if the caller is the owner of the account
         bool callerIsOwner = haveCommonOwnerInternal(account, msgSender);
@@ -1027,7 +1025,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function getPermitHashes(PermitPayload calldata payload)
         internal
         view
-        returns (bytes32 permitHash, bytes32 permitSentinelHash)
+        returns (bytes32 permitHash, bytes32 permitAttesterHash)
     {
         bytes32 domainSeparator =
             block.chainid == CACHED_CHAIN_ID ? CACHED_DOMAIN_SEPARATOR : calculateDomainSeparator();
@@ -1039,14 +1037,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
                 payload.nonceNamespace,
                 payload.nonce,
                 payload.deadline,
-                payload.sentinel,
+                payload.attester,
                 payload.value,
                 keccak256(payload.data)
             )
         );
 
-        bytes32 structHashPermitSentinel =
-            keccak256(abi.encode(PERMIT_SENTINEL_TYPE_HASH, payload.sentinel, keccak256(payload.signature)));
+        bytes32 structHashPermitAttester =
+            keccak256(abi.encode(PERMIT_ATTESTER_TYPE_HASH, payload.attester, keccak256(payload.signature)));
 
         // This code overwrites the two most significant bytes of the free memory pointer,
         // and restores them to 0 after
@@ -1055,8 +1053,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             mstore(0x02, domainSeparator)
             mstore(0x22, structHashPermit)
             permitHash := keccak256(0x00, 0x42)
-            mstore(0x22, structHashPermitSentinel)
-            permitSentinelHash := keccak256(0x00, 0x42)
+            mstore(0x22, structHashPermitAttester)
+            permitAttesterHash := keccak256(0x00, 0x42)
             mstore(0x22, 0)
         }
     }
@@ -1156,12 +1154,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         bytes19 addressPrefix = getAddressPrefixInternal(account);
 
-        // The bitMask defines which accounts the operator is authorized for. The bitMask is created from the account
-        // number which is a number up to 2^8 in binary, or 256. 1 << (uint160(owner) ^ uint160(account)) transforms
-        // that number in an 256-position binary array like 0...010...0, marking the account positionally in a uint256.
-        uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
-
-        return operatorLookup[addressPrefix][operator] & bitMask != 0;
+        return operatorLookup[addressPrefix][operator].isBitSet(owner, account);
     }
 
     function setAccountOwnerInternal(address account, address owner) internal {

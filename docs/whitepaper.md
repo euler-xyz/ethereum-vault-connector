@@ -21,7 +21,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [controlCollateral](#controlcollateral)
     * [permit](#permit)
         * [Nonce Namespaces](#nonce-namespaces)
-        * [Sentinels](#sentinels)
+        * [Attesters](#attesters)
     * [Authorisation](#authorisation)
         * [Sub-Accounts](#sub-accounts)
         * [Operators](#operators)
@@ -181,13 +181,13 @@ Permits are EIP-712 typed data messages with the following fields:
 * `signer`: The address to execute the operation on behalf of.
 * `nonceNamespace` and `nonce`: Values used to prevent replaying permit messages, and for sequencing (see below).
 * `deadline`: A timestamp after which the permit becomes invalid.
-* `sentinel`: The address for the second stage verification of the permit message (see below).
+* `attester`: The address for the second stage verification of the permit message (see below).
 * `value`: The value of native currency that is expected to be sent to the EVC.
 * `data`: Arbitrary calldata that will be used to invoke the EVC. Typically this will contain an invocation of the `batch` method.
 
 There are two types of signature methods supported by permits: ECDSA, which is used by EOAs, and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) which is used by smart contract wallets. In both cases, the `permit` method can be invoked by any unprivileged address, such as a keeper. If the signature is exactly 65 bytes long, an `ecrecover` is attempted. If the recovered address does not match `signer`, or for signature lengths other than 65, then an ERC-1271 verification is attempted, by staticcalling `isValidSignature` on `signer`.
 
-After verifying `nonce`, `nonceNamespace`, `deadline`, the `sentinel`'s and the `signer`'s `signature`s, the `data` will be used to invoke the EVC, forwarding the specified `value` (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
+After verifying `nonce`, `nonceNamespace`, `deadline`, the `attester`'s and the `signer`'s `signature`s, the `data` will be used to invoke the EVC, forwarding the specified `value` (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
 
 Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via `call` and `batch`, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
 
@@ -211,23 +211,23 @@ Permit messages can be cancelled in three ways:
 * Invoking the `setNonce` method. This allows users to increase their nonce up to a specified value, potentially cancelling many outstanding permit messages in the process. Note that there is no danger of rendering an account non-functional: Even if a nonce is set to the max `uint256`, there are an effectively unlimited number of other namespaces available.
 * Implicitly, by waiting until the `deadline` timestamp expires
 
-#### Sentinels
+#### Attesters
 
-To enhance security against phishing attacks and make them significantly more challenging, users are required to specify a `sentinel` address for the second stage verification of the permit message. This address must be authorized by the user prior to the `permit` function call. 
+To enhance security against phishing attacks and make them significantly more challenging, users are required to specify an `attester` address for the second stage verification of the permit message. This address must be authorized by the user prior to the `permit` function call. 
 
-A sentinel can be either an EOA or a smart contract, that is expected to sign an EIP-712 typed data message with the following fields:
-* `sentinel`: The address of the sentinel itself.
+An attester can be either an EOA or a smart contract, that is expected to sign an EIP-712 typed data message with the following fields:
+* `attester`: The address of the attester itself.
 * `signature`: The signature of the permit message by the `signer`.
 
-This mechanism ensures that for a user to fall victim to a phishing attack by signing a malicious permit message, the attacker must have previously deceived the user into setting a malicious `sentinel` capable of signing the user's permit message signature.
+This mechanism ensures that for a user to fall victim to a phishing attack by signing a malicious permit message, the attacker must have previously deceived the user into setting a malicious `attester` capable of signing the user's permit message signature.
 
-Sentinels can act as security gatekeepers, allowing permit operations to proceed only if the invoked data on the EVC on behalf of the user is deemed safe and non-malicious. This can be achieved through various methods such as simulation services, payload analysis, and more.
+Attesters can act as security gatekeepers, allowing permit operations to proceed only if the invoked data on the EVC on behalf of the user is deemed safe and non-malicious. This can be achieved through various methods such as simulation services, payload analysis, and more.
 
-Sentinels may be conservative signers and only allow the permit messages which contain a payload they are able to successfully assess. To avoid potential censorship of transactions by overly cautious sentinels, users have the flexibility to set an unlimited number of sentinel addresses, enabling them to select the most appropriate one for each permit message.
+Attesters may be conservative signers and only allow the permit messages which contain a payload they are able to successfully assess. To avoid potential censorship of transactions by overly cautious attesters, users have the flexibility to set an unlimited number of attester addresses, enabling them to select the most appropriate one for each permit message.
 
-For users who prefer not to depend on external sentinel services, they have an option to disable the feature. This approach guarantees complete control over which transactions are approved, thus providing a layer of censorship resistance. It must be emphasized however that with sentinel disabled, users must remain even more vigilant and careful about the messages they sign.
+For users who prefer not to depend on external attester services, they have an option to disable the feature. This approach guarantees complete control over which transactions are approved, thus providing a layer of censorship resistance. It must be emphasized however that with attester disabled, users must remain even more vigilant and careful about the messages they sign.
 
-Sentinels may also play a crucial role in mitigating gasless transaction DOS attacks. A relayer may mandate the use of a trusted sentinel to simulate the transaction, ensuring its correctness (i.e., it does not revert) and profitability for the relayer. If a trusted sentinel is used, the relayer can verify its signature off-chain, providing assurance that the transaction aligns with the relayer's expectations before broadcasting it.
+Attesters may also play a crucial role in mitigating gasless transaction DOS attacks. A relayer may mandate the use of a trusted attester to simulate the transaction, ensuring its correctness (i.e., it does not revert) and profitability for the relayer. If a trusted attester is used, the relayer can verify its signature off-chain, providing assurance that the transaction aligns with the relayer's expectations before broadcasting it.
 
 ### Authorisation
 
@@ -323,8 +323,8 @@ In order to take advantage of transient storage, the contracts have been structu
 
 To enhance user security, the EVC implements three distinct safety modes that influence its behavior across all sub-accounts associated with an owner:
 
-* `PERMIT-ONLY MODE`: In this mode, use of certain functions, as well as executing calls to external smart contracts via the EVC, is allowed exclusively through the `permit` function. This leverages the role of permit sentinels within the system to enhance security. It's important to note that this mode does not impact the actions of operators acting on an account's behalf.
-* `SENTINEL-DISABLED MODE`: In this mode, the permit sentinels are bypassed and do not participate in the signature verification of the permit message. This mode is designed for scenarios where the sentinel mechanism needs to be temporarily circumvented (i.e. due to censorship concerns).
+* `PERMIT-ONLY MODE`: In this mode, use of certain functions, as well as executing calls to external smart contracts via the EVC, is allowed exclusively through the `permit` function. This leverages the role of permit attesters within the system to enhance security. It's important to note that this mode does not impact the actions of operators acting on an account's behalf.
+* `ATTESTER-DISABLED MODE`: In this mode, the permit attesters are bypassed and do not participate in the signature verification of the permit message. This mode is designed for scenarios where the attester mechanism needs to be temporarily circumvented (i.e. due to censorship concerns).
 * `LOCKDOWN MODE`: This is the most restrictive mode, certain functions, as well as calls to external smart contracts through the EVC, are disabled. This mode is particularly useful in emergency situations, such as when a malicious operator has been added or a harmful permit message has been signed, necessitating immediate action to safeguard the owner's assets.
 
 ### Authentication by Vaults

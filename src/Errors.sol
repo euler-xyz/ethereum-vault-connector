@@ -12,9 +12,9 @@ contract Errors {
     error EVC_AccountOwnerNotRegistered();
     error EVC_OnBehalfOfAccountNotAuthenticated();
     error EVC_InvalidPermitOnlyModeStatus();
-    error EVC_InvalidSentinelDisabledModeStatus();
+    error EVC_InvalidAttesterDisabledModeStatus();
     error EVC_InvalidLockdownModeStatus();
-    error EVC_InvalidSentinelStatus();
+    error EVC_InvalidAttesterStatus();
     error EVC_InvalidOperatorStatus();
     error EVC_InvalidNonce();
     error EVC_InvalidAddress();
@@ -25,7 +25,7 @@ contract Errors {
     error EVC_PermitOnlyMode();
     error EVC_ChecksReentrancy();
     error EVC_ControlCollateralReentrancy();
-    error EVC_SentinelViolation();
+    error EVC_AttesterViolation();
     error EVC_ControllerViolation();
     error EVC_SimulationBatchNested();
     error EVC_RevertedBatchResult(

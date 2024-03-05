@@ -19,8 +19,8 @@ interface IEVC {
         uint256 nonce;
         /// @notice The timestamp after which the permit is considered expired.
         uint256 deadline;
-        /// @notice The address of the sentinel responsible for additional verification of the permit.
-        address sentinel;
+        /// @notice The address of the attester responsible for additional verification of the permit.
+        address attester;
         /// @notice The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
         /// balance of the EVC contract will be forwarded.
         uint256 value;
@@ -28,8 +28,8 @@ interface IEVC {
         bytes data;
         /// @notice The signature of the data signed by the signer.
         bytes signature;
-        /// @notice The signature of the sentinel for additional verification of the permit.
-        bytes sentinelSignature;
+        /// @notice The signature of the attester for additional verification of the permit.
+        bytes attesterSignature;
     }
 
     /// @notice A struct representing a batch item.
@@ -136,10 +136,10 @@ interface IEVC {
     /// @return A boolean indicating whether only permit-based operations are allowed.
     function isPermitOnlyMode(bytes19 addressPrefix) external view returns (bool);
 
-    /// @notice Determines if sentinel checks are bypassed for a specific address prefix.
-    /// @param addressPrefix The address prefix to evaluate for sentinel bypass status.
-    /// @return A boolean indicating if sentinel checks are bypassed.
-    function isSentinelDisabledMode(bytes19 addressPrefix) external view returns (bool);
+    /// @notice Determines if attester checks are bypassed for a specific address prefix.
+    /// @param addressPrefix The address prefix to evaluate for attester bypass status.
+    /// @return A boolean indicating if attester checks are bypassed.
+    function isAttesterDisabledMode(bytes19 addressPrefix) external view returns (bool);
 
     /// @notice Checks if lockdown mode is enabled for a given address prefix.
     /// @param addressPrefix The address prefix to check for lockdown mode status.
@@ -173,21 +173,23 @@ interface IEVC {
     /// @return authorized A boolean value that indicates whether the operator is authorized for the account.
     function isAccountOperatorAuthorized(address account, address operator) external view returns (bool authorized);
 
-    /// @notice Checks if a sentinel is authorized for a given address prefix.
-    /// @param addressPrefix The address prefix for which the sentinel authorization is being checked.
-    /// @param sentinel The address of the sentinel whose authorization status is being checked.
-    /// @return A boolean value indicating whether the sentinel is authorized for the given address prefix.
-    function isSentinelAuthorized(bytes19 addressPrefix, address sentinel) external view returns (bool);
+    /// @notice Checks if a attester is authorized for a given address prefix.
+    /// @dev The attester is considered authorized if the deadline stored is greater than or equal to the current block
+    /// timestamp.
+    /// @param addressPrefix The address prefix for which the attester authorization is being checked.
+    /// @param attester The address of the attester whose authorization status is being checked.
+    /// @return A boolean value indicating whether the attester is authorized for the given address prefix.
+    function isAttesterAuthorized(bytes19 addressPrefix, address attester) external view returns (bool);
 
     /// @notice Enables or disables permit-only mode for a given address prefix.
     /// @param addressPrefix The address prefix for which the permit-only mode is being set.
     /// @param enabled A boolean indicating whether to enable or disable permit-only mode.
     function setPermitOnlyMode(bytes19 addressPrefix, bool enabled) external payable;
 
-    /// @notice Toggles the sentinel checks' bypass status for a specified address prefix.
-    /// @param addressPrefix The address prefix targeted for sentinel checks' bypass configuration.
-    /// @param enabled True to bypass sentinel checks, false to enforce them.
-    function setSentinelDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
+    /// @notice Enables or disables the attester checks' bypass status for a specified address prefix.
+    /// @param addressPrefix The address prefix targeted for attester checks' bypass configuration.
+    /// @param enabled True to bypass attester checks, false to enforce them.
+    function setAttesterDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Enables or disables lockdown mode for a given address prefix.
     /// @param addressPrefix The address prefix for which the lockdown mode is being set.
@@ -226,13 +228,13 @@ interface IEVC {
     /// Reverts if provided value is equal to the currently stored.
     function setAccountOperator(address account, address operator, bool authorized) external payable;
 
-    /// @notice Authorizes or deauthorizes a sentinel for a given address prefix.
-    /// @dev This function can only be called by the owner of the address prefix. It is not possible to authorize the
-    /// sentinel from within the permit or checks-deferrable call context.
-    /// @param addressPrefix The address prefix for which the sentinel is being set.
-    /// @param sentinel The address of the sentinel.
-    /// @param authorized A boolean value that indicates whether the sentinel is being authorized or deauthorized.
-    function setSentinel(bytes19 addressPrefix, address sentinel, bool authorized) external payable;
+    /// @notice Authorizes or deauthorizes an attester for a given address prefix.
+    /// @dev This function can only be called by the owner of the address prefix. It is not possible to authorize
+    /// an attester from within the permit or checks-deferrable call context.
+    /// @param addressPrefix The address prefix for which the attester is being authorized or deauthorized.
+    /// @param attester The address of the attester being authorized or deauthorized.
+    /// @param deadline The deadline after which the attester is considered not authorized.
+    function setAttester(bytes19 addressPrefix, address attester, uint40 deadline) external payable;
 
     /// @notice Returns an array of collaterals enabled for an account.
     /// @dev A collateral is a vault for which account's balances are under the control of the currently enabled
