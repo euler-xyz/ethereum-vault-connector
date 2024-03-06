@@ -9,6 +9,7 @@ methods {
     // when the deferred checks are executed at the end of the deferred check
     // call that the set of vault addresses did not already contain
     // some vault address other than e.msg.sender.
+    // These summaries exclude the deferred checks from the rule.
     function EthereumVaultConnector.checkStatusAll(TransientStorage.SetType setType) internal => NONDET;
     function EthereumVaultConnector.restoreExecutionContext(ExecutionContext.EC ec) internal => NONDET;
 }
