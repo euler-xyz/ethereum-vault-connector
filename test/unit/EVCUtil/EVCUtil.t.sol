@@ -49,10 +49,6 @@ contract EVCClient is EVCUtil {
         return _msgSenderForBorrow();
     }
 
-    function getAccountOwner(address account) external view returns (address) {
-        return _getAccountOwner(account);
-    }
-
     fallback(bytes calldata) external returns (bytes memory) {
         return abi.encode(IVault.checkAccountStatus.selector);
     }
@@ -216,23 +212,5 @@ contract EVCUtilTest is Test {
         bytes memory result =
             evc.call(address(evcClient), caller, 0, abi.encodeWithSelector(evcClient.msgSenderForBorrow.selector));
         assertEq(abi.decode(result, (address)), caller);
-    }
-
-    function test_getAccountOwner(address caller, uint8 subAccountId) external {
-        vm.assume(caller != address(0) && caller != address(evc));
-
-        address subAccount = address(uint160(caller) ^ subAccountId);
-
-        // caller is not registered yet as an account owner on the EVC
-        assertEq(evcClient.getAccountOwner(caller), caller);
-        assertEq(evcClient.getAccountOwner(subAccount), subAccount);
-
-        // caller gets registered as an account owner on the EVC
-        vm.prank(caller);
-        evc.call(address(0), subAccount, 0, "");
-
-        // caller is registered as an account owner on the EVC
-        assertEq(evcClient.getAccountOwner(caller), caller);
-        assertEq(evcClient.getAccountOwner(subAccount), caller);
     }
 }

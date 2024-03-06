@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.19;
 
@@ -95,17 +95,5 @@ abstract contract EVCUtil {
         }
 
         return sender;
-    }
-
-    /// @notice Retrieves the owner of an account from the EVC.
-    /// @dev Use with care. If the account is not registered on the EVC yet, the queried account address is returned.
-    /// @param account The address of the account.
-    /// @return owner The address of the account owner.
-    function _getAccountOwner(address account) internal view virtual returns (address owner) {
-        try evc.getAccountOwner(account) returns (address _owner) {
-            owner = _owner;
-        } catch {
-            owner = account;
-        }
     }
 }

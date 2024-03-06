@@ -40,6 +40,12 @@ library ExecutionContext {
     // context value that should be written to the executionContext storage pointer:
     // executionContext = executionContext.setChecksInProgress();
 
+    function initialize(EC context) internal pure returns (EC result) {
+        // prepopulate the execution context storage slot to optimize gas consumption
+        // (it should never be cleared again thanks to the stamp)
+        result = EC.wrap(EC.unwrap(context) | (STAMP_DUMMY_VALUE << STAMP_OFFSET));
+    }
+
     function getOnBehalfOfAccount(EC context) internal pure returns (address result) {
         result = address(uint160(EC.unwrap(context) & ON_BEHALF_OF_ACCOUNT_MASK));
     }
@@ -90,11 +96,5 @@ library ExecutionContext {
 
     function setSimulationInProgress(EC context) internal pure returns (EC result) {
         result = EC.wrap(EC.unwrap(context) | SIMULATION_MASK);
-    }
-
-    function initialize() internal pure returns (EC result) {
-        // prepopulate the execution context storage slot to optimize gas consumption
-        // (it should never be cleared again thanks to the stamp)
-        result = EC.wrap(STAMP_DUMMY_VALUE << STAMP_OFFSET);
     }
 }
