@@ -36,65 +36,62 @@ library ExecutionContext {
     // None of the functions below modifies the state. All the functions operate on the copy
     // of the execution context and return its modified value as a result. In order to update
     // one should use the result of the function call as a new execution context value.
-    // i.e. the following call: executionContext.setChecksInProgress() returns the new execution
-    // context value that should be written to the executionContext storage pointer:
-    // executionContext = executionContext.setChecksInProgress();
 
-    function initialize(EC context) internal pure returns (EC result) {
+    function initialize(EC self) internal pure returns (EC result) {
         // prepopulate the execution context storage slot to optimize gas consumption
         // (it should never be cleared again thanks to the stamp)
-        result = EC.wrap(EC.unwrap(context) | (STAMP_DUMMY_VALUE << STAMP_OFFSET));
+        result = EC.wrap(EC.unwrap(self) | (STAMP_DUMMY_VALUE << STAMP_OFFSET));
     }
 
-    function getOnBehalfOfAccount(EC context) internal pure returns (address result) {
-        result = address(uint160(EC.unwrap(context) & ON_BEHALF_OF_ACCOUNT_MASK));
+    function getOnBehalfOfAccount(EC self) internal pure returns (address result) {
+        result = address(uint160(EC.unwrap(self) & ON_BEHALF_OF_ACCOUNT_MASK));
     }
 
-    function setOnBehalfOfAccount(EC context, address account) internal pure returns (EC result) {
-        result = EC.wrap((EC.unwrap(context) & ~ON_BEHALF_OF_ACCOUNT_MASK) | uint160(account));
+    function setOnBehalfOfAccount(EC self, address account) internal pure returns (EC result) {
+        result = EC.wrap((EC.unwrap(self) & ~ON_BEHALF_OF_ACCOUNT_MASK) | uint160(account));
     }
 
-    function areChecksDeferred(EC context) internal pure returns (bool result) {
-        result = EC.unwrap(context) & CHECKS_DEFERRED_MASK != 0;
+    function areChecksDeferred(EC self) internal pure returns (bool result) {
+        result = EC.unwrap(self) & CHECKS_DEFERRED_MASK != 0;
     }
 
-    function setChecksDeferred(EC context) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) | CHECKS_DEFERRED_MASK);
+    function setChecksDeferred(EC self) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(self) | CHECKS_DEFERRED_MASK);
     }
 
-    function areChecksInProgress(EC context) internal pure returns (bool result) {
-        result = EC.unwrap(context) & CHECKS_IN_PROGRESS_MASK != 0;
+    function areChecksInProgress(EC self) internal pure returns (bool result) {
+        result = EC.unwrap(self) & CHECKS_IN_PROGRESS_MASK != 0;
     }
 
-    function setChecksInProgress(EC context) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) | CHECKS_IN_PROGRESS_MASK);
+    function setChecksInProgress(EC self) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(self) | CHECKS_IN_PROGRESS_MASK);
     }
 
-    function isControlCollateralInProgress(EC context) internal pure returns (bool result) {
-        result = EC.unwrap(context) & CONTROL_COLLATERAL_IN_PROGRESS_LOCK_MASK != 0;
+    function isControlCollateralInProgress(EC self) internal pure returns (bool result) {
+        result = EC.unwrap(self) & CONTROL_COLLATERAL_IN_PROGRESS_LOCK_MASK != 0;
     }
 
-    function setControlCollateralInProgress(EC context) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) | CONTROL_COLLATERAL_IN_PROGRESS_LOCK_MASK);
+    function setControlCollateralInProgress(EC self) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(self) | CONTROL_COLLATERAL_IN_PROGRESS_LOCK_MASK);
     }
 
-    function isOperatorAuthenticated(EC context) internal pure returns (bool result) {
-        result = EC.unwrap(context) & OPERATOR_AUTHENTICATED_MASK != 0;
+    function isOperatorAuthenticated(EC self) internal pure returns (bool result) {
+        result = EC.unwrap(self) & OPERATOR_AUTHENTICATED_MASK != 0;
     }
 
-    function setOperatorAuthenticated(EC context) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) | OPERATOR_AUTHENTICATED_MASK);
+    function setOperatorAuthenticated(EC self) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(self) | OPERATOR_AUTHENTICATED_MASK);
     }
 
-    function clearOperatorAuthenticated(EC context) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) & ~OPERATOR_AUTHENTICATED_MASK);
+    function clearOperatorAuthenticated(EC self) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(self) & ~OPERATOR_AUTHENTICATED_MASK);
     }
 
-    function isSimulationInProgress(EC context) internal pure returns (bool result) {
-        result = EC.unwrap(context) & SIMULATION_MASK != 0;
+    function isSimulationInProgress(EC self) internal pure returns (bool result) {
+        result = EC.unwrap(self) & SIMULATION_MASK != 0;
     }
 
-    function setSimulationInProgress(EC context) internal pure returns (EC result) {
-        result = EC.wrap(EC.unwrap(context) | SIMULATION_MASK);
+    function setSimulationInProgress(EC self) internal pure returns (EC result) {
+        result = EC.wrap(EC.unwrap(self) | SIMULATION_MASK);
     }
 }

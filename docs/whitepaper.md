@@ -32,6 +32,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [Simulations](#simulations)
 * [Transient Storage](#transient-storage)
 * [Security Considerations](#security-considerations)
+    * [Lockdown Mode](#lockdown-mode)
     * [Authentication by Vaults](#authentication-by-vaults)
     * [EVC Contract Privileges](#evc-contract-privileges)
     * [Read-only Re-entrancy](#read-only-re-entrancy)
@@ -297,6 +298,10 @@ In order to take advantage of transient storage, the contracts have been structu
 
 
 ## Security Considerations
+
+### Lockdown Mode
+
+To improve user security, the EVC introduces a `LOCKDOWN MODE`. This mode, which can only be activated by the owner, applies to all their accounts simultaneously. Once activated, the EVC significantly reduces its functionality across the owner's accounts. In this state, the owner is restricted to managing operators and nonces, while operators are restricted to revoke their own permissions. With `LOCKDOWN MODE` active, neither the owner nor the operators can carry any other operations on the EVC. Notably, calling external smart contracts on behalf of the owner or any of their accounts is prohibited. However, authorized controllers can still control collaterals for the user even under lockdown. This mode is particularly useful in emergency situations, such as when a malicious operator has been added or a harmful permit message has been signed, necessitating immediate action to safeguard the owner's assets.
 
 ### Authentication by Vaults
 

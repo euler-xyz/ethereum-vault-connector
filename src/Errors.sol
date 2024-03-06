@@ -11,12 +11,14 @@ contract Errors {
     error EVC_NotAuthorized();
     error EVC_AccountOwnerNotRegistered();
     error EVC_OnBehalfOfAccountNotAuthenticated();
+    error EVC_InvalidLockdownModeStatus();
     error EVC_InvalidOperatorStatus();
     error EVC_InvalidNonce();
     error EVC_InvalidAddress();
     error EVC_InvalidTimestamp();
     error EVC_InvalidValue();
     error EVC_InvalidData();
+    error EVC_LockdownMode();
     error EVC_ChecksReentrancy();
     error EVC_ControlCollateralReentrancy();
     error EVC_ControllerViolation();

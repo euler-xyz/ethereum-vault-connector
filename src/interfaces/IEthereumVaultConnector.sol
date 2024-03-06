@@ -105,6 +105,11 @@ interface IEVC {
     /// the first 19 bytes of the account address.
     function getAccountOwner(address account) external view returns (address);
 
+    /// @notice Checks if lockdown mode is enabled for a given address prefix.
+    /// @param addressPrefix The address prefix to check for lockdown mode status.
+    /// @return A boolean indicating whether lockdown mode is enabled.
+    function isLockdownMode(bytes19 addressPrefix) external view returns (bool);
+
     /// @notice Returns the current nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used sequentially. There's no requirement to use
     /// all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in
@@ -131,6 +136,14 @@ interface IEVC {
     /// @param operator The address of the operator that is being checked.
     /// @return authorized A boolean value that indicates whether the operator is authorized for the account.
     function isAccountOperatorAuthorized(address account, address operator) external view returns (bool authorized);
+
+    /// @notice Enables or disables lockdown mode for a given address prefix.
+    /// @dev This function can only be called by the owner of the address prefix. To disable the lockdown mode, the EVC
+    /// must be called directly. It is not possible to disable the lockdown mode by using checks-deferrable call or
+    /// permit message.
+    /// @param addressPrefix The address prefix for which the lockdown mode is being set.
+    /// @param enabled A boolean indicating whether to enable or disable lockdown mode.
+    function setLockdownMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit
