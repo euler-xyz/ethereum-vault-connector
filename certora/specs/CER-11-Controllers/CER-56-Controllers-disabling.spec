@@ -29,5 +29,5 @@ rule enabled_controller_can_disable_itself {
     address account;
     require isControllerEnabled(account, e.msg.sender);
     disableController@withrevert(e, account); 
-    satisfy !lastReverted;
+    satisfy !lastReverted && !isControllerEnabled(account, e.msg.sender);
 }
