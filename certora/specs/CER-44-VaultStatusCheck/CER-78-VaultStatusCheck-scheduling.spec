@@ -4,6 +4,13 @@ import "../utils/IsMustRevertFunction.spec";
 // Only the Vault is allowed require the check for itself
 methods {
     function EthereumVaultConnector.requireVaultStatusCheckInternal(address vault) internal with (env e) => requireVaultStatusCheckOnlyCalledBySelf(e, vault);
+    // For the calls that allow deferred checks (call, batch, 
+    // controlCollateral), we cannot prove that the
+    // when the deferred checks are executed at the end of the deferred check
+    // call that the set of vault addresses did not already contain
+    // some vault address other than e.msg.sender.
+    function EthereumVaultConnector.checkStatusAll(TransientStorage.SetType setType) internal => NONDET;
+    function EthereumVaultConnector.restoreExecutionContext(ExecutionContext.EC ec) internal => NONDET;
 }
 
 // In all contexts where requireVaultStatusCheckInternal is called,
@@ -15,11 +22,6 @@ function requireVaultStatusCheckOnlyCalledBySelf(env e, address vault) {
 
 rule vault_status_check_scheduling (method f) filtered { f ->
     !isMustRevertFunction(f)
-    // These functions we have trouble reasoning about because
-    // they involve callWithContextInternal
-    && f.selector != sig:batch(IEVC.BatchItem[] calldata).selector
-    && f.selector != sig:call(address, address, uint256, bytes calldata).selector
-    && f.selector != sig:controlCollateral(address, address, uint256, bytes).selector
 }{
     env e;
     calldataarg args;
