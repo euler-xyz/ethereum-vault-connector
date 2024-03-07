@@ -10,7 +10,7 @@ methods {
 persistent ghost bool didAuth;
 function reachedAuthCaller(env e, address addr, bool allowOperator) returns address {
     // set didAuth if authenticateCaller is ever reached
-    didAuth = didAuth || true;
+    didAuth = true;
     // this is not relevant to the rule
     // but mirrors the returned value of the summarized function
     return currentContract == e.msg.sender ? getExecutionContextOnBehalfOfAccount(e) : e.msg.sender;
