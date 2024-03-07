@@ -4,6 +4,21 @@
 // depending on a function, a function-specific authentication is performed
 
 methods {
+    // TODO need to summarize restore execution context to avoid those callbacks
+    // which are covered by other rules
+}
+
+persistent ghost bool reachedDelegateCall;
+persistent ghost bool reachedCall;
+
+hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
+{
+    reachedCall = true;
+}
+
+hook DELEGATECALL(uint g, address addr, uint argsOffset, uint argsLength, uint retOffset, uint retLength) uint rc
+{
+    reachedDelegateCall = true;
 }
 
 rule call_self_call {
@@ -14,8 +29,12 @@ rule call_self_call {
     bytes data;
 
     require targetContract == currentContract;
+    require !reachedDelegateCall;
+    require !reachedCall;
     call(e, targetContract, onBehalfOfAccount, value, data);
     assert onBehalfOfAccount == 0;
+    assert reachedDelegateCall;
+    assert !reachedCall;
 }
 
 rule batch_self_call {
@@ -23,6 +42,10 @@ rule batch_self_call {
     IEVC.BatchItem[] items;
     require items.length == 1;
     require items[0].targetContract == currentContract;
+    require !reachedDelegateCall;
+    require !reachedCall;
     batch(e, items);
     assert items[0].onBehalfOfAccount == 0;
+    assert reachedDelegateCall;
+    assert !reachedCall;
 }
