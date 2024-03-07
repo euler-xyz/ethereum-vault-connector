@@ -62,4 +62,8 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
         return accountStatusChecks.contains(account);
     }
     
+    function selfCallSuccessCheck(uint256 value, bytes calldata data) external returns (bool) {
+        (bool success, ) = address(this).call{value: value}(data);
+        return success;
+    }
 }
