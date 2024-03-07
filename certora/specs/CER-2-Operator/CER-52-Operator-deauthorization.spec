@@ -12,19 +12,22 @@ methods {
 // - the Account Owner, or
 // - the Account Operator itself (one Account Operator MUST NOT be able to deauthorize the other Account Operator)
 rule operatorDeauthorization (method f) filtered { f -> 
-    f.selector == EthereumVaultConnectorHarness.setOperator(bytes19,address) ||
-    f.selector == EthereumVaultConnectorHarness.operatorDeauthorizationSetAccountOperator(address, address, bool)
+    !isMustRevertFunction(f) && 
+    f.selector != sig:batch(IEVC.BatchItem[] calldata).selector && 
+    f.selector != sig:call(address, address, uint256, bytes calldata).selector
 }{
     env e;
     calldataarg args;
     address operator;
     bytes19 addressPrefix;
     address caller = actualCaller(e);
+    address account;
+    require addressPrefix == getAddressPrefix(account);
     address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
-    address operatorBefore = getOperator(addressPrefix, operator);
+    uint256 operatorBefore = getOperator(addressPrefix, operator);
     f(e,args);
-    address operatorAfter = getOperator(addressPrefix, operator);
-    assert (operatorBefore && !operatorAfter) => 
+    uint256 operatorAfter = getOperator(addressPrefix, operator);
+    assert (operatorBefore != operatorAfter) => 
         (caller == operator || caller == owner);
 }
 
