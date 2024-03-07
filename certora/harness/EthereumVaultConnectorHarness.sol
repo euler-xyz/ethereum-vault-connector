@@ -11,7 +11,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     using Set for SetStorage;
 
     function getExecutionContextDefault() external view returns (uint256) {
-        return EC.unwrap(ExecutionContext.initialize());
+        return ExecutionContext.STAMP_DUMMY_VALUE << ExecutionContext.STAMP_OFFSET;
     }
 
     function getExecutionContextAreChecksDeferred() external view returns (bool) {
