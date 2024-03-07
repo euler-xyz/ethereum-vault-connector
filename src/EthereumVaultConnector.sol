@@ -5,7 +5,6 @@ pragma solidity ^0.8.19;
 import "./Set.sol";
 import "./Events.sol";
 import "./Errors.sol";
-import "./OwnerBitField.sol";
 import "./TransientStorage.sol";
 import "./interfaces/IEthereumVaultConnector.sol";
 import "./interfaces/IVault.sol";
@@ -16,8 +15,12 @@ import "./interfaces/IERC1271.sol";
 /// @notice This contract implements the Ethereum Vault Connector.
 contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     using ExecutionContext for EC;
-    using OwnerBitField for OBF;
     using Set for SetStorage;
+
+    struct OwnerStorage {
+        address owner;
+        bool isLockdownMode;
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       CONSTANTS                                           //
@@ -63,7 +66,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // of succeeding per guess. It has to be admitted that the EVC model is weaker because finding a private key for
     // an owner gives access to all accounts, but there is still a very comfortable security margin.
 
-    mapping(bytes19 addressPrefix => OBF ownerBitField) internal ownerLookup;
+    mapping(bytes19 addressPrefix => OwnerStorage ownerStorage) internal ownerLookup;
 
     mapping(bytes19 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
 
@@ -243,7 +246,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function isLockdownMode(bytes19 addressPrefix) external view returns (bool) {
-        return ownerLookup[addressPrefix].isLockdownMode();
+        return ownerLookup[addressPrefix].isLockdownMode;
     }
 
     /// @inheritdoc IEVC
@@ -263,7 +266,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function setLockdownMode(bytes19 addressPrefix, bool enabled) external payable virtual onlyOwner(addressPrefix) {
-        if (ownerLookup[addressPrefix].isLockdownMode() == enabled) {
+        if (ownerLookup[addressPrefix].isLockdownMode == enabled) {
             revert EVC_InvalidLockdownModeStatus();
         } else {
             // to increase user security, it is prohibited to disable the lockdown mode within the self-call of the
@@ -273,7 +276,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
                 revert EVC_NotAuthorized();
             }
 
-            ownerLookup[addressPrefix] = ownerLookup[addressPrefix].setLockdownMode(enabled);
+            ownerLookup[addressPrefix].isLockdownMode = enabled;
             emit LockdownModeStatus(addressPrefix, enabled);
         }
     }
@@ -702,19 +705,19 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bool allowOperator,
         bool checkLockdownMode
     ) internal virtual returns (address) {
-        bool authenticated;
-        address msgSender = _msgSender();
         bytes19 addressPrefix = getAddressPrefixInternal(account);
-        OBF ownerLookupCache = ownerLookup[addressPrefix];
+        address owner = ownerLookup[addressPrefix].owner;
+        bool lockdownMode = ownerLookup[addressPrefix].isLockdownMode;
 
-        if (checkLockdownMode && ownerLookupCache.isLockdownMode()) {
+        if (checkLockdownMode && lockdownMode) {
             revert EVC_LockdownMode();
         }
 
+        address msgSender = _msgSender();
+        bool authenticated = false;
+
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
-            address owner = ownerLookupCache.getOwner();
-
             // if the owner is not registered, register it
             if (owner == address(0)) {
                 setAccountOwnerInternal(account, msgSender);
@@ -1000,7 +1003,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function getAccountOwnerInternal(address account) internal view returns (address) {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
-        return ownerLookup[addressPrefix].getOwner();
+        return ownerLookup[addressPrefix].owner;
     }
 
     function isAccountOperatorAuthorizedInternal(
@@ -1024,7 +1027,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function setAccountOwnerInternal(address account, address owner) internal {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
-        ownerLookup[addressPrefix] = ownerLookup[addressPrefix].setOwner(owner);
+        ownerLookup[addressPrefix].owner = owner;
         emit OwnerRegistered(addressPrefix, owner);
     }
 

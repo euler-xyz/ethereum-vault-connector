@@ -20,7 +20,6 @@ For more information, visit the EVC [website](https://evc.wtf/) or refer to the 
 ├── EthereumVaultConnector.sol
 ├── Events.sol
 ├── ExecutionContext.sol
-├── OwnerBitField.sol
 ├── Set.sol
 └── TransientStorage.sol
 ```
