@@ -80,7 +80,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         CACHED_DOMAIN_SEPARATOR = calculateDomainSeparator();
     }
 
-    receive() external payable {}
+    receive() external payable {
+        // only receives value, no need to do anything here
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       MODIFIERS                                           //
@@ -532,16 +534,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         executionContext = contextCache.setChecksDeferred();
 
         uint256 length = items.length;
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ++i) {
             BatchItem calldata item = items[i];
             (bool success, bytes memory result) =
                 callWithAuthenticationInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
 
             if (!success) revertBytes(result);
-
-            unchecked {
-                ++i;
-            }
         }
 
         restoreExecutionContext(contextCache);
@@ -566,14 +564,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 length = items.length;
         batchItemsResult = new BatchItemResult[](length);
 
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ++i) {
             BatchItem calldata item = items[i];
             (batchItemsResult[i].success, batchItemsResult[i].result) =
                 callWithAuthenticationInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
-
-            unchecked {
-                ++i;
-            }
         }
 
         executionContext = contextCache.setChecksInProgress();
@@ -685,8 +679,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     function authenticateCaller(address account, bool allowOperator) internal virtual returns (address) {
-        bool authenticated = false;
         address msgSender = _msgSender();
+        bool authenticated;
 
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
@@ -858,14 +852,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 length = callbackResult.length;
         checksResult = new StatusCheckResult[](length);
 
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ++i) {
             (address checkedAddress, bool isValid, bytes memory result) =
                 abi.decode(callbackResult[i], (address, bool, bytes));
             checksResult[i] = StatusCheckResult(checkedAddress, isValid, result);
-
-            unchecked {
-                ++i;
-            }
         }
     }
 

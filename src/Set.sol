@@ -39,7 +39,7 @@ library Set {
     error TooManyElements();
     error InvalidIndex();
 
-    uint8 public constant MAX_ELEMENTS = 20; // must not exceed 255
+    uint8 internal constant MAX_ELEMENTS = 20; // must not exceed 255
     uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be 1
     uint8 internal constant DUMMY_STAMP = 1;
 
@@ -51,19 +51,15 @@ library Set {
     function initialize(SetStorage storage setStorage) internal {
         setStorage.stamp = DUMMY_STAMP;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < MAX_ELEMENTS;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < MAX_ELEMENTS; ++i) {
             setStorage.elements[i].stamp = DUMMY_STAMP;
-
-            unchecked {
-                ++i;
-            }
         }
     }
 
     /// @notice Inserts an element and returns information whether the element was inserted or not.
     /// @dev Reverts if the set is full but the element is not in the set storage.
     /// @param setStorage The set storage to which the element will be inserted.
-    /// @param element The address of the element to be inserted.
+    /// @param element The element to be inserted.
     /// @return A boolean value that indicates whether the element was inserted or not. If the element was already in
     /// the set storage, it returns false.
     function insert(SetStorage storage setStorage, address element) internal returns (bool) {
@@ -82,12 +78,8 @@ library Set {
 
         if (firstElement == element) return false;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             if (setStorage.elements[i].value == element) return false;
-
-            unchecked {
-                ++i;
-            }
         }
 
         if (numElements == MAX_ELEMENTS) revert TooManyElements();
@@ -104,7 +96,7 @@ library Set {
     /// @notice Removes an element and returns information whether the element was removed or not.
     /// @dev This operation may affect the order of elements in the array of elements obtained using get() function.
     /// @param setStorage The set storage from which the element will be removed.
-    /// @param element The address of the element to be removed.
+    /// @param element The element to be removed.
     /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set
     /// storage, it returns false.
     function remove(SetStorage storage setStorage, address element) internal returns (bool) {
@@ -115,13 +107,8 @@ library Set {
 
         uint256 searchIndex;
         if (firstElement != element) {
-            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements;) {
-                if (setStorage.elements[searchIndex].value == element) {
-                    break;
-                }
-                unchecked {
-                    ++searchIndex;
-                }
+            for (searchIndex = EMPTY_ELEMENT_OFFSET; searchIndex < numElements; ++searchIndex) {
+                if (setStorage.elements[searchIndex].value == element) break;
             }
 
             if (searchIndex == numElements) return false;
@@ -196,12 +183,8 @@ library Set {
 
         output[0] = firstElement;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             output[i] = setStorage.elements[i].value;
-
-            unchecked {
-                ++i;
-            }
         }
 
         return output;
@@ -210,7 +193,7 @@ library Set {
     /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the
     /// result.
     /// @param setStorage The set storage to be searched.
-    /// @param element The address of the element to be checked.
+    /// @param element The element to be searched for.
     /// @return A boolean value that indicates whether the set storage includes the element or not.
     function contains(SetStorage storage setStorage, address element) internal view returns (bool) {
         address firstElement = setStorage.firstElement;
@@ -219,12 +202,8 @@ library Set {
         if (numElements == 0) return false;
         if (firstElement == element) return true;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             if (setStorage.elements[i].value == element) return true;
-
-            unchecked {
-                ++i;
-            }
         }
 
         return false;
@@ -246,15 +225,11 @@ library Set {
 
         callback(firstElement);
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             address element = setStorage.elements[i].value;
             setStorage.elements[i].value = address(0);
 
             callback(element);
-
-            unchecked {
-                ++i;
-            }
         }
     }
 
@@ -282,16 +257,12 @@ library Set {
         (bool success, bytes memory result) = callback(firstElement);
         results[0] = abi.encode(firstElement, success, result);
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements;) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             address element = setStorage.elements[i].value;
             setStorage.elements[i].value = address(0);
 
             (success, result) = callback(element);
             results[i] = abi.encode(element, success, result);
-
-            unchecked {
-                ++i;
-            }
         }
 
         return results;

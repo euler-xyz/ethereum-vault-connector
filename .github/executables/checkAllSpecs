@@ -53,7 +53,9 @@ def runConf(filename):
     or the CompletedProcess when there was some error."""
     print(f'Starting {filename}')
     try:
-        res = subprocess.run(['certoraRun', '--server', 'production', '--prover_version', 'master', '--wait_for_results', 'all', filename],
+        # The commit sha fixes the CI at release version 7.0.2
+        # from February 2024.
+        res = subprocess.run(['certoraRun', '--server', 'production', '--commit_sha1', 'f399f355baa5db93ed145e89a5d52bea8135ae50', '--wait_for_results', 'all', filename],
                              capture_output = True)
     except Exception as e:
         with outputMutex:

@@ -5,6 +5,13 @@ import "../utils/IsMustRevertFunction.spec";
  */
 import "../utils/CallOpSanity.spec";
 
+methods {
+    function getAccountController(address account) external returns (address) envfree;
+    function isCollateralEnabled(address account, address vault) external returns (bool) envfree;
+    function isAccountController(address account, address controller) external returns (bool) envfree;
+
+}
+
 ////////////////////////////////////////////////////////////////
 //                                                            //
 //           Account Controllers (Ghost and Hooks)            //
@@ -72,18 +79,38 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
     assert(executingContract != currentContract || addr != currentContract);
 }
 
-// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function". Expected to fail on permit() function.
+// This rule checks the property of interest "EVC can only be msg.sender during the self-call in the permit() function. Expected to fail on permit() function.
+// To prove this for controlCollateral, we need the additionl assumption
+// that the EVC can never become an account controller. (See the rule after this one). We also prove this assumption
+// CER-80: https://linear.app/euler-labs/issue/CER-80/collaterals-restrictions
+
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
   filtered {f -> 
     !isMustRevertFunction(f) &&
-    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector
+    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector &&
+    f.selector != sig:EthereumVaultConnectorHarness.controlCollateral(address, address, uint256, bytes).selector
   }{
     //Exclude EVC as being the initiator of the call.
     require(e.msg.sender != currentContract);
-
     f(e,args);
 
     assert(true);
 }
 
+// For onlyController we need the additional assumption that
+// the EVC ("currentContract") can never become a collateral for any address.
+// NOTE: We will eventually prove this assumption to satisfy
+// CER-80: https://linear.app/euler-labs/issue/CER-80/collaterals-restrictions
+rule onlyEVCCanCallCriticalMethodOnlyController {
+    env e;
+    address targetCollateral;
+    address onBehalfOfAccount;
+    uint256 value;
+    bytes data;
 
+    require(e.msg.sender != currentContract);
+    require !isCollateralEnabled(onBehalfOfAccount, currentContract);
+    controlCollateral(e, targetCollateral, onBehalfOfAccount, value, data);
+
+    assert(true);
+}
