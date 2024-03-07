@@ -13,8 +13,7 @@ hook Sstore currentContract.ownerLookup[KEY bytes19 address_prefix] address newV
 }
 
 rule neverOverwriteOwner (method f) filtered {f ->
-    !isMustRevertFunction(f) &&
-    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector
+    !isMustRevertFunction(f) 
 }{
     env e;
     calldataarg args;
