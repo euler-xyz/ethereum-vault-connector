@@ -11,6 +11,23 @@ methods {
 // CER-52 Account Operator that is authorized to operate on behalf the Account MUST only be allowed to be deauthorized by:
 // - the Account Owner, or
 // - the Account Operator itself (one Account Operator MUST NOT be able to deauthorize the other Account Operator)
+rule operatorDeauthorization (method f) filtered { f -> 
+    f.selector == EthereumVaultConnectorHarness.setOperator(bytes19,address) ||
+    f.selector == EthereumVaultConnectorHarness.operatorDeauthorizationSetAccountOperator(address, address, bool)
+}{
+    env e;
+    calldataarg args;
+    address operator;
+    bytes19 addressPrefix;
+    address caller = actualCaller(e);
+    address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
+    address operatorBefore = getOperator(addressPrefix, operator);
+    f(e,args);
+    address operatorAfter = getOperator(addressPrefix, operator);
+    assert (operatorBefore && !operatorAfter) => 
+        (caller == operator || caller == owner);
+}
+
 
 rule operatorDeauthorizationSetOperator {
     env e;
