@@ -44,6 +44,13 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function requireAccountStatusCheckInternalHarness(address account) public {
         requireAccountStatusCheckInternal(account);
     }
+    function checkVaultStatus(address vault) public returns (bool) {
+        (bool isValid, ) = checkVaultStatusInternal(vault);
+        return isValid;
+    }
+    function requireVaultStatusCheck(address vault) external {
+       requireVaultStatusCheckInternal(vault);
+    }
 
     function areAccountStatusChecksEmpty() public view returns (bool) {
         return accountStatusChecks.numElements == 0;
