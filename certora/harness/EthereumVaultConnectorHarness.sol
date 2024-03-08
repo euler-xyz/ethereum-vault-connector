@@ -48,6 +48,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function areAccountStatusChecksEmpty() public view returns (bool) {
         return accountStatusChecks.numElements == 0;
     }
+
     function areVaultStatusChecksEmpty() public view returns (bool) {
         return vaultStatusChecks.numElements == 0;
     }
@@ -64,8 +65,16 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function isAccountController(address account, address controller) public view returns (bool) {
         return accountControllers[account].contains(controller);
     }
+
     function containsStatusCheckFor(address account) public view returns (bool) {
         return accountStatusChecks.contains(account);
     }
     
+    function selfCallSuccessCheck(uint256 value, bytes calldata data) external returns (bool) {
+        (bool success, ) = address(this).call{value: value}(data);
+        return success;
+    }
+    function ecGetOnBehalfOfAccount(EC context) external pure returns (address result) {
+        result = ExecutionContext.getOnBehalfOfAccount(context);
+    }
 }

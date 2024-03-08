@@ -1,20 +1,11 @@
 import "../utils/IsMustRevertFunction.spec";
+import "../utils/ActualCaller.spec";
 
 methods {
     function getOwnerOf(bytes19) external returns (address) envfree;
     function getOperator(bytes19, address) external returns (uint256) envfree;
     function getAddressPrefix(address) external returns (bytes19) envfree;
     function haveCommonOwner(address account, address otherAccount) external returns (bool) envfree;
-}
-
-// if msg.sender is the currentContract, it means we are within permit() and
-// we need to use executionContext.getOnBehalfOfAccount() instead.
-function actualCaller(env e) returns address {
-    if(e.msg.sender == currentContract) {
-        return getExecutionContextOnBehalfOfAccount(e);
-    } else {
-        return e.msg.sender;
-    }
 }
 
 /**
