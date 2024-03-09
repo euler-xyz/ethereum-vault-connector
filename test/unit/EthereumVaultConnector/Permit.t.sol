@@ -1179,4 +1179,33 @@ contract PermitTest is Test {
         evc.permit(operator, 0, 5, block.timestamp, 0, data, signature);
         assertEq(evc.isAccountOperatorAuthorized(bob, operator), false);
     }
+
+    function test_RevertIfInPermit_SetLockdownMode(uint256 privateKey) public {
+        vm.assume(
+            privateKey > 0
+                && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
+        address alice = vm.addr(privateKey);
+
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
+        vm.assume(alice != address(0) && alice != address(evc));
+
+        signerECDSA.setPrivateKey(privateKey);
+
+        bytes memory data = abi.encodeWithSelector(IEVC.setLockdownMode.selector, addressPrefix, true);
+        bytes memory signature = signerECDSA.signPermit(alice, 0, 0, 1, 0, data);
+
+        // succeeds in permit when enabling
+        vm.prank(alice);
+        evc.permit(alice, 0, 0, 1, 0, data, signature);
+        assertEq(evc.isLockdownMode(addressPrefix), true);
+
+        // fails in permit when disabling
+        data = abi.encodeWithSelector(IEVC.setLockdownMode.selector, addressPrefix, false);
+        signature = signerECDSA.signPermit(alice, 0, 1, 1, 0, data);
+
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(alice, 0, 1, 1, 0, data, signature);
+    }
 }
