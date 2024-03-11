@@ -9,7 +9,6 @@ import "./interfaces/IEthereumVaultConnector.sol";
 /// @notice This contract implements the error messages for the Ethereum Vault Connector.
 contract Errors {
     error EVC_NotAuthorized();
-    error EVC_AccountOwnerNotRegistered();
     error EVC_OnBehalfOfAccountNotAuthenticated();
     error EVC_InvalidOperatorStatus();
     error EVC_InvalidNonce();
