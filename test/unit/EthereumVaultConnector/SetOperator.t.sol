@@ -22,9 +22,7 @@ contract SetOperatorTest is Test {
         vm.assume(operatorBitField > 0);
 
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
-        vm.expectRevert(Errors.EVC_AccountOwnerNotRegistered.selector);
-        evc.getAccountOwner(alice);
-
+        assertEq(evc.getAccountOwner(alice), address(0));
         assertEq(evc.getOperator(addressPrefix, operator), 0);
 
         vm.expectEmit(true, true, false, false, address(evc));
@@ -84,8 +82,7 @@ contract SetOperatorTest is Test {
             assertEq(evc.isAccountOperatorAuthorized(account, operator), false);
 
             if (i == 0) {
-                vm.expectRevert(Errors.EVC_AccountOwnerNotRegistered.selector);
-                evc.getAccountOwner(account);
+                assertEq(evc.getAccountOwner(account), address(0));
             } else {
                 assertEq(evc.getAccountOwner(account), alice);
             }

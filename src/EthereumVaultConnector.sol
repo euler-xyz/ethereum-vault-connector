@@ -237,10 +237,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function getAccountOwner(address account) external view returns (address owner) {
-        owner = getAccountOwnerInternal(account);
-
-        if (owner == address(0)) revert EVC_AccountOwnerNotRegistered();
+    function getAccountOwner(address account) external view returns (address) {
+        return getAccountOwnerInternal(account);
     }
 
     /// @inheritdoc IEVC

@@ -65,8 +65,7 @@ contract CollateralsManagementTest is Test {
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
-        vm.expectRevert(Errors.EVC_AccountOwnerNotRegistered.selector);
-        evc.getAccountOwner(account);
+        assertEq(evc.getAccountOwner(account), address(0));
 
         // test collaterals management with use of an operator
         address msgSender = alice;

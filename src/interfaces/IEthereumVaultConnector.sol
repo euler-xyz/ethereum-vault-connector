@@ -98,7 +98,8 @@ interface IEVC {
     function getAddressPrefix(address account) external pure returns (bytes19);
 
     /// @notice Returns the owner for the specified account.
-    /// @dev The function will revert if the owner is not registered. Registration of the owner happens on the initial
+    /// @dev The function returns address(0) if the owner is not registered. Registration of the owner happens on the
+    /// initial
     /// interaction with the EVC that requires authentication of an owner.
     /// @param account The address of the account whose owner is being retrieved.
     /// @return owner The address of the account owner. An account owner is an EOA/smart contract which address matches
