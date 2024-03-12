@@ -266,9 +266,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function setLockdownMode(bytes19 addressPrefix, bool enabled) public payable virtual onlyOwner(addressPrefix) {
-        if (ownerLookup[addressPrefix].isLockdownMode == enabled) {
-            revert EVC_InvalidLockdownModeStatus();
-        } else {
+        if (ownerLookup[addressPrefix].isLockdownMode != enabled) {
             // to increase user security, it is prohibited to disable the lockdown mode within the self-call of the
             // permit function or within a checks-deferrable call. to disable the lockdown mode a direct call to the EVC
             // must be made

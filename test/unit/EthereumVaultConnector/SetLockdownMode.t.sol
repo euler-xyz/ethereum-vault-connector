@@ -20,9 +20,19 @@ contract SetLockdownModeTest is Test {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         assertEq(evc.isLockdownMode(addressPrefix), false);
 
+        // no-op when setting lockdown mode to the same value
+        vm.prank(alice);
+        evc.setLockdownMode(addressPrefix, false);
+        assertEq(evc.isLockdownMode(addressPrefix), false);
+
         vm.expectEmit(true, true, false, false, address(evc));
         emit LockdownModeStatus(addressPrefix, true);
 
+        vm.prank(alice);
+        evc.setLockdownMode(addressPrefix, true);
+        assertEq(evc.isLockdownMode(addressPrefix), true);
+
+        // no-op when setting lockdown mode to the same value
         vm.prank(alice);
         evc.setLockdownMode(addressPrefix, true);
         assertEq(evc.isLockdownMode(addressPrefix), true);
@@ -33,24 +43,6 @@ contract SetLockdownModeTest is Test {
         vm.prank(alice);
         evc.setLockdownMode(addressPrefix, false);
         assertEq(evc.isLockdownMode(addressPrefix), false);
-
-        vm.expectEmit(true, true, false, false, address(evc));
-        emit LockdownModeStatus(addressPrefix, true);
-
-        vm.prank(alice);
-        evc.setLockdownMode(addressPrefix, true);
-        assertEq(evc.isLockdownMode(addressPrefix), true);
-    }
-
-    function test_RevertIfLockdownModeInvalid_SetLockdownMode(address alice) public {
-        vm.assume(alice != address(0) && alice != address(evc));
-
-        bytes19 addressPrefix = evc.getAddressPrefix(alice);
-        assertEq(evc.isLockdownMode(addressPrefix), false);
-
-        vm.prank(alice);
-        vm.expectRevert(Errors.EVC_InvalidLockdownModeStatus.selector);
-        evc.setLockdownMode(addressPrefix, false);
 
         vm.expectEmit(true, true, false, false, address(evc));
         emit LockdownModeStatus(addressPrefix, true);

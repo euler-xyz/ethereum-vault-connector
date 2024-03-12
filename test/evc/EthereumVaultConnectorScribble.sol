@@ -23,8 +23,8 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
-    /// #if_succeeds "cannot be enabled if checks deferred" !enabled ==> !executionContext.areChecksDeferred();
-    /// #if_succeeds "cannot be enabled if in permit" !enabled ==> !inPermitSelfCall();
+    /// #if_succeeds "cannot be enabled if checks deferred" ownerLookup[addressPrefix].isLockdownMode && !enabled ==> !executionContext.areChecksDeferred();
+    /// #if_succeeds "cannot be enabled if in permit" ownerLookup[addressPrefix].isLockdownMode && !enabled ==> !inPermitSelfCall();
     function setLockdownMode(bytes19 addressPrefix, bool enabled) public payable virtual override {
         super.setLockdownMode(addressPrefix, enabled);
     }
