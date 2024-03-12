@@ -49,6 +49,18 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
         return expectedVaultsChecked;
     }
 
+    function setLockdown(bytes19 addressPrefix, bool enabled) external {
+        if (isFuzzSender()) return;
+
+        ownerLookup[addressPrefix].isLockdownMode = enabled;
+    }
+
+    function setPermitDisabled(bytes19 addressPrefix, bool enabled) external {
+        if (isFuzzSender()) return;
+
+        ownerLookup[addressPrefix].isPermitDisabledMode = enabled;
+    }
+
     function setChecksDeferred(bool deferred) external {
         if (isFuzzSender()) return;
 

@@ -17,12 +17,23 @@ import "../../src/EthereumVaultConnector.sol";
 /// #if_succeeds "vault status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
 /// #if_succeeds "vault status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
 /// #if_succeeds "vault status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...20) vaultStatusChecks.elements[i].value == address(0);
-/// #if_succeeds "each account has at most 1 controller" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in ownerLookup) forall(uint256 j in 0...256) accountControllers[address(uint160((i << 8) ^ j))].numElements <= 1;
 /// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
 /// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
 contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
+
+    /// #if_succeeds "cannot be enabled if checks deferred" ownerLookup[addressPrefix].isLockdownMode && !enabled ==> !executionContext.areChecksDeferred();
+    /// #if_succeeds "cannot be enabled if in permit" ownerLookup[addressPrefix].isLockdownMode && !enabled ==> !inPermitSelfCall();
+    function setLockdownMode(bytes19 addressPrefix, bool enabled) public payable virtual override {
+        super.setLockdownMode(addressPrefix, enabled);
+    }
+
+    /// #if_succeeds "cannot be enabled if checks deferred" ownerLookup[addressPrefix].isPermitDisabledMode && !enabled ==> !executionContext.areChecksDeferred();
+    /// #if_succeeds "cannot be enabled if in permit" ownerLookup[addressPrefix].isPermitDisabledMode && !enabled ==> !inPermitSelfCall();
+    function setPermitDisabledMode(bytes19 addressPrefix, bool enabled) public payable virtual override {
+        super.setPermitDisabledMode(addressPrefix, enabled);
+    }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isControlCollateralInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);

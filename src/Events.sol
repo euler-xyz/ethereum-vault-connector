@@ -7,6 +7,8 @@ pragma solidity ^0.8.19;
 /// @notice This contract implements the events for the Ethereum Vault Connector.
 contract Events {
     event OwnerRegistered(bytes19 indexed addressPrefix, address indexed owner);
+    event LockdownModeStatus(bytes19 indexed addressPrefix, bool enabled);
+    event PermitDisabledModeStatus(bytes19 indexed addressPrefix, bool enabled);
     event NonceUsed(bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
     event OperatorStatus(bytes19 indexed addressPrefix, address indexed operator, uint256 accountOperatorAuthorized);
     event CollateralStatus(address indexed account, address indexed collateral, bool enabled);

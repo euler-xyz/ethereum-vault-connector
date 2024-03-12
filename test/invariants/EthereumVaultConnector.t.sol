@@ -63,6 +63,16 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         vm.etch(vault, vaultMock.code);
     }
 
+    function setLockdownMode(bytes19, bool) public payable override {
+        // do nothing here to avoid reverts that will appear when the lockdown mode is on
+        return;
+    }
+
+    function setPermitDisabledMode(bytes19, bool) public payable override {
+        // do nothing here to avoid reverts that will appear when the permit disabled mode is on
+        return;
+    }
+
     function setNonce(bytes19 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
         if (msg.sender == address(this)) return;
         if (nonceLookup[addressPrefix][nonceNamespace] == type(uint256).max) return;
