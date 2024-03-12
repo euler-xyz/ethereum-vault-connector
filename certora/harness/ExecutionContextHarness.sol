@@ -52,8 +52,4 @@ contract ExecutionContextHarness {
         result = ExecutionContext.setSimulationInProgress(context);
     }
 
-    function initialize() external pure returns (EC result) {
-        result = ExecutionContext.initialize();
-    }
-
 }
