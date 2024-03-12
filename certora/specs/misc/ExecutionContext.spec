@@ -9,7 +9,6 @@ methods {
     function clearOperatorAuthenticated(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
     function isSimulationInProgress(ExecutionContextHarness.EC context) external returns (bool) envfree;
     function setSimulationInProgress(ExecutionContextHarness.EC context) external returns (ExecutionContextHarness.EC) envfree;
-    function initialize() external returns (ExecutionContextHarness.EC) envfree;
 }
 
 /// check basic functionality of getOnBehalfOfAccount and setOnBehalfOfAccount
