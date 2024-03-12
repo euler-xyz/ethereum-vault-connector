@@ -66,7 +66,6 @@ contract SetLockdownModeTest is Test {
         assertEq(evc.isLockdownMode(addressPrefix), true);
 
         // fails with checks deferred when disabling
-
         vm.prank(alice);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
         evc.setLockdownMode(addressPrefix, false);
@@ -79,6 +78,9 @@ contract SetLockdownModeTest is Test {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
 
         // setting nonce works when not in lockdown mode
+        vm.prank(alice);
+        evc.setLockdownMode(addressPrefix, false);
+
         vm.prank(alice);
         evc.setNonce(addressPrefix, 0, 1);
 
@@ -156,5 +158,15 @@ contract SetLockdownModeTest is Test {
 
         vm.prank(controller);
         evc.controlCollateral(vault, alice, 0, "");
+
+        // setting permit disabled mode still works when in lockdown mode
+        vm.prank(alice);
+        evc.setLockdownMode(addressPrefix, true);
+
+        vm.prank(alice);
+        evc.setPermitDisabledMode(addressPrefix, true);
+
+        vm.prank(alice);
+        evc.setPermitDisabledMode(addressPrefix, false);
     }
 }
