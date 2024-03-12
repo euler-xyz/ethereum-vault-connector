@@ -683,6 +683,40 @@ contract PermitTest is Test {
         assertTrue(evc.fallbackCalled());
     }
 
+    function test_RevertIfInPermitDisabledMode_Permit(uint256 privateKey, uint128 value, bytes memory data) public {
+        vm.assume(
+            privateKey > 0
+                && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
+        data = abi.encode(keccak256(data));
+        vm.deal(address(this), type(uint128).max);
+        address alice = vm.addr(privateKey);
+
+        evc.clearFallbackCalled();
+        evc.setExpectedHash(data);
+        evc.setExpectedValue(value);
+
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
+        vm.assume(alice != address(0) && alice != address(evc));
+
+        signerECDSA.setPrivateKey(privateKey);
+        bytes memory signature = signerECDSA.signPermit(alice, 0, 0, 1, value, data);
+
+        // permit fails when in permit disabled mode
+        vm.prank(alice);
+        evc.setPermitDisabledMode(addressPrefix, true);
+
+        vm.expectRevert(Errors.EVC_PermitDisabledMode.selector);
+        evc.permit{value: value}(alice, 0, 0, 1, value, data, signature);
+
+        // permit succeeds when not in permit disabled mode
+        vm.prank(alice);
+        evc.setPermitDisabledMode(addressPrefix, false);
+
+        evc.permit{value: value}(alice, 0, 0, 1, value, data, signature);
+        assertTrue(evc.fallbackCalled());
+    }
+
     function test_Permit(uint256 privateKey) public {
         vm.assume(
             privateKey > 0
@@ -1196,7 +1230,6 @@ contract PermitTest is Test {
         bytes memory signature = signerECDSA.signPermit(alice, 0, 0, 1, 0, data);
 
         // succeeds in permit when enabling
-        vm.prank(alice);
         evc.permit(alice, 0, 0, 1, 0, data, signature);
         assertEq(evc.isLockdownMode(addressPrefix), true);
 
@@ -1204,8 +1237,34 @@ contract PermitTest is Test {
         data = abi.encodeWithSelector(IEVC.setLockdownMode.selector, addressPrefix, false);
         signature = signerECDSA.signPermit(alice, 0, 1, 1, 0, data);
 
-        vm.prank(alice);
         vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.permit(alice, 0, 1, 1, 0, data, signature);
+    }
+
+    function test_RevertIfInPermit_SetPermitDisabledMode(uint256 privateKey) public {
+        vm.assume(
+            privateKey > 0
+                && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
+        address alice = vm.addr(privateKey);
+
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
+        vm.assume(alice != address(0) && alice != address(evc));
+
+        signerECDSA.setPrivateKey(privateKey);
+
+        bytes memory data = abi.encodeWithSelector(IEVC.setPermitDisabledMode.selector, addressPrefix, true);
+        bytes memory signature = signerECDSA.signPermit(alice, 0, 0, 1, 0, data);
+
+        // succeeds in permit when enabling
+        evc.permit(alice, 0, 0, 1, 0, data, signature);
+        assertEq(evc.isPermitDisabledMode(addressPrefix), true);
+
+        // fails in permit when disabling
+        data = abi.encodeWithSelector(IEVC.setPermitDisabledMode.selector, addressPrefix, false);
+        signature = signerECDSA.signPermit(alice, 0, 1, 1, 0, data);
+
+        vm.expectRevert(Errors.EVC_PermitDisabledMode.selector);
         evc.permit(alice, 0, 1, 1, 0, data, signature);
     }
 }

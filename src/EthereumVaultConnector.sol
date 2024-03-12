@@ -20,6 +20,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     struct OwnerStorage {
         address owner;
         bool isLockdownMode;
+        bool isPermitDisabledMode;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,6 +251,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
+    function isPermitDisabledMode(bytes19 addressPrefix) external view returns (bool) {
+        return ownerLookup[addressPrefix].isPermitDisabledMode;
+    }
+
+    /// @inheritdoc IEVC
     function getNonce(bytes19 addressPrefix, uint256 nonceNamespace) external view returns (uint256) {
         return nonceLookup[addressPrefix][nonceNamespace];
     }
@@ -267,15 +273,33 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function setLockdownMode(bytes19 addressPrefix, bool enabled) public payable virtual onlyOwner(addressPrefix) {
         if (ownerLookup[addressPrefix].isLockdownMode != enabled) {
-            // to increase user security, it is prohibited to disable the lockdown mode within the self-call of the
-            // permit function or within a checks-deferrable call. to disable the lockdown mode a direct call to the EVC
-            // must be made
+            // to increase user security, it is prohibited to disable this mode within the self-call of the permit
+            // function or within a checks-deferrable call. to disable this mode a direct call to the EVC must
+            // be made
             if (!enabled && (executionContext.areChecksDeferred() || inPermitSelfCall())) {
                 revert EVC_NotAuthorized();
             }
 
             ownerLookup[addressPrefix].isLockdownMode = enabled;
             emit LockdownModeStatus(addressPrefix, enabled);
+        }
+    }
+
+    /// @inheritdoc IEVC
+    function setPermitDisabledMode(
+        bytes19 addressPrefix,
+        bool enabled
+    ) public payable virtual onlyOwner(addressPrefix) {
+        if (ownerLookup[addressPrefix].isPermitDisabledMode != enabled) {
+            // to increase user security, it is prohibited to disable this mode within the self-call of the permit
+            // function (by definition) or within a checks-deferrable call. to disable this mode a direct call to
+            // the EVC must be made
+            if (!enabled && executionContext.areChecksDeferred()) {
+                revert EVC_NotAuthorized();
+            }
+
+            ownerLookup[addressPrefix].isPermitDisabledMode = enabled;
+            emit PermitDisabledModeStatus(addressPrefix, enabled);
         }
     }
 
@@ -487,13 +511,18 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_NotAuthorized();
         }
 
+        if (ownerLookup[addressPrefix].isPermitDisabledMode) {
+            revert EVC_PermitDisabledMode();
+        }
+
         unchecked {
             nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
         }
 
         emit NonceUsed(addressPrefix, nonceNamespace, nonce);
 
-        // EVC address becomes msg.sender for the duration this self-call, no authentication is required
+        // EVC address becomes the msg.sender for the duration this self-call, no authentication is required here.
+        // the signer will be later on authenticated as per data, depending on the functions that will be called
         (bool success, bytes memory result) = callWithContextInternal(address(this), signer, value, data);
 
         if (!success) revertBytes(result);

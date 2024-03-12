@@ -29,6 +29,12 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.setLockdownMode(addressPrefix, enabled);
     }
 
+    /// #if_succeeds "cannot be enabled if checks deferred" ownerLookup[addressPrefix].isPermitDisabledMode && !enabled ==> !executionContext.areChecksDeferred();
+    /// #if_succeeds "cannot be enabled if in permit" ownerLookup[addressPrefix].isPermitDisabledMode && !enabled ==> !inPermitSelfCall();
+    function setPermitDisabledMode(bytes19 addressPrefix, bool enabled) public payable virtual override {
+        super.setPermitDisabledMode(addressPrefix, enabled);
+    }
+
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isControlCollateralInProgress());
     /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;

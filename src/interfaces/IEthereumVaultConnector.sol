@@ -110,6 +110,11 @@ interface IEVC {
     /// @return A boolean indicating whether lockdown mode is enabled.
     function isLockdownMode(bytes19 addressPrefix) external view returns (bool);
 
+    /// @notice Checks if permit functionality is disabled for a given address prefix.
+    /// @param addressPrefix The address prefix to check for permit functionality status.
+    /// @return A boolean indicating whether permit functionality is disabled.
+    function isPermitDisabledMode(bytes19 addressPrefix) external view returns (bool);
+
     /// @notice Returns the current nonce for a given address prefix and nonce namespace.
     /// @dev Each nonce namespace provides 256 bit nonce that has to be used sequentially. There's no requirement to use
     /// all the nonces for a given nonce namespace before moving to the next one which allows to use permit messages in
@@ -138,12 +143,22 @@ interface IEVC {
     function isAccountOperatorAuthorized(address account, address operator) external view returns (bool authorized);
 
     /// @notice Enables or disables lockdown mode for a given address prefix.
-    /// @dev This function can only be called by the owner of the address prefix. To disable the lockdown mode, the EVC
-    /// must be called directly. It is not possible to disable the lockdown mode by using checks-deferrable call or
+    /// @dev This function can only be called by the owner of the address prefix. To disable this mode, the EVC
+    /// must be called directly. It is not possible to disable this mode by using checks-deferrable call or
     /// permit message.
     /// @param addressPrefix The address prefix for which the lockdown mode is being set.
     /// @param enabled A boolean indicating whether to enable or disable lockdown mode.
     function setLockdownMode(bytes19 addressPrefix, bool enabled) external payable;
+
+    /// @notice Enables or disables permit functionality for a given address prefix.
+    /// @dev This function can only be called by the owner of the address prefix. To disable this mode, the EVC
+    /// must be called directly. It is not possible to disable this mode by using checks-deferrable call or (by
+    /// definition) permit message. To support permit functionality by default, note that the logic was inverted here. To
+    /// disable  the permit functionality, one must pass true as the second argument. To enable the permit
+    /// functionality, one must pass false as the second argument.
+    /// @param addressPrefix The address prefix for which the permit functionality is being set.
+    /// @param enabled A boolean indicating whether to enable or disable permit functionality.
+    function setPermitDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides 256 bit

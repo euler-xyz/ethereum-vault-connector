@@ -18,6 +18,7 @@ contract Errors {
     error EVC_InvalidValue();
     error EVC_InvalidData();
     error EVC_LockdownMode();
+    error EVC_PermitDisabledMode();
     error EVC_ChecksReentrancy();
     error EVC_ControlCollateralReentrancy();
     error EVC_ControllerViolation();
