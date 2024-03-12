@@ -143,16 +143,16 @@ interface IEVC {
     function isAccountOperatorAuthorized(address account, address operator) external view returns (bool authorized);
 
     /// @notice Enables or disables lockdown mode for a given address prefix.
-    /// @dev This function can only be called by the owner of the address prefix. To disable the this mode, the EVC
-    /// must be called directly. It is not possible to disable the this mode by using checks-deferrable call or
+    /// @dev This function can only be called by the owner of the address prefix. To disable this mode, the EVC
+    /// must be called directly. It is not possible to disable this mode by using checks-deferrable call or
     /// permit message.
     /// @param addressPrefix The address prefix for which the lockdown mode is being set.
     /// @param enabled A boolean indicating whether to enable or disable lockdown mode.
     function setLockdownMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Enables or disables permit functionality for a given address prefix.
-    /// @dev This function can only be called by the owner of the address prefix. To disable the this mode, the EVC
-    /// must be called directly. It is not possible to disable the this mode by using checks-deferrable call or (by
+    /// @dev This function can only be called by the owner of the address prefix. To disable this mode, the EVC
+    /// must be called directly. It is not possible to disable this mode by using checks-deferrable call or (by
     /// definition) permit message. To support permit functionality by default, note that the logic was inverted here. To
     /// disable  the permit functionality, one must pass true as the second argument. To enable the permit
     /// functionality, one must pass false as the second argument.
