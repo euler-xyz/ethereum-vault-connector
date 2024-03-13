@@ -17,12 +17,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     using ExecutionContext for EC;
     using Set for SetStorage;
 
-    struct OwnerStorage {
-        address owner;
-        bool isLockdownMode;
-        bool isPermitDisabledMode;
-    }
-
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //                                       CONSTANTS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,6 +60,16 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // security: if somebody is trying to brute-force one of user's N>1 private keys, they have N times as many chances
     // of succeeding per guess. It has to be admitted that the EVC model is weaker because finding a private key for
     // an owner gives access to all accounts, but there is still a very comfortable security margin.
+
+    // Internal data structure that stores the addressPrefix owner and mode flags
+    struct OwnerStorage {
+        // The addressPrefix owner
+        address owner;
+        // Flag indicating if the addressPrefix is in lockdown mode
+        bool isLockdownMode;
+        // Flag indicating if the permit function is disabled for the addressPrefix
+        bool isPermitDisabledMode;
+    }
 
     mapping(bytes19 addressPrefix => OwnerStorage ownerStorage) internal ownerLookup;
 
