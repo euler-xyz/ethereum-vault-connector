@@ -37,7 +37,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. Account Operator MUST be allowed to deauthorize itself for the Account if it is authorized to operate on behalf of it.
 1. Only an Account Owner MUST be allowed to modify the Nonce for its Address Prefix and Nonce Namespace.
 1. New Nonce MUST NOT be lower than or equal to the currently stored.
-1. Each Account MUST have at most 20 Collateral Vaults enabled at a time.
+1. Each Account MUST have at most 10 Collateral Vaults enabled at a time.
 1. Each Account MUST have at most one Controller Vault enabled at a time unless it's a transient state during a Checks-deferrable Call.
 1. Only an Account Owner or the Account Operator MUST be allowed to enable and disable Collateral Vaults for the Account.
 1. Only an Account Owner or the Account Operator MUST be allowed to reorder enabled Collateral Vaults for the Account.
@@ -76,8 +76,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 1. If there is no Controller enabled for an Account at the time of the Check, the Account Status MUST always be considered valid. It includes disabling the only enabled Controller before the Checks.
 1. If there is more than one Controller enabled for an Account at the time of the Check, the Account Status MUST always be considered invalid.
 1. Both Account- and Vault-Status-Checks-related storage sets MUST return to their default state when the flag indicating checks deferred is cleared and the checks are performed.
-1. EVC MUST allow for Account Status Checks to be deferred for at most 20 Accounts at a time.
-1. EVC MUST allow for Vault Status Checks to be deferred for at most 20 Vaults at a time.
+1. EVC MUST allow for Account Status Checks to be deferred for at most 10 Accounts at a time.
+1. EVC MUST allow for Vault Status Checks to be deferred for at most 10 Vaults at a time.
 1. Execution Context MUST return to its default state when the flag indicating checks deferred is cleared.
 1. Execution Context's Account on behalf of which the current low-level call is being performed MUST be storing address(0) when Account and Vault Status Checks are in progress.
 1. If there's only one enabled Controller Vault for an Account, only that Controller MUST be allowed to forgive the Account Status Check if it's deferred.

@@ -11,15 +11,15 @@ contract SetGasTest is Test {
     address constant ELEMENT_1 = address(1);
     address constant ELEMENT_2 = address(2);
     address constant ELEMENT_19 = address(19);
-    address constant ELEMENT_20 = address(20);
-    address constant ELEMENT_21 = address(21);
+    address constant ELEMENT_10 = address(10);
+    address constant ELEMENT_11 = address(11);
     address constant ELEMENT_NOT_FOUND = address(99);
 
     SetStorage size00;
     SetStorage size01;
     SetStorage size02;
     SetStorage size05;
-    SetStorage size20;
+    SetStorage size10;
 
     function setUp() public {
         size01.insert(ELEMENT_1);
@@ -27,8 +27,8 @@ contract SetGasTest is Test {
         size02.insert(ELEMENT_1);
         size02.insert(ELEMENT_2);
 
-        for (uint160 i = 1; i <= 20; ++i) {
-            size20.insert(address(i));
+        for (uint160 i = 1; i <= 10; ++i) {
+            size10.insert(address(i));
         }
 
         for (uint160 i = 1; i <= 5; ++i) {
@@ -70,7 +70,7 @@ contract SetGasTest is Test {
     }
 
     function testGas_insert_size05() public {
-        size05.insert(ELEMENT_20);
+        size05.insert(ELEMENT_10);
     }
 
     function testGas_insert_size05_duplicateOfFirst() public {
@@ -85,21 +85,21 @@ contract SetGasTest is Test {
         size05.insert(ELEMENT_19);
     }
 
-    function testGas_insert_size20_reverts() public {
+    function testGas_insert_siz10_reverts() public {
         vm.expectRevert();
-        size20.insert(ELEMENT_21);
+        size10.insert(ELEMENT_11);
     }
 
-    function testGas_insert_size20_duplicateOfFirst() public {
-        size20.insert(ELEMENT_1);
+    function testGas_insert_size10_duplicateOfFirst() public {
+        size10.insert(ELEMENT_1);
     }
 
-    function testGas_insert_size20_duplicateOfSecond() public {
-        size20.insert(ELEMENT_2);
+    function testGas_insert_size10_duplicateOfSecond() public {
+        size10.insert(ELEMENT_2);
     }
 
-    function testGas_insert_size20_duplicateOfLast() public {
-        size20.insert(ELEMENT_20);
+    function testGas_insert_size10_duplicateOfLast() public {
+        size10.insert(ELEMENT_10);
     }
 
     /**
@@ -151,20 +151,20 @@ contract SetGasTest is Test {
         size05.contains(ELEMENT_19);
     }
 
-    function testGas_contains_size20_notFound() public view {
-        size20.contains(ELEMENT_NOT_FOUND);
+    function testGas_contains_size10_notFound() public view {
+        size10.contains(ELEMENT_NOT_FOUND);
     }
 
-    function testGas_contains_size20_foundAtFirst() public view {
-        size20.contains(ELEMENT_1);
+    function testGas_contains_size10_foundAtFirst() public view {
+        size10.contains(ELEMENT_1);
     }
 
-    function testGas_contains_size20_foundAtIndex1() public view {
-        size20.contains(ELEMENT_2);
+    function testGas_contains_size10_foundAtIndex1() public view {
+        size10.contains(ELEMENT_2);
     }
 
-    function testGas_contains_size20_foundAtLastIndex() public view {
-        size20.contains(ELEMENT_20);
+    function testGas_contains_size10_foundAtLastIndex() public view {
+        size10.contains(ELEMENT_10);
     }
 
     /**
@@ -216,19 +216,19 @@ contract SetGasTest is Test {
         size05.remove(ELEMENT_19);
     }
 
-    function testGas_remove_size20_notFound() public {
-        size20.remove(ELEMENT_NOT_FOUND);
+    function testGas_remove_size10_notFound() public {
+        size10.remove(ELEMENT_NOT_FOUND);
     }
 
-    function testGas_remove_size20_foundAtFirst() public {
-        size20.remove(ELEMENT_1);
+    function testGas_remove_size10_foundAtFirst() public {
+        size10.remove(ELEMENT_1);
     }
 
-    function testGas_remove_size20_foundAtIndex1() public {
-        size20.remove(ELEMENT_2);
+    function testGas_remove_size10_foundAtIndex1() public {
+        size10.remove(ELEMENT_2);
     }
 
-    function testGas_remove_size20_foundAtLastIndex() public {
-        size20.remove(ELEMENT_20);
+    function testGas_remove_size10_foundAtLastIndex() public {
+        size10.remove(ELEMENT_10);
     }
 }
