@@ -170,18 +170,18 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         return super.checkAccountStatusInternal(account);
     }
 
+    /// #if_succeeds "execution context is restored" EC.unwrap(executionContext) == EC.unwrap(contextCache);
+    /// #if_succeeds "sets must be empty if not deferred" !executionContext.areChecksDeferred() ==> accountStatusChecks.numElements == 0 && vaultStatusChecks.numElements == 0;
+    function restoreExecutionContext(EC contextCache) internal override {
+        super.restoreExecutionContext(contextCache);
+    }
+
     /// #if_succeeds "checks reentrancy guard must be locked" executionContext.areChecksInProgress();
-    /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
-    /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
-    /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
     function checkStatusAll(SetType setType) internal override {
         return super.checkStatusAll(setType);
     }
 
     /// #if_succeeds "checks reentrancy guard must be locked" executionContext.areChecksInProgress();
-    /// #if_succeeds "appropriate set must be empty after execution 1" setType == SetType.Account ==> accountStatusChecks.numElements == 0;
-    /// #if_succeeds "appropriate set must be empty after execution 2" setType == SetType.Vault ==> vaultStatusChecks.numElements == 0;
-    /// #if_succeeds "execution context stays untouched" old(EC.unwrap(executionContext)) == EC.unwrap(executionContext);
     function checkStatusAllWithResult(SetType setType) internal override returns (StatusCheckResult[] memory result) {
         return super.checkStatusAllWithResult(setType);
     }
