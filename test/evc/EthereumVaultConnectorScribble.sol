@@ -13,12 +13,12 @@ import "../../src/EthereumVaultConnector.sol";
 /// #if_succeeds "on behalf of account is zero when checks in progress" executionContext.areChecksInProgress() ==> executionContext.getOnBehalfOfAccount() == address(0);
 /// #if_succeeds "account status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(accountStatusChecks.numElements) == 0 && accountStatusChecks.numElements == 0;
 /// #if_succeeds "account status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(accountStatusChecks.firstElement) == address(0) && accountStatusChecks.firstElement == address(0);
-/// #if_succeeds "account status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...20) accountStatusChecks.elements[i].value == address(0);
+/// #if_succeeds "account status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...10) accountStatusChecks.elements[i].value == address(0);
 /// #if_succeeds "vault status checks set is empty 1" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.numElements) == 0 && vaultStatusChecks.numElements == 0;
 /// #if_succeeds "vault status checks set is empty 2" !old(executionContext.areChecksDeferred()) ==> old(vaultStatusChecks.firstElement) == address(0) && vaultStatusChecks.firstElement == address(0);
-/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...20) vaultStatusChecks.elements[i].value == address(0);
-/// #invariant "account status checks set has at most 20 elements" accountStatusChecks.numElements <= 20;
-/// #invariant "vault status checks set has at most 20 elements" vaultStatusChecks.numElements <= 20;
+/// #if_succeeds "vault status checks set is empty 3" !old(executionContext.areChecksDeferred()) ==> forall(uint256 i in 0...10) vaultStatusChecks.elements[i].value == address(0);
+/// #invariant "account status checks set has at most 10 elements" accountStatusChecks.numElements <= 10;
+/// #invariant "vault status checks set has at most 10 elements" vaultStatusChecks.numElements <= 10;
 contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     using ExecutionContext for EC;
     using Set for SetStorage;
@@ -36,7 +36,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isControlCollateralInProgress());
-    /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 20 ==> accountCollaterals[account].contains(vault);
+    /// #if_succeeds "the vault is present in the collateral set 1" old(accountCollaterals[account].numElements) < 10 ==> accountCollaterals[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the collateral array length 1" accountCollaterals[account].numElements == accountCollaterals[account].get().length;
     /// #if_succeeds "collateral cannot be EVC" vault != address(this);
     function enableCollateral(address account, address vault) public payable virtual override {
@@ -58,7 +58,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isControlCollateralInProgress());
-    /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 20 ==> accountControllers[account].contains(vault);
+    /// #if_succeeds "the vault is present in the controller set 1" old(accountControllers[account].numElements) < 10 ==> accountControllers[account].contains(vault);
     /// #if_succeeds "number of vaults is equal to the controller array length 1" accountControllers[account].numElements == accountControllers[account].get().length;
     /// #if_succeeds "controller cannot be EVC" vault != address(this);
     function enableController(address account, address vault) public payable virtual override {
