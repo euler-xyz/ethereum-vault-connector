@@ -170,7 +170,7 @@ Batches will often be a mixture of external calls, some of which call vaults and
 
 The `controlCollateral` function can only be used in one specific case: when a controller vault wants to invoke a function on a collateral vault on behalf of the account under its control. The typical use-case for this is a liquidation. The controller vault would detect that an account entered violation due to a price movement, and seize some collateral assets to repay the debt.
 
-This is accomplished by the controller vault calling `controlCollateral`. It passes in the collateral vault as the target collateral and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using the its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
+This is accomplished by the controller vault calling `controlCollateral`. It passes in the collateral vault as the target collateral and the violator as `onBehalfOfAccount`. The controller would construct a `withdraw` call using its own address as the `receiver`. From the collateral vault's perspective, this appears as a regular withdrawal, and it does not need to know that the funds are being withdrawn due to a liquidation.
 
 ### permit
 
