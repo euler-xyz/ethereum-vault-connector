@@ -162,11 +162,11 @@ interface IEVC {
     function setPermitDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
-    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides a 256 bit
-    /// nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce namespace
-    /// before moving to the next one which allows the use of permit messages in a non-sequential manner. To invalidate
-    /// signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit
-    /// messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides a 256
+    /// bit nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce
+    /// namespace before moving to the next one which allows the use of permit messages in a non-sequential manner. To
+    /// invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the
+    /// permit messages for a given nonce namespace, set the nonce to type(uint).max.
     /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
     /// @param nonce The new nonce for the given address prefix and nonce namespace.
@@ -178,8 +178,8 @@ interface IEVC {
     /// @param addressPrefix The address prefix for which the bit field is being set.
     /// @param operator The address of the operator for which the bit field is being set. Cannot be the EVC address,
     /// zero address, or an address belonging to the same address prefix.
-    /// @param operatorBitField The new bit field for the given address prefix and operator. Reverts if the provided value
-    /// is equal to the currently stored value.
+    /// @param operatorBitField The new bit field for the given address prefix and operator. Reverts if the provided
+    /// value is equal to the currently stored value.
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) external payable;
 
     /// @notice Authorizes or deauthorizes an operator for the account.
@@ -238,9 +238,9 @@ interface IEVC {
     function reorderCollaterals(address account, uint8 index1, uint8 index2) external payable;
 
     /// @notice Returns an array of enabled controllers for an account.
-    /// @dev A controller is a vault that has been chosen for an account to have special control over the account's balances
-    /// in enabled collaterals vaults. A user can have multiple controllers during a call execution, but at most one
-    /// can be selected when the account status check is performed.
+    /// @dev A controller is a vault that has been chosen for an account to have special control over the account's
+    /// balances in enabled collaterals vaults. A user can have multiple controllers during a call execution, but at
+    /// most one can be selected when the account status check is performed.
     /// @param account The address of the account whose controllers are being queried.
     /// @return An array of addresses that are the enabled controllers for the account.
     function getControllers(address account) external view returns (address[] memory);
@@ -296,8 +296,8 @@ interface IEVC {
     /// @notice Calls into a target contract as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost
     /// call ends, the account and vault status checks are performed.
-    /// @dev This function can be used to interact with any contract while checks are deferred. If the target contract is
-    /// msg.sender, msg.sender is called back with the calldata provided and the context set up according to the
+    /// @dev This function can be used to interact with any contract while checks are deferred. If the target contract
+    /// is msg.sender, msg.sender is called back with the calldata provided and the context set up according to the
     /// account provided. If the target contract is not msg.sender, only the owner or the operator of the account
     /// provided can call this function.
     /// @dev This function can be used to recover the remaining value from the EVC contract.
@@ -321,8 +321,8 @@ interface IEVC {
     /// controller vault as per data encoded.
     /// @dev This function defers the account and vault status checks (it's a checks-deferrable call). If the outermost
     /// call ends, the account and vault status checks are performed.
-    /// @dev This function can be used to interact with any contract while checks are deferred as long as the contract is
-    /// enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
+    /// @dev This function can be used to interact with any contract while checks are deferred as long as the contract
+    /// is enabled as a collateral of the account and the msg.sender is the only enabled controller of the account.
     /// @param targetCollateral The collateral address to be called.
     /// @param onBehalfOfAccount The address of the account for which it is checked whether msg.sender is authorized to
     /// act on behalf.
