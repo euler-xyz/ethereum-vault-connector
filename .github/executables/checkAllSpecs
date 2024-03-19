@@ -18,10 +18,10 @@ EXCLUDE_CONFS = [
 
 def listConfigs() -> list[str]:
     """List all config files."""
-    all_confs = glob.glob('certora/conf/**/*.conf', recursive=True)
+    subdir_confs = glob.glob('certora/conf/**/*.conf', recursive=True)
     root_confs = glob.glob('certora/conf/*.conf', recursive=True)
-    confs = all_confs + root_confs
-    return [x for x in confs]
+    confs = subdir_confs + root_confs
+    return [x for x in confs if x not in EXCLUDE_CONFS]
 
 def loadConfigDependencies(filename: str) -> set[str]:
     """Load all files a config depends on."""
