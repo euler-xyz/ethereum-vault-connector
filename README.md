@@ -2,7 +2,7 @@
 
 The Ethereum Vault Connector (EVC) is a foundational layer designed to facilitate the core functionality required for a lending market. It serves as a base building block for various protocols, providing a robust and flexible framework for developers to build upon. The EVC primarily mediates between vaults, contracts that implement the [ERC-4626](https://ethereum.org/en/developers/docs/standards/tokens/erc-4626/) interface and contain additional logic for interfacing with other vaults. The EVC not only provides a common base ecosystem but also reduces complexity in the core lending/borrowing contracts, allowing them to focus on their differentiating factors.
 
-For more information, visit the EVC [website](https://evc.wtf/) or refer to the [whitepaper](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md) and the [specs](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/specs.md).
+For more information, visit the [EVC website](https://evc.wtf/) or refer to the [whitepaper](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md) and the [specs](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/specs.md).
 
 ---
 
@@ -104,7 +104,7 @@ The Ethereum Vault Connector is currently undergoing security audits and should 
 
 ## Known limitations
 
-Refer to the [WHITEPAPER](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
+Refer to the [whitepaper](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
 
 ## Contributing
 
