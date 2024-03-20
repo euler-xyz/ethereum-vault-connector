@@ -14,8 +14,8 @@ abstract contract EVCUtil {
     error NotAuthorized();
     error ControllerDisabled();
 
-    constructor(IEVC _evc) {
-        evc = _evc;
+    constructor(address _evc) {
+        evc = IEVC(_evc);
     }
 
     /// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
