@@ -20,7 +20,7 @@ jobs:
 
       - name: setup cvt
         run: |
-          pip install certora-cli
+          pip install certora-cli==7.0.7
           echo "`pwd`/.github/executables" >> $GITHUB_PATH
 
       - name: run certora prover on conf files

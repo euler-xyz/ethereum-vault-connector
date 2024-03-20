@@ -43,10 +43,10 @@ rule vault_status_check_scheduling (method f) filtered { f ->
 
 persistent ghost bool onlyInsertSender;
 persistent ghost address savedSender;
-hook Sstore currentContract.vaultStatusChecks.elements[INDEX uint256 _index].value address newValue (address oldValue) STORAGE {
+hook Sstore currentContract.vaultStatusChecks.elements[INDEX uint256 _index].value address newValue (address oldValue) {
     onlyInsertSender = onlyInsertSender && (newValue == savedSender);
 }
-hook Sstore currentContract.vaultStatusChecks.firstElement address newValue STORAGE {
+hook Sstore currentContract.vaultStatusChecks.firstElement address newValue {
     onlyInsertSender = onlyInsertSender && (newValue == savedSender);
 }
 

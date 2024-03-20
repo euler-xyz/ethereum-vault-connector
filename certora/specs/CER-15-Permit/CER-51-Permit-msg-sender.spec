@@ -25,17 +25,17 @@ methods {
  * these sets across HAVOC'd function calls.
  */
 // when writing to accountControllers, check that value != currentContract
-hook Sstore EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement address value STORAGE {
+hook Sstore EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement address value {
     assert(value != currentContract);
 }
-hook Sstore EthereumVaultConnectorHarness.accountControllers[KEY address user].elements[INDEX uint256 i].value address value STORAGE {
+hook Sstore EthereumVaultConnectorHarness.accountControllers[KEY address user].elements[INDEX uint256 i].value address value {
     assert(value != currentContract);
 }
 // when loading from accountControllers, we know that value != currentContract
-hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement STORAGE {
+hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].firstElement {
     require(value != currentContract);
 }
-hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].elements[INDEX uint256 i].value STORAGE {
+hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY address user].elements[INDEX uint256 i].value {
     require(value != currentContract);
 }
 
@@ -46,17 +46,17 @@ hook Sload address value EthereumVaultConnectorHarness.accountControllers[KEY ad
 ////////////////////////////////////////////////////////////////
 
 // when writing to vaultStatusChecks, check that value != currentContract
-hook Sstore EthereumVaultConnectorHarness.vaultStatusChecks.firstElement address value STORAGE {
+hook Sstore EthereumVaultConnectorHarness.vaultStatusChecks.firstElement address value {
     assert(value != currentContract);
 }
-hook Sstore EthereumVaultConnectorHarness.vaultStatusChecks.elements[INDEX uint256 i].value address value STORAGE {
+hook Sstore EthereumVaultConnectorHarness.vaultStatusChecks.elements[INDEX uint256 i].value address value {
     assert(value != currentContract);
 }
 // when loading from vaultStatusChecks, we know that value != currentContract
-hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.firstElement STORAGE {
+hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.firstElement {
     require(value != currentContract);
 }
-hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.elements[INDEX uint256 i].value STORAGE {
+hook Sload address value EthereumVaultConnectorHarness.vaultStatusChecks.elements[INDEX uint256 i].value {
     require(value != currentContract);
 }
 
