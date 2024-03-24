@@ -163,7 +163,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @notice A modifier that verifies whether account or vault status checks are re-entered and sets the lock.
     /// @dev This modifier also clears the current account on behalf of which the operation is performed as it shouldn't
     /// be relied upon when the checks are in progress.
-    modifier nonReentrantChecks() virtual {
+    modifier nonReentrantChecks() {
         EC contextCache = executionContext;
 
         if (contextCache.areChecksInProgress()) {
@@ -190,7 +190,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function getCurrentOnBehalfOfAccount(address controllerToCheck)
-        public
+        external
         view
         returns (address onBehalfOfAccount, bool controllerEnabled)
     {
@@ -490,6 +490,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         bytes19 addressPrefix = getAddressPrefixInternal(signer);
+
+        if (ownerLookup[addressPrefix].isPermitDisabledMode) {
+            revert EVC_PermitDisabledMode();
+        }
+
         uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
 
         if (currentNonce == type(uint256).max || currentNonce != nonce) {
@@ -513,15 +518,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_NotAuthorized();
         }
 
-        if (ownerLookup[addressPrefix].isPermitDisabledMode) {
-            revert EVC_PermitDisabledMode();
-        }
-
         unchecked {
             nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
         }
 
-        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
+        emit NonceUsed(addressPrefix, nonceNamespace, currentNonce);
 
         // EVC address becomes the msg.sender for the duration this self-call, no authentication is required here.
         // the signer will be later on authenticated as per data, depending on the functions that will be called
@@ -633,7 +634,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function batchSimulation(BatchItem[] calldata items)
-        public
+        external
         payable
         virtual
         returns (
