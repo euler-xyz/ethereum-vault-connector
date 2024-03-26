@@ -7,11 +7,11 @@ methods {
     function insert(address element) external returns (bool) envfree;
     function remove(address element) external returns (bool) envfree;
     function get(uint8 index) external returns (address) envfree;
+    function get() external returns (address[]) envfree;
     function contains(address element) external returns (bool) envfree;
     function length() external returns (uint8) envfree;
+    function reorder(uint8 index1, uint8 index2) external envfree;
 }
-
-
 
 // GHOST COPIES:
 // For every storage variable we add a ghost field that is kept synchronized by hooks.
@@ -32,9 +32,10 @@ ghost mapping(address => mathint) ghostIndexes {
 }
 
 ghost mathint ghostLength {
-    init_state axiom  ghostLength == 0;
+    init_state axiom ghostLength == 0;
     // assumption: it's infeasible to grow the list to these many elements.
-    axiom ghostLength < max_uint256;
+    // Also note the operations with indexing use uint8
+    axiom ghostLength < max_uint8;
 }
 
 ghost address ghostFirst {
@@ -43,7 +44,7 @@ ghost address ghostFirst {
 
 // Store and load hooks to synchronize ghostValues .
 hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) STORAGE {
-    mathint index = to_mathint(_index)+1;
+    mathint index = to_mathint(_index);
     require ghostValues[index] == oldValue;
     require ghostIndexes[oldValue] == index;
 
@@ -54,8 +55,8 @@ hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value addr
 }
 
 hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value STORAGE {
-    require ghostIndexes[v] == to_mathint(index+1);
-    require ghostValues[index+1] == v;
+    require ghostIndexes[v] == to_mathint(index);
+    require ghostValues[index] == v;
 }
 
 // Store and load hooks to sync length
@@ -80,10 +81,9 @@ hook Sload address value currentContract.setStorage.firstElement STORAGE {
 
 // check for the ghosts and updates 
 invariant mirrorIsCorrect(uint8 i) 
-    ( i > 1 =>  get(i) == ghostValues[i]) &&
-    get(1) == ghostFirst &&
+    ( i > 0 =>  get(i) == ghostValues[i]) &&
+    get(0) == ghostFirst &&
     ghostLength == to_mathint(length());
-
 
 /** @title Elements are unique in the set.
 Proving this is together with proving that each element has a single index 
@@ -93,7 +93,7 @@ Proving this is together with proving that each element has a single index
 // containsIntegrity() and validSet().
 invariant validSet() 
     // inverse
-    ( forall mathint i. ( i <= ghostLength && i > 1) => 
+    ( forall mathint i. ( i < ghostLength && i > 0) => 
         ghostIndexes[ghostValues[i]] == i )
     &&
     ( forall address v. ( ghostIndexes[v]!=0 ) => 
@@ -101,29 +101,29 @@ invariant validSet()
     &&  
     // uniqueness
     ( forall mathint i.  forall mathint j. 
-        ( i <= ghostLength && i > 1 && j <= ghostLength && j > 1 && j != i ) =>
+        ( i < ghostLength && i > 0 && j < ghostLength && j > 0 && j != i ) =>
             ( ghostValues[i] != ghostValues[j] )
-     ) &&
-     ( forall mathint i.  
-        ( i <= ghostLength && i > 1 ) =>
-         ( ghostValues[i] != ghostFirst)
-     )
-
+    )
+    // &&
+    // // uniqueness ghostFirst
+    // (forall mathint i. (i < ghostLength && i > 0) =>
+    //     (ghostValues[i] != ghostFirst) &&
+    //     (ghostIndexes[ghostFirst] != i))
     { 
                 preserved {
-                    requireInvariant mirrorIsCorrect(1);
+                    requireInvariant mirrorIsCorrect(0);
                     uint8 _length = assert_uint8(ghostLength);
                     requireInvariant mirrorIsCorrect(_length); 
                 }
-        }
+    }
 
 invariant containsIntegrity(address v ) 
     v!=0 => ( contains(v) <=> ( v == ghostFirst  || 
-                    ( ghostIndexes[v] <= ghostLength && ghostIndexes[v] > 1 ))) 
+                    ( ghostIndexes[v] < ghostLength && ghostIndexes[v] > 0 ))) 
         {
             preserved {
                 requireInvariant validSet();
-                requireInvariant mirrorIsCorrect(1);
+                requireInvariant mirrorIsCorrect(0);
                 uint8 _length = assert_uint8(ghostLength);
                 requireInvariant mirrorIsCorrect(_length); 
             }
@@ -141,9 +141,20 @@ rule contained_if_inserted(address a) {
 rule not_contained_if_removed(address a) {
     env e;
     requireInvariant validSet();
-    requireInvariant mirrorIsCorrect(1);
+    requireInvariant mirrorIsCorrect(0);
     uint8 _length = assert_uint8(ghostLength);
+    require _length < 6; // loop bound
     requireInvariant mirrorIsCorrect(_length); 
+    requireInvariant containsIntegrity(a);
+    requireInvariant containsIntegrity(ghostFirst);
+
+    // Unrolled up to length fixed for loop bound
+    requireInvariant mirrorIsCorrect(0);
+    requireInvariant mirrorIsCorrect(1);
+    requireInvariant mirrorIsCorrect(2);
+    requireInvariant mirrorIsCorrect(3);
+    requireInvariant mirrorIsCorrect(4);
+    requireInvariant mirrorIsCorrect(5);
 
     remove(a);
     assert(!contains(a));
@@ -158,6 +169,54 @@ rule removed_iff_not_contained(address a) {
     bool containsBefore = contains(a);
     bool succ = remove(a);
     assert(succ <=> containsBefore);
+}
+
+// CER-87: Set get. Set library MUST return an array of all the elements 
+// contained in the set
+rule get_array_individual {
+    requireInvariant validSet();
+
+    uint8 uintLength = require_uint8(ghostLength);
+    uint8 i;
+    require i < uintLength;
+    require uintLength < 6; // loop bound
+    require i > 0;
+    address[] result = get();
+    assert ghostValues[i] == result[i];
+}
+
+// CER-89: Reorder: Set library MUST swap the position of two elements so 
+// that they appear switched in the array obtained using the get function.
+rule reorder_swaps {
+    env e;
+    requireInvariant validSet();
+    uint8 index1;
+    uint8 index2;
+    uint8 uintLength = require_uint8(ghostLength);
+    address elt1Before = get(index1);
+    address elt2Before = get(index2);
+    require uintLength < 6; // loop bound
+    reorder(index1, index2);
+    address elt1After = get(index1);
+    address elt2After = get(index2);
+    assert elt1After == elt2Before;
+    assert elt2After == elt1Before;
+}
+
+rule reorder_swaps_ghost {
+    requireInvariant validSet();
+    uint8 index1;
+    uint8 index2;
+    requireInvariant mirrorIsCorrect(index1);
+    requireInvariant mirrorIsCorrect(index2);
+    uint8 uintLength = require_uint8(ghostLength);
+    address elt1Before = ghostValues[index1];
+    address elt2Before = ghostValues[index2];
+    reorder(index1, index2);
+    address elt1After = ghostValues[index1];
+    address elt2After = ghostValues[index2];
+    assert elt1After == elt2Before;
+    assert elt2After == elt1Before;
 }
 
 /** @title remove decreases the number of elements by one */

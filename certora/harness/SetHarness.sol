@@ -21,9 +21,8 @@ contract SetHarness {
     }
 
     function get(uint8 index) external view returns (address ) {
-        if (index==0) return address(0);
-        if (index == 1) return setStorage.firstElement;
-        return setStorage.elements[index-1].value;
+        if (index==0) return setStorage.firstElement;
+        return setStorage.elements[index].value;
 
     }
 
@@ -37,6 +36,14 @@ contract SetHarness {
     function length(
     ) external view returns (uint8) {
         return setStorage.numElements;
+    }
+
+    function get() external view returns (address [] memory) {
+        return Set.get(setStorage);
+    }
+
+    function reorder(uint8 index1, uint8 index2) external {
+        Set.reorder(setStorage, index1, index2);
     }
 
 }
