@@ -220,7 +220,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     }
 
     function batch(BatchItem[] calldata items) public payable override {
-        if (items.length > Set.MAX_ELEMENTS) return;
+        if (items.length > MAX_ELEMENTS) return;
 
         for (uint256 i = 0; i < items.length; i++) {
             if (uint160(items[i].value) > type(uint128).max) return;
@@ -272,9 +272,9 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     }
 
     function exposeAccountCollaterals(address account) external view returns (uint8, address[] memory) {
-        address[] memory result = new address[](Set.MAX_ELEMENTS);
+        address[] memory result = new address[](MAX_ELEMENTS);
 
-        for (uint256 i = 0; i < Set.MAX_ELEMENTS; i++) {
+        for (uint256 i = 0; i < MAX_ELEMENTS; i++) {
             if (i == 0) {
                 result[i] = accountCollaterals[account].firstElement;
             } else {
@@ -285,9 +285,9 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     }
 
     function exposeAccountControllers(address account) external view returns (uint8, address[] memory) {
-        address[] memory result = new address[](Set.MAX_ELEMENTS);
+        address[] memory result = new address[](MAX_ELEMENTS);
 
-        for (uint256 i = 0; i < Set.MAX_ELEMENTS; i++) {
+        for (uint256 i = 0; i < MAX_ELEMENTS; i++) {
             if (i == 0) {
                 result[i] = accountControllers[account].firstElement;
             } else {
@@ -302,10 +302,10 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         view
         returns (uint8, address[] memory, uint8, address[] memory)
     {
-        address[] memory result1 = new address[](Set.MAX_ELEMENTS);
-        address[] memory result2 = new address[](Set.MAX_ELEMENTS);
+        address[] memory result1 = new address[](MAX_ELEMENTS);
+        address[] memory result2 = new address[](MAX_ELEMENTS);
 
-        for (uint256 i = 0; i < Set.MAX_ELEMENTS; i++) {
+        for (uint256 i = 0; i < MAX_ELEMENTS; i++) {
             if (i == 0) {
                 result1[i] = accountStatusChecks.firstElement;
                 result2[i] = vaultStatusChecks.firstElement;
@@ -379,7 +379,7 @@ contract EthereumVaultConnectorInvariants is Test {
             (uint8 accountCollateralsNumCollaterals, address[] memory accountCollateralsArray) =
                 evc.exposeAccountCollaterals(touchedAccounts[i]);
 
-            assertTrue(accountCollateralsNumCollaterals <= Set.MAX_ELEMENTS);
+            assertTrue(accountCollateralsNumCollaterals <= MAX_ELEMENTS);
             for (uint256 j = 0; j < accountCollateralsNumCollaterals; j++) {
                 assertTrue(accountCollateralsArray[j] != address(0));
             }

@@ -2,6 +2,10 @@
 
 pragma solidity ^0.8.19;
 
+/// @dev Represents the maximum number of elements that can be stored in the set.
+/// Must not exceed 255 due to the uint8 data type limit.
+uint8 constant MAX_ELEMENTS = 10;
+
 /// @title ElementStorage
 /// @notice This struct is used to store the value and stamp of an element.
 /// @dev The stamp field is used to keep the storage slot non-zero when the element is removed.
@@ -28,7 +32,7 @@ struct SetStorage {
     /// @notice The stamp of the set.
     uint88 stamp;
     /// @notice The array of elements in the set. Stores the elements starting from index 1.
-    ElementStorage[2 ** 8 - 1] elements;
+    ElementStorage[MAX_ELEMENTS] elements;
 }
 
 /// @title Set
@@ -39,7 +43,6 @@ library Set {
     error TooManyElements();
     error InvalidIndex();
 
-    uint8 internal constant MAX_ELEMENTS = 10; // must not exceed 255
     uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be 1
     uint8 internal constant DUMMY_STAMP = 1;
 

@@ -60,7 +60,7 @@ contract CollateralsManagementTest is Test {
         setUp();
 
         vm.assume(alice != address(0) && alice != address(evc));
-        vm.assume(numberOfVaults > 0 && numberOfVaults <= Set.MAX_ELEMENTS);
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= MAX_ELEMENTS);
         vm.assume(seed > 1000);
 
         address account = address(uint160(uint160(alice) ^ subAccountId));

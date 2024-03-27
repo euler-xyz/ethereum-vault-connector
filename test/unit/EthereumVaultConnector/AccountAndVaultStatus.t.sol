@@ -20,7 +20,7 @@ contract AccountAndVaultStatusTest is Test {
         bytes memory seed,
         bool allStatusesValid
     ) external {
-        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS);
+        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
@@ -84,7 +84,7 @@ contract AccountAndVaultStatusTest is Test {
     }
 
     function test_WhenDeferred_RequireAccountAndVaultStatusCheck(uint8 numberOfAddresses, bytes memory seed) external {
-        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS);
+        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
@@ -132,7 +132,7 @@ contract AccountAndVaultStatusTest is Test {
         address[] calldata accounts
     ) external {
         vm.assume(index < accounts.length);
-        vm.assume(accounts.length > 0 && accounts.length <= Set.MAX_ELEMENTS);
+        vm.assume(accounts.length > 0 && accounts.length <= MAX_ELEMENTS);
 
         address vault = address(new Vault(evc));
 
@@ -151,7 +151,7 @@ contract AccountAndVaultStatusTest is Test {
         uint8 numberOfAddresses,
         bytes memory seed
     ) external {
-        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= Set.MAX_ELEMENTS);
+        vm.assume(numberOfAddresses > 0 && numberOfAddresses <= MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
