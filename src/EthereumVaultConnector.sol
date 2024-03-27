@@ -109,7 +109,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
         // function
         address phantomAccount = address(uint160(uint152(addressPrefix)) << 8);
-        authenticateCaller(phantomAccount, false, false);
+        authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
 
         _;
     }
@@ -121,7 +121,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @param account The address of the account for which it is checked whether the caller is the owner or an
     /// operator.
     modifier onlyOwnerOrOperator(address account) {
-        authenticateCaller(account, true, true);
+        authenticateCaller({account: account, allowOperator: true, checkLockdownMode: true});
 
         _;
     }
@@ -334,7 +334,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
         // function
         address phantomAccount = address(uint160(uint152(addressPrefix)) << 8);
-        address msgSender = authenticateCaller(phantomAccount, false, false);
+        address msgSender =
+            authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
 
         // the operator can neither be the EVC nor can be one of 256 accounts of the owner
         if (operator == address(this) || haveCommonOwnerInternal(msgSender, operator)) {
@@ -354,7 +355,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @dev Uses authenticateCaller() function instead of onlyOwnerOrOperator() modifier to authenticate and get the
     /// caller address at once.
     function setAccountOperator(address account, address operator, bool authorized) public payable virtual {
-        address msgSender = authenticateCaller(account, true, false);
+        address msgSender = authenticateCaller({account: account, allowOperator: true, checkLockdownMode: false});
 
         // if the account and the caller have a common owner, the caller must be the owner. if the account and the
         // caller don't have a common owner, the caller must be an operator and the owner address is taken from the
@@ -834,7 +835,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             // when the target contract is equal to the msg.sender, both in call() and batch(), authentication is not
             // required
             if (targetContract != msg.sender) {
-                authenticateCaller(onBehalfOfAccount, true, true);
+                authenticateCaller({account: onBehalfOfAccount, allowOperator: true, checkLockdownMode: true});
             }
 
             (success, result) = callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
