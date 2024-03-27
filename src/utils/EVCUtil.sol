@@ -11,10 +11,13 @@ import "../interfaces/IEthereumVaultConnector.sol";
 abstract contract EVCUtil {
     IEVC internal immutable evc;
 
+    error EVC_InvalidAddress();
     error NotAuthorized();
     error ControllerDisabled();
 
     constructor(IEVC _evc) {
+        if (address(_evc) == address(0)) revert EVC_InvalidAddress();
+
         evc = _evc;
     }
 

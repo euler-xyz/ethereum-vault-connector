@@ -48,7 +48,7 @@ interface IEVC {
 
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the
     /// controllerToCheck is an enabled controller for that account.
-    /// @dev This function should only be used by external smart contracts if msg.sender is the EVC. Otherwise, the 
+    /// @dev This function should only be used by external smart contracts if msg.sender is the EVC. Otherwise, the
     /// account address returned must not be trusted.
     /// @dev When checks in progress, on behalf of account is always address(0). When address is zero, the function
     /// reverts to protect the consumer from ever relying on the on behalf of account address which is in its default
