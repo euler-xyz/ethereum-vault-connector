@@ -91,7 +91,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     receive() external payable {
-        // only receives value, no need to do anything here
+        // only allows to receive value when checks are deferred
+        if (!executionContext.areChecksDeferred()) {
+            revert EVC_NotAuthorized();
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
