@@ -28,7 +28,7 @@ struct SetStorage {
     /// @notice The stamp of the set.
     uint88 stamp;
     /// @notice The array of elements in the set. Stores the elements starting from index 1.
-    ElementStorage[2 ** 8] elements;
+    ElementStorage[2 ** 8 - 1] elements;
 }
 
 /// @title Set
