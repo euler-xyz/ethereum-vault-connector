@@ -306,7 +306,7 @@ To improve user security, the EVC introduces the `LOCKDOWN MODE`. This mode, whi
 
 ### Permit Disabled Mode
 
-Another feature to improve user security is the `PERMIT DISABLED MODE`. This mode, which can only be activated by the owner, applies to all their accounts simultaneously. Once activated, the EVC no longer allows executing permits that were signed by the owner which activated this mode. This mode is particularly useful in emergency situations, such as when a harmful permit message has been signed, necessitating immediate action to safeguard the user's assets. The `PERMIT DISABLED MODE` is a subset of the `LOCKDOWN MODE` which is more restrictive.
+Another feature to improve user security is the `PERMIT DISABLED MODE`. This mode, which can only be activated by the owner, applies to all their accounts simultaneously. Once activated, the EVC no longer allows executing permits that were signed by the owner which activated this mode. This mode is particularly useful in emergency situations, such as when a harmful permit message has been signed, necessitating immediate action to safeguard the user's assets.
 
 ### Authentication by Vaults
 
