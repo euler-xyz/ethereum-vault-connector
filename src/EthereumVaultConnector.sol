@@ -912,7 +912,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         for (uint256 i; i < length; ++i) {
             (address checkedAddress, bool isValid, bytes memory result) =
                 abi.decode(callbackResult[i], (address, bool, bytes));
-            checksResult[i] = StatusCheckResult(checkedAddress, isValid, result);
+            checksResult[i] = StatusCheckResult({checkedAddress: checkedAddress, isValid: isValid, result: result});
         }
     }
 
