@@ -748,30 +748,25 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         address msgSender = _msgSender();
-        bool authenticated = false;
 
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
                 setAccountOwnerInternal(account, msgSender);
-                authenticated = true;
+                return msgSender;
             } else if (owner == msgSender) {
-                authenticated = true;
+                return msgSender;
             }
         }
 
         // if the caller is not the owner, check if it is an operator if operators are allowed
-        if (!authenticated && allowOperator) {
-            authenticated = isAccountOperatorAuthorizedInternal(account, msgSender);
+        if (allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
+            return msgSender;
         }
 
         // must revert if neither the owner nor the operator were authenticated
-        if (!authenticated) {
-            revert EVC_NotAuthorized();
-        }
-
-        return msgSender;
+        revert EVC_NotAuthorized();
     }
 
     function callWithContextInternal(
