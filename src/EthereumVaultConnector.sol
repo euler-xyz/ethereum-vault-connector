@@ -355,7 +355,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         // if the account and the caller have a common owner, the caller must be the owner. if the account and the
         // caller don't have a common owner, the caller must be an operator and the owner address is taken from the
-        // storage
+        // storage. the caller authentication above guarantees that the account owner is already registered hence
+        // non-zero
         address owner = haveCommonOwnerInternal(account, msgSender) ? msgSender : getAccountOwnerInternal(account);
 
         // if it's an operator calling, it can only act for itself and must not be able to change other operators status

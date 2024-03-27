@@ -73,7 +73,10 @@ contract SetLockdownModeTest is Test {
 
     function test_Integration_SetLockdownMode(address alice, address vault, address operator) public {
         vm.assume(alice != address(0) && alice != address(evc) && !evc.haveCommonOwner(alice, operator));
-        vm.assume(vault != address(0) && vault != address(evc) && vault != address(this) && vault != alice && vault != operator);
+        vm.assume(
+            vault != address(0) && vault != address(evc) && vault != address(this) && vault != alice
+                && vault != operator
+        );
         vm.assume(operator != address(0) && operator != address(evc));
 
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
