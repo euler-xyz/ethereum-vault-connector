@@ -71,7 +71,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bool isPermitDisabledMode;
     }
 
-    mapping(bytes19 addressPrefix => OwnerStorage ownerStorage) internal ownerLookup;
+    mapping(bytes19 addressPrefix => OwnerStorage) internal ownerLookup;
 
     mapping(bytes19 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
 
