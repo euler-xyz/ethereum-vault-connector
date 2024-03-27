@@ -625,7 +625,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
                 callWithAuthenticationInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
         }
 
-        executionContext = contextCache.setChecksInProgress();
+        executionContext = contextCache.setChecksInProgress().setOnBehalfOfAccount(address(0));
 
         accountsStatusCheckResult = checkStatusAllWithResult(SetType.Account);
         vaultsStatusCheckResult = checkStatusAllWithResult(SetType.Vault);
