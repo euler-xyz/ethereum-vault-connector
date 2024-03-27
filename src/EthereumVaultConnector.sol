@@ -854,7 +854,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address controller = accountControllers[account].firstElement;
 
         if (numOfControllers == 0) return (true, "");
-        else if (numOfControllers > 1) revert EVC_ControllerViolation();
+        else if (numOfControllers > 1) return (false, abi.encodeWithSelector(EVC_ControllerViolation.selector));
 
         bool success;
         (success, result) =
