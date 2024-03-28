@@ -132,19 +132,26 @@ library Set {
 
         // set numElements for every execution path to avoid SSTORE and bit masking when the element removed is
         // firstElement
+        ElementStorage storage lastElement = setStorage.elements[lastIndex];
         if (searchIndex != lastIndex) {
             if (searchIndex == 0) {
-                setStorage.firstElement = setStorage.elements[lastIndex].value;
+                setStorage.firstElement = lastElement.value;
                 setStorage.numElements = uint8(lastIndex);
+                setStorage.stamp = DUMMY_STAMP;
             } else {
-                setStorage.elements[searchIndex].value = setStorage.elements[lastIndex].value;
+                setStorage.elements[searchIndex].value = lastElement.value;
+
+                setStorage.firstElement = firstElement;
                 setStorage.numElements = uint8(lastIndex);
+                setStorage.stamp = DUMMY_STAMP;
             }
         } else {
+            setStorage.firstElement = firstElement;
             setStorage.numElements = uint8(lastIndex);
+            setStorage.stamp = DUMMY_STAMP;
         }
 
-        setStorage.elements[lastIndex].value = address(0);
+        lastElement.value = address(0);
 
         return true;
     }
