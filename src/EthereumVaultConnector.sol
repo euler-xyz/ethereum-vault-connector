@@ -24,6 +24,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     string public constant name = "Ethereum Vault Connector";
     string public constant version = "1";
 
+    uint256 internal constant ACCOUNT_ID_OFFSET = 8;
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
     bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
@@ -108,7 +109,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     modifier onlyOwner(bytes19 addressPrefix) {
         // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
         // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << 8);
+        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
         authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
 
         _;
@@ -333,7 +334,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) public payable virtual {
         // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
         // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << 8);
+        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
         address msgSender =
             authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
 
