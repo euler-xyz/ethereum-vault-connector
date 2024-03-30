@@ -24,7 +24,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     string public constant name = "Ethereum Vault Connector";
     string public constant version = "1";
 
-    uint256 internal constant ACCOUNT_ID_OFFSET = 8;
+    uint160 internal constant ACCOUNT_ID_OFFSET = 8;
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
     bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
