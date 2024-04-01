@@ -174,11 +174,12 @@ This is accomplished by the controller vault calling `controlCollateral`. It pas
 
 ### permit
 
-Instead of invoking the EVC directly, signed messages called `permit`s can also be provided to the EVC. Permits can be invoked by anyone, but they will execute on behalf of the signer of the permit message. They are useful for implementing "gasless" transactions.
+Instead of invoking the EVC directly, signed messages called `permit`s can also be provided to the EVC. Permits can be invoked by the specified sender (or anyone under certain circumstances), but they will execute on behalf of the signer of the permit message. They are useful for implementing "gasless" transactions.
 
 Permits are EIP-712 typed data messages with the following fields:
 
 * `signer`: The address to execute the operation on behalf of.
+* `sender`: The address of the `msg.sender` which is expected to execute the data signed by the `signer`.
 * `nonceNamespace` and `nonce`: Values used to prevent replaying permit messages, and for sequencing (see below)
 * `deadline`: A timestamp after which the permit becomes invalid.
 * `value`: The value of native currency that is expected to be sent to the EVC
@@ -186,7 +187,7 @@ Permits are EIP-712 typed data messages with the following fields:
 
 There are two types of signature methods supported by permits: ECDSA, which is used by EOAs, and [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) which is used by smart contract wallets. In both cases, the `permit` method can be invoked by any unprivileged address, such as a keeper. If the signature is exactly 65 bytes long, an `ecrecover` is attempted. If the recovered address does not match `signer`, or for signature lengths other than 65, then an ERC-1271 verification is attempted, by staticcalling `isValidSignature` on `signer`.
 
-After verifying `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC, forwarding the specified `value` (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
+After verifying `sender`, `deadline`, `signature`, `nonce`, and `nonceNamespace`, the `data` will be used to invoke the EVC, forwarding the specified `value` (or the full balance of the EVC contract if max `uint256` was specified). Although other methods can be invoked, the most general purpose method to use is `batch`. Inside a batch, each batch item can specify an `onBehalfOfAccount` address. This can be any sub-account of the owner, meaning a signed batch can affect multiple sub-accounts, just as a regular non-permit invocation of `batch` can. If the `signer` is an operator of another account, then the other account can also be specified -- this could be useful for gaslessly invoking a restricted "hot wallet" operator.
 
 Internally, `permit` works by `call`ing `address(this)`, which has the effect of setting `msg.sender` to the EVC itself, indicating to the EVC that the actually authenticated user should be taken from the execution context. It is critical that a permit is the only way for this to happen, otherwise the authentication could be bypassed. Note that the EVC can be self-invoked via `call` and `batch`, but this is done with *delegatecall*, leaving `msg.sender` unchanged.
 

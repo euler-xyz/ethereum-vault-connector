@@ -201,6 +201,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
 
     function permit(
         address signer,
+        address,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
@@ -216,7 +217,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         deal(address(this), value);
         nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace];
         deadline = block.timestamp;
-        super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
+        super.permit(signer, msg.sender, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
     function batch(BatchItem[] calldata items) public payable override {

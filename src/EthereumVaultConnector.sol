@@ -32,7 +32,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     bytes32 internal constant PERMIT_TYPEHASH = keccak256(
-        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
+        "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
     uint256 internal immutable CACHED_CHAIN_ID;
@@ -479,6 +479,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function permit(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
@@ -486,8 +487,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual nonReentrantChecksAndControlCollateral {
-        // cannot be called within the self-call of the permit function; can occur for nested calls
-        if (inPermitSelfCall()) {
+        // cannot be called within the self-call of the permit function; can occur for nested calls.
+        // the permit function can be called only by the specified sender
+        if (inPermitSelfCall() || (sender != address(0) && sender != msg.sender)) {
             revert EVC_NotAuthorized();
         }
 
@@ -496,10 +498,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         bytes19 addressPrefix = getAddressPrefixInternal(signer);
-        uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
+        {
+            uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
 
-        if (currentNonce == type(uint256).max || currentNonce != nonce) {
-            revert EVC_InvalidNonce();
+            if (currentNonce == type(uint256).max || currentNonce != nonce) {
+                revert EVC_InvalidNonce();
+            }
         }
 
         if (deadline < block.timestamp) {
@@ -510,7 +514,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidData();
         }
 
-        bytes32 permitHash = getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        bytes32 permitHash = getPermitHash(signer, sender, nonceNamespace, nonce, deadline, value, data);
 
         if (
             signer != recoverECDSASigner(permitHash, signature)
@@ -524,7 +528,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         unchecked {
-            nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
+            nonceLookup[addressPrefix][nonceNamespace] = nonce + 1;
         }
 
         emit NonceUsed(addressPrefix, nonceNamespace, nonce);
@@ -928,6 +932,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function getPermitHash(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
@@ -937,8 +942,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes32 domainSeparator =
             block.chainid == CACHED_CHAIN_ID ? CACHED_DOMAIN_SEPARATOR : calculateDomainSeparator();
 
-        bytes32 structHash =
-            keccak256(abi.encode(PERMIT_TYPEHASH, signer, nonceNamespace, nonce, deadline, value, keccak256(data)));
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, signer, sender, nonceNamespace, nonce, deadline, value, keccak256(data))
+        );
 
         // This code overwrites the two most significant bytes of the free memory pointer,
         // and restores them to 0 after
