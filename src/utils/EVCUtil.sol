@@ -29,11 +29,10 @@ abstract contract EVCUtil {
         if (msg.sender == address(evc)) {
             _;
         } else {
-            bytes32 _evcCallSelector = evc.call.selector;
             address _evc = address(evc);
 
             assembly {
-                mstore(0, _evcCallSelector) // EVC.call selector
+                mstore(0, 0x1f8b521500000000000000000000000000000000000000000000000000000000) // EVC.call selector
                 mstore(4, address()) // EVC.call 1st argument - address(this)
                 mstore(36, caller()) // EVC.call 2nd argument - msg.sender
                 mstore(68, callvalue()) // EVC.call 3rd argument - msg.value
