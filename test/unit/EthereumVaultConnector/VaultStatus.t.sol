@@ -15,7 +15,7 @@ contract VaultStatusTest is Test {
     }
 
     function test_RequireVaultStatusCheck(uint8 vaultsNumber, bool allStatusesValid) external {
-        vm.assume(vaultsNumber > 0 && vaultsNumber <= MAX_ELEMENTS);
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < vaultsNumber; i++) {
             address vault = address(new Vault(evc));
@@ -43,7 +43,7 @@ contract VaultStatusTest is Test {
     }
 
     function test_WhenDeferred_RequireVaultStatusCheck(uint8 vaultsNumber, bool allStatusesValid) external {
-        vm.assume(vaultsNumber > 0 && vaultsNumber <= MAX_ELEMENTS);
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < vaultsNumber; i++) {
             address vault = address(new Vault(evc));
@@ -77,7 +77,7 @@ contract VaultStatusTest is Test {
 
     function test_RevertIfChecksReentrancy_RequireVaultStatusCheck(uint8 index, uint8 vaultsNumber) external {
         vm.assume(index < vaultsNumber);
-        vm.assume(vaultsNumber > 0 && vaultsNumber <= MAX_ELEMENTS);
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= SET_MAX_ELEMENTS);
 
         address[] memory vaults = new address[](vaultsNumber);
         for (uint256 i = 0; i < vaultsNumber; i++) {
@@ -96,7 +96,7 @@ contract VaultStatusTest is Test {
     }
 
     function test_AcquireChecksLock_RequireVaultStatusChecks(uint8 numberOfVaults) external {
-        vm.assume(numberOfVaults > 0 && numberOfVaults <= MAX_ELEMENTS);
+        vm.assume(numberOfVaults > 0 && numberOfVaults <= SET_MAX_ELEMENTS);
 
         address[] memory vaults = new address[](numberOfVaults);
         for (uint256 i = 0; i < numberOfVaults; i++) {
@@ -112,7 +112,7 @@ contract VaultStatusTest is Test {
     }
 
     function test_ForgiveVaultStatusCheck(uint8 vaultsNumber) external {
-        vm.assume(vaultsNumber > 0 && vaultsNumber <= MAX_ELEMENTS);
+        vm.assume(vaultsNumber > 0 && vaultsNumber <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < vaultsNumber; i++) {
             address vault = address(new Vault(evc));

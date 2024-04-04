@@ -19,7 +19,7 @@ contract AccountStatusTest is Test {
         bytes memory seed,
         bool allStatusesValid
     ) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
@@ -54,7 +54,7 @@ contract AccountStatusTest is Test {
     }
 
     function test_WhenDeferred_RequireAccountStatusCheck(uint8 numberOfAccounts, bytes memory seed) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             evc.setChecksDeferred(false);
@@ -90,7 +90,7 @@ contract AccountStatusTest is Test {
     }
 
     function test_AcquireChecksLock_RequireAccountStatusChecks(uint8 numberOfAccounts, bytes memory seed) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
@@ -108,7 +108,7 @@ contract AccountStatusTest is Test {
     }
 
     function test_ForgiveAccountStatusCheck(uint8 numberOfAccounts, bytes memory seed) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
 
         address[] memory accounts = new address[](numberOfAccounts);
         for (uint256 i = 0; i < numberOfAccounts; i++) {
@@ -171,7 +171,7 @@ contract AccountStatusTest is Test {
         uint8 numberOfAccounts,
         bytes memory seed
     ) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
@@ -195,7 +195,7 @@ contract AccountStatusTest is Test {
         uint8 numberOfAccounts,
         bytes memory seed
     ) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
         address controller_1 = address(new Vault(evc));
         address controller_2 = address(new Vault(evc));
 
@@ -224,7 +224,7 @@ contract AccountStatusTest is Test {
         uint8 numberOfAccounts,
         bytes memory seed
     ) external {
-        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= MAX_ELEMENTS);
+        vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
 
         address controller = address(new Vault(evc));
         for (uint256 i = 0; i < numberOfAccounts; i++) {

@@ -13,7 +13,7 @@ contract IsVaultStatusCheckDeferredTest is Test {
     }
 
     function test_IsVaultStatusCheckDeferred(uint8 numberOfVaults) external {
-        vm.assume(numberOfVaults <= MAX_ELEMENTS);
+        vm.assume(numberOfVaults <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfVaults; ++i) {
             evc.setChecksDeferred(false);
