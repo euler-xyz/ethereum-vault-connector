@@ -165,11 +165,10 @@ interface IEVC {
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
     /// @dev This function can only be called by the owner of the address prefix. Each nonce namespace provides a 256
-    /// bit
-    /// nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce namespace
-    /// before moving to the next one which allows the use of permit messages in a non-sequential manner. To invalidate
-    /// signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the permit
-    /// messages for a given nonce namespace, set the nonce to type(uint).max.
+    /// bit nonce that has to be used sequentially. There's no requirement to use all the nonces for a given nonce
+    /// namespace before moving to the next one which allows the use of permit messages in a non-sequential manner. To
+    /// invalidate signed permit messages, set the nonce for a given nonce namespace accordingly. To invalidate all the
+    /// permit messages for a given nonce namespace, set the nonce to type(uint).max.
     /// @param addressPrefix The address prefix for which the nonce is being set.
     /// @param nonceNamespace The nonce namespace for which the nonce is being set.
     /// @param nonce The new nonce for the given address prefix and nonce namespace.
