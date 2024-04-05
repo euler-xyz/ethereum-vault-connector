@@ -18,8 +18,10 @@ EXCLUDE_CONFS = [
 
 def listConfigs() -> list[str]:
     """List all config files."""
-    all_confs = glob.glob('certora/conf/**/*.conf', recursive=True)
-    return [x for x in all_confs if x not in EXCLUDE_CONFS]
+    subdir_confs = glob.glob('certora/conf/**/*.conf', recursive=True)
+    root_confs = glob.glob('certora/conf/*.conf', recursive=True)
+    confs = subdir_confs + root_confs
+    return [x for x in confs if x not in EXCLUDE_CONFS]
 
 def loadConfigDependencies(filename: str) -> set[str]:
     """Load all files a config depends on."""
@@ -55,7 +57,7 @@ def runConf(filename):
     try:
         # The commit sha fixes the CI at release version 7.0.2
         # from February 2024.
-        res = subprocess.run(['certoraRun', '--server', 'production', '--commit_sha1', 'f399f355baa5db93ed145e89a5d52bea8135ae50', '--wait_for_results', 'all', filename],
+        res = subprocess.run(['certoraRun', '--server', 'production', '--wait_for_results', 'all', filename],
                              capture_output = True)
     except Exception as e:
         with outputMutex:

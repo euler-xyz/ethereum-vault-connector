@@ -6,7 +6,7 @@ persistent ghost bool overwroteOwner {
     init_state axiom overwroteOwner == false;
 }
 
-hook Sstore currentContract.ownerLookup[KEY bytes19 address_prefix] address newValue (address oldValue) STORAGE {
+hook Sstore currentContract.ownerLookup[KEY bytes19 address_prefix].owner address newValue (address oldValue) {
     if (oldValue != 0 && newValue != oldValue) {
         overwroteOwner = true;
     }

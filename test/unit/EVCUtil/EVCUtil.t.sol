@@ -8,7 +8,7 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 import "../../../src/interfaces/IVault.sol";
 
 contract EVCClient is EVCUtil {
-    constructor(IEVC _evc) EVCUtil(_evc) {
+    constructor(address _evc) EVCUtil(_evc) {
         // do nothing
     }
 
@@ -60,12 +60,12 @@ contract EVCUtilTest is Test {
 
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
-        evcClient = new EVCClient(evc);
+        evcClient = new EVCClient(address(evc));
     }
 
     function test_EVCUtilConstructor() external {
         vm.expectRevert(EVCUtil.EVC_InvalidAddress.selector);
-        new EVCClient(IEVC(address(0)));
+        new EVCClient(address(0));
     }
 
     function test_callThroughEVCUint(uint256 input) external {
