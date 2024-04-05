@@ -17,7 +17,7 @@ contract EVCClient is EVCUtil {
         return param;
     }
 
-    function calledThroughEVCPayableUint(uint256 param) external payable callThroughEVCPayable returns (uint256) {
+    function calledThroughEVCPayableUint(uint256 param) external payable callThroughEVC returns (uint256) {
         require(msg.sender == address(evc), "Not EVC");
         return param;
     }
@@ -30,7 +30,7 @@ contract EVCClient is EVCUtil {
     function calledThroughEVCPayableBytes(bytes calldata param)
         external
         payable
-        callThroughEVCPayable
+        callThroughEVC
         returns (bytes memory)
     {
         require(msg.sender == address(evc), "Not EVC");
@@ -61,6 +61,11 @@ contract EVCUtilTest is Test {
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
         evcClient = new EVCClient(address(evc));
+    }
+
+    function test_EVCUtilConstructor() external {
+        vm.expectRevert(EVCUtil.EVC_InvalidAddress.selector);
+        new EVCClient(address(0));
     }
 
     function test_callThroughEVCUint(uint256 input) external {

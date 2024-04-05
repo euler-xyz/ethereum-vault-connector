@@ -13,7 +13,7 @@ contract IsAccountStatusCheckDeferredTest is Test {
     }
 
     function test_IsAccountStatusCheckDeferred(uint8 numberOfAccounts, bytes memory seed) external {
-        vm.assume(numberOfAccounts <= Set.MAX_ELEMENTS);
+        vm.assume(numberOfAccounts <= SET_MAX_ELEMENTS);
 
         for (uint256 i = 0; i < numberOfAccounts; ++i) {
             evc.setChecksDeferred(false);

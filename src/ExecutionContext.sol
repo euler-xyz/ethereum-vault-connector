@@ -31,17 +31,10 @@ library ExecutionContext {
     uint256 internal constant SIMULATION_MASK = 0x00000000000000FF000000000000000000000000000000000000000000000000;
     uint256 internal constant STAMP_MASK = 0xFFFFFFFFFFFFFF00000000000000000000000000000000000000000000000000;
     uint256 internal constant STAMP_OFFSET = 200;
-    uint256 internal constant STAMP_DUMMY_VALUE = 1;
 
     // None of the functions below modifies the state. All the functions operate on the copy
     // of the execution context and return its modified value as a result. In order to update
     // one should use the result of the function call as a new execution context value.
-
-    function initialize(EC self) internal pure returns (EC result) {
-        // prepopulate the execution context storage slot to optimize gas consumption
-        // (it should never be cleared again thanks to the stamp)
-        result = EC.wrap(EC.unwrap(self) | (STAMP_DUMMY_VALUE << STAMP_OFFSET));
-    }
 
     function getOnBehalfOfAccount(EC self) internal pure returns (address result) {
         result = address(uint160(EC.unwrap(self) & ON_BEHALF_OF_ACCOUNT_MASK));

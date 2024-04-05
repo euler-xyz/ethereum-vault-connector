@@ -75,7 +75,7 @@ contract SetLockdownModeTest is Test {
         vm.assume(alice != address(0) && alice != address(evc) && !evc.haveCommonOwner(alice, operator));
         vm.assume(
             vault != address(0) && vault != address(evc) && vault != address(this) && vault != alice
-                && vault != operator
+                && vault != operator && !evc.haveCommonOwner(vault, address(0)) && vault.code.length == 0
         );
         vm.assume(operator != address(0) && operator != address(evc));
 

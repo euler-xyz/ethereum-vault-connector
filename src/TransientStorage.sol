@@ -26,7 +26,7 @@ abstract contract TransientStorage {
     constructor() {
         // set the execution context to non-zero value to always keep the storage slot in non-zero state.
         // it allows for cheaper SSTOREs when the execution context is in its default state
-        executionContext = executionContext.initialize();
+        executionContext = EC.wrap(1 << ExecutionContext.STAMP_OFFSET);
 
         // there are two types of data that are stored using SetStorage type:
         // - the data that is transient in nature (accountStatusChecks and vaultStatusChecks)

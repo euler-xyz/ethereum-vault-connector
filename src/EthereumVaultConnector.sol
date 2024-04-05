@@ -24,6 +24,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     string public constant name = "Ethereum Vault Connector";
     string public constant version = "1";
 
+    uint160 internal constant ACCOUNT_ID_OFFSET = 8;
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
     bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
@@ -31,7 +32,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     bytes32 internal constant PERMIT_TYPEHASH = keccak256(
-        "Permit(address signer,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
+        "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
     uint256 internal immutable CACHED_CHAIN_ID;
@@ -71,7 +72,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bool isPermitDisabledMode;
     }
 
-    mapping(bytes19 addressPrefix => OwnerStorage ownerStorage) internal ownerLookup;
+    mapping(bytes19 addressPrefix => OwnerStorage) internal ownerLookup;
 
     mapping(bytes19 addressPrefix => mapping(address operator => uint256 operatorBitField)) internal operatorLookup;
 
@@ -91,7 +92,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     receive() external payable {
-        // only receives value, no need to do anything here
+        // only allows to receive value when checks are deferred
+        if (!executionContext.areChecksDeferred()) {
+            revert EVC_NotAuthorized();
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,8 +109,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     modifier onlyOwner(bytes19 addressPrefix) {
         // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
         // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << 8);
-        authenticateCaller(phantomAccount, false, false);
+        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
+        authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
 
         _;
     }
@@ -118,7 +122,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @param account The address of the account for which it is checked whether the caller is the owner or an
     /// operator.
     modifier onlyOwnerOrOperator(address account) {
-        authenticateCaller(account, true, true);
+        authenticateCaller({account: account, allowOperator: true, checkLockdownMode: true});
 
         _;
     }
@@ -330,8 +334,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) public payable virtual {
         // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
         // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << 8);
-        address msgSender = authenticateCaller(phantomAccount, false, false);
+        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
+        address msgSender =
+            authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
 
         // the operator can neither be the EVC nor can be one of 256 accounts of the owner
         if (operator == address(this) || haveCommonOwnerInternal(msgSender, operator)) {
@@ -351,11 +356,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @dev Uses authenticateCaller() function instead of onlyOwnerOrOperator() modifier to authenticate and get the
     /// caller address at once.
     function setAccountOperator(address account, address operator, bool authorized) public payable virtual {
-        address msgSender = authenticateCaller(account, true, false);
+        address msgSender = authenticateCaller({account: account, allowOperator: true, checkLockdownMode: false});
 
         // if the account and the caller have a common owner, the caller must be the owner. if the account and the
         // caller don't have a common owner, the caller must be an operator and the owner address is taken from the
-        // storage
+        // storage. the caller authentication above guarantees that the account owner is already registered hence
+        // non-zero
         address owner = haveCommonOwnerInternal(account, msgSender) ? msgSender : getAccountOwnerInternal(account);
 
         // if it's an operator calling, it can only act for itself and must not be able to change other operators status
@@ -473,6 +479,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @inheritdoc IEVC
     function permit(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
@@ -480,8 +487,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual nonReentrantChecksAndControlCollateral {
-        // cannot be called within the self-call of the permit function; can occur for nested calls
-        if (inPermitSelfCall()) {
+        // cannot be called within the self-call of the permit function; can occur for nested calls.
+        // the permit function can be called only by the specified sender
+        if (inPermitSelfCall() || (sender != address(0) && sender != msg.sender)) {
             revert EVC_NotAuthorized();
         }
 
@@ -495,10 +503,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_PermitDisabledMode();
         }
 
-        uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
+        {
+            uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
 
-        if (currentNonce == type(uint256).max || currentNonce != nonce) {
-            revert EVC_InvalidNonce();
+            if (currentNonce == type(uint256).max || currentNonce != nonce) {
+                revert EVC_InvalidNonce();
+            }
         }
 
         if (deadline < block.timestamp) {
@@ -509,7 +519,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             revert EVC_InvalidData();
         }
 
-        bytes32 permitHash = getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        bytes32 permitHash = getPermitHash(signer, sender, nonceNamespace, nonce, deadline, value, data);
 
         if (
             signer != recoverECDSASigner(permitHash, signature)
@@ -519,10 +529,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         unchecked {
-            nonceLookup[addressPrefix][nonceNamespace] = currentNonce + 1;
+            nonceLookup[addressPrefix][nonceNamespace] = nonce + 1;
         }
 
-        emit NonceUsed(addressPrefix, nonceNamespace, currentNonce);
+        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
 
         // EVC address becomes the msg.sender for the duration this self-call, no authentication is required here.
         // the signer will be later on authenticated as per data, depending on the functions that will be called
@@ -622,7 +632,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
                 callWithAuthenticationInternal(item.targetContract, item.onBehalfOfAccount, item.value, item.data);
         }
 
-        executionContext = contextCache.setChecksInProgress();
+        executionContext = contextCache.setChecksInProgress().setOnBehalfOfAccount(address(0));
 
         accountsStatusCheckResult = checkStatusAllWithResult(SetType.Account);
         vaultsStatusCheckResult = checkStatusAllWithResult(SetType.Vault);
@@ -744,30 +754,25 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         address msgSender = _msgSender();
-        bool authenticated = false;
 
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
                 setAccountOwnerInternal(account, msgSender);
-                authenticated = true;
+                return msgSender;
             } else if (owner == msgSender) {
-                authenticated = true;
+                return msgSender;
             }
         }
 
         // if the caller is not the owner, check if it is an operator if operators are allowed
-        if (!authenticated && allowOperator) {
-            authenticated = isAccountOperatorAuthorizedInternal(account, msgSender);
+        if (allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
+            return msgSender;
         }
 
         // must revert if neither the owner nor the operator were authenticated
-        if (!authenticated) {
-            revert EVC_NotAuthorized();
-        }
-
-        return msgSender;
+        revert EVC_NotAuthorized();
     }
 
     function callWithContextInternal(
@@ -831,7 +836,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             // when the target contract is equal to the msg.sender, both in call() and batch(), authentication is not
             // required
             if (targetContract != msg.sender) {
-                authenticateCaller(onBehalfOfAccount, true, true);
+                authenticateCaller({account: onBehalfOfAccount, allowOperator: true, checkLockdownMode: true});
             }
 
             (success, result) = callWithContextInternal(targetContract, onBehalfOfAccount, value, data);
@@ -854,7 +859,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address controller = accountControllers[account].firstElement;
 
         if (numOfControllers == 0) return (true, "");
-        else if (numOfControllers > 1) revert EVC_ControllerViolation();
+        else if (numOfControllers > 1) return (false, abi.encodeWithSelector(EVC_ControllerViolation.selector));
 
         bool success;
         (success, result) =
@@ -913,7 +918,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         for (uint256 i; i < length; ++i) {
             (address checkedAddress, bool isValid, bytes memory result) =
                 abi.decode(callbackResult[i], (address, bool, bytes));
-            checksResult[i] = StatusCheckResult(checkedAddress, isValid, result);
+            checksResult[i] = StatusCheckResult({checkedAddress: checkedAddress, isValid: isValid, result: result});
         }
     }
 
@@ -928,6 +933,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     function getPermitHash(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
@@ -937,8 +943,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes32 domainSeparator =
             block.chainid == CACHED_CHAIN_ID ? CACHED_DOMAIN_SEPARATOR : calculateDomainSeparator();
 
-        bytes32 structHash =
-            keccak256(abi.encode(PERMIT_TYPEHASH, signer, nonceNamespace, nonce, deadline, value, keccak256(data)));
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, signer, sender, nonceNamespace, nonce, deadline, value, keccak256(data))
+        );
 
         // This code overwrites the two most significant bytes of the free memory pointer,
         // and restores them to 0 after

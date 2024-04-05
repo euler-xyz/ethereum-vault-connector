@@ -11,10 +11,13 @@ import "../interfaces/IEthereumVaultConnector.sol";
 abstract contract EVCUtil {
     IEVC internal immutable evc;
 
+    error EVC_InvalidAddress();
     error NotAuthorized();
     error ControllerDisabled();
 
     constructor(address _evc) {
+        if (_evc == address(0)) revert EVC_InvalidAddress();
+
         evc = IEVC(_evc);
     }
 
@@ -26,27 +29,22 @@ abstract contract EVCUtil {
         if (msg.sender == address(evc)) {
             _;
         } else {
-            bytes memory result = evc.call(address(this), msg.sender, 0, msg.data);
+            address _evc = address(evc);
 
             assembly {
-                return(add(32, result), mload(result))
-            }
-        }
-    }
+                mstore(0, 0x1f8b521500000000000000000000000000000000000000000000000000000000) // EVC.call selector
+                mstore(4, address()) // EVC.call 1st argument - address(this)
+                mstore(36, caller()) // EVC.call 2nd argument - msg.sender
+                mstore(68, callvalue()) // EVC.call 3rd argument - msg.value
+                mstore(100, 128) // EVC.call 4th argument - msg.data, offset to the start of encoding - 128 bytes
+                mstore(132, calldatasize()) // msg.data length
+                calldatacopy(164, 0, calldatasize()) // original calldata
+                let result := call(gas(), _evc, callvalue(), 0, add(164, calldatasize()), 0, 0)
 
-    /// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
-    /// @dev Optional to use for functions requiring account and vault status checks to enforce predictable behavior.
-    /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
-    /// modifier of the function.
-    /// @dev This modifier is used for payable functions because it forwards the value to the EVC.
-    modifier callThroughEVCPayable() virtual {
-        if (msg.sender == address(evc)) {
-            _;
-        } else {
-            bytes memory result = evc.call{value: msg.value}(address(this), msg.sender, msg.value, msg.data);
-
-            assembly {
-                return(add(32, result), mload(result))
+                returndatacopy(0, 0, returndatasize())
+                switch result
+                case 0 { revert(0, returndatasize()) }
+                default { return(64, sub(returndatasize(), 64)) } // strip bytes encoding from call return
             }
         }
     }

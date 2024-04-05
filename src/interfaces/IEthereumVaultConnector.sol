@@ -48,6 +48,8 @@ interface IEVC {
 
     /// @notice Returns an account on behalf of which the operation is being executed at the moment and whether the
     /// controllerToCheck is an enabled controller for that account.
+    /// @dev This function should only be used by external smart contracts if msg.sender is the EVC. Otherwise, the
+    /// account address returned must not be trusted.
     /// @dev When checks in progress, on behalf of account is always address(0). When address is zero, the function
     /// reverts to protect the consumer from ever relying on the on behalf of account address which is in its default
     /// state.
@@ -275,6 +277,8 @@ interface IEVC {
     /// @param signer The address signing the permit message (ECDSA) or verifying the permit message signature
     /// (ERC-1271). It's also the owner or the operator of all the accounts for which authentication will be needed
     /// during the execution of the arbitrary data call.
+    /// @param sender The address of the msg.sender which is expected to execute the data signed by the signer. If
+    /// address(0) is passed, the msg.sender is ignored.
     /// @param nonceNamespace The nonce namespace for which the nonce is being used.
     /// @param nonce The nonce for the given account and nonce namespace. A valid nonce value is considered to be the
     /// value currently stored and can take any value between 0 and type(uint256).max - 1.
@@ -285,6 +289,7 @@ interface IEVC {
     /// @param signature The signature of the data signed by the signer.
     function permit(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
