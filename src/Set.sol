@@ -32,6 +32,7 @@ struct SetStorage {
 }
 
 /// @title Set
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This library provides functions for managing sets of addresses.
 /// @dev The maximum number of elements in the set is defined by the constant MAX_ELEMENTS.

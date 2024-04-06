@@ -5,6 +5,7 @@ pragma solidity ^0.8.19;
 type EC is uint256;
 
 /// @title ExecutionContext
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This library provides functions for managing the execution context in the Ethereum Vault Connector.
 /// @dev The execution context is a bit field that stores the following information:
