@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 /// @title IEVC
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This interface defines the methods for the Ethereum Vault Connector.
 interface IEVC {

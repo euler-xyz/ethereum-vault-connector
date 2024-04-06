@@ -5,6 +5,7 @@ pragma solidity ^0.8.19;
 import "./interfaces/IEthereumVaultConnector.sol";
 
 /// @title Errors
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This contract implements the error messages for the Ethereum Vault Connector.
 contract Errors {

@@ -11,6 +11,7 @@ import "./interfaces/IVault.sol";
 import "./interfaces/IERC1271.sol";
 
 /// @title EthereumVaultConnector
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This contract implements the Ethereum Vault Connector.
 contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
