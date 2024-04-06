@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.19;
 
-import "../interfaces/IEthereumVaultConnector.sol";
+import {IEVC} from "../interfaces/IEthereumVaultConnector.sol";
 
 /// @title EVCUtil
 /// @dev This contract is an abstract base contract for interacting with the Ethereum Vault Connector (EVC).
