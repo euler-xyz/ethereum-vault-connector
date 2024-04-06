@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 /// @title Events
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This contract implements the events for the Ethereum Vault Connector.
 contract Events {
