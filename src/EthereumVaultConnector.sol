@@ -2,15 +2,17 @@
 
 pragma solidity ^0.8.19;
 
-import "./Set.sol";
-import "./Events.sol";
-import "./Errors.sol";
-import "./TransientStorage.sol";
-import "./interfaces/IEthereumVaultConnector.sol";
-import "./interfaces/IVault.sol";
-import "./interfaces/IERC1271.sol";
+import {Set, SetStorage} from "./Set.sol";
+import {Events} from "./Events.sol";
+import {Errors} from "./Errors.sol";
+import {ExecutionContext, EC} from "./ExecutionContext.sol";
+import {TransientStorage} from "./TransientStorage.sol";
+import {IEVC} from "./interfaces/IEthereumVaultConnector.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {IERC1271} from "./interfaces/IERC1271.sol";
 
 /// @title EthereumVaultConnector
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This contract implements the Ethereum Vault Connector.
 contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
@@ -21,7 +23,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     //                                       CONSTANTS                                           //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// @notice Name of the Ethereum Vault Connector.
     string public constant name = "Ethereum Vault Connector";
+
+    /// @notice Version of the Ethereum Vault Connector.
     string public constant version = "1";
 
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
@@ -90,6 +95,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         CACHED_DOMAIN_SEPARATOR = calculateDomainSeparator();
     }
 
+    /// @notice Fallback function to receive Ether.
     receive() external payable {
         // only receives value, no need to do anything here
     }
@@ -729,6 +735,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     //                                  INTERNAL FUNCTIONS                                       //
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// @notice Authenticates the caller of a function.
+    /// @dev This function checks if the caller is the owner or an authorized operator of the account, and if the
+    /// account is not in lockdown mode.
+    /// @param account The account address to authenticate the caller against.
+    /// @param allowOperator A boolean indicating if operators are allowed to authenticate as the caller.
+    /// @param checkLockdownMode A boolean indicating if the function should check for lockdown mode on the account.
+    /// @return The address of the authenticated caller.
     function authenticateCaller(
         address account,
         bool allowOperator,
@@ -769,6 +782,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         return msgSender;
     }
 
+    /// @notice Internal function to make a call to a target contract with a specific context.
+    /// @dev This function sets the execution context for the duration of the call.
+    /// @param targetContract The contract address to call.
+    /// @param onBehalfOfAccount The account address on behalf of which the call is made.
+    /// @param value The amount of value to send with the call.
+    /// @param data The calldata to send with the call.
     function callWithContextInternal(
         address targetContract,
         address onBehalfOfAccount,
@@ -809,6 +828,16 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         executionContext = contextCache;
     }
 
+    /// @notice Internal function to call a target contract with necessary authentication.
+    /// @dev This function decides whether to use delegatecall or a regular call based on the target contract.
+    /// If the target contract is this contract, it uses delegatecall to preserve msg.sender for authentication.
+    /// Otherwise, it authenticates the caller if needed and proceeds with a regular call.
+    /// @param targetContract The contract address to call.
+    /// @param onBehalfOfAccount The account address on behalf of which the call is made.
+    /// @param value The amount of value to send with the call.
+    /// @param data The calldata to send with the call.
+    /// @return success A boolean indicating if the call was successful.
+    /// @return result The bytes returned from the call.
     function callWithAuthenticationInternal(
         address targetContract,
         address onBehalfOfAccount,
@@ -837,6 +866,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
+    /// @notice Restores the execution context from a cached state.
+    /// @dev This function restores the execution context to a previously cached state, performing necessary status
+    /// checks if they are no longer deferred. If checks are no longer deferred, it sets the execution context to
+    /// indicate checks are in progress and clears the 'on behalf of' account. It then performs status checks for both
+    /// accounts and vaults before restoring the execution context to the cached state.
+    /// @param contextCache The cached execution context to restore from.
     function restoreExecutionContext(EC contextCache) internal virtual {
         if (!contextCache.areChecksDeferred()) {
             executionContext = contextCache.setChecksInProgress().setOnBehalfOfAccount(address(0));
@@ -848,6 +883,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         executionContext = contextCache;
     }
 
+    /// @notice Checks the status of an account internally.
+    /// @dev This function first checks the number of controllers for the account. If there are no controllers enabled,
+    /// it returns true immediately, indicating the account status is valid without further checks. If there is more
+    /// than one controller, it reverts with an EVC_ControllerViolation error. For a single controller, it proceeds to
+    /// call the controller to check the account status.
+    /// @param account The account address to check the status for.
+    /// @return isValid A boolean indicating if the account status is valid.
+    /// @return result The bytes returned from the controller call, indicating the account status.
     function checkAccountStatusInternal(address account) internal virtual returns (bool isValid, bytes memory result) {
         uint256 numOfControllers = accountControllers[account].numElements;
         address controller = accountControllers[account].firstElement;
@@ -873,6 +916,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
+    /// @notice Checks the status of a vault internally.
+    /// @dev This function makes an external call to the vault to check its status.
+    /// @param vault The address of the vault to check the status for.
+    /// @return isValid A boolean indicating if the vault status is valid.
+    /// @return result The bytes returned from the vault call, indicating the vault status.
     function checkVaultStatusInternal(address vault) internal returns (bool isValid, bytes memory result) {
         bool success;
         (success, result) = vault.call(abi.encodeCall(IVault.checkVaultStatus, ()));
@@ -891,6 +939,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
+    /// @notice Checks the status of all entities in a set, either accounts or vaults, and clears the checks.
+    /// @dev Iterates over either accountStatusChecks or vaultStatusChecks based on the setType and performs status
+    /// checks.
+    /// Clears the checks while performing them.
+    /// @param setType The type of set to perform the status checks on, either accounts or vaults.
     function checkStatusAll(SetType setType) internal virtual {
         setType == SetType.Account
             ? accountStatusChecks.forEachAndClear(requireAccountStatusCheckInternal)
@@ -918,13 +971,25 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     // Permit-related functions
 
+    /// @notice Determines if the signer address is valid.
+    /// @dev It's important to revisit this logic when deploying on chains other than the Ethereum mainnet.
+    /// @param signer The address of the signer to validate.
+    /// @return bool Returns true if the signer is valid, false otherwise.
     function isSignerValid(address signer) internal pure virtual returns (bool) {
         // not valid if the signer address falls into any of the precompiles/predeploys
         // addresses space (depends on the chain ID).
-        // IMPORTANT: revisit this logic when deploying on chains other than the Ethereum mainnet
         return !haveCommonOwnerInternal(signer, address(0));
     }
 
+    /// @notice Computes the permit hash for a given set of parameters.
+    /// @dev This function generates a permit hash using EIP712 typed data signing.
+    /// @param signer The address of the signer.
+    /// @param nonceNamespace The namespace of the nonce.
+    /// @param nonce The nonce value, ensuring permits are used once.
+    /// @param deadline The time until when the permit is valid.
+    /// @param value The value associated with the permit.
+    /// @param data Calldata associated with the permit.
+    /// @return permitHash The computed permit hash.
     function getPermitHash(
         address signer,
         uint256 nonceNamespace,
@@ -950,10 +1015,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
-    // Based on:
-    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
-    // Note that the function returns zero address if the signature is invalid hence the result always has to be
-    // checked against address zero.
+    /// @notice Recovers the signer address from a hash and a signature.
+    /// Based on:
+    /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol
+    /// Note that the function returns zero address if the signature is invalid hence the result always has to be
+    /// checked against address zero.
+    /// @param hash The hash of the signed data.
+    /// @param signature The signature to recover the signer from.
+    /// @return signer The address of the signer, or the zero address if signature recovery fails.
     function recoverECDSASigner(bytes32 hash, bytes memory signature) internal pure returns (address signer) {
         if (signature.length != 65) return address(0);
 
@@ -987,8 +1056,16 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         signer = ecrecover(hash, v, r, s);
     }
 
-    // Based on:
-    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/SignatureChecker.sol
+    /// @notice Checks if a given signature is valid according to ERC-1271 standard.
+    /// @dev This function is based on the implementation found in OpenZeppelin's SignatureChecker.
+    /// See:
+    /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/SignatureChecker.sol
+    /// It performs a static call to the signer's address with the signature data and checks if the returned value
+    /// matches the expected valid signature selector.
+    /// @param signer The address of the signer to validate the signature against.
+    /// @param hash The hash of the data that was signed.
+    /// @param signature The signature to validate.
+    /// @return isValid True if the signature is valid according to ERC-1271, false otherwise.
     function isValidERC1271Signature(
         address signer,
         bytes32 hash,
@@ -1003,38 +1080,64 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             && abi.decode(result, (bytes32)) == bytes32(IERC1271.isValidSignature.selector);
     }
 
+    /// @notice Calculates the EIP-712 domain separator for the contract.
+    /// @return The calculated EIP-712 domain separator as a bytes32 value.
     function calculateDomainSeparator() internal view returns (bytes32) {
         return keccak256(abi.encode(TYPE_HASH, HASHED_NAME, HASHED_VERSION, block.chainid, address(this)));
     }
 
     // Auxiliary functions
 
+    /// @notice Returns the message sender's address.
+    /// @dev In the context of a permit self-call, it returns the account on behalf of which the call is made.
+    /// Otherwise, it returns `msg.sender`.
+    /// @return The address of the message sender or the account on behalf of which the call is made.
     function _msgSender() internal view virtual returns (address) {
-        // when in permit self-call, the "true" caller address (that is the permit message signer) is taken from the
-        // execution context
         return inPermitSelfCall() ? executionContext.getOnBehalfOfAccount() : msg.sender;
     }
 
+    /// @notice Checks if the contract is in the context of a permit self-call.
+    /// @dev EVC can only be `msg.sender` during the self-call in the permit function.
+    /// @return True if the current call is a self-call within the permit function, false otherwise.
     function inPermitSelfCall() internal view returns (bool) {
-        // EVC can only be msg.sender during the self-call in the permit function
         return address(this) == msg.sender;
     }
 
+    /// @notice Determines if two accounts have a common owner by comparing their address prefixes.
+    /// @param account The first account address to compare.
+    /// @param otherAccount The second account address to compare.
+    /// @return result True if the accounts have a common owner, false otherwise.
     function haveCommonOwnerInternal(address account, address otherAccount) internal pure returns (bool result) {
         assembly {
             result := lt(xor(account, otherAccount), 0x100)
         }
     }
 
+    /// @notice Computes the address prefix for a given account address.
+    /// @dev The address prefix is derived by right-shifting the account address by 8 bits which effectively reduces the
+    /// address size to 19 bytes.
+    /// @param account The account address to compute the prefix for.
+    /// @return The computed address prefix as a bytes19 value.
     function getAddressPrefixInternal(address account) internal pure returns (bytes19) {
         return bytes19(uint152(uint160(account) >> 8));
     }
 
+    /// @notice Retrieves the owner of a given account by its address prefix.
+    /// @param account The account address to retrieve the owner for.
+    /// @return The address of the account owner.
     function getAccountOwnerInternal(address account) internal view returns (address) {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         return ownerLookup[addressPrefix].owner;
     }
 
+    /// @notice Checks if an operator is authorized for a specific account.
+    /// @dev Determines operator authorization by checking if the operator's bit is set in the operator's bit field for
+    /// the account's address prefix. If the owner is not registered (address(0)), it implies the operator cannot be
+    /// authorized, hence returns false. The bitMask is calculated by shifting 1 left by the XOR of the owner's and
+    /// account's address, effectively checking the operator's authorization for the specific account.
+    /// @param account The account address to check the operator authorization for.
+    /// @param operator The operator address to check authorization status.
+    /// @return isAuthorized True if the operator is authorized for the account, false otherwise.
     function isAccountOperatorAuthorizedInternal(
         address account,
         address operator
@@ -1054,12 +1157,20 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         return operatorLookup[addressPrefix][operator] & bitMask != 0;
     }
 
+    /// @notice Sets the owner of an account within the Ethereum Vault Connector.
+    /// @dev This function updates the owner of an account by updating the ownerLookup mapping with the new owner's
+    /// address.
+    /// @param account The account address for which the owner is being set.
+    /// @param owner The new owner's address to be set for the account.
     function setAccountOwnerInternal(address account, address owner) internal {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         ownerLookup[addressPrefix].owner = owner;
         emit OwnerRegistered(addressPrefix, owner);
     }
 
+    /// @notice Reverts the transaction with a custom error message if provided, otherwise reverts with a generic empty
+    /// error.
+    /// @param errMsg The custom error message to revert the transaction with.
     function revertBytes(bytes memory errMsg) internal pure {
         if (errMsg.length != 0) {
             assembly {

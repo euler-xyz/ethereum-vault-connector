@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 /// @title IEVC
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This interface defines the methods for the Ethereum Vault Connector.
 interface IEVC {
@@ -217,10 +218,11 @@ interface IEVC {
     function enableCollateral(address account, address vault) external payable;
 
     /// @notice Disables a collateral for an account.
-    /// @dev A collateral is a vault for which account’s balances are under the control of the currently enabled
-    /// controller vault. Only the owner or an operator of the account can call this function. Disabling a collateral
-    /// might change the order of collaterals in the array obtained using getCollaterals function. Account status checks
-    /// are performed.
+    /// @dev This function does not preserve the order of collaterals in the array obtained using the getCollaterals
+    /// function; the order may change. A collateral is a vault for which account’s balances are under the control of
+    /// the currently enabled controller vault. Only the owner or an operator of the account can call this function.
+    /// Disabling a collateral might change the order of collaterals in the array obtained using getCollaterals
+    /// function. Account status checks are performed.
     /// @param account The account address for which the collateral is being disabled.
     /// @param vault The address of a collateral being disabled.
     function disableCollateral(address account, address vault) external payable;

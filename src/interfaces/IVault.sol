@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 /// @title IVault
+/// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This interface defines the methods for the Vault for the purpose of integration with the Ethereum Vault
 /// Connector.
@@ -16,6 +17,7 @@ interface IVault {
 
     /// @notice Checks the status of an account.
     /// @param account The address of the account to be checked.
+    /// @param collaterals The array of enabled collateral addresses to be considered for the account status check.
     /// @return magicValue Must return the bytes4 magic value 0xb168c58f (which is a selector of this function) when
     /// account status is valid, or revert otherwise.
     function checkAccountStatus(address account, address[] calldata collaterals) external returns (bytes4 magicValue);

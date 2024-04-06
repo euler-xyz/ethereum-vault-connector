@@ -2,10 +2,12 @@
 
 pragma solidity ^0.8.19;
 
-import "../interfaces/IEthereumVaultConnector.sol";
+import {IEVC} from "../interfaces/IEthereumVaultConnector.sol";
 
 /// @title EVCUtil
-/// @dev This contract is an abstract base contract for interacting with the Ethereum Vault Connector (EVC).
+/// @custom:security-contact security@euler.xyz
+/// @author Euler Labs (https://www.eulerlabs.com/)
+/// @notice This contract is an abstract base contract for interacting with the Ethereum Vault Connector (EVC).
 /// It provides utility functions for authenticating the callers in the context of the EVC, a pattern for enforcing the
 /// contracts to be called through the EVC.
 abstract contract EVCUtil {
