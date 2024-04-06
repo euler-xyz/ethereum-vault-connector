@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.19;
 
-import "./interfaces/IEthereumVaultConnector.sol";
+import {IEVC} from "./interfaces/IEthereumVaultConnector.sol";
 
 /// @title Errors
 /// @custom:security-contact security@euler.xyz

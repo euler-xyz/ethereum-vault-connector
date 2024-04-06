@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.19;
 
-import "./ExecutionContext.sol";
-import "./Set.sol";
+import {ExecutionContext, EC} from "./ExecutionContext.sol";
+import {Set, SetStorage} from "./Set.sol";
 
 /// @title TransientStorage
 /// @custom:security-contact security@euler.xyz

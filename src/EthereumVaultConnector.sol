@@ -2,13 +2,14 @@
 
 pragma solidity ^0.8.19;
 
-import "./Set.sol";
-import "./Events.sol";
-import "./Errors.sol";
-import "./TransientStorage.sol";
-import "./interfaces/IEthereumVaultConnector.sol";
-import "./interfaces/IVault.sol";
-import "./interfaces/IERC1271.sol";
+import {Set, SetStorage} from "./Set.sol";
+import {Events} from "./Events.sol";
+import {Errors} from "./Errors.sol";
+import {ExecutionContext, EC} from "./ExecutionContext.sol";
+import {TransientStorage} from "./TransientStorage.sol";
+import {IEVC} from "./interfaces/IEthereumVaultConnector.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {IERC1271} from "./interfaces/IERC1271.sol";
 
 /// @title EthereumVaultConnector
 /// @custom:security-contact security@euler.xyz
