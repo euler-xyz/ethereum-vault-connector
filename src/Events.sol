@@ -9,6 +9,15 @@ contract Events {
     event OwnerRegistered(bytes19 indexed addressPrefix, address indexed owner);
     event LockdownModeStatus(bytes19 indexed addressPrefix, bool enabled);
     event PermitDisabledModeStatus(bytes19 indexed addressPrefix, bool enabled);
+
+    /// @notice Emitted when the nonce status is updated for a given address prefix and nonce namespace.
+    /// @param addressPrefix The prefix of the address for which the nonce status is updated.
+    /// @param nonceNamespace The namespace of the nonce being updated.
+    /// @param oldNonce The previous nonce value before the update.
+    /// @param newNonce The new nonce value after the update.
+    event NonceStatus(
+        bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 oldNonce, uint256 newNonce
+    );
     event NonceUsed(bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
     event OperatorStatus(bytes19 indexed addressPrefix, address indexed operator, uint256 accountOperatorAuthorized);
     event CollateralStatus(address indexed account, address indexed collateral, bool enabled);
