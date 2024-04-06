@@ -22,6 +22,15 @@ contract Events {
     /// @param enabled True if the permit disabled mode is enabled, false otherwise.
     event PermitDisabledModeStatus(bytes19 indexed addressPrefix, bool enabled);
 
+    /// @notice Emitted when the nonce status is updated for a given address prefix and nonce namespace.
+    /// @param addressPrefix The prefix of the address for which the nonce status is updated.
+    /// @param nonceNamespace The namespace of the nonce being updated.
+    /// @param oldNonce The previous nonce value before the update.
+    /// @param newNonce The new nonce value after the update.
+    event NonceStatus(
+        bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 oldNonce, uint256 newNonce
+    );
+
     /// @notice Emitted when a nonce is used for an address prefix and nonce namespace as part of permit execution.
     /// @param addressPrefix The address prefix for which the nonce is used.
     /// @param nonceNamespace The namespace of the nonce used.

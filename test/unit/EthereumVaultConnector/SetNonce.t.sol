@@ -8,13 +8,15 @@ import "../../evc/EthereumVaultConnectorHarness.sol";
 contract SetNonceTest is Test {
     EthereumVaultConnectorHarness internal evc;
 
-    event NonceUsed(bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 nonce);
+    event NonceStatus(
+        bytes19 indexed addressPrefix, uint256 indexed nonceNamespace, uint256 oldNonce, uint256 newNonce
+    );
 
     function setUp() public {
         evc = new EthereumVaultConnectorHarness();
     }
 
-    function test_SetNonce(address alice, uint256 nonceNamespace, uint256 nonce) public {
+    function test_SetNonce(address alice, uint256 nonceNamespace, uint128 nonce) public {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(nonce > 0);
 
@@ -22,10 +24,16 @@ contract SetNonceTest is Test {
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), 0);
 
         vm.expectEmit(true, true, false, true, address(evc));
-        emit NonceUsed(addressPrefix, nonceNamespace, nonce - 1);
+        emit NonceStatus(addressPrefix, nonceNamespace, 0, nonce);
         vm.prank(alice);
         evc.setNonce(addressPrefix, nonceNamespace, nonce);
         assertEq(evc.getNonce(addressPrefix, nonceNamespace), nonce);
+
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceStatus(addressPrefix, nonceNamespace, nonce, 2 * uint256(nonce));
+        vm.prank(alice);
+        evc.setNonce(addressPrefix, nonceNamespace, 2 * uint256(nonce));
+        assertEq(evc.getNonce(addressPrefix, nonceNamespace), 2 * uint256(nonce));
     }
 
     function test_RevertIfSenderNotOwner_SetNonce(

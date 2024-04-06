@@ -317,17 +317,15 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 nonceNamespace,
         uint256 nonce
     ) public payable virtual onlyOwner(addressPrefix) {
-        if (nonceLookup[addressPrefix][nonceNamespace] >= nonce) {
+        uint256 currentNonce = nonceLookup[addressPrefix][nonceNamespace];
+
+        if (currentNonce >= nonce) {
             revert EVC_InvalidNonce();
         }
 
         nonceLookup[addressPrefix][nonceNamespace] = nonce;
 
-        unchecked {
-            nonce -= 1;
-        }
-
-        emit NonceUsed(addressPrefix, nonceNamespace, nonce);
+        emit NonceStatus(addressPrefix, nonceNamespace, currentNonce, nonce);
     }
 
     /// @inheritdoc IEVC
