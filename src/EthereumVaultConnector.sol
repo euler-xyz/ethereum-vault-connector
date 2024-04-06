@@ -918,7 +918,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     // Permit-related functions
 
-    function isSignerValid(address signer) internal pure returns (bool) {
+    function isSignerValid(address signer) internal pure virtual returns (bool) {
         // not valid if the signer address falls into any of the precompiles/predeploys
         // addresses space (depends on the chain ID).
         // IMPORTANT: revisit this logic when deploying on chains other than the Ethereum mainnet
