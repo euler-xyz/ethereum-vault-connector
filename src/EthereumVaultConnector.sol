@@ -975,7 +975,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @dev It's important to revisit this logic when deploying on chains other than the Ethereum mainnet.
     /// @param signer The address of the signer to validate.
     /// @return bool Returns true if the signer is valid, false otherwise.
-    function isSignerValid(address signer) internal pure returns (bool) {
+    function isSignerValid(address signer) internal pure virtual returns (bool) {
         // not valid if the signer address falls into any of the precompiles/predeploys
         // addresses space (depends on the chain ID).
         return !haveCommonOwnerInternal(signer, address(0));
