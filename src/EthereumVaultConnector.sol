@@ -1125,7 +1125,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @param account The account address to compute the prefix for.
     /// @return The computed address prefix as a bytes19 value.
     function getAddressPrefixInternal(address account) internal pure returns (bytes19) {
-        return bytes19(uint152(uint160(account) >> 8));
+        return bytes19(uint152(uint160(account) >> ACCOUNT_ID_OFFSET));
     }
 
     /// @notice Retrieves the owner of a given account by its address prefix.
