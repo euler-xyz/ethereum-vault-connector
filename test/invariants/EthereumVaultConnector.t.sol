@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
+import "../../src/Set.sol";
 import "../../src/interfaces/IERC1271.sol";
 import "../evc/EthereumVaultConnectorScribble.sol";
 

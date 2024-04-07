@@ -167,8 +167,8 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     }
 
     /// #if_succeeds "must have at most one controller" accountControllers[account].numElements <= 1;
-    function checkAccountStatusInternal(address account) internal override returns (bool isValid, bytes memory data) {
-        return super.checkAccountStatusInternal(account);
+    function requireAccountStatusCheckInternal(address account) internal virtual override {
+        super.requireAccountStatusCheckInternal(account);
     }
 
     /// #if_succeeds "execution context is restored" EC.unwrap(executionContext) == EC.unwrap(contextCache);

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
+import "../../../src/Set.sol";
 import "../../evc/EthereumVaultConnectorHarness.sol";
 
 contract IsAccountStatusCheckDeferredTest is Test {
