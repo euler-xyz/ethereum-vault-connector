@@ -42,7 +42,7 @@ ghost address ghostFirst {
 }
 
 // Store and load hooks to synchronize ghostValues .
-hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) STORAGE {
+hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) {
     mathint index = to_mathint(_index)+1;
     require ghostValues[index] == oldValue;
     require ghostIndexes[oldValue] == index;
@@ -53,28 +53,28 @@ hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value addr
     
 }
 
-hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value STORAGE {
+hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value {
     require ghostIndexes[v] == to_mathint(index+1);
     require ghostValues[index+1] == v;
 }
 
 // Store and load hooks to sync length
-hook Sstore currentContract.setStorage.numElements uint8 newValue (uint8 oldValue) STORAGE {
+hook Sstore currentContract.setStorage.numElements uint8 newValue (uint8 oldValue) {
     // make sure we were mirroring before
     require ghostLength == to_mathint(oldValue);
     ghostLength = to_mathint(newValue);
 }
 
-hook Sload uint8 value currentContract.setStorage.numElements STORAGE {
+hook Sload uint8 value currentContract.setStorage.numElements {
     require ghostLength == to_mathint(value);
 }
 
 // Store and load hooks to sync firstElement
-hook Sstore currentContract.setStorage.firstElement address newValue STORAGE {
+hook Sstore currentContract.setStorage.firstElement address newValue {
     ghostFirst = newValue;
 }
 
-hook Sload address value currentContract.setStorage.firstElement STORAGE {
+hook Sload address value currentContract.setStorage.firstElement {
     require ghostFirst == value;
 }
 

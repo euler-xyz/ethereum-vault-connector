@@ -8,13 +8,14 @@ import "../../src/EthereumVaultConnector.sol";
 contract EVCHarness is EthereumVaultConnector {
     function permitHash(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
         uint256 value,
         bytes calldata data
     ) external view returns (bytes32) {
-        return getPermitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        return getPermitHash(signer, sender, nonceNamespace, nonce, deadline, value, data);
     }
 
     function getIsValidERC1271Signature(
@@ -44,7 +45,7 @@ contract EVCGas is Test {
         uint256 value,
         bytes calldata data
     ) public view {
-        evc.permitHash(signer, nonceNamespace, nonce, deadline, value, data);
+        evc.permitHash(signer, address(this), nonceNamespace, nonce, deadline, value, data);
     }
 
     function testGas_haveCommonOwner(address a, address b) public view {

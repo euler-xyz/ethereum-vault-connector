@@ -33,7 +33,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     }
 
     function getOwnerOf(bytes19 prefix) public view returns (address) {
-        return ownerLookup[prefix];
+        return ownerLookup[prefix].owner;
     }
 
     function checkAccountStatus(address account) public returns (bool) {

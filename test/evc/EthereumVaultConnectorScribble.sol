@@ -75,6 +75,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isControlCollateralInProgress());
     function permit(
         address signer,
+        address sender,
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
@@ -82,7 +83,7 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         bytes calldata data,
         bytes calldata signature
     ) public payable virtual override {
-        super.permit(signer, nonceNamespace, nonce, deadline, value, data, signature);
+        super.permit(signer, sender, nonceNamespace, nonce, deadline, value, data, signature);
     }
 
     /// #if_succeeds "is non-reentrant" !old(executionContext.areChecksInProgress()) && !old(executionContext.isControlCollateralInProgress());

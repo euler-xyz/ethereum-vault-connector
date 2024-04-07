@@ -2,6 +2,10 @@
 
 pragma solidity ^0.8.19;
 
+/// @dev Represents the maximum number of elements that can be stored in the set.
+/// Must not exceed 255 due to the uint8 data type limit.
+uint8 constant SET_MAX_ELEMENTS = 10;
+
 /// @title ElementStorage
 /// @notice This struct is used to store the value and stamp of an element.
 /// @dev The stamp field is used to keep the storage slot non-zero when the element is removed.
@@ -28,19 +32,18 @@ struct SetStorage {
     /// @notice The stamp of the set.
     uint88 stamp;
     /// @notice The array of elements in the set. Stores the elements starting from index 1.
-    ElementStorage[2 ** 8] elements;
+    ElementStorage[SET_MAX_ELEMENTS] elements;
 }
 
 /// @title Set
 /// @custom:security-contact security@euler.xyz
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This library provides functions for managing sets of addresses.
-/// @dev The maximum number of elements in the set is defined by the constant MAX_ELEMENTS.
+/// @dev The maximum number of elements in the set is defined by the constant SET_MAX_ELEMENTS.
 library Set {
     error TooManyElements();
     error InvalidIndex();
 
-    uint8 internal constant MAX_ELEMENTS = 10; // must not exceed 255
     uint8 internal constant EMPTY_ELEMENT_OFFSET = 1; // must be 1
     uint8 internal constant DUMMY_STAMP = 1;
 
@@ -52,7 +55,7 @@ library Set {
     function initialize(SetStorage storage setStorage) internal {
         setStorage.stamp = DUMMY_STAMP;
 
-        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < MAX_ELEMENTS; ++i) {
+        for (uint256 i = EMPTY_ELEMENT_OFFSET; i < SET_MAX_ELEMENTS; ++i) {
             setStorage.elements[i].stamp = DUMMY_STAMP;
         }
     }
@@ -83,7 +86,7 @@ library Set {
             if (setStorage.elements[i].value == element) return false;
         }
 
-        if (numElements == MAX_ELEMENTS) revert TooManyElements();
+        if (numElements == SET_MAX_ELEMENTS) revert TooManyElements();
 
         setStorage.elements[numElements].value = element;
 
@@ -130,19 +133,26 @@ library Set {
 
         // set numElements for every execution path to avoid SSTORE and bit masking when the element removed is
         // firstElement
+        ElementStorage storage lastElement = setStorage.elements[lastIndex];
         if (searchIndex != lastIndex) {
             if (searchIndex == 0) {
-                setStorage.firstElement = setStorage.elements[lastIndex].value;
+                setStorage.firstElement = lastElement.value;
                 setStorage.numElements = uint8(lastIndex);
+                setStorage.stamp = DUMMY_STAMP;
             } else {
-                setStorage.elements[searchIndex].value = setStorage.elements[lastIndex].value;
+                setStorage.elements[searchIndex].value = lastElement.value;
+
+                setStorage.firstElement = firstElement;
                 setStorage.numElements = uint8(lastIndex);
+                setStorage.stamp = DUMMY_STAMP;
             }
         } else {
+            setStorage.firstElement = firstElement;
             setStorage.numElements = uint8(lastIndex);
+            setStorage.stamp = DUMMY_STAMP;
         }
 
-        setStorage.elements[lastIndex].value = address(0);
+        lastElement.value = address(0);
 
         return true;
     }

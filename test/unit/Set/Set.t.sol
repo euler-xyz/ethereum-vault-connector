@@ -51,7 +51,7 @@ contract SetTest is Test {
 
         // count added elements not to exceed the limit
         uint256 expectedNumElements;
-        for (uint256 i = 0; i < elements.length && expectedNumElements < Set.MAX_ELEMENTS; ++i) {
+        for (uint256 i = 0; i < elements.length && expectedNumElements < SET_MAX_ELEMENTS; ++i) {
             if (setStorage.insert(elements[i])) ++expectedNumElements;
         }
 
@@ -109,7 +109,7 @@ contract SetTest is Test {
         seed = bound(seed, 101, type(uint256).max);
         delete setStorage;
 
-        for (uint256 i = 0; i < Set.MAX_ELEMENTS; ++i) {
+        for (uint256 i = 0; i < SET_MAX_ELEMENTS; ++i) {
             assertEq(setStorage.insert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, i))))))), true);
         }
 
@@ -152,7 +152,7 @@ contract SetTest is Test {
     }
 
     function test_ContainsMaxElements_Insert() public {
-        for (uint256 i = 0; i < Set.MAX_ELEMENTS; i++) {
+        for (uint256 i = 0; i < SET_MAX_ELEMENTS; i++) {
             address e = address(uint160(uint256(i)));
             address eNext = address(uint160(uint256(i + 1)));
             assertTrue(setStorage.insert(e));
@@ -160,11 +160,11 @@ contract SetTest is Test {
             assertFalse(setStorage.contains(eNext));
         }
 
-        assertEq(setStorage.numElements, Set.MAX_ELEMENTS);
+        assertEq(setStorage.numElements, SET_MAX_ELEMENTS);
     }
 
     function test_Reorder(uint8 numberOfElements, address firstElement, uint8 index1, uint8 index2) public {
-        numberOfElements = uint8(bound(numberOfElements, 2, Set.MAX_ELEMENTS));
+        numberOfElements = uint8(bound(numberOfElements, 2, SET_MAX_ELEMENTS));
         index1 = uint8(bound(index1, 0, numberOfElements - 2));
         index2 = uint8(bound(index2, index1 + 1, numberOfElements - 1));
 
@@ -193,7 +193,7 @@ contract SetTest is Test {
         uint8 index1,
         uint8 index2
     ) public {
-        numberOfElements = uint8(bound(numberOfElements, 2, Set.MAX_ELEMENTS));
+        numberOfElements = uint8(bound(numberOfElements, 2, SET_MAX_ELEMENTS));
 
         for (uint8 i = 0; i < numberOfElements; ++i) {
             setStorage.insert(address(uint160(uint256(keccak256(abi.encode(i, firstElement))))));
@@ -259,7 +259,7 @@ contract SetTest is Test {
     }
 
     function test_ForEachAndClear(uint8 numberOfElements, address firstElement) public {
-        numberOfElements = uint8(bound(numberOfElements, 2, Set.MAX_ELEMENTS));
+        numberOfElements = uint8(bound(numberOfElements, 2, SET_MAX_ELEMENTS));
 
         for (uint8 i = 0; i < numberOfElements; ++i) {
             address element = address(uint160(uint256(keccak256(abi.encode(i, firstElement)))));
@@ -273,13 +273,13 @@ contract SetTest is Test {
         assertEq(setStorage.numElements, 0);
         assertEq(setStorage.firstElement, address(0));
 
-        for (uint8 i = 0; i < Set.MAX_ELEMENTS; ++i) {
+        for (uint8 i = 0; i < SET_MAX_ELEMENTS; ++i) {
             assertEq(setStorage.elements[i].value, address(0));
         }
     }
 
     function test_ForEachAndClearWithResult(uint8 numberOfElements, address firstElement) public {
-        numberOfElements = uint8(bound(numberOfElements, 2, Set.MAX_ELEMENTS));
+        numberOfElements = uint8(bound(numberOfElements, 2, SET_MAX_ELEMENTS));
 
         for (uint8 i = 0; i < numberOfElements; ++i) {
             address element = address(uint160(uint256(keccak256(abi.encode(i, firstElement)))));
@@ -294,7 +294,7 @@ contract SetTest is Test {
         assertEq(setStorage.numElements, 0);
         assertEq(setStorage.firstElement, address(0));
 
-        for (uint8 i = 0; i < Set.MAX_ELEMENTS; ++i) {
+        for (uint8 i = 0; i < SET_MAX_ELEMENTS; ++i) {
             assertEq(setStorage.elements[i].value, address(0));
         }
 
