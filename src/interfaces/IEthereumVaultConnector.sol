@@ -179,8 +179,8 @@ interface IEVC {
     /// @dev This function can only be called by the owner of the address prefix. Each bit in the bit field corresponds
     /// to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being set.
-    /// @param operator The address of the operator for which the bit field is being set. Cannot be the EVC address,
-    /// zero address, or an address belonging to the same address prefix.
+    /// @param operator The address of the operator for which the bit field is being set. Can neither be the EVC address
+    /// nor an address belonging to the same address prefix.
     /// @param operatorBitField The new bit field for the given address prefix and operator. Reverts if the provided
     /// value is equal to the currently stored value.
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) external payable;
@@ -190,8 +190,8 @@ interface IEVC {
     /// can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can
     /// only deauthorize itself.
     /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being installed or uninstalled. Can neither be zero address,
-    /// nor EVC, nor an address belonging to the same owner as the account.
+    /// @param operator The address of the operator that is being installed or uninstalled. Can neither be the EVC
+    /// address nor an address belonging to the same owner as the account.
     /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
     /// Reverts if the provided value is equal to the currently stored value.
     function setAccountOperator(address account, address operator, bool authorized) external payable;
