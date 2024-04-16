@@ -59,8 +59,9 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        setAccountOwnerInternal(account, account);
-        operatorLookup[getAddressPrefixInternal(account)][msg.sender] = type(uint256).max;
+        bytes19 addressPrefix = getAddressPrefixInternal(account);
+        ownerLookup[addressPrefix].owner = account;
+        operatorLookup[addressPrefix][msg.sender] = type(uint256).max;
         vm.etch(vault, vaultMock.code);
     }
 
@@ -77,8 +78,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     function setNonce(bytes19 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
         if (msg.sender == address(this)) return;
         if (nonceLookup[addressPrefix][nonceNamespace] == type(uint256).max) return;
-        addressPrefix = getAddressPrefixInternal(msg.sender);
-        setAccountOwnerInternal(address(uint160(uint152(addressPrefix)) << 8), msg.sender);
+        ownerLookup[addressPrefix].owner = msg.sender;
         nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
         super.setNonce(addressPrefix, nonceNamespace, nonce);
     }
@@ -89,7 +89,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         if (operatorLookup[addressPrefix][operator] == operatorBitField) return;
         addressPrefix = getAddressPrefixInternal(msg.sender);
-        setAccountOwnerInternal(address(uint160(uint152(addressPrefix)) << 8), msg.sender);
+        ownerLookup[addressPrefix].owner = msg.sender;
         super.setOperator(addressPrefix, operator, operatorBitField);
     }
 
@@ -100,7 +100,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         if (isAccountOperatorAuthorizedInternal(account, operator) == authorized) return;
         account = msg.sender;
-        setAccountOwnerInternal(account, msg.sender);
+        ownerLookup[getAddressPrefixInternal(account)].owner = msg.sender;
         super.setAccountOperator(account, operator, authorized);
     }
 
@@ -136,7 +136,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
             return;
         }
 
-        setAccountOwnerInternal(account, msg.sender);
+        ownerLookup[getAddressPrefixInternal(account)].owner = msg.sender;
         super.reorderCollaterals(account, index1, index2);
     }
 

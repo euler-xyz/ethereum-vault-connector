@@ -770,7 +770,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
-                setAccountOwnerInternal(account, msgSender);
+                ownerLookup[addressPrefix].owner = msgSender;
+                emit OwnerRegistered(addressPrefix, msgSender);
                 return msgSender;
             } else if (owner == msgSender) {
                 return msgSender;
@@ -1161,17 +1162,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
 
         return operatorLookup[addressPrefix][operator] & bitMask != 0;
-    }
-
-    /// @notice Sets the owner of an account within the Ethereum Vault Connector.
-    /// @dev This function updates the owner of an account by updating the ownerLookup mapping with the new owner's
-    /// address.
-    /// @param account The account address for which the owner is being set.
-    /// @param owner The new owner's address to be set for the account.
-    function setAccountOwnerInternal(address account, address owner) internal {
-        bytes19 addressPrefix = getAddressPrefixInternal(account);
-        ownerLookup[addressPrefix].owner = owner;
-        emit OwnerRegistered(addressPrefix, owner);
     }
 
     /// @notice Reverts the transaction with a custom error message if provided, otherwise reverts with a generic empty
