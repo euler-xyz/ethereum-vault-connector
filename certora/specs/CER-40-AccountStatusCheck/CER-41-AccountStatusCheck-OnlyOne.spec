@@ -11,7 +11,5 @@ rule account_status_only_one_controller {
     address account;
     require numOfController(account) > 1;
     bool isValid = checkAccountStatus@withrevert(account);
-    // Note: writing the rule as follows is actually a counterexample. checkAccountStatus reverts rather than returning false in this case.
-    // assert !isValid;
-    assert lastReverted;
+    assert !isValid;
 }
