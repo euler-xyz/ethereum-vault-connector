@@ -34,6 +34,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 * [Security Considerations](#security-considerations)
     * [Lockdown Mode](#lockdown-mode)
     * [Permit Disabled Mode](#permit-disabled-mode)
+    * [Denial of Service](#denial-of-service)
     * [Authentication by Vaults](#authentication-by-vaults)
     * [EVC Contract Privileges](#evc-contract-privileges)
     * [Read-only Re-entrancy](#read-only-re-entrancy)
@@ -86,6 +87,8 @@ Within the `checkAccountStatus` callback, vaults should inspect the provided lis
 Vaults have the freedom to price all the assets according to their preference (both liability and accepted collaterals), without depending on potentially untrustworthy oracles.
 
 While it might be tempting for the controller to allow a broad range of collateral vaults to encourage borrowing, the controller vault creators must exercise caution when deciding which vaults to accept as collateral. A malicious or incorrectly coded vault could, among other things, misrepresent the amount of assets it holds, reject liquidations when a user is in violation, or fail to require account status checks when necessary. Therefore, vaults should limit allowed collaterals to a set of audited addresses known to be reliable, or verify the addresses in a registry or factory contract to ensure they were created by trustworthy, audited contracts.
+
+One of areas of concern when selecting suitable collateral vaults for a controller involves evaluating potential differences in collateral behavior depending on the state of the EVC execution context flags, such as [`controlCollateralInProgress`](#controlcollateralinprogress) and [others](#extra-information). While the flags exposed by the EVC can potentially be misused by collateral contracts, leading to unintended consequences in the system, they also offer an opportunity to enhance system stability when used appropriately.
 
 ### Execution Flow
 
@@ -291,6 +294,9 @@ Simulations work by actually performing the requested operations but then revert
 * Although internally simulations work by reverting, the recommended interface returns it as regular return data, which causes fewer compatibility problems (sometimes error data is mangled or dropped). This is the reason for `batchRevert`: You can't do a "try/catch" without an external call, so this must be an external function, although we recommend using the `batchSimulation` entry point instead.
 * Simulations don't have the side-effect of making regular batches create large return-data (which would be gas inefficient)
 
+While in simulation, the EVC sets the execution context `simulationInProgress` flag that can be observed by external smart contracts. While the introduction of this flag was meant to increase the UX, it must be noted that malicious vaults or external systems could use this information to act differently during simulation mode, i.e. they can trick the user into thinking that the vault/external system is not malicious. 
+
+As with any other EVC feature, users should only use the EVC simulation with trusted and recognized smart contracts that do not aim to trick or harm them in any way. Considering the EVC simulation features are mostly meant to be used by the UI applications, this is the natural place where user protection should be applied. Simulations should not be used as a security measure to determine the effects of a batch if the systems with which the batch interacts are untrusted. If the user aims to faithfully evaluate the outcome of the simulation to assess the security of the to be executed transaction, they should resort to other methods and available commercial solutions.
 
 ## Transient Storage
 
@@ -308,6 +314,10 @@ To improve user security, the EVC introduces the `LOCKDOWN MODE`. This mode, whi
 ### Permit Disabled Mode
 
 Another feature to improve user security is the `PERMIT DISABLED MODE`. This mode, which can only be activated by the owner, applies to all their accounts simultaneously. Once activated, the EVC no longer allows executing permits that were signed by the owner which activated this mode. This mode is particularly useful in emergency situations, such as when a harmful permit message has been signed, necessitating immediate action to safeguard the user's assets.
+
+### Denial of Service
+
+The EVC has been designed to function as a glorified multi-call contract allowing users to execute calls into any other addresses, including contracts containing malicious code. As with any other system of such a type, it is the user's responsibility to carefully select contracts they interact with. If not careful, malicious and non-compatible contracts can cause denial of service attacks, i.e. by requesting an account or vault status check for the account or vault for which the check fails. Arbitrary non malicious code can also introduce EVC failures by including a number of vault or account status checks that exceeds the maximum of 10 (`SET_MAX_ELEMENTS`). This behavior should never pose a greater security threat to the system as a whole and with user’s care, can easily be avoided.
 
 ### Authentication by Vaults
 
@@ -327,6 +337,8 @@ Because the EVC contract can be made to invoke any arbitrary target contract wit
 The only exception to this is mid-transaction inside of a batch. If one batch item temporarily moves value or tokens into the EVC, but a subsequent batch item moves it out, then as long as no untrusted code runs in between, it is safe. However, moving tokens to the EVC is often unnecessary because tokens can be moved immediately to their final destination with `transferFrom` and by setting various `recipient` parameters in contracts.
 
 One exception to this is wrapping ETH into WETH. The deposit method will always credit the caller with the WETH tokens. In this case, the user must transfer the WETH in a subsequent batch item (ideally the batch item immediately after the deposit using `call` function).
+
+It is important to note that calls and batch items in the EVC can transfer the entire value balance of the EVC by setting the value input parameter to `type(uint256).max`. This can carry unintended consequences when calls are nested, even in the presence of trusted contracts only. Consider a scenario where a user performs a batch call with three actions: A, B, and C. A withdraws some value into the EVC, B performs some arbitrary operation on trusted vaults, and C deposits the value somewhere, using `type(uint256).max` as the input parameter. If B performs an action on the EVC that uses its value balance, then C would fail to deposit the expected amount received in A, but the failure will in general not result in a revert. This can be problematic if B triggers malicious code, but it can also fail when the action performed by B is correct but also performs an EVC call with `type(uint256).max` value, unintentionally using the whole value amount from A. The problem is not present when using a specified value in C, because the C action would cause a revert. Therefore, the use of `type(uint256).max` as value is safe only when no intermediate action exists that transfers value to the EVC.
 
 One area where the untrustable EVC address may cause problems is tokens that implement hooks/callbacks, such as ERC-777 tokens. In this case, somebody could install a hook for the EVC as a recipient, and cause inbound transfers to fail, or possibly even be redirected. The EVC doesn't attempt to solve this issue and care should be taken when interacting with contracts which implement hooks/callbacks.
 

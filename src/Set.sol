@@ -233,12 +233,13 @@ library Set {
 
         setStorage.numElements = 0;
         setStorage.firstElement = address(0);
+        setStorage.stamp = DUMMY_STAMP;
 
         callback(firstElement);
 
         for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             address element = setStorage.elements[i].value;
-            setStorage.elements[i].value = address(0);
+            setStorage.elements[i] = ElementStorage({value: address(0), stamp: DUMMY_STAMP});
 
             callback(element);
         }
@@ -264,13 +265,14 @@ library Set {
 
         setStorage.numElements = 0;
         setStorage.firstElement = address(0);
+        setStorage.stamp = DUMMY_STAMP;
 
         (bool success, bytes memory result) = callback(firstElement);
         results[0] = abi.encode(firstElement, success, result);
 
         for (uint256 i = EMPTY_ELEMENT_OFFSET; i < numElements; ++i) {
             address element = setStorage.elements[i].value;
-            setStorage.elements[i].value = address(0);
+            setStorage.elements[i] = ElementStorage({value: address(0), stamp: DUMMY_STAMP});
 
             (success, result) = callback(element);
             results[i] = abi.encode(element, success, result);

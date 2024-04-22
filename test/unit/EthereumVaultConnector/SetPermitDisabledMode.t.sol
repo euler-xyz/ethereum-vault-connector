@@ -72,12 +72,12 @@ contract SetPermitDisabledModeTest is Test {
     }
 
     function test_Integration_SetPermitDisabledMode(address alice, address vault, address operator) public {
-        vm.assume(alice != address(0) && alice != address(evc) && !evc.haveCommonOwner(alice, operator));
+        vm.assume(alice != address(0) && !evc.haveCommonOwner(alice, operator) && alice.code.length == 0);
         vm.assume(
-            vault != address(0) && vault != address(evc) && vault != address(this) && vault != alice
-                && vault != operator
+            vault != address(0) && vault != alice && vault != operator && vault.code.length == 0
+                && vault != 0xF62849F9A0B5Bf2913b396098F7c7019b51A820a
         );
-        vm.assume(operator != address(0) && operator != address(evc));
+        vm.assume(operator != address(0) && operator.code.length == 0);
 
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
 
