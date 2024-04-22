@@ -214,7 +214,7 @@ interface IEVC {
     /// @notice Enables a collateral for an account.
     /// @dev A collaterals is a vault for which account's balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. Unless it's a duplicate,
-    /// the collateral is added to the end of the array. There can be at most 10 unique collaterals enabled at the time.
+    /// the collateral is added to the end of the array. There can be at most 10 unique collaterals enabled at a time.
     /// Account status checks are performed.
     /// @param account The account address for which the collateral is being enabled.
     /// @param vault The address being enabled as a collateral.
@@ -262,7 +262,7 @@ interface IEVC {
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s
     /// balances in the enabled collaterals vaults. Only the owner or an operator of the account can call this function.
     /// Unless it's a duplicate, the controller is added to the end of the array. Transiently, there can be at most 10
-    /// unique controllers enabled at the time, but at most one can be enabled after the outermost checks-deferrable
+    /// unique controllers enabled at a time, but at most one can be enabled after the outermost checks-deferrable
     /// call concludes. Account status checks are performed.
     /// @param account The address for which the controller is being enabled.
     /// @param vault The address of the controller being enabled.
@@ -384,7 +384,7 @@ interface IEVC {
 
     /// @notice Checks the status of an account and reverts if it is not valid.
     /// @dev If checks deferred, the account is added to the set of accounts to be checked at the end of the outermost
-    /// checks-deferrable call. There can be at most 10 unique accounts added to the set at the time. Account status
+    /// checks-deferrable call. There can be at most 10 unique accounts added to the set at a time. Account status
     /// check is performed by calling into the selected controller vault and passing the array of currently enabled
     /// collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
@@ -405,7 +405,7 @@ interface IEVC {
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
     /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the outermost
-    /// checks-deferrable call. There can be at most 10 unique vaults added to the set at the time. This function can
+    /// checks-deferrable call. There can be at most 10 unique vaults added to the set at a time. This function can
     /// only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
 
