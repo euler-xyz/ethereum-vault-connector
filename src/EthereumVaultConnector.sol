@@ -764,31 +764,36 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         address owner = ownerLookup[addressPrefix].owner;
         bool lockdownMode = ownerLookup[addressPrefix].isLockdownMode;
-
-        if (checkLockdownMode && lockdownMode) {
-            revert EVC_LockdownMode();
-        }
-
         address msgSender = _msgSender();
+        bool authenticated = false;
 
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
                 setAccountOwnerInternal(account, msgSender);
-                return msgSender;
+                authenticated = true;
             } else if (owner == msgSender) {
-                return msgSender;
+                authenticated = true;
             }
         }
 
         // if the caller is not the owner, check if it is an operator if operators are allowed
-        if (allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
-            return msgSender;
+        if (!authenticated && allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
+            authenticated = true;
         }
 
         // must revert if neither the owner nor the operator were authenticated
-        revert EVC_NotAuthorized();
+        if (!authenticated) {
+            revert EVC_NotAuthorized();
+        }
+
+        // revert if the account is in lockdown mode unless the lockdown mode is not being checked
+        if (checkLockdownMode && lockdownMode) {
+            revert EVC_LockdownMode();
+        }
+
+        return msgSender;
     }
 
     /// @notice Internal function to make a call to a target contract with a specific context.
