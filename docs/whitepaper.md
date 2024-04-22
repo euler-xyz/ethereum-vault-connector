@@ -87,6 +87,8 @@ Vaults have the freedom to price all the assets according to their preference (b
 
 While it might be tempting for the controller to allow a broad range of collateral vaults to encourage borrowing, the controller vault creators must exercise caution when deciding which vaults to accept as collateral. A malicious or incorrectly coded vault could, among other things, misrepresent the amount of assets it holds, reject liquidations when a user is in violation, or fail to require account status checks when necessary. Therefore, vaults should limit allowed collaterals to a set of audited addresses known to be reliable, or verify the addresses in a registry or factory contract to ensure they were created by trustworthy, audited contracts.
 
+One of areas of concern when selecting suitable collateral vaults for a controller involves evaluating potential differences in collateral behavior depending on the state of the EVC execution context flags, such as [`controlCollateralInProgress`](#controlcollateralinprogress) and [others](#extra-information). While the flags exposed by the EVC can potentially be misused by collateral contracts, leading to unintended consequences in the system, they also offer an opportunity to enhance system stability when used appropriately.
+
 ### Execution Flow
 
 Although the vaults themselves implement `checkAccountStatus`, there is no need for them to invoke this function directly. It will be called by the EVC when necessary. Instead, after performing any operation that could affect an account's liquidity, a vault should invoke `requireAccountStatusCheck` on the EVC to schedule a future callback. Additionally, operations that can affect the liquidity of a *separate* account will need their own `requireAccountStatusCheck` calls.
