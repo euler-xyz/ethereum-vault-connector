@@ -269,6 +269,7 @@ contract PermitTest is Test {
         address msgSender = sender == address(0) ? address(uint160(uint256(keccak256(abi.encode(alice))))) : sender;
         data = abi.encode(keccak256(data));
 
+        vm.assume(msgSender != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, address(0)));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
