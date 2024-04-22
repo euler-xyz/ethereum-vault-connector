@@ -286,8 +286,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function setLockdownMode(bytes19 addressPrefix, bool enabled) public payable virtual onlyOwner(addressPrefix) {
         if (ownerLookup[addressPrefix].isLockdownMode != enabled) {
             // to increase user security, it is prohibited to disable this mode within the self-call of the permit
-            // function or within a checks-deferrable call. to disable this mode a direct call to the EVC must
-            // be made
+            // function or within a checks-deferrable call. to disable this mode, the setLockdownMode function must be
+            // called directly
             if (!enabled && (executionContext.areChecksDeferred() || inPermitSelfCall())) {
                 revert EVC_NotAuthorized();
             }
@@ -304,8 +304,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     ) public payable virtual onlyOwner(addressPrefix) {
         if (ownerLookup[addressPrefix].isPermitDisabledMode != enabled) {
             // to increase user security, it is prohibited to disable this mode within the self-call of the permit
-            // function (by definition) or within a checks-deferrable call. to disable this mode a direct call to
-            // the EVC must be made
+            // function (verified in the permit function) or within a checks-deferrable call. to disable this mode the
+            // setPermitDisabledMode function must be called directly
             if (!enabled && executionContext.areChecksDeferred()) {
                 revert EVC_NotAuthorized();
             }
