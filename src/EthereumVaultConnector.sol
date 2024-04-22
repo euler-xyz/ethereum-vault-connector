@@ -113,10 +113,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// will be) as an owner in the ownerLookup.
     /// @param addressPrefix The address prefix for which it is checked whether the caller is the owner.
     modifier onlyOwner(bytes19 addressPrefix) {
-        // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
-        // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
-        authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
+        authenticateCaller({addressPrefix: addressPrefix, allowOperator: false, checkLockdownMode: false});
 
         _;
     }
@@ -336,11 +333,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @dev Uses authenticateCaller() function instead of onlyOwner() modifier to authenticate and get the caller
     /// address at once.
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) public payable virtual {
-        // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
-        // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
         address msgSender =
-            authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
+            authenticateCaller({addressPrefix: addressPrefix, allowOperator: false, checkLockdownMode: false});
 
         // the operator can neither be the EVC nor can be one of 256 accounts of the owner
         if (operator == address(this) || haveCommonOwnerInternal(msgSender, operator)) {
@@ -794,6 +788,27 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
 
         return msgSender;
+    }
+
+    /// @notice Authenticates the caller of a function.
+    /// @dev This function converts a bytes19 address prefix into a phantom account address which is an account address
+    /// that belongs to the owner of the address prefix.
+    /// @param addressPrefix The bytes19 address prefix to authenticate the caller against.
+    /// @param allowOperator A boolean indicating if operators are allowed to authenticate as the caller.
+    /// @param checkLockdownMode A boolean indicating if the function should check for lockdown mode on the account.
+    /// @return The address of the authenticated caller.
+    function authenticateCaller(
+        bytes19 addressPrefix,
+        bool allowOperator,
+        bool checkLockdownMode
+    ) internal virtual returns (address) {
+        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
+
+        return authenticateCaller({
+            account: phantomAccount,
+            allowOperator: allowOperator,
+            checkLockdownMode: checkLockdownMode
+        });
     }
 
     /// @notice Internal function to make a call to a target contract with a specific context.
