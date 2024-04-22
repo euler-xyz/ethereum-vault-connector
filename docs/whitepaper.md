@@ -294,6 +294,9 @@ Simulations work by actually performing the requested operations but then revert
 * Although internally simulations work by reverting, the recommended interface returns it as regular return data, which causes fewer compatibility problems (sometimes error data is mangled or dropped). This is the reason for `batchRevert`: You can't do a "try/catch" without an external call, so this must be an external function, although we recommend using the `batchSimulation` entry point instead.
 * Simulations don't have the side-effect of making regular batches create large return-data (which would be gas inefficient)
 
+While in simulation, the EVC sets the execution context `simulationInProgress` flag that can be observed by external smart contracts. While the introduction of this flag was meant to increase the UX, it must be noted that malicious vaults or external systems could use this information to act differently during simulation mode, i.e. they can trick the user into thinking that the vault/external system is not malicious. 
+
+As with any other EVC feature, users should only use the EVC simulation with trusted and recognized smart contracts that do not aim to trick or harm them in any way. Considering the EVC simulation features are mostly meant to be used by the UI applications, this is the natural place where user protection should be applied. Simulations should not be used as a security measure to determine the effects of a batch if the systems with which the batch interacts are untrusted. If the user aims to faithfully evaluate the outcome of the simulation to assess the security of the to be executed transaction, they should resort to other methods and available commercial solutions.
 
 ## Transient Storage
 
