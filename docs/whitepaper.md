@@ -34,6 +34,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
 * [Security Considerations](#security-considerations)
     * [Lockdown Mode](#lockdown-mode)
     * [Permit Disabled Mode](#permit-disabled-mode)
+    * [Denial of Service](#denial-of-service)
     * [Authentication by Vaults](#authentication-by-vaults)
     * [EVC Contract Privileges](#evc-contract-privileges)
     * [Read-only Re-entrancy](#read-only-re-entrancy)
@@ -310,6 +311,10 @@ To improve user security, the EVC introduces the `LOCKDOWN MODE`. This mode, whi
 ### Permit Disabled Mode
 
 Another feature to improve user security is the `PERMIT DISABLED MODE`. This mode, which can only be activated by the owner, applies to all their accounts simultaneously. Once activated, the EVC no longer allows executing permits that were signed by the owner which activated this mode. This mode is particularly useful in emergency situations, such as when a harmful permit message has been signed, necessitating immediate action to safeguard the user's assets.
+
+### Denial of Service
+
+The EVC has been designed to function as a glorified multi-call contract allowing users to execute calls into any other addresses, including contracts containing malicious code. As with any other system of such a type, it is the user's responsibility to carefully select contracts they interact with. If not careful, malicious and non-compatible contracts can cause denial of service attacks, i.e. by requesting an account or vault status check for the account or vault for which the check fails. Arbitrary non malicious code can also introduce EVC failures by including a number of vault or account status checks that exceeds the maximum of 10 (`SET_MAX_ELEMENTS`). This behavior should never pose a greater security threat to the system as a whole and with user’s care, can easily be avoided.
 
 ### Authentication by Vaults
 
