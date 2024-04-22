@@ -685,11 +685,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function requireAccountStatusCheck(address account) public payable virtual nonReentrantChecks {
+    function requireAccountStatusCheck(address account) public payable virtual {
         if (executionContext.areChecksDeferred()) {
             accountStatusChecks.insert(account);
         } else {
-            requireAccountStatusCheckInternal(account);
+            requireAccountStatusCheckInternalNonReentrantChecks(account);
         }
     }
 
@@ -716,11 +716,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function requireVaultStatusCheck() public payable virtual nonReentrantChecks {
+    function requireVaultStatusCheck() public payable virtual {
         if (executionContext.areChecksDeferred()) {
             vaultStatusChecks.insert(msg.sender);
         } else {
-            requireVaultStatusCheckInternal(msg.sender);
+            requireVaultStatusCheckInternalNonReentrantChecks(msg.sender);
         }
     }
 
@@ -730,13 +730,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function requireAccountAndVaultStatusCheck(address account) public payable virtual nonReentrantChecks {
+    function requireAccountAndVaultStatusCheck(address account) public payable virtual {
         if (executionContext.areChecksDeferred()) {
             accountStatusChecks.insert(account);
             vaultStatusChecks.insert(msg.sender);
         } else {
-            requireAccountStatusCheckInternal(account);
-            requireVaultStatusCheckInternal(msg.sender);
+            requireAccountStatusCheckInternalNonReentrantChecks(account);
+            requireVaultStatusCheckInternalNonReentrantChecks(msg.sender);
         }
     }
 
@@ -920,6 +920,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
+    function requireAccountStatusCheckInternalNonReentrantChecks(address account) internal virtual nonReentrantChecks {
+        requireAccountStatusCheckInternal(account);
+    }
+
     /// @notice Checks the status of a vault internally.
     /// @dev This function makes an external call to the vault to check its status.
     /// @param vault The address of the vault to check the status for.
@@ -941,6 +945,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (!isValid) {
             revertBytes(result);
         }
+    }
+
+    function requireVaultStatusCheckInternalNonReentrantChecks(address vault) internal virtual nonReentrantChecks {
+        requireVaultStatusCheckInternal(vault);
     }
 
     /// @notice Checks the status of all entities in a set, either accounts or vaults, and clears the checks.
