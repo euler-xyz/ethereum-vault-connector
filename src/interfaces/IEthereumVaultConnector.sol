@@ -161,7 +161,7 @@ interface IEVC {
     /// disable  the permit functionality, one must pass true as the second argument. To enable the permit
     /// functionality, one must pass false as the second argument.
     /// @param addressPrefix The address prefix for which the permit functionality is being set.
-    /// @param enabled A boolean indicating whether to enable or disable permit functionality.
+    /// @param enabled A boolean indicating whether to enable or disable the disable-permit mode.
     function setPermitDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
