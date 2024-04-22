@@ -661,12 +661,17 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         if (success) {
             revert EVC_BatchPanic();
-        } else if (bytes4(result) != EVC_RevertedBatchResult.selector) {
+        } else if (result.length < 4 || bytes4(result) != EVC_RevertedBatchResult.selector) {
             revertBytes(result);
         }
 
         assembly {
+            let length := mload(result)
+            // skip 4-byte EVC_RevertedBatchResult selector
             result := add(result, 4)
+            // write new array length = original length - 4-byte selector
+            // cannot underflow as we require result.length >= 4 above
+            mstore(result, sub(length, 4))
         }
 
         (batchItemsResult, accountsStatusCheckResult, vaultsStatusCheckResult) =
