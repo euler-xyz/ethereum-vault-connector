@@ -63,6 +63,12 @@ contract EVCUtilTest is Test {
         evcClient = new EVCClient(address(evc));
     }
 
+    function test_EVC(address _evc) external {
+        vm.assume(_evc != address(0));
+        EVCClient client = new EVCClient(address(_evc));
+        assertEq(client.EVC(), address(_evc));
+    }
+
     function test_EVCUtilConstructor() external {
         vm.expectRevert(EVCUtil.EVC_InvalidAddress.selector);
         new EVCClient(address(0));
