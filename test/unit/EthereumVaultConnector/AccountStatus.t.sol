@@ -18,18 +18,24 @@ contract AccountStatusTest is Test {
     function test_RequireAccountStatusCheck(
         uint8 numberOfAccounts,
         bytes memory seed,
+        uint40 timestamp,
         bool allStatusesValid
     ) external {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
+        vm.assume(timestamp > 0);
 
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             address controller = address(new Vault(evc));
 
+            vm.warp(0);
+
             vm.prank(account);
             evc.enableController(account, controller);
             Vault(controller).clearChecks();
             evc.clearExpectedChecks();
+
+            vm.warp(timestamp);
 
             // check all the options: account state is ok, account state is violated with
             // controller returning false and reverting
@@ -47,15 +53,26 @@ contract AccountStatusTest is Test {
             }
 
             evc.requireAccountStatusCheck(account);
-
             evc.verifyAccountStatusChecks();
+
+            if (allStatusesValid || uint160(account) % 3 == 0) {
+                assertTrue(evc.getLastAccountStatusCheckTimestamp(account) == block.timestamp);
+            } else {
+                assertFalse(evc.getLastAccountStatusCheckTimestamp(account) == block.timestamp);
+            }
+
             Vault(controller).clearChecks();
             evc.clearExpectedChecks();
         }
     }
 
-    function test_WhenDeferred_RequireAccountStatusCheck(uint8 numberOfAccounts, bytes memory seed) external {
+    function test_WhenDeferred_RequireAccountStatusCheck(
+        uint8 numberOfAccounts,
+        bytes memory seed,
+        uint40 timestamp
+    ) external {
         vm.assume(numberOfAccounts > 0 && numberOfAccounts <= SET_MAX_ELEMENTS);
+        vm.assume(timestamp > 0);
 
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             evc.setChecksDeferred(false);
@@ -63,9 +80,13 @@ contract AccountStatusTest is Test {
             address account = address(uint160(uint256(keccak256(abi.encode(i, seed)))));
             address controller = address(new Vault(evc));
 
+            vm.warp(0);
+
             vm.prank(account);
             evc.enableController(account, controller);
             Vault(controller).setAccountStatusState(1);
+
+            vm.warp(timestamp);
 
             // account status check will be scheduled for later due to deferred state
             evc.setChecksDeferred(true);
@@ -76,6 +97,7 @@ contract AccountStatusTest is Test {
             assertFalse(evc.isAccountStatusCheckDeferred(account));
             evc.requireAccountStatusCheck(account);
             assertTrue(evc.isAccountStatusCheckDeferred(account));
+            assertTrue(evc.getLastAccountStatusCheckTimestamp(account) == 0);
             evc.reset();
         }
     }
@@ -86,8 +108,12 @@ contract AccountStatusTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
         evc.requireAccountStatusCheck(account);
 
+        vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
+        evc.getLastAccountStatusCheckTimestamp(account);
+
         evc.setChecksInProgress(false);
         evc.requireAccountStatusCheck(account);
+        evc.getLastAccountStatusCheckTimestamp(account);
     }
 
     function test_AcquireChecksLock_RequireAccountStatusChecks(uint8 numberOfAccounts, bytes memory seed) external {

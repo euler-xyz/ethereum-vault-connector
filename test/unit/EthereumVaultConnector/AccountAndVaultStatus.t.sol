@@ -19,9 +19,11 @@ contract AccountAndVaultStatusTest is Test {
     function test_RequireAccountAndVaultStatusCheck(
         uint8 numberOfAddresses,
         bytes memory seed,
+        uint48 timestamp,
         bool allStatusesValid
     ) external {
         vm.assume(numberOfAddresses > 0 && numberOfAddresses <= SET_MAX_ELEMENTS);
+        vm.assume(timestamp > 0);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
@@ -37,10 +39,14 @@ contract AccountAndVaultStatusTest is Test {
             address controller = controllers[i];
             address vault = vaults[i];
 
+            vm.warp(0);
+
             vm.prank(account);
             evc.enableController(account, controller);
             Vault(controller).clearChecks();
             evc.clearExpectedChecks();
+
+            vm.warp(timestamp);
 
             // check all the options: states are ok, states are violated with
             // vault/controller returning false and reverting
@@ -68,6 +74,8 @@ contract AccountAndVaultStatusTest is Test {
                 vm.expectEmit(true, false, false, false, address(evc));
                 emit VaultStatusCheck(vault);
             } else if (!alreadyExpectsRevert) {
+                alreadyExpectsRevert = true;
+
                 vm.expectRevert(
                     uint160(vault) % 3 == 1 ? bytes("vault status violation") : abi.encode(bytes4(uint32(1)))
                 );
@@ -78,14 +86,26 @@ contract AccountAndVaultStatusTest is Test {
 
             evc.verifyAccountStatusChecks();
             evc.verifyVaultStatusChecks();
+
+            if (allStatusesValid || uint160(account) % 3 == 0 && !alreadyExpectsRevert) {
+                assertTrue(evc.getLastAccountStatusCheckTimestamp(account) == block.timestamp);
+            } else {
+                assertFalse(evc.getLastAccountStatusCheckTimestamp(account) == block.timestamp);
+            }
+
             Vault(controller).clearChecks();
             Vault(vault).clearChecks();
             evc.clearExpectedChecks();
         }
     }
 
-    function test_WhenDeferred_RequireAccountAndVaultStatusCheck(uint8 numberOfAddresses, bytes memory seed) external {
+    function test_WhenDeferred_RequireAccountAndVaultStatusCheck(
+        uint8 numberOfAddresses,
+        bytes memory seed,
+        uint48 timestamp
+    ) external {
         vm.assume(numberOfAddresses > 0 && numberOfAddresses <= SET_MAX_ELEMENTS);
+        vm.assume(timestamp > 0);
 
         address[] memory accounts = new address[](numberOfAddresses);
         address[] memory controllers = new address[](numberOfAddresses);
@@ -103,10 +123,14 @@ contract AccountAndVaultStatusTest is Test {
             address controller = controllers[i];
             address vault = vaults[i];
 
+            vm.warp(0);
+
             vm.prank(account);
             evc.enableController(account, controller);
             Vault(controller).setAccountStatusState(1);
             Vault(vault).setVaultStatusState(1);
+
+            vm.warp(timestamp);
 
             // status checks will be scheduled for later due to deferred state
             evc.setChecksDeferred(true);
@@ -123,6 +147,7 @@ contract AccountAndVaultStatusTest is Test {
 
             assertTrue(evc.isAccountStatusCheckDeferred(account));
             assertTrue(evc.isVaultStatusCheckDeferred(vault));
+            assertTrue(evc.getLastAccountStatusCheckTimestamp(account) == 0);
 
             evc.reset();
         }
@@ -143,9 +168,13 @@ contract AccountAndVaultStatusTest is Test {
         vm.prank(vault);
         evc.requireAccountAndVaultStatusCheck(accounts[index]);
 
+        vm.expectRevert(abi.encodeWithSelector(Errors.EVC_ChecksReentrancy.selector));
+        evc.getLastAccountStatusCheckTimestamp(accounts[index]);
+
         evc.setChecksInProgress(false);
         vm.prank(vault);
         evc.requireAccountAndVaultStatusCheck(accounts[index]);
+        evc.getLastAccountStatusCheckTimestamp(accounts[index]);
     }
 
     function test_AcquireChecksLock_RequireAccountAndVaultStatusChecks(
