@@ -23,6 +23,12 @@ abstract contract EVCUtil {
         evc = IEVC(_evc);
     }
 
+    /// @notice Returns the address of the Ethereum Vault Connector (EVC) used by this contract.
+    /// @return The address of the EVC contract.
+    function EVC() external view returns (address) {
+        return address(evc);
+    }
+
     /// @notice Ensures that the msg.sender is the EVC by using the EVC callback functionality if necessary.
     /// @dev Optional to use for functions requiring account and vault status checks to enforce predictable behavior.
     /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
