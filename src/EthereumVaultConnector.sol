@@ -149,6 +149,15 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         _;
     }
 
+    /// @notice A modifier that verifies whether account or vault status checks are re-entered.
+    modifier nonReentrantChecks() {
+        if (executionContext.areChecksInProgress()) {
+            revert EVC_ChecksReentrancy();
+        }
+
+        _;
+    }
+
     /// @notice A modifier that verifies whether account or vault status checks are re-entered as well as checks for
     /// controlCollateral re-entrancy.
     modifier nonReentrantChecksAndControlCollateral() {
@@ -170,7 +179,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @notice A modifier that verifies whether account or vault status checks are re-entered and sets the lock.
     /// @dev This modifier also clears the current account on behalf of which the operation is performed as it shouldn't
     /// be relied upon when the checks are in progress.
-    modifier nonReentrantChecks() {
+    modifier nonReentrantChecksAcquireLock() {
         EC contextCache = executionContext;
 
         if (contextCache.areChecksInProgress()) {
@@ -675,11 +684,12 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Account Status Check
 
     /// @inheritdoc IEVC
-    function isAccountStatusCheckDeferred(address account) external view returns (bool) {
-        if (executionContext.areChecksInProgress()) {
-            revert EVC_ChecksReentrancy();
-        }
+    function getLastAccountStatusCheckTimestamp(address account) external view nonReentrantChecks returns (uint256) {
+        return accountControllers[account].getMetadata();
+    }
 
+    /// @inheritdoc IEVC
+    function isAccountStatusCheckDeferred(address account) external view nonReentrantChecks returns (bool) {
         return accountStatusChecks.contains(account);
     }
 
@@ -697,7 +707,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         public
         payable
         virtual
-        nonReentrantChecks
+        nonReentrantChecksAcquireLock
         onlyController(account)
     {
         accountStatusChecks.remove(account);
@@ -706,11 +716,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Vault Status Check
 
     /// @inheritdoc IEVC
-    function isVaultStatusCheckDeferred(address vault) external view returns (bool) {
-        if (executionContext.areChecksInProgress()) {
-            revert EVC_ChecksReentrancy();
-        }
-
+    function isVaultStatusCheckDeferred(address vault) external view nonReentrantChecks returns (bool) {
         return vaultStatusChecks.contains(vault);
     }
 
@@ -724,7 +730,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function forgiveVaultStatusCheck() public payable virtual nonReentrantChecks {
+    function forgiveVaultStatusCheck() public payable virtual nonReentrantChecksAcquireLock {
         vaultStatusChecks.remove(msg.sender);
     }
 
@@ -922,8 +928,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @return isValid A boolean indicating if the account status is valid.
     /// @return result The bytes returned from the controller call, indicating the account status.
     function checkAccountStatusInternal(address account) internal virtual returns (bool isValid, bytes memory result) {
-        uint256 numOfControllers = accountControllers[account].numElements;
-        address controller = accountControllers[account].firstElement;
+        SetStorage storage accountControllersStorage = accountControllers[account];
+        uint256 numOfControllers = accountControllersStorage.numElements;
+        address controller = accountControllersStorage.firstElement;
+        uint8 stamp = accountControllersStorage.stamp;
 
         if (numOfControllers == 0) return (true, "");
         else if (numOfControllers > 1) return (false, abi.encodeWithSelector(EVC_ControllerViolation.selector));
@@ -934,6 +942,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         isValid = success && result.length == 32
             && abi.decode(result, (bytes32)) == bytes32(IVault.checkAccountStatus.selector);
+
+        if (isValid) {
+            accountControllersStorage.numElements = uint8(numOfControllers);
+            accountControllersStorage.firstElement = controller;
+            accountControllersStorage.metadata = uint80(block.timestamp);
+            accountControllersStorage.stamp = stamp;
+        }
 
         emit AccountStatusCheck(account, controller);
     }
@@ -946,7 +961,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
-    function requireAccountStatusCheckInternalNonReentrantChecks(address account) internal virtual nonReentrantChecks {
+    function requireAccountStatusCheckInternalNonReentrantChecks(address account)
+        internal
+        virtual
+        nonReentrantChecksAcquireLock
+    {
         requireAccountStatusCheckInternal(account);
     }
 
@@ -973,7 +992,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
-    function requireVaultStatusCheckInternalNonReentrantChecks(address vault) internal virtual nonReentrantChecks {
+    function requireVaultStatusCheckInternalNonReentrantChecks(address vault)
+        internal
+        virtual
+        nonReentrantChecksAcquireLock
+    {
         requireVaultStatusCheckInternal(vault);
     }
 

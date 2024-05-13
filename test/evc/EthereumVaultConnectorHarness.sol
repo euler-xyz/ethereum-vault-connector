@@ -163,6 +163,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
     function verifyAccountStatusChecks() public view {
         for (uint256 i = 0; i < expectedAccountsChecked.length; ++i) {
             address[] memory controllers = accountControllers[expectedAccountsChecked[i]].get();
+            uint256 lastAccountStatusCheckTimestamp = accountControllers[expectedAccountsChecked[i]].getMetadata();
 
             require(controllers.length <= 1, "verifyAccountStatusChecks/length");
 
@@ -176,6 +177,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnectorScribble {
             }
 
             require(counter == 1, "verifyAccountStatusChecks/counter");
+            require(lastAccountStatusCheckTimestamp == block.timestamp, "verifyAccountStatusChecks/timestamp");
         }
     }
 }

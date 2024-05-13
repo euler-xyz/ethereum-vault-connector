@@ -376,6 +376,12 @@ interface IEVC {
             StatusCheckResult[] memory vaultsStatusCheckResult
         );
 
+    /// @notice Retrieves the timestamp of the last account status check performed for a specific account.
+    /// @dev This function reverts if the checks are in progress.
+    /// @param account The address of the account for which the last status check timestamp is being queried.
+    /// @return The timestamp of the last status check as a uint256.
+    function getLastAccountStatusCheckTimestamp(address account) external view returns (uint256);
+
     /// @notice Checks whether the status check is deferred for a given account.
     /// @dev This function reverts if the checks are in progress.
     /// @param account The address of the account for which it is checked whether the status check is deferred.

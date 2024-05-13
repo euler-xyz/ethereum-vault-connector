@@ -29,8 +29,10 @@ struct SetStorage {
     uint8 numElements;
     /// @notice The first element in the set.
     address firstElement;
+    /// @notice The metadata of the set.
+    uint80 metadata;
     /// @notice The stamp of the set.
-    uint88 stamp;
+    uint8 stamp;
     /// @notice The array of elements in the set. Stores the elements starting from index 1.
     ElementStorage[SET_MAX_ELEMENTS] elements;
 }
@@ -69,6 +71,7 @@ library Set {
     function insert(SetStorage storage setStorage, address element) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
+        uint80 metadata = setStorage.metadata;
 
         if (numElements == 0) {
             // gas optimization:
@@ -76,6 +79,7 @@ library Set {
             // the element is removed. when a new element is inserted after the removal, it should be cheaper
             setStorage.numElements = 1;
             setStorage.firstElement = element;
+            setStorage.metadata = metadata;
             setStorage.stamp = DUMMY_STAMP;
             return true;
         }
@@ -106,6 +110,7 @@ library Set {
     function remove(SetStorage storage setStorage, address element) internal returns (bool) {
         address firstElement = setStorage.firstElement;
         uint256 numElements = setStorage.numElements;
+        uint80 metadata = setStorage.metadata;
 
         if (numElements == 0) return false;
 
@@ -122,6 +127,7 @@ library Set {
         if (numElements == 1) {
             setStorage.numElements = 0;
             setStorage.firstElement = address(0);
+            setStorage.metadata = metadata;
             setStorage.stamp = DUMMY_STAMP;
             return true;
         }
@@ -138,17 +144,20 @@ library Set {
             if (searchIndex == 0) {
                 setStorage.firstElement = lastElement.value;
                 setStorage.numElements = uint8(lastIndex);
+                setStorage.metadata = metadata;
                 setStorage.stamp = DUMMY_STAMP;
             } else {
                 setStorage.elements[searchIndex].value = lastElement.value;
 
                 setStorage.firstElement = firstElement;
                 setStorage.numElements = uint8(lastIndex);
+                setStorage.metadata = metadata;
                 setStorage.stamp = DUMMY_STAMP;
             }
         } else {
             setStorage.firstElement = firstElement;
             setStorage.numElements = uint8(lastIndex);
+            setStorage.metadata = metadata;
             setStorage.stamp = DUMMY_STAMP;
         }
 
@@ -181,6 +190,13 @@ library Set {
         }
     }
 
+    /// @notice Sets the metadata for the set storage.
+    /// @param setStorage The storage structure where metadata will be set.
+    /// @param metadata The metadata value to set.
+    function setMetadata(SetStorage storage setStorage, uint80 metadata) internal {
+        setStorage.metadata = metadata;
+    }
+
     /// @notice Returns an array of elements contained in the storage.
     /// @dev The order of the elements in the array may be affected by performing operations on the set.
     /// @param setStorage The set storage to be processed.
@@ -199,6 +215,13 @@ library Set {
         }
 
         return output;
+    }
+
+    /// @notice Retrieves the metadata from the set storage.
+    /// @param setStorage The storage structure from which metadata is retrieved.
+    /// @return The metadata value.
+    function getMetadata(SetStorage storage setStorage) internal view returns (uint80) {
+        return setStorage.metadata;
     }
 
     /// @notice Checks if the set storage contains a given element and returns a boolean value that indicates the
@@ -228,11 +251,13 @@ library Set {
     function forEachAndClear(SetStorage storage setStorage, function(address) callback) internal {
         uint256 numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
+        uint80 metadata = setStorage.metadata;
 
         if (numElements == 0) return;
 
         setStorage.numElements = 0;
         setStorage.firstElement = address(0);
+        setStorage.metadata = metadata;
         setStorage.stamp = DUMMY_STAMP;
 
         callback(firstElement);
@@ -259,12 +284,14 @@ library Set {
     ) internal returns (bytes[] memory) {
         uint256 numElements = setStorage.numElements;
         address firstElement = setStorage.firstElement;
+        uint80 metadata = setStorage.metadata;
         bytes[] memory results = new bytes[](numElements);
 
         if (numElements == 0) return results;
 
         setStorage.numElements = 0;
         setStorage.firstElement = address(0);
+        setStorage.metadata = metadata;
         setStorage.stamp = DUMMY_STAMP;
 
         (bool success, bytes memory result) = callback(firstElement);

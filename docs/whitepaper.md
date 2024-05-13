@@ -12,6 +12,7 @@ Mick de Graaf, Kasper Pawlowski, Dariusz Glowinski, Michael Bentley, Doug Hoyte
     * [Collateral Validity](#collateral-validity)
     * [Execution Flow](#execution-flow)
     * [Single Controller](#single-controller)
+    * [Last Account Status Check Timestamp](#last-account-status-check-timestamp)
     * [Forgiveness](#forgiveness)
 * [Vault Status Checks](#vault-status-checks)
 * [Execution](#execution)
@@ -103,6 +104,10 @@ There is a subtle complication that vault implementations should consider if the
 At the time of the account status check, an account can have at most one controller. This is how single-liability-per-account is enforced. Multiple controllers are disallowed because it is unlikely two independent controllers would be able to behave consistently in the presence of "shared" accounts. If this is ever required, a multi-controller controller could be created with the desired sharing logic.
 
 Although having more than one controller is disallowed when the account status check is performed, multiple controllers can be transiently attached while these checks are deferred. As long as all or all but one controllers release themselves during the execution of the [checks-deferrable call](#checks-deferrable-call), the account status check will succeed.
+
+### Last Account Status Check Timestamp
+
+A successful `checkAccountStatus` call to the enabled controller vault will record the timestamp of the last successful account status check for a given account in the EVC's storage. This timestamp can be later retrieved using the `getLastAccountStatusCheckTimestamp` function on the EVC.
 
 ### Forgiveness
 
