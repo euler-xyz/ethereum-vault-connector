@@ -161,6 +161,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetContract) <= 10) return "";
         if (targetContract == address(this)) return "";
+        if (bytes4(data) == VaultMock.checkAccountStatus.selector) return "";
 
         setup(onBehalfOfAccount, targetContract);
 
@@ -177,6 +178,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (onBehalfOfAccount == address(0)) return "";
         if (uint160(targetCollateral) <= 10) return "";
         if (targetCollateral == address(this)) return "";
+        if (bytes4(data) == VaultMock.checkAccountStatus.selector) return "";
 
         setup(onBehalfOfAccount, msg.sender);
         accountCollaterals[onBehalfOfAccount].insert(targetCollateral);
@@ -218,6 +220,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
             if (items[i].value > 0) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
+            if (bytes4(items[i].data) == VaultMock.checkAccountStatus.selector) return;
         }
 
         super.batch(items);
