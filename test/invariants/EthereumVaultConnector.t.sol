@@ -53,15 +53,16 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
 
     fallback() external payable {}
 
+    function authenticateCaller(address, bool, bool) internal view override returns (address) {
+        return msg.sender;
+    }
+
     function getTouchedAccounts() external view returns (address[] memory) {
         return touchedAccounts;
     }
 
     function setup(address account, address vault) internal {
         touchedAccounts.push(account);
-        bytes19 addressPrefix = getAddressPrefixInternal(account);
-        ownerLookup[addressPrefix].owner = account;
-        operatorLookup[addressPrefix][msg.sender] = type(uint256).max;
         vm.etch(vault, vaultMock.code);
     }
 
@@ -78,7 +79,6 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     function setNonce(bytes19 addressPrefix, uint256 nonceNamespace, uint256 nonce) public payable override {
         if (msg.sender == address(this)) return;
         if (nonceLookup[addressPrefix][nonceNamespace] == type(uint256).max) return;
-        ownerLookup[addressPrefix].owner = msg.sender;
         nonce = nonceLookup[addressPrefix][nonceNamespace] + 1;
         super.setNonce(addressPrefix, nonceNamespace, nonce);
     }
@@ -88,19 +88,16 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         if (operatorLookup[addressPrefix][operator] == operatorBitField) return;
-        addressPrefix = getAddressPrefixInternal(msg.sender);
-        ownerLookup[addressPrefix].owner = msg.sender;
         super.setOperator(addressPrefix, operator, operatorBitField);
     }
 
     function setAccountOperator(address account, address operator, bool authorized) public payable override {
+        operator = msg.sender;
         if (msg.sender == address(this)) return;
         if (account == address(0)) return;
         if (operator == address(0) || operator == address(this)) return;
         if (haveCommonOwnerInternal(msg.sender, operator)) return;
         if (isAccountOperatorAuthorizedInternal(account, operator) == authorized) return;
-        account = msg.sender;
-        ownerLookup[getAddressPrefixInternal(account)].owner = msg.sender;
         super.setAccountOperator(account, operator, authorized);
     }
 
@@ -129,14 +126,11 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (haveCommonOwnerInternal(account, msg.sender)) return;
         if (account == address(0)) return;
 
-        account = msg.sender;
-
         if (index1 >= index2 || int256(uint256(index2)) >= int256(uint256(accountCollaterals[account].numElements)) - 2)
         {
             return;
         }
 
-        ownerLookup[getAddressPrefixInternal(account)].owner = msg.sender;
         super.reorderCollaterals(account, index1, index2);
     }
 
@@ -160,7 +154,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     function call(
         address targetContract,
         address onBehalfOfAccount,
-        uint256 value,
+        uint256,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
         if (haveCommonOwnerInternal(onBehalfOfAccount, msg.sender)) return "";
@@ -169,15 +163,14 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (targetContract == address(this)) return "";
 
         setup(onBehalfOfAccount, targetContract);
-        deal(address(this), value);
 
-        result = super.call(targetContract, onBehalfOfAccount, value, data);
+        result = super.call(targetContract, onBehalfOfAccount, 0, data);
     }
 
     function controlCollateral(
         address targetCollateral,
         address onBehalfOfAccount,
-        uint256 value,
+        uint256,
         bytes calldata data
     ) public payable override returns (bytes memory result) {
         if (uint160(msg.sender) <= 10 || msg.sender == address(this)) return "";
@@ -186,7 +179,6 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (targetCollateral == address(this)) return "";
 
         setup(onBehalfOfAccount, msg.sender);
-        deal(address(this), value);
         accountCollaterals[onBehalfOfAccount].insert(targetCollateral);
 
         uint8 numElementsCache = accountControllers[onBehalfOfAccount].numElements;
@@ -194,7 +186,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         accountControllers[onBehalfOfAccount].numElements = 1;
         accountControllers[onBehalfOfAccount].firstElement = msg.sender;
 
-        result = super.controlCollateral(targetCollateral, onBehalfOfAccount, value, data);
+        result = super.controlCollateral(targetCollateral, onBehalfOfAccount, 0, data);
 
         accountControllers[onBehalfOfAccount].numElements = numElementsCache;
         accountControllers[onBehalfOfAccount].firstElement = firstElementCache;
@@ -206,31 +198,28 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         uint256 nonceNamespace,
         uint256 nonce,
         uint256 deadline,
-        uint256 value,
+        uint256,
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
         if (uint160(signer) <= 255 || signer == address(this)) return;
         if (nonce == type(uint256).max) return;
-        if (value > type(uint128).max) return;
-        if (data.length == 0) return;
+        if (data.length == 0 || bytes4(data) == 0) return;
         vm.etch(signer, signerMock.code);
-        deal(address(this), value);
         nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace];
         deadline = block.timestamp;
-        super.permit(signer, msg.sender, nonceNamespace, nonce, deadline, value, data, signature);
+        super.permit(signer, msg.sender, nonceNamespace, nonce, deadline, 0, data, signature);
     }
 
     function batch(BatchItem[] calldata items) public payable override {
         if (items.length > SET_MAX_ELEMENTS) return;
 
         for (uint256 i = 0; i < items.length; i++) {
-            if (uint160(items[i].value) > type(uint128).max) return;
+            if (items[i].value > 0) return;
             if (uint160(items[i].targetContract) <= 10) return;
             if (items[i].targetContract == address(this)) return;
         }
 
-        vm.deal(address(this), type(uint256).max);
         super.batch(items);
     }
 
