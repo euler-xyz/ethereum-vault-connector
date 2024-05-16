@@ -379,7 +379,7 @@ interface IEVC {
     /// @notice Retrieves the timestamp of the last successful account status check performed for a specific account.
     /// @dev This function reverts if the checks are in progress.
     /// @dev The account status check is considered to be successful if it calls into the selected controller vault and
-    /// obtains expected magic value. This timestamp does not change if the account status is considered valid due to no
+    /// obtains expected magic value. This timestamp does not change if the account status is considered valid when no
     /// controller enabled. When consuming, one might need to ensure that the account status check is not deferred at
     /// the moment.
     /// @param account The address of the account for which the last status check timestamp is being queried.
