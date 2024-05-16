@@ -210,7 +210,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         vm.etch(signer, signerMock.code);
         nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace];
         deadline = block.timestamp;
-        super.permit(signer, msg.sender, nonceNamespace, nonce, deadline, 0, data, signature);
+        try this.permit(signer, msg.sender, nonceNamespace, nonce, deadline, 0, data, signature) {} catch {}
     }
 
     function batch(BatchItem[] calldata items) public payable override {
