@@ -73,6 +73,13 @@ contract Vault is IVault, Target {
                 revert("cvs/on-behalf-of-account-2");
             }
         }
+        try evc.getLastAccountStatusCheckTimestamp(address(0)) {
+            revert("cvs/last-account-status-check-timestamp");
+        } catch (bytes memory reason) {
+            if (bytes4(reason) != Errors.EVC_ChecksReentrancy.selector) {
+                revert("cvs/last-account-status-check-timestamp-2");
+            }
+        }
         require(evc.areChecksInProgress(), "cvs/checks-not-in-progress");
 
         if (vaultStatusState == 0) {
@@ -92,6 +99,13 @@ contract Vault is IVault, Target {
                 revert("cas/on-behalf-of-account-2");
             }
         }
+        try evc.getLastAccountStatusCheckTimestamp(address(0)) {
+            revert("cas/last-account-status-check-timestamp");
+        } catch (bytes memory reason) {
+            if (bytes4(reason) != Errors.EVC_ChecksReentrancy.selector) {
+                revert("cas/last-account-status-check-timestamp-2");
+            }
+        }
         require(evc.areChecksInProgress(), "cas/checks-not-in-progress");
 
         if (accountStatusState == 0) {
@@ -104,8 +118,7 @@ contract Vault is IVault, Target {
     }
 
     function requireChecks(address account) external payable {
-        evc.requireAccountStatusCheck(account);
-        evc.requireVaultStatusCheck();
+        evc.requireAccountAndVaultStatusCheck(account);
     }
 
     function requireChecksWithSimulationCheck(address account, bool expectedSimulationInProgress) external payable {
@@ -113,8 +126,7 @@ contract Vault is IVault, Target {
             evc.isSimulationInProgress() == expectedSimulationInProgress, "requireChecksWithSimulationCheck/simulation"
         );
 
-        evc.requireAccountStatusCheck(account);
-        evc.requireVaultStatusCheck();
+        evc.requireAccountAndVaultStatusCheck(account);
     }
 
     function call(address target, bytes memory data) external payable virtual {
@@ -150,6 +162,13 @@ contract VaultMalicious is Vault {
                 revert("cvs/on-behalf-of-account-2");
             }
         }
+        try evc.getLastAccountStatusCheckTimestamp(address(0)) {
+            revert("cvs/last-account-status-check-timestamp");
+        } catch (bytes memory reason) {
+            if (bytes4(reason) != Errors.EVC_ChecksReentrancy.selector) {
+                revert("cvs/last-account-status-check-timestamp-2");
+            }
+        }
         require(evc.areChecksInProgress(), "cvs/checks-not-in-progress");
 
         if (expectedErrorSelector == 0) {
@@ -172,6 +191,13 @@ contract VaultMalicious is Vault {
         } catch (bytes memory reason) {
             if (bytes4(reason) != Errors.EVC_OnBehalfOfAccountNotAuthenticated.selector) {
                 revert("cas/on-behalf-of-account-2");
+            }
+        }
+        try evc.getLastAccountStatusCheckTimestamp(address(0)) {
+            revert("cas/last-account-status-check-timestamp");
+        } catch (bytes memory reason) {
+            if (bytes4(reason) != Errors.EVC_ChecksReentrancy.selector) {
+                revert("cas/last-account-status-check-timestamp-2");
             }
         }
         require(evc.areChecksInProgress(), "cas/checks-not-in-progress");

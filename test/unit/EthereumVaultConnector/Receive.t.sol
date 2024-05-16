@@ -16,11 +16,12 @@ contract ReceiveTest is Test {
         vm.assume(value > 0);
         vm.deal(address(this), 2 * uint256(value));
 
-        // succeds when checks are not deferred
-        address(evc).call{value: value}("");
+        // fails when checks are not deferred
+        (bool success,) = address(evc).call{value: value}("");
+        assertFalse(success);
 
         evc.setChecksDeferred(true);
-        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
-        address(evc).call{value: value}("");
+        (success,) = address(evc).call{value: value}("");
+        assertTrue(success);
     }
 }

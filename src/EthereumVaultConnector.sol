@@ -113,10 +113,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// will be) as an owner in the ownerLookup.
     /// @param addressPrefix The address prefix for which it is checked whether the caller is the owner.
     modifier onlyOwner(bytes19 addressPrefix) {
-        // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
-        // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
-        authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
+        authenticateCaller({addressPrefix: addressPrefix, allowOperator: false, checkLockdownMode: false});
 
         _;
     }
@@ -152,6 +149,15 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         _;
     }
 
+    /// @notice A modifier that verifies whether account or vault status checks are re-entered.
+    modifier nonReentrantChecks() {
+        if (executionContext.areChecksInProgress()) {
+            revert EVC_ChecksReentrancy();
+        }
+
+        _;
+    }
+
     /// @notice A modifier that verifies whether account or vault status checks are re-entered as well as checks for
     /// controlCollateral re-entrancy.
     modifier nonReentrantChecksAndControlCollateral() {
@@ -173,7 +179,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @notice A modifier that verifies whether account or vault status checks are re-entered and sets the lock.
     /// @dev This modifier also clears the current account on behalf of which the operation is performed as it shouldn't
     /// be relied upon when the checks are in progress.
-    modifier nonReentrantChecks() {
+    modifier nonReentrantChecksAcquireLock() {
         EC contextCache = executionContext;
 
         if (contextCache.areChecksInProgress()) {
@@ -286,8 +292,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function setLockdownMode(bytes19 addressPrefix, bool enabled) public payable virtual onlyOwner(addressPrefix) {
         if (ownerLookup[addressPrefix].isLockdownMode != enabled) {
             // to increase user security, it is prohibited to disable this mode within the self-call of the permit
-            // function or within a checks-deferrable call. to disable this mode a direct call to the EVC must
-            // be made
+            // function or within a checks-deferrable call. to disable this mode, the setLockdownMode function must be
+            // called directly
             if (!enabled && (executionContext.areChecksDeferred() || inPermitSelfCall())) {
                 revert EVC_NotAuthorized();
             }
@@ -304,8 +310,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     ) public payable virtual onlyOwner(addressPrefix) {
         if (ownerLookup[addressPrefix].isPermitDisabledMode != enabled) {
             // to increase user security, it is prohibited to disable this mode within the self-call of the permit
-            // function (by definition) or within a checks-deferrable call. to disable this mode a direct call to
-            // the EVC must be made
+            // function (verified in the permit function) or within a checks-deferrable call. to disable this mode the
+            // setPermitDisabledMode function must be called directly
             if (!enabled && executionContext.areChecksDeferred()) {
                 revert EVC_NotAuthorized();
             }
@@ -336,11 +342,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @dev Uses authenticateCaller() function instead of onlyOwner() modifier to authenticate and get the caller
     /// address at once.
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) public payable virtual {
-        // calculate a phantom address from the address prefix which can be used as an input to the authenticateCaller()
-        // function
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
         address msgSender =
-            authenticateCaller({account: phantomAccount, allowOperator: false, checkLockdownMode: false});
+            authenticateCaller({addressPrefix: addressPrefix, allowOperator: false, checkLockdownMode: false});
 
         // the operator can neither be the EVC nor can be one of 256 accounts of the owner
         if (operator == address(this) || haveCommonOwnerInternal(msgSender, operator)) {
@@ -661,12 +664,17 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
         if (success) {
             revert EVC_BatchPanic();
-        } else if (bytes4(result) != EVC_RevertedBatchResult.selector) {
+        } else if (result.length < 4 || bytes4(result) != EVC_RevertedBatchResult.selector) {
             revertBytes(result);
         }
 
         assembly {
+            let length := mload(result)
+            // skip 4-byte EVC_RevertedBatchResult selector
             result := add(result, 4)
+            // write new array length = original length - 4-byte selector
+            // cannot underflow as we require result.length >= 4 above
+            mstore(result, sub(length, 4))
         }
 
         (batchItemsResult, accountsStatusCheckResult, vaultsStatusCheckResult) =
@@ -676,20 +684,21 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Account Status Check
 
     /// @inheritdoc IEVC
-    function isAccountStatusCheckDeferred(address account) external view returns (bool) {
-        if (executionContext.areChecksInProgress()) {
-            revert EVC_ChecksReentrancy();
-        }
+    function getLastAccountStatusCheckTimestamp(address account) external view nonReentrantChecks returns (uint256) {
+        return accountControllers[account].getMetadata();
+    }
 
+    /// @inheritdoc IEVC
+    function isAccountStatusCheckDeferred(address account) external view nonReentrantChecks returns (bool) {
         return accountStatusChecks.contains(account);
     }
 
     /// @inheritdoc IEVC
-    function requireAccountStatusCheck(address account) public payable virtual nonReentrantChecks {
+    function requireAccountStatusCheck(address account) public payable virtual {
         if (executionContext.areChecksDeferred()) {
             accountStatusChecks.insert(account);
         } else {
-            requireAccountStatusCheckInternal(account);
+            requireAccountStatusCheckInternalNonReentrantChecks(account);
         }
     }
 
@@ -698,7 +707,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         public
         payable
         virtual
-        nonReentrantChecks
+        nonReentrantChecksAcquireLock
         onlyController(account)
     {
         accountStatusChecks.remove(account);
@@ -707,36 +716,32 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Vault Status Check
 
     /// @inheritdoc IEVC
-    function isVaultStatusCheckDeferred(address vault) external view returns (bool) {
-        if (executionContext.areChecksInProgress()) {
-            revert EVC_ChecksReentrancy();
-        }
-
+    function isVaultStatusCheckDeferred(address vault) external view nonReentrantChecks returns (bool) {
         return vaultStatusChecks.contains(vault);
     }
 
     /// @inheritdoc IEVC
-    function requireVaultStatusCheck() public payable virtual nonReentrantChecks {
+    function requireVaultStatusCheck() public payable virtual {
         if (executionContext.areChecksDeferred()) {
             vaultStatusChecks.insert(msg.sender);
         } else {
-            requireVaultStatusCheckInternal(msg.sender);
+            requireVaultStatusCheckInternalNonReentrantChecks(msg.sender);
         }
     }
 
     /// @inheritdoc IEVC
-    function forgiveVaultStatusCheck() public payable virtual nonReentrantChecks {
+    function forgiveVaultStatusCheck() public payable virtual nonReentrantChecksAcquireLock {
         vaultStatusChecks.remove(msg.sender);
     }
 
     /// @inheritdoc IEVC
-    function requireAccountAndVaultStatusCheck(address account) public payable virtual nonReentrantChecks {
+    function requireAccountAndVaultStatusCheck(address account) public payable virtual {
         if (executionContext.areChecksDeferred()) {
             accountStatusChecks.insert(account);
             vaultStatusChecks.insert(msg.sender);
         } else {
-            requireAccountStatusCheckInternal(account);
-            requireVaultStatusCheckInternal(msg.sender);
+            requireAccountStatusCheckInternalNonReentrantChecks(account);
+            requireVaultStatusCheckInternalNonReentrantChecks(msg.sender);
         }
     }
 
@@ -759,31 +764,58 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes19 addressPrefix = getAddressPrefixInternal(account);
         address owner = ownerLookup[addressPrefix].owner;
         bool lockdownMode = ownerLookup[addressPrefix].isLockdownMode;
-
-        if (checkLockdownMode && lockdownMode) {
-            revert EVC_LockdownMode();
-        }
-
         address msgSender = _msgSender();
+        bool authenticated = false;
 
         // check if the caller is the owner of the account
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
-                setAccountOwnerInternal(account, msgSender);
-                return msgSender;
+                ownerLookup[addressPrefix].owner = msgSender;
+                emit OwnerRegistered(addressPrefix, msgSender);
+                authenticated = true;
             } else if (owner == msgSender) {
-                return msgSender;
+                authenticated = true;
             }
         }
 
         // if the caller is not the owner, check if it is an operator if operators are allowed
-        if (allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
-            return msgSender;
+        if (!authenticated && allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
+            authenticated = true;
         }
 
         // must revert if neither the owner nor the operator were authenticated
-        revert EVC_NotAuthorized();
+        if (!authenticated) {
+            revert EVC_NotAuthorized();
+        }
+
+        // revert if the account is in lockdown mode unless the lockdown mode is not being checked
+        if (checkLockdownMode && lockdownMode) {
+            revert EVC_LockdownMode();
+        }
+
+        return msgSender;
+    }
+
+    /// @notice Authenticates the caller of a function.
+    /// @dev This function converts a bytes19 address prefix into a phantom account address which is an account address
+    /// that belongs to the owner of the address prefix.
+    /// @param addressPrefix The bytes19 address prefix to authenticate the caller against.
+    /// @param allowOperator A boolean indicating if operators are allowed to authenticate as the caller.
+    /// @param checkLockdownMode A boolean indicating if the function should check for lockdown mode on the account.
+    /// @return The address of the authenticated caller.
+    function authenticateCaller(
+        bytes19 addressPrefix,
+        bool allowOperator,
+        bool checkLockdownMode
+    ) internal virtual returns (address) {
+        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
+
+        return authenticateCaller({
+            account: phantomAccount,
+            allowOperator: allowOperator,
+            checkLockdownMode: checkLockdownMode
+        });
     }
 
     /// @notice Internal function to make a call to a target contract with a specific context.
@@ -896,8 +928,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @return isValid A boolean indicating if the account status is valid.
     /// @return result The bytes returned from the controller call, indicating the account status.
     function checkAccountStatusInternal(address account) internal virtual returns (bool isValid, bytes memory result) {
-        uint256 numOfControllers = accountControllers[account].numElements;
-        address controller = accountControllers[account].firstElement;
+        SetStorage storage accountControllersStorage = accountControllers[account];
+        uint256 numOfControllers = accountControllersStorage.numElements;
+        address controller = accountControllersStorage.firstElement;
+        uint8 stamp = accountControllersStorage.stamp;
 
         if (numOfControllers == 0) return (true, "");
         else if (numOfControllers > 1) return (false, abi.encodeWithSelector(EVC_ControllerViolation.selector));
@@ -909,6 +943,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         isValid = success && result.length == 32
             && abi.decode(result, (bytes32)) == bytes32(IVault.checkAccountStatus.selector);
 
+        if (isValid) {
+            accountControllersStorage.numElements = uint8(numOfControllers);
+            accountControllersStorage.firstElement = controller;
+            accountControllersStorage.metadata = uint80(block.timestamp);
+            accountControllersStorage.stamp = stamp;
+        }
+
         emit AccountStatusCheck(account, controller);
     }
 
@@ -918,6 +959,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (!isValid) {
             revertBytes(result);
         }
+    }
+
+    function requireAccountStatusCheckInternalNonReentrantChecks(address account)
+        internal
+        virtual
+        nonReentrantChecksAcquireLock
+    {
+        requireAccountStatusCheckInternal(account);
     }
 
     /// @notice Checks the status of a vault internally.
@@ -941,6 +990,14 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (!isValid) {
             revertBytes(result);
         }
+    }
+
+    function requireVaultStatusCheckInternalNonReentrantChecks(address vault)
+        internal
+        virtual
+        nonReentrantChecksAcquireLock
+    {
+        requireVaultStatusCheckInternal(vault);
     }
 
     /// @notice Checks the status of all entities in a set, either accounts or vaults, and clears the checks.
@@ -976,7 +1033,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     // Permit-related functions
 
     /// @notice Determines if the signer address is valid.
-    /// @dev It's important to revisit this logic when deploying on chains other than the Ethereum mainnet.
+    /// @dev It's important to revisit this logic when deploying on chains other than the Ethereum mainnet. If new
+    /// precompiles had been added to the Ethereum mainnet, the current implementation of the function would not be
+    /// future-proof and would need to be updated.
     /// @param signer The address of the signer to validate.
     /// @return bool Returns true if the signer is valid, false otherwise.
     function isSignerValid(address signer) internal pure virtual returns (bool) {
@@ -1125,7 +1184,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @param account The account address to compute the prefix for.
     /// @return The computed address prefix as a bytes19 value.
     function getAddressPrefixInternal(address account) internal pure returns (bytes19) {
-        return bytes19(uint152(uint160(account) >> 8));
+        return bytes19(uint152(uint160(account) >> ACCOUNT_ID_OFFSET));
     }
 
     /// @notice Retrieves the owner of a given account by its address prefix.
@@ -1161,17 +1220,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         uint256 bitMask = 1 << (uint160(owner) ^ uint160(account));
 
         return operatorLookup[addressPrefix][operator] & bitMask != 0;
-    }
-
-    /// @notice Sets the owner of an account within the Ethereum Vault Connector.
-    /// @dev This function updates the owner of an account by updating the ownerLookup mapping with the new owner's
-    /// address.
-    /// @param account The account address for which the owner is being set.
-    /// @param owner The new owner's address to be set for the account.
-    function setAccountOwnerInternal(address account, address owner) internal {
-        bytes19 addressPrefix = getAddressPrefixInternal(account);
-        ownerLookup[addressPrefix].owner = owner;
-        emit OwnerRegistered(addressPrefix, owner);
     }
 
     /// @notice Reverts the transaction with a custom error message if provided, otherwise reverts with a generic empty

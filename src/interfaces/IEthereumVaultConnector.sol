@@ -161,7 +161,7 @@ interface IEVC {
     /// disable  the permit functionality, one must pass true as the second argument. To enable the permit
     /// functionality, one must pass false as the second argument.
     /// @param addressPrefix The address prefix for which the permit functionality is being set.
-    /// @param enabled A boolean indicating whether to enable or disable permit functionality.
+    /// @param enabled A boolean indicating whether to enable or disable the disable-permit mode.
     function setPermitDisabledMode(bytes19 addressPrefix, bool enabled) external payable;
 
     /// @notice Sets the nonce for a given address prefix and nonce namespace.
@@ -179,8 +179,8 @@ interface IEVC {
     /// @dev This function can only be called by the owner of the address prefix. Each bit in the bit field corresponds
     /// to one account belonging to the same owner. If the bit is set, the operator is authorized for the account.
     /// @param addressPrefix The address prefix for which the bit field is being set.
-    /// @param operator The address of the operator for which the bit field is being set. Cannot be the EVC address,
-    /// zero address, or an address belonging to the same address prefix.
+    /// @param operator The address of the operator for which the bit field is being set. Can neither be the EVC address
+    /// nor an address belonging to the same address prefix.
     /// @param operatorBitField The new bit field for the given address prefix and operator. Reverts if the provided
     /// value is equal to the currently stored value.
     function setOperator(bytes19 addressPrefix, address operator, uint256 operatorBitField) external payable;
@@ -190,8 +190,8 @@ interface IEVC {
     /// can perform actions for an account on behalf of the owner. If it's an operator calling this function, it can
     /// only deauthorize itself.
     /// @param account The address of the account whose operator is being set or unset.
-    /// @param operator The address of the operator that is being installed or uninstalled. Can neither be zero address,
-    /// nor EVC, nor an address belonging to the same owner as the account.
+    /// @param operator The address of the operator that is being installed or uninstalled. Can neither be the EVC
+    /// address nor an address belonging to the same owner as the account.
     /// @param authorized A boolean value that indicates whether the operator is being authorized or deauthorized.
     /// Reverts if the provided value is equal to the currently stored value.
     function setAccountOperator(address account, address operator, bool authorized) external payable;
@@ -214,7 +214,8 @@ interface IEVC {
     /// @notice Enables a collateral for an account.
     /// @dev A collaterals is a vault for which account's balances are under the control of the currently enabled
     /// controller vault. Only the owner or an operator of the account can call this function. Unless it's a duplicate,
-    /// the collateral is added to the end of the array. Account status checks are performed.
+    /// the collateral is added to the end of the array. There can be at most 10 unique collaterals enabled at a time.
+    /// Account status checks are performed.
     /// @param account The account address for which the collateral is being enabled.
     /// @param vault The address being enabled as a collateral.
     function enableCollateral(address account, address vault) external payable;
@@ -260,7 +261,9 @@ interface IEVC {
     /// @notice Enables a controller for an account.
     /// @dev A controller is a vault that has been chosen for an account to have special control over account’s
     /// balances in the enabled collaterals vaults. Only the owner or an operator of the account can call this function.
-    /// Unless it's a duplicate, the controller is added to the end of the array. Account status checks are performed.
+    /// Unless it's a duplicate, the controller is added to the end of the array. Transiently, there can be at most 10
+    /// unique controllers enabled at a time, but at most one can be enabled after the outermost checks-deferrable
+    /// call concludes. Account status checks are performed.
     /// @param account The address for which the controller is being enabled.
     /// @param vault The address of the controller being enabled.
     function enableController(address account, address vault) external payable;
@@ -373,6 +376,16 @@ interface IEVC {
             StatusCheckResult[] memory vaultsStatusCheckResult
         );
 
+    /// @notice Retrieves the timestamp of the last successful account status check performed for a specific account.
+    /// @dev This function reverts if the checks are in progress.
+    /// @dev The account status check is considered to be successful if it calls into the selected controller vault and
+    /// obtains expected magic value. This timestamp does not change if the account status is considered valid when no
+    /// controller enabled. When consuming, one might need to ensure that the account status check is not deferred at
+    /// the moment.
+    /// @param account The address of the account for which the last status check timestamp is being queried.
+    /// @return The timestamp of the last status check as a uint256.
+    function getLastAccountStatusCheckTimestamp(address account) external view returns (uint256);
+
     /// @notice Checks whether the status check is deferred for a given account.
     /// @dev This function reverts if the checks are in progress.
     /// @param account The address of the account for which it is checked whether the status check is deferred.
@@ -381,9 +394,9 @@ interface IEVC {
 
     /// @notice Checks the status of an account and reverts if it is not valid.
     /// @dev If checks deferred, the account is added to the set of accounts to be checked at the end of the outermost
-    /// checks-deferrable call. Account status check is performed by calling into the selected controller vault and
-    /// passing the array of currently enabled collaterals. If controller is not selected, the account is always
-    /// considered valid.
+    /// checks-deferrable call. There can be at most 10 unique accounts added to the set at a time. Account status
+    /// check is performed by calling into the selected controller vault and passing the array of currently enabled
+    /// collaterals. If controller is not selected, the account is always considered valid.
     /// @param account The address of the account to be checked.
     function requireAccountStatusCheck(address account) external payable;
 
@@ -402,7 +415,8 @@ interface IEVC {
 
     /// @notice Checks the status of a vault and reverts if it is not valid.
     /// @dev If checks deferred, the vault is added to the set of vaults to be checked at the end of the outermost
-    /// checks-deferrable call. This function can only be called by the vault itself.
+    /// checks-deferrable call. There can be at most 10 unique vaults added to the set at a time. This function can
+    /// only be called by the vault itself.
     function requireVaultStatusCheck() external payable;
 
     /// @notice Forgives previously deferred vault status check.

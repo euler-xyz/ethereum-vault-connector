@@ -228,6 +228,12 @@ contract SetTest is Test {
         setStorage.reorder(index1, index2);
     }
 
+    function test_setMetadata(uint80 metadata) public {
+        vm.assume(metadata > 0);
+        setStorage.setMetadata(metadata);
+        assertEq(setStorage.getMetadata(), metadata);
+    }
+
     function test_Empty_Remove(address e) public {
         assertFalse(setStorage.remove(e));
         assertEq(setStorage.numElements, 0);

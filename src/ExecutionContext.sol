@@ -30,7 +30,6 @@ library ExecutionContext {
     uint256 internal constant OPERATOR_AUTHENTICATED_MASK =
         0x0000000000000000FF0000000000000000000000000000000000000000000000;
     uint256 internal constant SIMULATION_MASK = 0x00000000000000FF000000000000000000000000000000000000000000000000;
-    uint256 internal constant STAMP_MASK = 0xFFFFFFFFFFFFFF00000000000000000000000000000000000000000000000000;
     uint256 internal constant STAMP_OFFSET = 200;
 
     // None of the functions below modifies the state. All the functions operate on the copy

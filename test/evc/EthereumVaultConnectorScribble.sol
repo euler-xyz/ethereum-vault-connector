@@ -124,8 +124,8 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.batchRevert(items);
     }
 
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> accountStatusChecks.contains(account);
+    /// #if_succeeds "timestamps is stored only if checks not deferred" !old(executionContext.areChecksDeferred()) && accountControllers[account].numElements == 1 ==> getLastAccountStatusCheckTimestamp(account) == block.timestamp;
     function requireAccountStatusCheck(address account) public payable virtual override {
         super.requireAccountStatusCheck(account);
     }
@@ -136,7 +136,6 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.forgiveAccountStatusCheck(account);
     }
 
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "vault is added to the set only if checks deferred" old(executionContext.areChecksDeferred()) ==> vaultStatusChecks.contains(msg.sender);
     function requireVaultStatusCheck() public payable virtual override {
         super.requireVaultStatusCheck();
@@ -148,9 +147,9 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
         super.forgiveVaultStatusCheck();
     }
 
-    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
     /// #if_succeeds "account is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> accountStatusChecks.contains(account);
     /// #if_succeeds "vault is added to the set only if checks deferred" executionContext.areChecksDeferred() ==> vaultStatusChecks.contains(msg.sender);
+    /// #if_succeeds "timestamps is stored only if checks not deferred" !old(executionContext.areChecksDeferred()) && accountControllers[account].numElements == 1 ==> getLastAccountStatusCheckTimestamp(account) == block.timestamp;
     function requireAccountAndVaultStatusCheck(address account) public payable virtual override {
         super.requireAccountAndVaultStatusCheck(account);
     }
@@ -169,6 +168,16 @@ contract EthereumVaultConnectorScribble is EthereumVaultConnector {
     /// #if_succeeds "must have at most one controller" accountControllers[account].numElements <= 1;
     function requireAccountStatusCheckInternal(address account) internal virtual override {
         super.requireAccountStatusCheckInternal(account);
+    }
+
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
+    function requireAccountStatusCheckInternalNonReentrantChecks(address account) internal virtual override {
+        super.requireAccountStatusCheckInternalNonReentrantChecks(account);
+    }
+
+    /// #if_succeeds "is checks non-reentrant" !old(executionContext.areChecksInProgress());
+    function requireVaultStatusCheckInternalNonReentrantChecks(address vault) internal virtual override {
+        super.requireVaultStatusCheckInternalNonReentrantChecks(vault);
     }
 
     /// #if_succeeds "execution context is restored" EC.unwrap(executionContext) == EC.unwrap(contextCache);
