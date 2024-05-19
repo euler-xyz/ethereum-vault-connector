@@ -9,6 +9,6 @@ rule account_status_only_one_controller {
     env e;
     address account;
     require numOfController(account) > 1;
-    bool isValid = checkAccountStatus@withrevert(e, account);
+    bool isValid = checkAccountStatus(e, account);
     assert !isValid;
 }
