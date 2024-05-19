@@ -42,6 +42,7 @@ invariant topLevelFunctionDontChangeTransientStorage()
     getRawExecutionContext() == getExecutionContextDefault()
     filtered { f ->
         !isMustRevertFunction(f) &&
+        !f.isFallback &&            // certora plans to deprecate certora tool-generated function from sanity checks
         f.selector != sig:getCurrentOnBehalfOfAccount(address).selector
     }
 

@@ -1,6 +1,5 @@
 methods {
     function numOfController(address account) external returns (uint8) envfree;
-    function checkAccountStatus(address account) external returns (bool) envfree;
 }
 
 // CER-41: Account Status Check more than one controller.
@@ -10,6 +9,6 @@ rule account_status_only_one_controller {
     env e;
     address account;
     require numOfController(account) > 1;
-    bool isValid = checkAccountStatus@withrevert(account);
+    bool isValid = checkAccountStatus@withrevert(e, account);
     assert !isValid;
 }
