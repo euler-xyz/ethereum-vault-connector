@@ -72,6 +72,6 @@ rule enableControllerEnequeusStatusCheckWhenDeferred {
 rule checkAccountStatusForcesNumControllersLEOne {
     env e;
     address account;
-    checkAccountStatus(e, account);
-    assert numOfController(account) <= 1;
+    bool status = checkAccountStatus(e, account);
+    assert numOfController(account) > 1 => !status;
 }

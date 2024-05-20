@@ -5,5 +5,4 @@
  * generic rules or invariants if automatic sanity checks are enabled.
  */
 definition isMustRevertFunction(method f) returns bool =
-    f.selector == sig:EthereumVaultConnectorHarness.batchSimulation(IEVC.BatchItem[]).selector ||
     f.selector == sig:EthereumVaultConnectorHarness.batchRevert(IEVC.BatchItem[]).selector;
