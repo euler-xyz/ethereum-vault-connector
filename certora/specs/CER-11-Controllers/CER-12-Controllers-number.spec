@@ -69,10 +69,6 @@ rule enableControllerEnequeusStatusCheckWhenDeferred {
 // This directly specifies that checkAccountStatusInternal
 // will force numOfController for the checked account to be
 // less or equal to one to cover deferred checks.
-// -----------------------------------------------------------
-// UPD: This directly specifies that checkAccountStatusInternal
-// will return false if accountControllers[account].numElements
-// is greater than 1.
 rule checkAccountStatusForcesNumControllersLEOne {
     env e;
     address account;
