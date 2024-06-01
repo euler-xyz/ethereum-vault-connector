@@ -250,6 +250,10 @@ contract PermitTest is Test {
         evc.permit{value: msgSender.balance}(alice, sender, nonceNamespace, nonce, deadline, value, data, signature);
         assertTrue(evc.fallbackCalled());
 
+        uint256 balance = address(evc).balance;
+        assertTrue(balance > 0);
+        console.log("balance", balance);
+
         // it's not possible to carry out a reply attack
         vm.expectRevert(Errors.EVC_InvalidNonce.selector);
         evc.permit{value: msgSender.balance}(alice, sender, nonceNamespace, nonce, deadline, value, data, signature);
@@ -301,6 +305,59 @@ contract PermitTest is Test {
         // it's not possible to carry out a reply attack
         vm.expectRevert(Errors.EVC_InvalidNonce.selector);
         evc.permit{value: msgSender.balance}(alice, sender, nonceNamespace, nonce, deadline, value, data, signature);
+    }
+
+      function test_ECDSA_Permit_with_Sender_address0(
+        uint256 privateKey,
+        address sender,
+        uint256 nonceNamespace,
+        uint256 nonce,
+        uint256 deadline,
+        bytes memory data,
+        uint16 value
+    ) public {
+        vm.assume(
+            privateKey > 0
+                && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
+        );
+        address alice = vm.addr(privateKey);
+        address msgSender = sender == address(0) ? address(uint160(uint256(keccak256(abi.encode(alice))))) : sender;
+        address attacker = makeAddr("attacker");
+        bytes19 addressPrefix = evc.getAddressPrefix(alice);
+        data = abi.encode(keccak256(data));
+
+        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(nonce > 0 && nonce < type(uint256).max);
+
+        vm.warp(deadline);
+        vm.deal(attacker, type(uint128).max);
+        vm.deal(msgSender, type(uint128).max);
+        signerECDSA.setPrivateKey(privateKey);
+
+        if (nonce > 0) {
+            vm.prank(alice);
+            evc.setNonce(addressPrefix, nonceNamespace, nonce);
+        }
+
+        evc.clearFallbackCalled();
+        evc.setExpectedHash(data);
+        evc.setExpectedValue(value);
+
+        bytes memory signature = signerECDSA.signPermit(alice, address(0), nonceNamespace, nonce, deadline, value, data);
+
+        vm.expectEmit(true, true, false, true, address(evc));
+        emit NonceUsed(evc.getAddressPrefix(alice), nonceNamespace, nonce);
+        vm.expectEmit(true, true, true, true, address(evc));
+        emit CallWithContext(attacker, evc.getAddressPrefix(alice), alice, address(evc), bytes4(data));
+
+        vm.prank(attacker);
+        evc.permit{value: attacker.balance}(alice, address(0), nonceNamespace, nonce, deadline, value, data, signature);
+        assertTrue(evc.fallbackCalled());
+
+        // This will revert because attacker has done the tx with frontrunning.
+        vm.prank(msgSender);
+        vm.expectRevert(Errors.EVC_InvalidNonce.selector);
+        evc.permit{value: msgSender.balance}(alice, address(0), nonceNamespace, nonce, deadline, value, data, signature);
     }
 
     function test_RevertIfNestedPermit_Permit(
