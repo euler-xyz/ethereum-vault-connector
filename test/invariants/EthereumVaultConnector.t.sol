@@ -257,12 +257,26 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         accountControllers[account].firstElement = firstElementCache;
     }
 
-    function requireAccountStatusCheckInternal(address) internal pure override {
-        return;
+    function checkAccountStatusInternal(address account)
+        internal
+        view
+        virtual
+        override
+        returns (bool isValid, bytes memory result)
+    {
+        SetStorage storage accountControllersStorage = accountControllers[account];
+        uint256 numOfControllers = accountControllersStorage.numElements;
+
+        if (numOfControllers == 0) return (true, "");
+        else if (numOfControllers > 1) return (false, abi.encodeWithSelector(EVC_ControllerViolation.selector));
+
+        isValid = true;
+        result = "";
     }
 
-    function requireVaultStatusCheckInternal(address) internal pure override {
-        return;
+    function checkVaultStatusInternal(address) internal pure override returns (bool isValid, bytes memory result) {
+        isValid = true;
+        result = "";
     }
 
     function exposeAccountCollaterals(address account) external view returns (uint8, address[] memory) {
