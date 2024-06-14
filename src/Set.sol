@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.0;
 
 /// @dev Represents the maximum number of elements that can be stored in the set.
 /// Must not exceed 255 due to the uint8 data type limit.
