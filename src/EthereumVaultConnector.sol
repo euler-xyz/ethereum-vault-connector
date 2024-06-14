@@ -974,7 +974,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @param vault The address of the vault to check the status for.
     /// @return isValid A boolean indicating if the vault status is valid.
     /// @return result The bytes returned from the vault call, indicating the vault status.
-    function checkVaultStatusInternal(address vault) internal returns (bool isValid, bytes memory result) {
+    function checkVaultStatusInternal(address vault) internal virtual returns (bool isValid, bytes memory result) {
         bool success;
         (success, result) = vault.call(abi.encodeCall(IVault.checkVaultStatus, ()));
 
