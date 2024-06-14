@@ -74,7 +74,7 @@ contract SetPermitDisabledModeTest is Test {
     function test_Integration_SetPermitDisabledMode(address alice, address vault, address operator) public {
         vm.assume(alice != address(0) && !evc.haveCommonOwner(alice, operator) && alice.code.length == 0);
         vm.assume(
-            vault != address(0) && vault != alice && vault != operator && vault.code.length == 0
+            uint160(vault) > 255 && vault != alice && vault != operator && vault.code.length == 0
                 && vault != 0xF62849F9A0B5Bf2913b396098F7c7019b51A820a
         );
         vm.assume(operator != address(0) && operator.code.length == 0);

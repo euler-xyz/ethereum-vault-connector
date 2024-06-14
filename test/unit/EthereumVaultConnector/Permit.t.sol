@@ -223,6 +223,7 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
 
         vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(msgSender != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
         vm.warp(deadline);
