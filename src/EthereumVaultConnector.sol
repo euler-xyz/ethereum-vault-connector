@@ -26,15 +26,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @notice Name of the Ethereum Vault Connector.
     string public constant name = "Ethereum Vault Connector";
 
-    /// @notice Version of the Ethereum Vault Connector.
-    string public constant version = "1";
-
     uint160 internal constant ACCOUNT_ID_OFFSET = 8;
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
-    bytes32 internal constant HASHED_VERSION = keccak256(bytes(version));
 
     bytes32 internal constant TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
     bytes32 internal constant PERMIT_TYPEHASH = keccak256(
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
@@ -1148,7 +1144,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// @notice Calculates the EIP-712 domain separator for the contract.
     /// @return The calculated EIP-712 domain separator as a bytes32 value.
     function calculateDomainSeparator() internal view returns (bytes32) {
-        return keccak256(abi.encode(TYPE_HASH, HASHED_NAME, HASHED_VERSION, block.chainid, address(this)));
+        return keccak256(abi.encode(TYPE_HASH, HASHED_NAME, block.chainid, address(this)));
     }
 
     // Auxiliary functions
