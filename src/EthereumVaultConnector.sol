@@ -260,7 +260,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
 
     /// @inheritdoc IEVC
     function getAccountOwner(address account) external view returns (address) {
-        return getAccountOwnerInternal(account);
+        bytes19 addressPrefix = getAddressPrefixInternal(account);
+        return ownerLookup[addressPrefix].owner;
     }
 
     /// @inheritdoc IEVC
@@ -364,12 +365,13 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     /// caller address at once.
     function setAccountOperator(address account, address operator, bool authorized) public payable virtual {
         address msgSender = authenticateCaller({account: account, allowOperator: true, checkLockdownMode: false});
+        bytes19 addressPrefix = getAddressPrefixInternal(account);
 
         // if the account and the caller have a common owner, the caller must be the owner. if the account and the
         // caller don't have a common owner, the caller must be an operator and the owner address is taken from the
         // storage. the caller authentication above guarantees that the account owner is already registered hence
         // non-zero
-        address owner = haveCommonOwnerInternal(account, msgSender) ? msgSender : getAccountOwnerInternal(account);
+        address owner = haveCommonOwnerInternal(account, msgSender) ? msgSender : ownerLookup[addressPrefix].owner;
 
         // if it's an operator calling, it can only act for itself and must not be able to change other operators status
         if (owner != msgSender && operator != msgSender) {
@@ -380,8 +382,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (operator == address(this) || haveCommonOwnerInternal(owner, operator)) {
             revert EVC_InvalidAddress();
         }
-
-        bytes19 addressPrefix = getAddressPrefixInternal(account);
 
         // The bitMask defines which accounts the operator is authorized for. The bitMask is created from the account
         // number which is a number up to 2^8 in binary, or 256. 1 << (uint160(owner) ^ uint160(account)) transforms
@@ -1187,14 +1187,6 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         return bytes19(uint152(uint160(account) >> ACCOUNT_ID_OFFSET));
     }
 
-    /// @notice Retrieves the owner of a given account by its address prefix.
-    /// @param account The account address to retrieve the owner for.
-    /// @return The address of the account owner.
-    function getAccountOwnerInternal(address account) internal view returns (address) {
-        bytes19 addressPrefix = getAddressPrefixInternal(account);
-        return ownerLookup[addressPrefix].owner;
-    }
-
     /// @notice Checks if an operator is authorized for a specific account.
     /// @dev Determines operator authorization by checking if the operator's bit is set in the operator's bit field for
     /// the account's address prefix. If the owner is not registered (address(0)), it implies the operator cannot be
@@ -1207,12 +1199,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         address account,
         address operator
     ) internal view returns (bool isAuthorized) {
-        address owner = getAccountOwnerInternal(account);
+        bytes19 addressPrefix = getAddressPrefixInternal(account);
+        address owner = ownerLookup[addressPrefix].owner;
 
         // if the owner is not registered yet, it means that the operator couldn't have been authorized
         if (owner == address(0)) return false;
-
-        bytes19 addressPrefix = getAddressPrefixInternal(account);
 
         // The bitMask defines which accounts the operator is authorized for. The bitMask is created from the account
         // number which is a number up to 2^8 in binary, or 256. 1 << (uint160(owner) ^ uint160(account)) transforms
