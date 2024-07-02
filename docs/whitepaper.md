@@ -235,7 +235,7 @@ Sub-accounts allow users access to multiple (up to 256) virtual accounts that ar
 
 Since an account can only have one controller at a time (except for mid-transaction), sub-accounts are also the only way an Ethereum account can hold multiple Vault borrows concurrently.
 
-The EVC also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on- or off-chain. This mapping is populated when an address interacts with the EVC for the first time. In order to resolve a sub-account, the `getAccountOwner` function should be called with a sub-account address. It will either return the account's primary address, or revert with an error if the account has not yet interacted with the EVC.
+The EVC also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on- or off-chain. This mapping is populated when an address interacts with the EVC for the first time. In order to resolve a sub-account, the `getAccountOwner` function should be called with a sub-account address. It will either return the account's primary address, or `address(0)` if the account has not yet interacted with the EVC.
 
 #### Operators
 
