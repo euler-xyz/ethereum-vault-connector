@@ -777,6 +777,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             } else if (owner == msgSender) {
                 authenticated = true;
             }
+
+            // prevent both the caller and the account from being smart contracts at the same time
+            if (account != msgSender && account.code.length != 0) {
+                authenticated = false;
+            }
         }
 
         // if the caller is not the owner, check if it is an operator if operators are allowed
@@ -798,8 +803,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @notice Authenticates the caller of a function.
-    /// @dev This function converts a bytes19 address prefix into a phantom account address which is an account address
-    /// that belongs to the owner of the address prefix.
+    /// @dev This function either passes the address prefix owner address, if the address prefix owner is already
+    /// registered, or converts the bytes19 address prefix into an account address which will belong to the owner when
+    /// it's finally registered.
     /// @param addressPrefix The bytes19 address prefix to authenticate the caller against.
     /// @param allowOperator A boolean indicating if operators are allowed to authenticate as the caller.
     /// @param checkLockdownMode A boolean indicating if the function should check for lockdown mode on the account.
@@ -809,10 +815,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bool allowOperator,
         bool checkLockdownMode
     ) internal virtual returns (address) {
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
+        address owner = ownerLookup[addressPrefix].owner;
 
         return authenticateCaller({
-            account: phantomAccount,
+            account: owner == address(0) ? address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET) : owner,
             allowOperator: allowOperator,
             checkLockdownMode: checkLockdownMode
         });

@@ -216,6 +216,53 @@ contract CallTest is Test {
         }
     }
 
+    function test_RevertIfOwnerAndAccountAreSmartContracts_Call(address alice, uint8 id) public {
+        vm.assume(uint160(alice) > 255 && alice != address(evc));
+        vm.assume(id != 0);
+
+        address alicesSubAccount = address(uint160(alice) ^ id);
+
+        // both alice and her sub-account are contracts
+        vm.etch(alice, "ff");
+        vm.etch(alicesSubAccount, "ff");
+
+        address targetContract = address(new Target());
+        vm.assume(targetContract != alice && targetContract != address(evc));
+
+        bytes memory data1 = abi.encodeWithSelector(
+            Target(targetContract).callTest.selector, address(evc), address(evc), 0, alicesSubAccount, false
+        );
+
+        bytes memory data2 = abi.encodeWithSelector(
+            Target(targetContract).callTest.selector, address(evc), address(evc), 0, alice, false
+        );
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alicesSubAccount, 0, data1);
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alicesSubAccount);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alice, 0, data2);
+
+        // alice successfully registers as an owner
+        vm.prank(alice);
+        evc.call(targetContract, alice, 0, data2);
+        assertEq(evc.getAccountOwner(alice), alice);
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alicesSubAccount, 0, data1);
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alicesSubAccount);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alice, 0, data2);
+    }
+
     function test_RevertIfChecksReentrancy_Call(address alice, uint256 seed) public {
         vm.assume(alice != address(evc));
 
