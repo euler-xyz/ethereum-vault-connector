@@ -74,11 +74,15 @@ abstract contract EVCUtil {
         _;
     }
 
-    /// @notice Ensures standard authentication path on the EVC.
+    /// @notice Ensures a standard authentication path on the EVC.
     /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
     /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
     /// It reverts if the authenticated account owner is known and it is not the account owner.
     /// @dev It assumes that if the caller is not the EVC, the caller is the account owner.
+    /// @dev This modifier must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This modifier must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
     modifier onlyEVCAccountOwner() virtual {
         if (msg.sender == address(evc)) {
             EC ec = EC.wrap(evc.getRawExecutionContext());
