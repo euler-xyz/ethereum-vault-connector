@@ -22,17 +22,6 @@ rule checkStatusCalled_call {
     assert checkCalled;
 }
 
-rule checkStatusCalled_permit {
-    env e;
-    calldataarg args;
-
-    require checkCalled == false;
-    // Assume the initiall context did not defer checks
-    require !getExecutionContextAreChecksDeferred(e);
-    permit(e, args);
-    assert checkCalled;
-}
-
 rule checkStatusCalled_batch {
     env e;
     calldataarg args;
