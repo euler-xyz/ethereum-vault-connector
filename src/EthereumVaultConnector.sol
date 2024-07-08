@@ -933,8 +933,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         else if (numOfControllers > 1) return (false, abi.encodeWithSelector(EVC_ControllerViolation.selector));
 
         bool success;
-        (success, result) =
-            controller.call(abi.encodeCall(IVault.checkAccountStatus, (account, accountCollaterals[account].get())));
+        (success, result) = controller.staticcall(
+            abi.encodeCall(IVault.checkAccountStatus, (account, accountCollaterals[account].get()))
+        );
 
         isValid = success && result.length == 32
             && abi.decode(result, (bytes32)) == bytes32(IVault.checkAccountStatus.selector);
