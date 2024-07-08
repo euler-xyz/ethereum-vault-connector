@@ -91,7 +91,7 @@ contract Vault is IVault, Target {
         }
     }
 
-    function checkAccountStatus(address, address[] memory) external virtual override returns (bytes4 magicValue) {
+    function checkAccountStatus(address, address[] memory) external view virtual override returns (bytes4 magicValue) {
         try evc.getCurrentOnBehalfOfAccount(address(0)) {
             revert("cas/on-behalf-of-account");
         } catch (bytes memory reason) {
@@ -176,7 +176,7 @@ contract VaultMalicious is Vault {
         }
 
         (bool success, bytes memory result) =
-            address(evc).call(abi.encodeWithSelector(evc.batch.selector, new IEVC.BatchItem[](0)));
+            address(evc).staticcall(abi.encodeWithSelector(evc.getLastAccountStatusCheckTimestamp.selector, address(0)));
 
         if (success || bytes4(result) != expectedErrorSelector) {
             return this.checkVaultStatus.selector;
@@ -185,7 +185,7 @@ contract VaultMalicious is Vault {
         revert("malicious vault");
     }
 
-    function checkAccountStatus(address, address[] memory) external override returns (bytes4) {
+    function checkAccountStatus(address, address[] memory) external view override returns (bytes4) {
         try evc.getCurrentOnBehalfOfAccount(address(0)) {
             revert("cas/on-behalf-of-account");
         } catch (bytes memory reason) {
@@ -207,7 +207,7 @@ contract VaultMalicious is Vault {
         }
 
         (bool success, bytes memory result) =
-            address(evc).call(abi.encodeWithSelector(evc.batch.selector, new IEVC.BatchItem[](0)));
+            address(evc).staticcall(abi.encodeWithSelector(evc.getLastAccountStatusCheckTimestamp.selector, address(0)));
 
         if (success || bytes4(result) != expectedErrorSelector) {
             return this.checkAccountStatus.selector;

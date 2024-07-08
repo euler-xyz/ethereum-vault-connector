@@ -270,9 +270,7 @@ The previous value of `onBehalfOfAccount` is stored in a local "cache" variable 
 
 #### checksInProgress
 
-The EVC invokes the `checkAccountStatus` and `checkVaultStatus` callbacks using low-level `call` instead of `staticcall` so that controllers can checkpoint state during these operations. However, because of this there is a danger that the EVC could be re-entered during these operations, either directly by a controller, or indirectly by a contract it invokes.
-
-Because of this, the EVC's execution context maintains a `checksInProgress` mutex that is acquired before unwinding the sets of accounts and vaults that need checking. This mutex is also checked during operations that alter these sets. If it did not do this, then information cached by the higher-level unwinding function (such as the sizes of the sets) could become inconsistent with the underlying storage, which could be used to bypass these critical checks.
+Because the EVC invokes the `checkAccountStatus` and `checkVaultStatus` callbacks that could re-enter the EVC, either directly or by a contract they invoke, the EVC's execution context maintains a `checksInProgress` mutex that is acquired before unwinding the sets of accounts and vaults that need checking. This mutex is also checked during operations that alter these sets. If it did not do this, then information cached by the higher-level unwinding function (such as the sizes of the sets) could become inconsistent with the underlying storage, which could be used to bypass these critical checks.
 
 #### controlCollateralInProgress
 
