@@ -771,22 +771,22 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
-                ownerLookup[addressPrefix].owner = msgSender;
+                ownerLookup[addressPrefix].owner = owner = msgSender;
                 emit OwnerRegistered(addressPrefix, msgSender);
                 authenticated = true;
             } else if (owner == msgSender) {
                 authenticated = true;
-            }
-
-            // prevent both the caller and the account from being smart contracts at the same time
-            if (account != msgSender && account.code.length != 0) {
-                authenticated = false;
             }
         }
 
         // if the caller is not the owner, check if it is an operator if operators are allowed
         if (!authenticated && allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
             authenticated = true;
+        }
+
+        // if the authenticated account is non-owner, prevent its account from being a smart contract
+        if (authenticated && owner != account && account.code.length != 0) {
+            authenticated = false;
         }
 
         // must revert if neither the owner nor the operator were authenticated
