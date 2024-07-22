@@ -14,6 +14,7 @@ import {ExecutionContext, EC} from "../ExecutionContext.sol";
 abstract contract EVCUtil {
     using ExecutionContext for EC;
 
+    uint160 internal constant ACCOUNT_ID_OFFSET = 8;
     IEVC internal immutable evc;
 
     error EVC_InvalidAddress();
@@ -99,6 +100,28 @@ abstract contract EVCUtil {
             }
         }
         _;
+    }
+
+    /// @notice Checks whether the specified account and the other account have the same owner.
+    /// @dev The function is used to check whether one account is authorized to perform operations on behalf of the
+    /// other. Accounts are considered to have a common owner if they share the first 19 bytes of their address.
+    /// @param account The address of the account that is being checked.
+    /// @param otherAccount The address of the other account that is being checked.
+    /// @return A boolean flag that indicates whether the accounts have the same owner.
+    function _haveCommonOwner(address account, address otherAccount) internal pure returns (bool) {
+        bool result;
+        assembly {
+            result := lt(xor(account, otherAccount), 0x100)
+        }
+        return result;
+    }
+
+    /// @notice Returns the address prefix of the specified account.
+    /// @dev The address prefix is the first 19 bytes of the account address.
+    /// @param account The address of the account whose address prefix is being retrieved.
+    /// @return A bytes19 value that represents the address prefix of the account.
+    function _getAddressPrefix(address account) internal pure returns (bytes19) {
+        return bytes19(uint152(uint160(account) >> ACCOUNT_ID_OFFSET));
     }
 
     /// @notice Retrieves the message sender in the context of the EVC.
