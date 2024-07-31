@@ -272,7 +272,10 @@ contract CallTest is Test {
     ) public {
         vm.assume(uint160(alice) > 255 && alice != address(evc));
         vm.assume(targetContract != operator && !evc.haveCommonOwner(alice, operator));
-        vm.assume(uint160(targetContract) > 255 && targetContract != address(evc) && !evc.haveCommonOwner(alice, targetContract));
+        vm.assume(
+            uint160(targetContract) > 255 && targetContract != address(evc)
+                && !evc.haveCommonOwner(alice, targetContract)
+        );
         vm.assume(id != 0);
         vm.assume(data.length != 0);
 
