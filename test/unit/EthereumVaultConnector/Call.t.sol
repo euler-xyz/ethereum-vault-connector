@@ -216,6 +216,102 @@ contract CallTest is Test {
         }
     }
 
+    function test_RevertIfOwnerAndAccountAreSmartContracts_Call(address alice, uint8 id) public {
+        vm.assume(uint160(alice) > 255 && alice != address(evc));
+        vm.assume(id != 0);
+
+        address alicesSubAccount = address(uint160(alice) ^ id);
+
+        // both alice and her sub-account are contracts
+        vm.etch(alice, "ff");
+        vm.etch(alicesSubAccount, "ff");
+
+        address targetContract = address(new Target());
+        vm.assume(targetContract != alice && targetContract != address(evc));
+
+        bytes memory data1 = abi.encodeWithSelector(
+            Target(targetContract).callTest.selector, address(evc), address(evc), 0, alicesSubAccount, false
+        );
+
+        bytes memory data2 = abi.encodeWithSelector(
+            Target(targetContract).callTest.selector, address(evc), address(evc), 0, alice, false
+        );
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alicesSubAccount, 0, data1);
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alicesSubAccount);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alice, 0, data2);
+
+        // alice successfully registers as an owner
+        vm.prank(alice);
+        evc.call(targetContract, alice, 0, data2);
+        assertEq(evc.getAccountOwner(alice), alice);
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alicesSubAccount, 0, data1);
+
+        // authentication is unsuccessfull because both the caller and the account are smart contracts at the same time
+        vm.prank(alicesSubAccount);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alice, 0, data2);
+    }
+
+    function test_RevertIfSubAccountOfRegisteredOwnerIsSmartContract_Call(
+        address alice,
+        uint8 id,
+        address operator,
+        address targetContract,
+        bytes memory data
+    ) public {
+        vm.assume(uint160(alice) > 255 && alice != address(evc));
+        vm.assume(targetContract != operator && !evc.haveCommonOwner(alice, operator));
+        vm.assume(targetContract != address(evc) && !evc.haveCommonOwner(alice, targetContract));
+        vm.assume(id != 0);
+        vm.assume(data.length != 0);
+
+        address alicesSubAccount = address(uint160(alice) ^ id);
+
+        // alice's sub-account is contract
+        vm.etch(alicesSubAccount, "ff");
+
+        // authentication is unsuccessfull because alice's sub-account is a smart contract
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.setAccountOperator(alicesSubAccount, operator, true);
+
+        // alice's sub-account is no longer a contract
+        vm.etch(alicesSubAccount, "");
+
+        // this time authentication is successful; register alice as an owner by registering an operator for her
+        // sub-account
+        vm.prank(alice);
+        evc.setAccountOperator(alicesSubAccount, operator, true);
+
+        // authentication is successfull as long as alice's sub-account is not a smart contract
+        vm.prank(alice);
+        evc.call(targetContract, alicesSubAccount, 0, data);
+        vm.prank(operator);
+        evc.call(targetContract, alicesSubAccount, 0, data);
+
+        // alice's sub-account is a contract once again
+        vm.etch(alicesSubAccount, "ff");
+
+        // authentication is unsuccessfull because alice's sub-account is a smart contract
+        vm.prank(alice);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alicesSubAccount, 0, data);
+        vm.prank(operator);
+        vm.expectRevert(Errors.EVC_NotAuthorized.selector);
+        evc.call(targetContract, alicesSubAccount, 0, data);
+    }
+
     function test_RevertIfChecksReentrancy_Call(address alice, uint256 seed) public {
         vm.assume(alice != address(evc));
 
