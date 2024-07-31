@@ -767,7 +767,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         if (haveCommonOwnerInternal(account, msgSender)) {
             // if the owner is not registered, register it
             if (owner == address(0)) {
-                ownerLookup[addressPrefix].owner = msgSender;
+                ownerLookup[addressPrefix].owner = owner = msgSender;
                 emit OwnerRegistered(addressPrefix, msgSender);
                 authenticated = true;
             } else if (owner == msgSender) {
@@ -778,6 +778,11 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         // if the caller is not the owner, check if it is an operator if operators are allowed
         if (!authenticated && allowOperator && isAccountOperatorAuthorizedInternal(account, msgSender)) {
             authenticated = true;
+        }
+
+        // if the authenticated account is non-owner, prevent its account from being a smart contract
+        if (authenticated && owner != account && account.code.length != 0) {
+            authenticated = false;
         }
 
         // must revert if neither the owner nor the operator were authenticated
@@ -794,8 +799,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @notice Authenticates the caller of a function.
-    /// @dev This function converts a bytes19 address prefix into a phantom account address which is an account address
-    /// that belongs to the owner of the address prefix.
+    /// @dev This function either passes the address prefix owner address, if the address prefix owner is already
+    /// registered, or converts the bytes19 address prefix into an account address which will belong to the owner when
+    /// it's finally registered.
     /// @param addressPrefix The bytes19 address prefix to authenticate the caller against.
     /// @param allowOperator A boolean indicating if operators are allowed to authenticate as the caller.
     /// @param checkLockdownMode A boolean indicating if the function should check for lockdown mode on the account.
@@ -805,10 +811,10 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bool allowOperator,
         bool checkLockdownMode
     ) internal virtual returns (address) {
-        address phantomAccount = address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET);
+        address owner = ownerLookup[addressPrefix].owner;
 
         return authenticateCaller({
-            account: phantomAccount,
+            account: owner == address(0) ? address(uint160(uint152(addressPrefix)) << ACCOUNT_ID_OFFSET) : owner,
             allowOperator: allowOperator,
             checkLockdownMode: checkLockdownMode
         });
