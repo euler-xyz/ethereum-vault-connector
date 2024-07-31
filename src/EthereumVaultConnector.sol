@@ -491,7 +491,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         bytes calldata signature
     ) public payable virtual nonReentrantChecksAndControlCollateral {
         // cannot be called within the self-call of the permit function; can occur for nested calls.
-        // the permit function can be called only by the specified sender
+        // the permit function can be called only by the specified sender, unless address zero is specified in which
+        // case anyone can call it
         if (inPermitSelfCall() || (sender != address(0) && sender != msg.sender)) {
             revert EVC_NotAuthorized();
         }
