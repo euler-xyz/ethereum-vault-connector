@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {IEVC} from "../interfaces/IEthereumVaultConnector.sol";
+import {ExecutionContext, EC} from "../ExecutionContext.sol";
 
 /// @title EVCUtil
 /// @custom:security-contact security@euler.xyz
@@ -11,6 +12,8 @@ import {IEVC} from "../interfaces/IEthereumVaultConnector.sol";
 /// It provides utility functions for authenticating the callers in the context of the EVC, a pattern for enforcing the
 /// contracts to be called through the EVC.
 abstract contract EVCUtil {
+    using ExecutionContext for EC;
+
     IEVC internal immutable evc;
 
     error EVC_InvalidAddress();
@@ -68,6 +71,33 @@ abstract contract EVCUtil {
             revert NotAuthorized();
         }
 
+        _;
+    }
+
+    /// @notice Ensures a standard authentication path on the EVC.
+    /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
+    /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
+    /// It reverts if the authenticated account owner is known and it is not the account owner.
+    /// @dev It assumes that if the caller is not the EVC, the caller is the account owner.
+    /// @dev This modifier must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This modifier must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
+    modifier onlyEVCAccountOwner() virtual {
+        if (msg.sender == address(evc)) {
+            EC ec = EC.wrap(evc.getRawExecutionContext());
+
+            if (ec.isOperatorAuthenticated() || ec.isControlCollateralInProgress() || ec.areChecksInProgress()) {
+                revert NotAuthorized();
+            }
+
+            address onBehalfOfAccount = ec.getOnBehalfOfAccount();
+            address owner = evc.getAccountOwner(onBehalfOfAccount);
+
+            if (owner != address(0) && owner != onBehalfOfAccount) {
+                revert NotAuthorized();
+            }
+        }
         _;
     }
 
