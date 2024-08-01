@@ -3,7 +3,7 @@
 // Account address. In that case, the authentication is not performed
 
 methods {
-    function EthereumVaultConnector.authenticateCaller(address account, bool allowOperator) internal returns (address) with (env e) => 
+    function EthereumVaultConnector.authenticateCaller(address account, bool allowOperator, bool checkLockdownMode) internal returns (address) with (env e) => 
         reachedAuthCaller(e, account, allowOperator);
 }
 
