@@ -21,9 +21,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function numOfController(address account) public view returns (uint8) {
         return accountControllers[account].numElements;
     }
-    function getAccountController(address account) public view returns (address) {
-        return accountControllers[account].firstElement;
-    }
+    
     function accountCollateralsContains(address account, address collateral) public view returns (bool) {
         return accountCollaterals[account].contains(collateral);
     }
@@ -63,6 +61,10 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
 
     function getAccountCollaterals(address account) external view returns (address[] memory) {
         return accountCollaterals[account].get();
+    }
+
+    function getAccountController(address account) public view returns (address) {
+        return accountControllers[account].firstElement;
     }
 
     function isAccountController(address account, address controller) public view returns (bool) {
