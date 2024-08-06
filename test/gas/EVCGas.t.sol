@@ -22,7 +22,7 @@ contract EVCHarness is EthereumVaultConnector {
         address signer,
         bytes32 hash,
         bytes memory signature
-    ) external returns (bool isValid) {
+    ) external view returns (bool isValid) {
         // for compatibility with scribble, do not make this view
         return isValidERC1271Signature(signer, hash, signature);
     }
