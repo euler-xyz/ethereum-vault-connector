@@ -38,40 +38,14 @@ abstract contract EVCUtil {
     /// @dev If this modifier used in conjuction with any other modifier, it must appear as the first (outermost)
     /// modifier of the function.
     modifier callThroughEVC() virtual {
-        if (msg.sender == address(evc)) {
-            _;
-        } else {
-            address _evc = address(evc);
-
-            assembly {
-                mstore(0, 0x1f8b521500000000000000000000000000000000000000000000000000000000) // EVC.call selector
-                mstore(4, address()) // EVC.call 1st argument - address(this)
-                mstore(36, caller()) // EVC.call 2nd argument - msg.sender
-                mstore(68, callvalue()) // EVC.call 3rd argument - msg.value
-                mstore(100, 128) // EVC.call 4th argument - msg.data, offset to the start of encoding - 128 bytes
-                mstore(132, calldatasize()) // msg.data length
-                calldatacopy(164, 0, calldatasize()) // original calldata
-
-                // abi encoded bytes array should be zero padded so its length is a multiple of 32
-                // store zero word after msg.data bytes and round up calldatasize to nearest multiple of 32
-                mstore(add(164, calldatasize()), 0)
-                let result := call(gas(), _evc, callvalue(), 0, add(164, and(add(calldatasize(), 31), not(31))), 0, 0)
-
-                returndatacopy(0, 0, returndatasize())
-                switch result
-                case 0 { revert(0, returndatasize()) }
-                default { return(64, sub(returndatasize(), 64)) } // strip bytes encoding from call return
-            }
-        }
+        _callThroughEVC();
+        _;
     }
 
     /// @notice Ensures that the caller is the EVC in the appropriate context.
     /// @dev Should be used for checkAccountStatus and checkVaultStatus functions.
     modifier onlyEVCWithChecksInProgress() virtual {
-        if (msg.sender != address(evc) || !evc.areChecksInProgress()) {
-            revert NotAuthorized();
-        }
-
+        _onlyEVCWithChecksInProgress();
         _;
     }
 
@@ -85,21 +59,33 @@ abstract contract EVCUtil {
     /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
     /// the EVC.
     modifier onlyEVCAccountOwner() virtual {
-        if (msg.sender == address(evc)) {
-            EC ec = EC.wrap(evc.getRawExecutionContext());
-
-            if (ec.isOperatorAuthenticated() || ec.isControlCollateralInProgress() || ec.areChecksInProgress()) {
-                revert NotAuthorized();
-            }
-
-            address onBehalfOfAccount = ec.getOnBehalfOfAccount();
-            address owner = evc.getAccountOwner(onBehalfOfAccount);
-
-            if (owner != address(0) && owner != onBehalfOfAccount) {
-                revert NotAuthorized();
-            }
-        }
+        _onlyEVCAccountOwner();
         _;
+    }
+
+    function _callThroughEVC() internal {
+        address _evc = address(evc);
+        if (msg.sender == _evc) return;
+
+        assembly {
+            mstore(0, 0x1f8b521500000000000000000000000000000000000000000000000000000000) // EVC.call selector
+            mstore(4, address()) // EVC.call 1st argument - address(this)
+            mstore(36, caller()) // EVC.call 2nd argument - msg.sender
+            mstore(68, callvalue()) // EVC.call 3rd argument - msg.value
+            mstore(100, 128) // EVC.call 4th argument - msg.data, offset to the start of encoding - 128 bytes
+            mstore(132, calldatasize()) // msg.data length
+            calldatacopy(164, 0, calldatasize()) // original calldata
+
+            // abi encoded bytes array should be zero padded so its length is a multiple of 32
+            // store zero word after msg.data bytes and round up calldatasize to nearest multiple of 32
+            mstore(add(164, calldatasize()), 0)
+            let result := call(gas(), _evc, callvalue(), 0, add(164, and(add(calldatasize(), 31), not(31))), 0, 0)
+
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 { revert(0, returndatasize()) }
+            default { return(64, sub(returndatasize(), 64)) } // strip bytes encoding from call return
+        }
     }
 
     /// @notice Checks whether the specified account and the other account have the same owner.
@@ -158,5 +144,28 @@ abstract contract EVCUtil {
         }
 
         return sender;
+    }
+
+    function _onlyEVCWithChecksInProgress() internal view {
+        if (msg.sender != address(evc) || !evc.areChecksInProgress()) {
+            revert NotAuthorized();
+        }
+    }
+
+    function _onlyEVCAccountOwner() internal view {
+        if (msg.sender == address(evc)) {
+            EC ec = EC.wrap(evc.getRawExecutionContext());
+
+            if (ec.isOperatorAuthenticated() || ec.isControlCollateralInProgress() || ec.areChecksInProgress()) {
+                revert NotAuthorized();
+            }
+
+            address onBehalfOfAccount = ec.getOnBehalfOfAccount();
+            address owner = evc.getAccountOwner(onBehalfOfAccount);
+
+            if (owner != address(0) && owner != onBehalfOfAccount) {
+                revert NotAuthorized();
+            }
+        }
     }
 }
