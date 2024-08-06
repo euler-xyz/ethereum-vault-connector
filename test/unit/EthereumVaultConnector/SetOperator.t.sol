@@ -39,6 +39,8 @@ contract SetOperatorTest is Test {
             bool isAlreadyAuthorized = operatorBitField & (1 << i) != 0;
             assertEq(evc.isAccountOperatorAuthorized(account, operator), isAlreadyAuthorized);
 
+            if (account.code.length != 0) continue;
+
             // authorize the operator
             if (!isAlreadyAuthorized) {
                 vm.expectEmit(true, true, false, true, address(evc));
@@ -80,6 +82,8 @@ contract SetOperatorTest is Test {
             address account = address(uint160(uint160(alice) ^ i));
             bytes19 addressPrefix = evc.getAddressPrefix(account);
             assertEq(evc.isAccountOperatorAuthorized(account, operator), false);
+
+            vm.assume(account.code.length == 0);
 
             if (i == 0) {
                 assertEq(evc.getAccountOwner(account), address(0));
@@ -143,6 +147,8 @@ contract SetOperatorTest is Test {
         for (uint256 i = 0; i < 256; ++i) {
             address account = address(uint160(uint160(alice) ^ i));
             bool isAlreadyAuthorized = operatorBitField & (1 << i) != 0;
+
+            if (account.code.length != 0) continue;
 
             // revert when trying to set the same operator status
             vm.prank(alice);

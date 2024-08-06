@@ -102,7 +102,9 @@ library Set {
     }
 
     /// @notice Removes an element and returns information whether the element was removed or not.
-    /// @dev This operation may affect the order of elements in the array of elements obtained using get() function.
+    /// @dev This operation may affect the order of elements in the array of elements obtained using get() function. This
+    /// function does not modify the metadata of the set, even if it becomes empty as a result of invoking this
+    /// function.
     /// @param setStorage The set storage from which the element will be removed.
     /// @param element The element to be removed.
     /// @return A boolean value that indicates whether the element was removed or not. If the element was not in the set
@@ -245,7 +247,8 @@ library Set {
 
     /// @notice Iterates over each element in the set and applies the callback function to it.
     /// @dev The set is cleared as a result of this call. Considering that this function does not follow the
-    /// Checks-Effects-Interactions pattern, the function using it must prevent re-entrancy.
+    /// Checks-Effects-Interactions pattern, the function using it must prevent re-entrancy. This function does not
+    /// modify the metadata of the set.
     /// @param setStorage The set storage to be processed.
     /// @param callback The function to be applied to each element.
     function forEachAndClear(SetStorage storage setStorage, function(address) callback) internal {
@@ -273,7 +276,8 @@ library Set {
     /// @notice Iterates over each element in the set and applies the callback function to it, returning the array of
     /// callback results.
     /// @dev The set is cleared as a result of this call. Considering that this function does not follow the
-    /// Checks-Effects-Interactions pattern, the function using it must prevent re-entrancy.
+    /// Checks-Effects-Interactions pattern, the function using it must prevent re-entrancy. This function does not
+    /// modify the metadata of the set.
     /// @param setStorage The set storage to be processed.
     /// @param callback The function to be applied to each element.
     /// @return result An array of encoded bytes that are the addresses passed to the callback function and results of

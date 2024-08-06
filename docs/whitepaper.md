@@ -235,7 +235,7 @@ Sub-accounts allow users access to multiple (up to 256) virtual accounts that ar
 
 Since an account can only have one controller at a time (except for mid-transaction), sub-accounts are also the only way an Ethereum account can hold multiple Vault borrows concurrently.
 
-The EVC also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on- or off-chain. This mapping is populated when an address interacts with the EVC for the first time. In order to resolve a sub-account, the `getAccountOwner` function should be called with a sub-account address. It will either return the account's primary address, or revert with an error if the account has not yet interacted with the EVC.
+The EVC also maintains a look-up mapping `ownerLookup` so sub-accounts can be easily resolved to owner addresses, on- or off-chain. This mapping is populated when an address interacts with the EVC for the first time. In order to resolve a sub-account, the `getAccountOwner` function should be called with a sub-account address. It will either return the account's primary address, or `address(0)` if the account has not yet interacted with the EVC.
 
 #### Operators
 
@@ -270,9 +270,7 @@ The previous value of `onBehalfOfAccount` is stored in a local "cache" variable 
 
 #### checksInProgress
 
-The EVC invokes the `checkAccountStatus` and `checkVaultStatus` callbacks using low-level `call` instead of `staticcall` so that controllers can checkpoint state during these operations. However, because of this there is a danger that the EVC could be re-entered during these operations, either directly by a controller, or indirectly by a contract it invokes.
-
-Because of this, the EVC's execution context maintains a `checksInProgress` mutex that is acquired before unwinding the sets of accounts and vaults that need checking. This mutex is also checked during operations that alter these sets. If it did not do this, then information cached by the higher-level unwinding function (such as the sizes of the sets) could become inconsistent with the underlying storage, which could be used to bypass these critical checks.
+Because the EVC invokes the `checkAccountStatus` and `checkVaultStatus` callbacks that could re-enter the EVC, either directly or by a contract they invoke, the EVC's execution context maintains a `checksInProgress` mutex that is acquired before unwinding the sets of accounts and vaults that need checking. This mutex is also checked during operations that alter these sets. If it did not do this, then information cached by the higher-level unwinding function (such as the sizes of the sets) could become inconsistent with the underlying storage, which could be used to bypass these critical checks.
 
 #### controlCollateralInProgress
 

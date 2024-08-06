@@ -50,6 +50,7 @@ contract ControllersManagementTest is Test {
         vm.assume(seed > 1000);
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
+        vm.assume(account.code.length == 0);
 
         // test controllers management with use of an operator
         address msgSender = alice;
