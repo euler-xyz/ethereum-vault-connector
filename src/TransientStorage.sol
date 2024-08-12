@@ -10,7 +10,7 @@ import {Set, SetStorage} from "./Set.sol";
 /// @author Euler Labs (https://www.eulerlabs.com/)
 /// @notice This contract provides transient storage for the Ethereum Vault Connector.
 /// @dev All the variables in this contract are considered transient meaning that their state does not change between
-/// transactions.
+/// invocations.
 abstract contract TransientStorage {
     using ExecutionContext for EC;
     using Set for SetStorage;

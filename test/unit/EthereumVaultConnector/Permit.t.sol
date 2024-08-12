@@ -12,33 +12,26 @@ abstract contract EIP712 {
     using ShortStrings for *;
 
     bytes32 internal constant _TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
     bytes32 internal immutable _hashedName;
-    bytes32 internal immutable _hashedVersion;
-
     ShortString private immutable _name;
-    ShortString private immutable _version;
     string private _nameFallback;
-    string private _versionFallback;
 
     /**
      * @dev Initializes the domain separator.
      *
-     * The meaning of `name` and `version` is specified in
+     * The meaning of `name` is specified in
      * https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator[EIP 712]:
      *
      * - `name`: the user readable name of the signing domain, i.e. the name of the DApp or the protocol.
-     * - `version`: the current major version of the signing domain.
      *
      * NOTE: These parameters cannot be changed except through a xref:learn::upgrading-smart-contracts.adoc[smart
      * contract upgrade].
      */
-    constructor(string memory name, string memory version) {
+    constructor(string memory name) {
         _name = name.toShortStringWithFallback(_nameFallback);
-        _version = version.toShortStringWithFallback(_versionFallback);
         _hashedName = keccak256(bytes(name));
-        _hashedVersion = keccak256(bytes(version));
     }
 
     /**
@@ -80,7 +73,7 @@ contract SignerECDSA is EIP712, Test {
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
-    constructor(EthereumVaultConnector _evc) EIP712(_evc.name(), _evc.version()) {
+    constructor(EthereumVaultConnector _evc) EIP712(_evc.name()) {
         evc = _evc;
     }
 
@@ -89,7 +82,7 @@ contract SignerECDSA is EIP712, Test {
     }
 
     function _buildDomainSeparator() internal view override returns (bytes32) {
-        return keccak256(abi.encode(_TYPE_HASH, _hashedName, _hashedVersion, block.chainid, address(evc)));
+        return keccak256(abi.encode(_TYPE_HASH, _hashedName, block.chainid, address(evc)));
     }
 
     function signPermit(
@@ -118,12 +111,12 @@ contract SignerERC1271 is EIP712, IERC1271 {
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
-    constructor(EthereumVaultConnector _evc) EIP712(_evc.name(), _evc.version()) {
+    constructor(EthereumVaultConnector _evc) EIP712(_evc.name()) {
         evc = _evc;
     }
 
     function _buildDomainSeparator() internal view override returns (bytes32) {
-        return keccak256(abi.encode(_TYPE_HASH, _hashedName, _hashedVersion, block.chainid, address(evc)));
+        return keccak256(abi.encode(_TYPE_HASH, _hashedName, block.chainid, address(evc)));
     }
 
     function setSignatureHash(bytes calldata signature) external {
