@@ -8,9 +8,7 @@ contract ExecutionContextHarness {
     uint public constant ON_BEHALF_OF_ACCOUNT_MASK = ExecutionContext.ON_BEHALF_OF_ACCOUNT_MASK;
     uint public constant OPERATOR_AUTHENTICATED_MASK = ExecutionContext.OPERATOR_AUTHENTICATED_MASK;
     uint public constant SIMULATION_MASK = ExecutionContext.SIMULATION_MASK;
-    uint public constant STAMP_MASK = ExecutionContext.STAMP_MASK;
     uint public constant STAMP_OFFSET = ExecutionContext.STAMP_OFFSET;
-    uint public constant STAMP_DUMMY_VALUE = ExecutionContext.STAMP_DUMMY_VALUE;
 
     function areChecksDeferred(EC context) external pure returns (bool result) {
         result = ExecutionContext.areChecksDeferred(context);
