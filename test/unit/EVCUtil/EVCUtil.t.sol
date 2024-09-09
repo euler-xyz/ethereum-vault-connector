@@ -27,17 +27,18 @@ contract EVCClient is EVCUtil {
         return param;
     }
 
-    function calledThroughEVCPayableBytes(bytes calldata param)
-        external
-        payable
-        callThroughEVC
-        returns (bytes memory)
-    {
+    function calledThroughEVCPayableBytes(
+        bytes calldata param
+    ) external payable callThroughEVC returns (bytes memory) {
         require(msg.sender == address(evc), "Not EVC");
         return param;
     }
 
     function calledByEVCWithChecksInProgress() external onlyEVCWithChecksInProgress {
+        // do nothing
+    }
+
+    function calledByEVCAccount() external onlyEVCAccount {
         // do nothing
     }
 
@@ -187,17 +188,24 @@ contract EVCUtilTest is Test {
         evcClient.calledByEVCWithChecksInProgress();
     }
 
-    function test_calledByEVCAccountOwner(address caller, uint8 id) external {
+    function test_calledByEVCAccount_calledByEVCAccountOwner(address caller, uint8 id) external {
         vm.assume(!evc.haveCommonOwner(caller, address(0)) && !evc.haveCommonOwner(caller, address(evc)));
         vm.assume(id != 0);
 
         // msg.sender is not EVC
         evc.setOnBehalfOfAccount(address(0));
         vm.prank(caller);
+        evcClient.calledByEVCAccount();
+
+        vm.prank(caller);
         evcClient.calledByEVCAccountOwner();
 
         // msg.sender is EVC and operator is authenticated
         evc.setOperatorAuthenticated(true);
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.calledByEVCAccount();
+
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
@@ -207,6 +215,10 @@ contract EVCUtilTest is Test {
         evc.setControlCollateralInProgress(true);
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.calledByEVCAccount();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
 
         // msg.sender is EVC and checks are in progress
@@ -214,11 +226,19 @@ contract EVCUtilTest is Test {
         evc.setChecksInProgress(true);
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.calledByEVCAccount();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
 
         // msg.sender is EVC, the owner is not registered yet
         evc.setChecksInProgress(false);
         evc.setOnBehalfOfAccount(caller);
+        assertEq(evc.getAccountOwner(caller), address(0));
+        vm.prank(address(evc));
+        evcClient.calledByEVCAccount();
+
         assertEq(evc.getAccountOwner(caller), address(0));
         vm.prank(address(evc));
         evcClient.calledByEVCAccountOwner();
@@ -230,10 +250,18 @@ contract EVCUtilTest is Test {
         assertEq(evc.getAccountOwner(caller), caller);
         evc.setOnBehalfOfAccount(caller);
         vm.prank(address(evc));
+        evcClient.calledByEVCAccount();
+
+        assertEq(evc.getAccountOwner(caller), caller);
+        evc.setOnBehalfOfAccount(caller);
+        vm.prank(address(evc));
         evcClient.calledByEVCAccountOwner();
 
         // msg.sender is EVC, the owner is registered but the authenticated account is not the owner
         evc.setOnBehalfOfAccount(address(uint160(uint160(caller) ^ id)));
+        vm.prank(address(evc));
+        evcClient.calledByEVCAccount();
+
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
