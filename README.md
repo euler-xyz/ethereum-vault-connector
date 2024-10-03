@@ -100,8 +100,6 @@ This software is **experimental** and is provided "as is" and "as available".
 
 Always include thorough tests when using the Ethereum Vault Connector to ensure it interacts correctly with your code.
 
-The Ethereum Vault Connector is currently undergoing security audits and should not be used in production.
-
 ## Known limitations
 
 Refer to the [whitepaper](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
