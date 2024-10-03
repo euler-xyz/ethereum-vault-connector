@@ -49,7 +49,7 @@ abstract contract EVCUtil {
         _;
     }
 
-    /// @notice Ensures a standard authentication path on the EVC allowing the account owner or any of its EVC account.
+    /// @notice Ensures a standard authentication path on the EVC allowing the account owner or any of its EVC accounts.
     /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
     /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
     /// @dev This modifier must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
