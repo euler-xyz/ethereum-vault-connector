@@ -171,12 +171,12 @@ abstract contract EVCUtil {
         }
     }
 
-    /// @notice Ensures that the function is called only by the EVC account owner or any EVC account
+    /// @notice Ensures that the function is called only by the EVC account owner or any of its EVC accounts
     /// @dev This function checks if the caller is the EVC and if so, verifies that the execution context is not in a
     /// special state (operator authenticated, collateral control in progress, or checks in progress). If
     /// onlyAccountOwner is true and the owner was already registered on the EVC, it verifies that the onBehalfOfAccount
-    /// is the owner. If onlyAccountOwner is false, it allows any EVC account to call the function.
-    /// @param onlyAccountOwner If true, only allows the account owner; if false, allows any EVC account
+    /// is the owner. If onlyAccountOwner is false, it allows any EVC account of the owner to call the function.
+    /// @param onlyAccountOwner If true, only allows the account owner; if false, allows any EVC account of the owner
     function _onlyEVCAccount(bool onlyAccountOwner) internal view {
         if (msg.sender == address(evc)) {
             EC ec = EC.wrap(evc.getRawExecutionContext());
