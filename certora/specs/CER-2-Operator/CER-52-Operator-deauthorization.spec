@@ -23,6 +23,7 @@ rule operatorDeauthorization (method f) filtered { f ->
     address caller = actualCaller(e);
     address account;
     require addressPrefix == getAddressPrefix(account);
+    requireInvariant OwnerIsFromPrefix(addressPrefix);
     address owner = haveCommonOwner(account, caller) ? caller : getAccountOwner(e, account);
     uint256 operatorBefore = getOperator(addressPrefix, operator);
     f(e,args);
@@ -40,6 +41,8 @@ rule operatorDeauthorizationSetOperator {
     uint256 operatorBitField;
 
     address caller = actualCaller(e);
+    
+    requireInvariant OwnerIsFromPrefix(addressPrefix);
 
     // call the setOperator() method giving 0 as the bit field to deauthorize
     setOperator(e, addressPrefix, operator, 0);

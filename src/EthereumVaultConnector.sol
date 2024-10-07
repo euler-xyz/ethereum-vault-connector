@@ -201,11 +201,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function getCurrentOnBehalfOfAccount(address controllerToCheck)
-        external
-        view
-        returns (address onBehalfOfAccount, bool controllerEnabled)
-    {
+    function getCurrentOnBehalfOfAccount(
+        address controllerToCheck
+    ) external view returns (address onBehalfOfAccount, bool controllerEnabled) {
         onBehalfOfAccount = executionContext.getOnBehalfOfAccount();
 
         // for safety, revert if no account has been authenticated
@@ -647,7 +645,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function batchSimulation(BatchItem[] calldata items)
+    function batchSimulation(
+        BatchItem[] calldata items
+    )
         external
         payable
         virtual
@@ -700,13 +700,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     }
 
     /// @inheritdoc IEVC
-    function forgiveAccountStatusCheck(address account)
-        public
-        payable
-        virtual
-        nonReentrantChecksAcquireLock
-        onlyController(account)
-    {
+    function forgiveAccountStatusCheck(
+        address account
+    ) public payable virtual nonReentrantChecksAcquireLock onlyController(account) {
         accountStatusChecks.remove(account);
     }
 
@@ -965,11 +961,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
-    function requireAccountStatusCheckInternalNonReentrantChecks(address account)
-        internal
-        virtual
-        nonReentrantChecksAcquireLock
-    {
+    function requireAccountStatusCheckInternalNonReentrantChecks(
+        address account
+    ) internal virtual nonReentrantChecksAcquireLock {
         requireAccountStatusCheckInternal(account);
     }
 
@@ -996,11 +990,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
         }
     }
 
-    function requireVaultStatusCheckInternalNonReentrantChecks(address vault)
-        internal
-        virtual
-        nonReentrantChecksAcquireLock
-    {
+    function requireVaultStatusCheckInternalNonReentrantChecks(
+        address vault
+    ) internal virtual nonReentrantChecksAcquireLock {
         requireVaultStatusCheckInternal(vault);
     }
 
@@ -1015,11 +1007,9 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
             : vaultStatusChecks.forEachAndClear(requireVaultStatusCheckInternal);
     }
 
-    function checkStatusAllWithResult(SetType setType)
-        internal
-        virtual
-        returns (StatusCheckResult[] memory checksResult)
-    {
+    function checkStatusAllWithResult(
+        SetType setType
+    ) internal virtual returns (StatusCheckResult[] memory checksResult) {
         bytes[] memory callbackResult = setType == SetType.Account
             ? accountStatusChecks.forEachAndClearWithResult(checkAccountStatusInternal)
             : vaultStatusChecks.forEachAndClearWithResult(checkVaultStatusInternal);

@@ -1,133 +1,71 @@
+/* Verification of `Set` library 
+Full run: https://prover.certora.com/output/40726/c4fecbacb03045a28f210f7c0ca7c67a/?anonymousKey=1f4e421af7ce97274005b30761e9fb75a78d5aa0
+Mutation run:  https://mutation-testing.certora.com/?id=8239ff0c-739c-4451-be5e-8b69336ccf7b&anonymousKey=c8d17ebd-bc1f-48e7-b201-a9e2bcf22d2b
 
-/*
-Verification of Set.sol 
 */
-
 methods {
-    function insert(address element) external returns (bool) envfree;
-    function remove(address element) external returns (bool) envfree;
-    function get(uint8 index) external returns (address) envfree;
-    function contains(address element) external returns (bool) envfree;
-    function length() external returns (uint8) envfree;
+    function insert(address) external returns (bool) envfree;
+    function remove(address) external returns (bool) envfree;
+    function reorder(uint8, uint8) external envfree;
+    function contains(address) external returns (bool) envfree;
 }
 
 
+definition get(uint8 index)  returns address  =
+        (index==0 ? currentContract.setStorage.firstElement : currentContract.setStorage.elements[index].value);
 
-// GHOST COPIES:
-// For every storage variable we add a ghost field that is kept synchronized by hooks.
-// The ghost fields can be accessed by the spec, even inside quantifiers.
-
-/** @title ghost field for the values array - mapping the value to the element number 
- firstElement - is elemnt #1 
- setStorage.elements[1] - is element #2  ghostValues[2]
- ghostLength is the number of elements as stored also in setStorage.numElements
- last element #numElements is stored in currentContract.setStorage.elements[numElements-1] and in ghostValues[ghostLength]
-*/
-ghost mapping(mathint => address) ghostValues {
-    init_state axiom forall mathint i. ghostValues[i] == 0;
-}
-// ghost field for mapping the set's elements back to their index
-ghost mapping(address => mathint) ghostIndexes {
-    init_state axiom forall address x. ghostIndexes[x] == 0;
-}
-
-ghost mathint ghostLength {
-    init_state axiom  ghostLength == 0;
-    // assumption: it's infeasible to grow the list to these many elements.
-    axiom ghostLength < max_uint256;
-}
-
-ghost address ghostFirst {
-    init_state axiom ghostFirst == 0; 
-}
-
-// Store and load hooks to synchronize ghostValues .
-hook Sstore currentContract.setStorage.elements[INDEX uint256 _index].value address newValue (address oldValue) {
-    mathint index = to_mathint(_index)+1;
-    require ghostValues[index] == oldValue;
-    require ghostIndexes[oldValue] == index;
-
-    ghostValues[index] = newValue;
-    ghostIndexes[oldValue] = 0;
-    ghostIndexes[newValue] = index;
-    
-}
-
-hook Sload address v currentContract.setStorage.elements[INDEX uint256 index].value {
-    require ghostIndexes[v] == to_mathint(index+1);
-    require ghostValues[index+1] == v;
-}
-
-// Store and load hooks to sync length
-hook Sstore currentContract.setStorage.numElements uint8 newValue (uint8 oldValue) {
-    // make sure we were mirroring before
-    require ghostLength == to_mathint(oldValue);
-    ghostLength = to_mathint(newValue);
-}
-
-hook Sload uint8 value currentContract.setStorage.numElements {
-    require ghostLength == to_mathint(value);
-}
-
-// Store and load hooks to sync firstElement
-hook Sstore currentContract.setStorage.firstElement address newValue {
-    ghostFirst = newValue;
-}
-
-hook Sload address value currentContract.setStorage.firstElement {
-    require ghostFirst == value;
-}
-
-// check for the ghosts and updates 
-invariant mirrorIsCorrect(uint8 i) 
-    ( i > 1 =>  get(i) == ghostValues[i]) &&
-    get(1) == ghostFirst &&
-    ghostLength == to_mathint(length());
+definition length() returns uint8 =  currentContract.setStorage.numElements;
 
 
-/** @title Elements are unique in the set.
-Proving this is together with proving that each element has a single index 
-**/
-// CER-93 Set insert: must insert an element into the set unless it's a 
-// duplicate or the set is full. This is covered by a combination of
-// containsIntegrity() and validSet().
-invariant validSet() 
-    // inverse
-    ( forall mathint i. ( i <= ghostLength && i > 1) => 
-        ghostIndexes[ghostValues[i]] == i )
-    &&
-    ( forall address v. ( ghostIndexes[v]!=0 ) => 
-        ghostValues[ghostIndexes[v]] == v )
-    &&  
-    // uniqueness
-    ( forall mathint i.  forall mathint j. 
-        ( i <= ghostLength && i > 1 && j <= ghostLength && j > 1 && j != i ) =>
-            ( ghostValues[i] != ghostValues[j] )
-     ) &&
-     ( forall mathint i.  
-        ( i <= ghostLength && i > 1 ) =>
-         ( ghostValues[i] != ghostFirst)
-     )
-
-    { 
-                preserved {
-                    requireInvariant mirrorIsCorrect(1);
-                    uint8 _length = assert_uint8(ghostLength);
-                    requireInvariant mirrorIsCorrect(_length); 
-                }
+/// @title Elements in set are unique
+invariant uniqueElements() 
+    forall uint8 i. forall uint8 j. 
+        (i < length() && j < length() && i != j => get(i) != get(j)) 
+    {
+        preserved reorder(uint8 m, uint8 n) {
+            //need to help the grounding a bit
+            require uniqueElements_assumption(m,0);
+            require uniqueElements_assumption(m,n);
+            require uniqueElements_assumption(n,0);
         }
+    }
 
-invariant containsIntegrity(address v ) 
-    v!=0 => ( contains(v) <=> ( v == ghostFirst  || 
-                    ( ghostIndexes[v] <= ghostLength && ghostIndexes[v] > 1 ))) 
-        {
-            preserved {
-                requireInvariant validSet();
-                requireInvariant mirrorIsCorrect(1);
-                uint8 _length = assert_uint8(ghostLength);
-                requireInvariant mirrorIsCorrect(_length); 
-            }
-        }
+//  Invariant uniqueElements is proven for all values, therefore it is safe to assume for two individual entries 
+definition uniqueElements_assumption(uint8 i, uint8 j) returns bool = 
+    (i < length() && j < length() && i != j => get(i) != get(j)) ;
+
+
+
+/// @title The length of the set can change at most by 1
+rule setLengthChangedByOne(method f) {
+    uint8 lengthBefore = length();
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint8 lengthAfter = length();
+    assert lengthAfter <= lengthBefore + 1;
+}
+
+
+/// @title Length is increased only by insert and decreased only by remove
+/// Meaning:
+/// - If the length increased then `insert` was called
+/// - If the length decreased then `remove` was called
+rule setLengthIncreaseDecrease(method f) {
+    uint8 lengthBefore = length();
+
+    env e;
+    calldataarg args;
+    f(e, args);
+
+    uint8 lengthAfter = length();
+    assert lengthAfter > lengthBefore => f.selector == sig:insert(address).selector;
+    assert lengthAfter < lengthBefore => f.selector == sig:remove(address).selector;
+}
+
+
 
 // CER-86 Set insert: contains must return true if an element is present in 
 // the set. (This is specified in combination with validSet/containsIntegrity)
@@ -140,11 +78,10 @@ rule contained_if_inserted(address a) {
 // CER-91: set library MUST remove an element from the set if it's present
 rule not_contained_if_removed(address a) {
     env e;
-    requireInvariant validSet();
-    requireInvariant mirrorIsCorrect(1);
-    uint8 _length = assert_uint8(ghostLength);
-    requireInvariant mirrorIsCorrect(_length); 
-
+    requireInvariant uniqueElements();
+    require uniqueElements_assumption(0,1);
+    require uniqueElements_assumption(0,2);
+    require uniqueElements_assumption(1,2);
     remove(a);
     assert(!contains(a));
 }
@@ -154,7 +91,7 @@ rule not_contained_if_removed(address a) {
 // (In other words it returns true if and only if an element is removed).
 rule removed_iff_not_contained(address a) {
     env e;
-    requireInvariant validSet();
+    requireInvariant uniqueElements();
     bool containsBefore = contains(a);
     bool succ = remove(a);
     assert(succ <=> containsBefore);
@@ -163,16 +100,10 @@ rule removed_iff_not_contained(address a) {
 /** @title remove decreases the number of elements by one */
 rule removed_then_length_decrease(address a) {
     env e;
-    requireInvariant validSet();
-    mathint ghostBefore = ghostLength;
+    requireInvariant uniqueElements();
+    mathint lengthBefore = length();
     bool succ = remove(a);
-    assert(succ => ghostLength == ghostBefore - 1);
+    assert(succ => length() == lengthBefore - 1);
 }
 
-/** @title every operation is feasible */ 
-rule sanity(method f) {
-    env e;
-    calldataarg args;
-    f(e, args);
-    satisfy true;
-}
+use builtin rule sanity; 

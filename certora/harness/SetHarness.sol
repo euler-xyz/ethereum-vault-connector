@@ -20,23 +20,12 @@ contract SetHarness {
         return Set.remove(setStorage, element);
     }
 
-    function get(uint8 index) external view returns (address ) {
-        if (index==0) return address(0);
-        if (index == 1) return setStorage.firstElement;
-        return setStorage.elements[index-1].value;
-
+    function reorder(uint8 index1, uint8 index2) external  {
+        Set.reorder(setStorage, index1, index2);
     }
 
-    function contains(
-        address element
-    ) external view returns (bool found) {
-        return Set.contains(setStorage, element);
-    }
-
-
-    function length(
-    ) external view returns (uint8) {
-        return setStorage.numElements;
+    function contains(address elem) external view returns (bool) {
+        return Set.contains(setStorage, elem);
     }
 
 }
