@@ -34,7 +34,7 @@ jobs:
                 submodules: recursive
           - uses: foundry-rs/foundry-toolchain@v1
             with:
-                version: nightly
+                version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
 
           - name: Run foundry fmt check
             run: |
