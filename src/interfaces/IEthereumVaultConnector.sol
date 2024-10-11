@@ -61,9 +61,10 @@ interface IEVC {
     /// @return controllerEnabled A boolean value that indicates whether controllerToCheck is an enabled controller for
     /// the account on behalf of which the operation is being executed at the moment. Always false if controllerToCheck
     /// is address(0).
-    function getCurrentOnBehalfOfAccount(
-        address controllerToCheck
-    ) external view returns (address onBehalfOfAccount, bool controllerEnabled);
+    function getCurrentOnBehalfOfAccount(address controllerToCheck)
+        external
+        view
+        returns (address onBehalfOfAccount, bool controllerEnabled);
 
     /// @notice Checks if checks are deferred.
     /// @return A boolean indicating whether checks are deferred.
@@ -366,9 +367,7 @@ interface IEVC {
     /// @return batchItemsResult An array of batch item results for each item.
     /// @return accountsStatusCheckResult An array of account status check results for each account.
     /// @return vaultsStatusCheckResult An array of vault status check results for each vault.
-    function batchSimulation(
-        BatchItem[] calldata items
-    )
+    function batchSimulation(BatchItem[] calldata items)
         external
         payable
         returns (

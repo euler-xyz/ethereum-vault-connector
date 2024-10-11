@@ -27,9 +27,12 @@ contract EVCClient is EVCUtil {
         return param;
     }
 
-    function calledThroughEVCPayableBytes(
-        bytes calldata param
-    ) external payable callThroughEVC returns (bytes memory) {
+    function calledThroughEVCPayableBytes(bytes calldata param)
+        external
+        payable
+        callThroughEVC
+        returns (bytes memory)
+    {
         require(msg.sender == address(evc), "Not EVC");
         return param;
     }
