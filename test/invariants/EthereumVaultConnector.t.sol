@@ -230,9 +230,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         return;
     }
 
-    function batchSimulation(
-        BatchItem[] calldata
-    )
+    function batchSimulation(BatchItem[] calldata)
         public
         payable
         override
@@ -259,9 +257,13 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         accountControllers[account].firstElement = firstElementCache;
     }
 
-    function checkAccountStatusInternal(
-        address account
-    ) internal view virtual override returns (bool isValid, bytes memory result) {
+    function checkAccountStatusInternal(address account)
+        internal
+        view
+        virtual
+        override
+        returns (bool isValid, bytes memory result)
+    {
         SetStorage storage accountControllersStorage = accountControllers[account];
         uint256 numOfControllers = accountControllersStorage.numElements;
 
