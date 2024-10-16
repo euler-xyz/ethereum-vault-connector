@@ -57,6 +57,10 @@ contract EVCClient is EVCUtil {
         return _msgSenderForBorrow();
     }
 
+    function msgSenderOnlyEVCAccountOwner() external view returns (address) {
+        return _msgSenderOnlyEVCAccountOwner();
+    }
+
     fallback(bytes calldata) external returns (bytes memory) {
         return abi.encode(IVault.checkAccountStatus.selector);
     }
@@ -191,7 +195,10 @@ contract EVCUtilTest is Test {
         evcClient.calledByEVCWithChecksInProgress();
     }
 
-    function test_calledByEVCAccount_calledByEVCAccountOwner(address caller, uint8 id) external {
+    function test_calledByEVCAccount_calledByEVCAccountOwner_msgSenderOnlyEVCAccountOwner(
+        address caller,
+        uint8 id
+    ) external {
         vm.assume(!evc.haveCommonOwner(caller, address(0)) && !evc.haveCommonOwner(caller, address(evc)));
         vm.assume(id != 0);
 
@@ -203,6 +210,9 @@ contract EVCUtilTest is Test {
         vm.prank(caller);
         evcClient.calledByEVCAccountOwner();
 
+        vm.prank(caller);
+        assertEq(evcClient.msgSenderOnlyEVCAccountOwner(), caller);
+
         // msg.sender is EVC and operator is authenticated
         evc.setOperatorAuthenticated(true);
         vm.prank(address(evc));
@@ -212,6 +222,10 @@ contract EVCUtilTest is Test {
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccountOwner();
 
         // msg.sender is EVC and control collateral is in progress
         evc.setOperatorAuthenticated(false);
@@ -224,6 +238,10 @@ contract EVCUtilTest is Test {
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
 
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccountOwner();
+
         // msg.sender is EVC and checks are in progress
         evc.setControlCollateralInProgress(false);
         evc.setChecksInProgress(true);
@@ -234,6 +252,10 @@ contract EVCUtilTest is Test {
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccountOwner();
 
         // msg.sender is EVC, the owner is not registered yet
         evc.setChecksInProgress(false);
@@ -246,6 +268,10 @@ contract EVCUtilTest is Test {
         vm.prank(address(evc));
         evcClient.calledByEVCAccountOwner();
 
+        assertEq(evc.getAccountOwner(caller), address(0));
+        vm.prank(address(evc));
+        assertEq(evcClient.msgSenderOnlyEVCAccountOwner(), caller);
+
         // msg.sender is EVC, the owner is registered and the authenticated account is the owner
         evc.setOnBehalfOfAccount(address(0));
         vm.prank(caller);
@@ -256,9 +282,12 @@ contract EVCUtilTest is Test {
         evcClient.calledByEVCAccount();
 
         assertEq(evc.getAccountOwner(caller), caller);
-        evc.setOnBehalfOfAccount(caller);
         vm.prank(address(evc));
         evcClient.calledByEVCAccountOwner();
+
+        assertEq(evc.getAccountOwner(caller), caller);
+        vm.prank(address(evc));
+        assertEq(evcClient.msgSenderOnlyEVCAccountOwner(), caller);
 
         // msg.sender is EVC, the owner is registered but the authenticated account is not the owner
         evc.setOnBehalfOfAccount(address(uint160(uint160(caller) ^ id)));
@@ -268,6 +297,10 @@ contract EVCUtilTest is Test {
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccountOwner();
     }
 
     function test_msgSender(address caller) external {

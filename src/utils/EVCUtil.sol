@@ -57,7 +57,7 @@ abstract contract EVCUtil {
     /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
     /// the EVC.
     modifier onlyEVCAccount() virtual {
-        _onlyEVCAccount(false);
+        _authenticateCallerWithStandardContextState(false);
         _;
     }
 
@@ -71,7 +71,7 @@ abstract contract EVCUtil {
     /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
     /// the EVC.
     modifier onlyEVCAccountOwner() virtual {
-        _onlyEVCAccount(true);
+        _authenticateCallerWithStandardContextState(true);
         _;
     }
 
@@ -133,6 +133,13 @@ abstract contract EVCUtil {
         return sender;
     }
 
+    /// @notice Retrieves the message sender, ensuring it's the EVC account owner and that the execution context is in a
+    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// @return The address of the message sender.
+    function _msgSenderOnlyEVCAccountOwner() internal view returns (address) {
+        return _authenticateCallerWithStandardContextState(true);
+    }
+
     /// @notice Calls the current external function through the EVC.
     /// @dev This function is used to route the current call through the EVC if it's not already coming from the EVC. It
     /// makes the EVC set the execution context and call back this contract with unchanged calldata. msg.sender is used
@@ -177,7 +184,8 @@ abstract contract EVCUtil {
     /// onlyAccountOwner is true and the owner was already registered on the EVC, it verifies that the onBehalfOfAccount
     /// is the owner. If onlyAccountOwner is false, it allows any EVC account of the owner to call the function.
     /// @param onlyAccountOwner If true, only allows the account owner; if false, allows any EVC account of the owner
-    function _onlyEVCAccount(bool onlyAccountOwner) internal view {
+    /// @return The address of the message sender.
+    function _authenticateCallerWithStandardContextState(bool onlyAccountOwner) internal view returns (address) {
         if (msg.sender == address(evc)) {
             EC ec = EC.wrap(evc.getRawExecutionContext());
 
@@ -185,14 +193,19 @@ abstract contract EVCUtil {
                 revert NotAuthorized();
             }
 
+            address onBehalfOfAccount = ec.getOnBehalfOfAccount();
+
             if (onlyAccountOwner) {
-                address onBehalfOfAccount = ec.getOnBehalfOfAccount();
                 address owner = evc.getAccountOwner(onBehalfOfAccount);
 
                 if (owner != address(0) && owner != onBehalfOfAccount) {
                     revert NotAuthorized();
                 }
             }
+
+            return onBehalfOfAccount;
         }
+
+        return msg.sender;
     }
 }
