@@ -82,4 +82,7 @@ contract EthereumVaultConnectorHarness is EthereumVaultConnector {
     function ecGetOnBehalfOfAccount(EC context) external pure returns (address result) {
         result = ExecutionContext.getOnBehalfOfAccount(context);
     }
+    function isPhantomAccountContract(bytes19 addressPrefix) external view returns (bool) {
+        return address(uint160(uint152(addressPrefix)) << 8).code.length != 0;
+    }
 }

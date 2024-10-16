@@ -87,7 +87,7 @@ hook CALL(uint g, address addr, uint value, uint argsOffset, uint argsLength, ui
 rule onlyEVCCanCallCriticalMethod(method f, env e, calldataarg args)
   filtered {f -> 
     !isMustRevertFunction(f) &&
-    f.selector != sig:EthereumVaultConnectorHarness.permit(address,uint256,uint256,uint256,uint256,bytes,bytes).selector &&
+    f.selector != sig:EthereumVaultConnectorHarness.permit(address,address,uint256,uint256,uint256,uint256,bytes,bytes).selector &&
     f.selector != sig:EthereumVaultConnectorHarness.controlCollateral(address, address, uint256, bytes).selector
   }{
     //Exclude EVC as being the initiator of the call.

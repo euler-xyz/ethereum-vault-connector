@@ -6,6 +6,7 @@ methods {
     function getOperator(bytes19, address) external returns (uint256) envfree;
     function getAddressPrefix(address) external returns (bytes19) envfree;
     function haveCommonOwner(address account, address otherAccount) external returns (bool) envfree;
+    function isPhantomAccountContract(bytes19 addressPrefix) external returns (bool) envfree;
 }
 
 /**
@@ -26,6 +27,8 @@ rule onlyOwnerCanCallSetOperator() {
     address ownerBefore = getOwnerOf(addressPrefix);
 
     address caller = actualCaller(e);
+
+    requireInvariant OwnerIsFromPrefix(addressPrefix);
 
     // call the setOperator() method.
     setOperator(e, addressPrefix, operator, operatorBitField);
@@ -95,6 +98,10 @@ rule theOwnerCanCallSetOperator() {
         require(getAddressPrefix(e.msg.sender) == addressPrefix);
         // the owner is not set yet (zero) or identical to msg.sender
         require(owner == 0 || owner == e.msg.sender);
+        // if the owner is not set yet, require that its phantom account is not a contract
+        if (owner == 0) {
+            require(!isPhantomAccountContract(addressPrefix));
+        }
     }
 
     // The function will revert if any of these assumptions do not hold:

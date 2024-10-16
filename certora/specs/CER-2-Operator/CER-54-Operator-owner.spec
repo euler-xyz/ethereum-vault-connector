@@ -29,6 +29,8 @@ rule setOperator_owner() {
     address operator;
     uint256 operatorBitField;
 
+    requireInvariant OwnerIsFromPrefix(addressPrefix);
+
     // call the setOperator() method.
     setOperator(e, addressPrefix, operator, operatorBitField);
     // For any address "addr" with prefix "addressPrefix"
