@@ -133,8 +133,24 @@ abstract contract EVCUtil {
         return sender;
     }
 
+    /// @notice Retrieves the message sender, ensuring it's any EVC account meaning that the execution context is in a
+    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// @dev This function must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This function must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This function can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
+    /// @return The address of the message sender.
+    function _msgSenderOnlyEVCAccount() internal view returns (address) {
+        return _authenticateCallerWithStandardContextState(false);
+    }
+
     /// @notice Retrieves the message sender, ensuring it's the EVC account owner and that the execution context is in a
     /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// @dev It assumes that if the caller is not the EVC, the caller is the account owner.
+    /// @dev This function must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This function must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This function can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
     /// @return The address of the message sender.
     function _msgSenderOnlyEVCAccountOwner() internal view returns (address) {
         return _authenticateCallerWithStandardContextState(true);

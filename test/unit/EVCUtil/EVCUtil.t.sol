@@ -57,6 +57,10 @@ contract EVCClient is EVCUtil {
         return _msgSenderForBorrow();
     }
 
+    function msgSenderOnlyEVCAccount() external view returns (address) {
+        return _msgSenderOnlyEVCAccount();
+    }
+
     function msgSenderOnlyEVCAccountOwner() external view returns (address) {
         return _msgSenderOnlyEVCAccountOwner();
     }
@@ -195,7 +199,7 @@ contract EVCUtilTest is Test {
         evcClient.calledByEVCWithChecksInProgress();
     }
 
-    function test_calledByEVCAccount_calledByEVCAccountOwner_msgSenderOnlyEVCAccountOwner(
+    function test_calledByEVCAccount_calledByEVCAccountOwner_msgSenderOnlyEVCAccount_msgSenderOnlyEVCAccountOwner(
         address caller,
         uint8 id
     ) external {
@@ -211,6 +215,9 @@ contract EVCUtilTest is Test {
         evcClient.calledByEVCAccountOwner();
 
         vm.prank(caller);
+        assertEq(evcClient.msgSenderOnlyEVCAccount(), caller);
+
+        vm.prank(caller);
         assertEq(evcClient.msgSenderOnlyEVCAccountOwner(), caller);
 
         // msg.sender is EVC and operator is authenticated
@@ -222,6 +229,10 @@ contract EVCUtilTest is Test {
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccount();
 
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
@@ -240,6 +251,10 @@ contract EVCUtilTest is Test {
 
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccount();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.msgSenderOnlyEVCAccountOwner();
 
         // msg.sender is EVC and checks are in progress
@@ -255,6 +270,10 @@ contract EVCUtilTest is Test {
 
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
+        evcClient.msgSenderOnlyEVCAccount();
+
+        vm.prank(address(evc));
+        vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.msgSenderOnlyEVCAccountOwner();
 
         // msg.sender is EVC, the owner is not registered yet
@@ -267,6 +286,10 @@ contract EVCUtilTest is Test {
         assertEq(evc.getAccountOwner(caller), address(0));
         vm.prank(address(evc));
         evcClient.calledByEVCAccountOwner();
+
+        assertEq(evc.getAccountOwner(caller), address(0));
+        vm.prank(address(evc));
+        assertEq(evcClient.msgSenderOnlyEVCAccount(), caller);
 
         assertEq(evc.getAccountOwner(caller), address(0));
         vm.prank(address(evc));
@@ -287,6 +310,10 @@ contract EVCUtilTest is Test {
 
         assertEq(evc.getAccountOwner(caller), caller);
         vm.prank(address(evc));
+        assertEq(evcClient.msgSenderOnlyEVCAccount(), caller);
+
+        assertEq(evc.getAccountOwner(caller), caller);
+        vm.prank(address(evc));
         assertEq(evcClient.msgSenderOnlyEVCAccountOwner(), caller);
 
         // msg.sender is EVC, the owner is registered but the authenticated account is not the owner
@@ -297,6 +324,9 @@ contract EVCUtilTest is Test {
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
         evcClient.calledByEVCAccountOwner();
+
+        vm.prank(address(evc));
+        assertEq(evcClient.msgSenderOnlyEVCAccount(), address(uint160(uint160(caller) ^ id)));
 
         vm.prank(address(evc));
         vm.expectRevert(abi.encodeWithSelector(EVCUtil.NotAuthorized.selector));
