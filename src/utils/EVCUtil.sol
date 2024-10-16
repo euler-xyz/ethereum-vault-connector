@@ -49,6 +49,18 @@ abstract contract EVCUtil {
         _;
     }
 
+    /// @notice Ensures a standard authentication path on the EVC allowing the account owner or any of its EVC accounts.
+    /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
+    /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
+    /// @dev This modifier must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This modifier must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
+    modifier onlyEVCAccount() virtual {
+        _authenticateCallerWithStandardContextState(false);
+        _;
+    }
+
     /// @notice Ensures a standard authentication path on the EVC.
     /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
     /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
@@ -59,7 +71,7 @@ abstract contract EVCUtil {
     /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
     /// the EVC.
     modifier onlyEVCAccountOwner() virtual {
-        _onlyEVCAccountOwner();
+        _authenticateCallerWithStandardContextState(true);
         _;
     }
 
@@ -121,6 +133,29 @@ abstract contract EVCUtil {
         return sender;
     }
 
+    /// @notice Retrieves the message sender, ensuring it's any EVC account meaning that the execution context is in a
+    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// @dev This function must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This function must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This function can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
+    /// @return The address of the message sender.
+    function _msgSenderOnlyEVCAccount() internal view returns (address) {
+        return _authenticateCallerWithStandardContextState(false);
+    }
+
+    /// @notice Retrieves the message sender, ensuring it's the EVC account owner and that the execution context is in a
+    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// @dev It assumes that if the caller is not the EVC, the caller is the account owner.
+    /// @dev This function must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
+    /// @dev This function must not be used on checkAccountStatus and checkVaultStatus functions.
+    /// @dev This function can be used on access controlled functions to prevent non-standard authentication paths on
+    /// the EVC.
+    /// @return The address of the message sender.
+    function _msgSenderOnlyEVCAccountOwner() internal view returns (address) {
+        return _authenticateCallerWithStandardContextState(true);
+    }
+
     /// @notice Calls the current external function through the EVC.
     /// @dev This function is used to route the current call through the EVC if it's not already coming from the EVC. It
     /// makes the EVC set the execution context and call back this contract with unchanged calldata. msg.sender is used
@@ -159,12 +194,14 @@ abstract contract EVCUtil {
         }
     }
 
-    /// @notice Ensures that the function is called only by the EVC account owner
+    /// @notice Ensures that the function is called only by the EVC account owner or any of its EVC accounts
     /// @dev This function checks if the caller is the EVC and if so, verifies that the execution context is not in a
-    /// special state (operator authenticated, collateral control in progress, or checks in progress). If the owner was
-    /// already registered on the EVC, it verifies that the onBehalfOfAccount is the owner.
-    /// @dev Reverts if the caller is not the EVC or if the execution context is in a special state.
-    function _onlyEVCAccountOwner() internal view {
+    /// special state (operator authenticated, collateral control in progress, or checks in progress). If
+    /// onlyAccountOwner is true and the owner was already registered on the EVC, it verifies that the onBehalfOfAccount
+    /// is the owner. If onlyAccountOwner is false, it allows any EVC account of the owner to call the function.
+    /// @param onlyAccountOwner If true, only allows the account owner; if false, allows any EVC account of the owner
+    /// @return The address of the message sender.
+    function _authenticateCallerWithStandardContextState(bool onlyAccountOwner) internal view returns (address) {
         if (msg.sender == address(evc)) {
             EC ec = EC.wrap(evc.getRawExecutionContext());
 
@@ -173,11 +210,18 @@ abstract contract EVCUtil {
             }
 
             address onBehalfOfAccount = ec.getOnBehalfOfAccount();
-            address owner = evc.getAccountOwner(onBehalfOfAccount);
 
-            if (owner != address(0) && owner != onBehalfOfAccount) {
-                revert NotAuthorized();
+            if (onlyAccountOwner) {
+                address owner = evc.getAccountOwner(onBehalfOfAccount);
+
+                if (owner != address(0) && owner != onBehalfOfAccount) {
+                    revert NotAuthorized();
+                }
             }
+
+            return onBehalfOfAccount;
         }
+
+        return msg.sender;
     }
 }
