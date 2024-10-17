@@ -29,7 +29,7 @@ abstract contract EVCUtil {
 
     /// @notice Returns the address of the Ethereum Vault Connector (EVC) used by this contract.
     /// @return The address of the EVC contract.
-    function EVC() external view returns (address) {
+    function EVC() external view virtual returns (address) {
         return address(evc);
     }
 
