@@ -29,7 +29,9 @@ abstract contract EIP712 {
      * NOTE: These parameters cannot be changed except through a xref:learn::upgrading-smart-contracts.adoc[smart
      * contract upgrade].
      */
-    constructor(string memory name) {
+    constructor(
+        string memory name
+    ) {
         _name = name.toShortStringWithFallback(_nameFallback);
         _hashedName = keccak256(bytes(name));
     }
@@ -60,7 +62,9 @@ abstract contract EIP712 {
      * address signer = ECDSA.recover(digest, signature);
      * ```
      */
-    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
+    function _hashTypedDataV4(
+        bytes32 structHash
+    ) internal view virtual returns (bytes32) {
         return ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
     }
 }
@@ -73,11 +77,15 @@ contract SignerECDSA is EIP712, Test {
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
-    constructor(EthereumVaultConnector _evc) EIP712(_evc.name()) {
+    constructor(
+        EthereumVaultConnector _evc
+    ) EIP712(_evc.name()) {
         evc = _evc;
     }
 
-    function setPrivateKey(uint256 _privateKey) external {
+    function setPrivateKey(
+        uint256 _privateKey
+    ) external {
         privateKey = _privateKey;
     }
 
@@ -111,7 +119,9 @@ contract SignerERC1271 is EIP712, IERC1271 {
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
-    constructor(EthereumVaultConnector _evc) EIP712(_evc.name()) {
+    constructor(
+        EthereumVaultConnector _evc
+    ) EIP712(_evc.name()) {
         evc = _evc;
     }
 
@@ -119,7 +129,9 @@ contract SignerERC1271 is EIP712, IERC1271 {
         return keccak256(abi.encode(_TYPE_HASH, _hashedName, block.chainid, address(evc)));
     }
 
-    function setSignatureHash(bytes calldata signature) external {
+    function setSignatureHash(
+        bytes calldata signature
+    ) external {
         signatureHash = keccak256(signature);
     }
 
@@ -151,15 +163,21 @@ contract EthereumVaultConnectorWithFallback is EthereumVaultConnectorHarness {
     bool internal shouldRevert;
     bool public fallbackCalled;
 
-    function setExpectedHash(bytes calldata data) external {
+    function setExpectedHash(
+        bytes calldata data
+    ) external {
         expectedHash = keccak256(data);
     }
 
-    function setExpectedValue(uint256 value) external {
+    function setExpectedValue(
+        uint256 value
+    ) external {
         expectedValue = value;
     }
 
-    function setShouldRevert(bool sr) external {
+    function setShouldRevert(
+        bool sr
+    ) external {
         shouldRevert = sr;
     }
 
@@ -167,7 +185,9 @@ contract EthereumVaultConnectorWithFallback is EthereumVaultConnectorHarness {
         fallbackCalled = false;
     }
 
-    fallback(bytes calldata data) external payable returns (bytes memory) {
+    fallback(
+        bytes calldata data
+    ) external payable returns (bytes memory) {
         if (shouldRevert) revert("fallback reverted");
 
         if (expectedHash == keccak256(data) && expectedValue == msg.value && address(this) == msg.sender) {
@@ -179,6 +199,7 @@ contract EthereumVaultConnectorWithFallback is EthereumVaultConnectorHarness {
 }
 
 contract PermitTest is Test {
+    address internal constant COMMON_PREDEPLOYS = 0x4200000000000000000000000000000000000000;
     EthereumVaultConnectorWithFallback internal evc;
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
@@ -215,7 +236,10 @@ contract PermitTest is Test {
         address msgSender = sender == address(0) ? address(uint160(uint256(keccak256(abi.encode(alice))))) : sender;
         data = abi.encode(keccak256(data));
 
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         vm.assume(msgSender != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
@@ -264,7 +288,7 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
 
         vm.assume(msgSender != address(evc));
-        vm.assume(!evc.haveCommonOwner(alice, address(0)));
+        vm.assume(!evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
         vm.warp(deadline);
@@ -310,7 +334,10 @@ contract PermitTest is Test {
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data2 = abi.encode(keccak256(data2));
         vm.assume(nonce > 0 && nonce < type(uint256).max - 1);
@@ -351,7 +378,10 @@ contract PermitTest is Test {
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
         );
         address alice = vm.addr(privateKey);
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(sender != address(0) && sender != address(this));
@@ -369,6 +399,7 @@ contract PermitTest is Test {
     }
 
     function test_RevertIfSignerInvalid_Permit(
+        bool option,
         address alice,
         uint256 nonceNamespace,
         uint256 nonce,
@@ -377,7 +408,9 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
-        alice = address(uint160(bound(uint160(alice), 0, 0xFF)));
+        alice = option
+            ? address(uint160(bound(uint160(alice), 0, 0xFF)))
+            : address(uint160(bound(uint160(alice), uint160(COMMON_PREDEPLOYS), uint160(COMMON_PREDEPLOYS) + 0xFF)));
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
@@ -404,7 +437,10 @@ contract PermitTest is Test {
     ) public {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         vm.assume(nonce < type(uint256).max);
         vm.warp(deadline);
 
@@ -436,7 +472,10 @@ contract PermitTest is Test {
     ) public {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.assume(deadline < type(uint256).max);
         vm.warp(deadline + 1);
@@ -466,7 +505,10 @@ contract PermitTest is Test {
         address alice = vm.addr(privateKey);
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.assume(value > 0);
         vm.warp(deadline);
@@ -499,7 +541,10 @@ contract PermitTest is Test {
         bytes calldata signature
     ) public {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.warp(deadline);
 
@@ -531,7 +576,10 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
         signerECDSA.setPrivateKey(privateKey);
 
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && alice != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && alice != address(evc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.warp(deadline);
         vm.deal(address(evc), value);
@@ -569,7 +617,10 @@ contract PermitTest is Test {
         bytes calldata signature,
         uint16 value
     ) public {
-        vm.assume(!evc.haveCommonOwner(signer, address(0)) && signer != address(evc));
+        vm.assume(
+            !evc.haveCommonOwner(signer, address(0)) && !evc.haveCommonOwner(signer, COMMON_PREDEPLOYS)
+                && signer != address(evc)
+        );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
         bytes19 addressPrefix = evc.getAddressPrefix(signer);
@@ -597,7 +648,7 @@ contract PermitTest is Test {
         address alice = vm.addr(privateKey);
         signerECDSA.setPrivateKey(privateKey);
 
-        vm.assume(!evc.haveCommonOwner(alice, address(0)));
+        vm.assume(!evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS));
         vm.warp(deadline);
 
         // ECDSA signature invalid due to signer.
@@ -695,7 +746,7 @@ contract PermitTest is Test {
         address alice = address(new SignerERC1271(evc));
         SignerERC1271(alice).setSignatureHash(signature);
 
-        vm.assume(!evc.haveCommonOwner(alice, address(0)));
+        vm.assume(!evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS));
         vm.warp(deadline);
 
         // ECDSA signature is always invalid here hence we fall back to ERC-1271 signature
@@ -776,7 +827,9 @@ contract PermitTest is Test {
         assertTrue(evc.fallbackCalled());
     }
 
-    function test_Permit(uint256 privateKey) public {
+    function test_Permit(
+        uint256 privateKey
+    ) public {
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -785,7 +838,10 @@ contract PermitTest is Test {
         address bob = address(new SignerERC1271(evc));
         address target = address(new Vault(evc));
 
-        vm.assume(!evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, bob));
+        vm.assume(
+            !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, bob)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+        );
         vm.deal(address(this), type(uint128).max);
         signerECDSA.setPrivateKey(privateKey);
 
@@ -1273,7 +1329,9 @@ contract PermitTest is Test {
         assertEq(evc.isAccountOperatorAuthorized(bob, operator), false);
     }
 
-    function test_RevertIfInPermit_SetLockdownMode(uint256 privateKey) public {
+    function test_RevertIfInPermit_SetLockdownMode(
+        uint256 privateKey
+    ) public {
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -1300,7 +1358,9 @@ contract PermitTest is Test {
         evc.permit(alice, address(this), 0, 1, 1, 0, data, signature);
     }
 
-    function test_RevertIfInPermit_SetPermitDisabledMode(uint256 privateKey) public {
+    function test_RevertIfInPermit_SetPermitDisabledMode(
+        uint256 privateKey
+    ) public {
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
