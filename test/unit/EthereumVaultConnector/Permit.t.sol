@@ -29,9 +29,7 @@ abstract contract EIP712 {
      * NOTE: These parameters cannot be changed except through a xref:learn::upgrading-smart-contracts.adoc[smart
      * contract upgrade].
      */
-    constructor(
-        string memory name
-    ) {
+    constructor(string memory name) {
         _name = name.toShortStringWithFallback(_nameFallback);
         _hashedName = keccak256(bytes(name));
     }
@@ -62,9 +60,7 @@ abstract contract EIP712 {
      * address signer = ECDSA.recover(digest, signature);
      * ```
      */
-    function _hashTypedDataV4(
-        bytes32 structHash
-    ) internal view virtual returns (bytes32) {
+    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
         return ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
     }
 }
@@ -77,15 +73,11 @@ contract SignerECDSA is EIP712, Test {
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
-    constructor(
-        EthereumVaultConnector _evc
-    ) EIP712(_evc.name()) {
+    constructor(EthereumVaultConnector _evc) EIP712(_evc.name()) {
         evc = _evc;
     }
 
-    function setPrivateKey(
-        uint256 _privateKey
-    ) external {
+    function setPrivateKey(uint256 _privateKey) external {
         privateKey = _privateKey;
     }
 
@@ -119,9 +111,7 @@ contract SignerERC1271 is EIP712, IERC1271 {
         "Permit(address signer,address sender,uint256 nonceNamespace,uint256 nonce,uint256 deadline,uint256 value,bytes data)"
     );
 
-    constructor(
-        EthereumVaultConnector _evc
-    ) EIP712(_evc.name()) {
+    constructor(EthereumVaultConnector _evc) EIP712(_evc.name()) {
         evc = _evc;
     }
 
@@ -129,9 +119,7 @@ contract SignerERC1271 is EIP712, IERC1271 {
         return keccak256(abi.encode(_TYPE_HASH, _hashedName, block.chainid, address(evc)));
     }
 
-    function setSignatureHash(
-        bytes calldata signature
-    ) external {
+    function setSignatureHash(bytes calldata signature) external {
         signatureHash = keccak256(signature);
     }
 
@@ -163,21 +151,15 @@ contract EthereumVaultConnectorWithFallback is EthereumVaultConnectorHarness {
     bool internal shouldRevert;
     bool public fallbackCalled;
 
-    function setExpectedHash(
-        bytes calldata data
-    ) external {
+    function setExpectedHash(bytes calldata data) external {
         expectedHash = keccak256(data);
     }
 
-    function setExpectedValue(
-        uint256 value
-    ) external {
+    function setExpectedValue(uint256 value) external {
         expectedValue = value;
     }
 
-    function setShouldRevert(
-        bool sr
-    ) external {
+    function setShouldRevert(bool sr) external {
         shouldRevert = sr;
     }
 
@@ -185,9 +167,7 @@ contract EthereumVaultConnectorWithFallback is EthereumVaultConnectorHarness {
         fallbackCalled = false;
     }
 
-    fallback(
-        bytes calldata data
-    ) external payable returns (bytes memory) {
+    fallback(bytes calldata data) external payable returns (bytes memory) {
         if (shouldRevert) revert("fallback reverted");
 
         if (expectedHash == keccak256(data) && expectedValue == msg.value && address(this) == msg.sender) {
@@ -827,9 +807,7 @@ contract PermitTest is Test {
         assertTrue(evc.fallbackCalled());
     }
 
-    function test_Permit(
-        uint256 privateKey
-    ) public {
+    function test_Permit(uint256 privateKey) public {
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -1329,9 +1307,7 @@ contract PermitTest is Test {
         assertEq(evc.isAccountOperatorAuthorized(bob, operator), false);
     }
 
-    function test_RevertIfInPermit_SetLockdownMode(
-        uint256 privateKey
-    ) public {
+    function test_RevertIfInPermit_SetLockdownMode(uint256 privateKey) public {
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -1358,9 +1334,7 @@ contract PermitTest is Test {
         evc.permit(alice, address(this), 0, 1, 1, 0, data, signature);
     }
 
-    function test_RevertIfInPermit_SetPermitDisabledMode(
-        uint256 privateKey
-    ) public {
+    function test_RevertIfInPermit_SetPermitDisabledMode(uint256 privateKey) public {
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
