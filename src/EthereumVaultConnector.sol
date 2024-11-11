@@ -27,6 +27,7 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     string public constant name = "Ethereum Vault Connector";
 
     uint160 internal constant ACCOUNT_ID_OFFSET = 8;
+    address internal constant EIP_7587_PRECOMPILES = 0x0000000000000000000000000000000000000100;
     address internal constant COMMON_PREDEPLOYS = 0x4200000000000000000000000000000000000000;
     bytes32 internal constant HASHED_NAME = keccak256(bytes(name));
 
@@ -1046,7 +1047,8 @@ contract EthereumVaultConnector is Events, Errors, TransientStorage, IEVC {
     function isSignerValid(address signer) internal pure virtual returns (bool) {
         // not valid if the signer address falls into any of the precompiles/predeploys
         // addresses space (depends on the chain ID).
-        return !haveCommonOwnerInternal(signer, address(0)) && !haveCommonOwnerInternal(signer, COMMON_PREDEPLOYS);
+        return !haveCommonOwnerInternal(signer, address(0)) && !haveCommonOwnerInternal(signer, EIP_7587_PRECOMPILES)
+            && !haveCommonOwnerInternal(signer, COMMON_PREDEPLOYS);
     }
 
     /// @notice Computes the permit hash for a given set of parameters.
