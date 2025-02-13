@@ -181,6 +181,7 @@ contract EthereumVaultConnectorWithFallback is EthereumVaultConnectorHarness {
 contract PermitTest is Test {
     address internal constant EIP_7587_PRECOMPILES = 0x0000000000000000000000000000000000000100;
     address internal constant COMMON_PREDEPLOYS = 0x4200000000000000000000000000000000000000;
+    address internal constant MORPH_PREDEPLOYS = 0x5300000000000000000000000000000000000000;
     EthereumVaultConnectorWithFallback internal evc;
     SignerECDSA internal signerECDSA;
     SignerERC1271 internal signerERC1271;
@@ -219,7 +220,8 @@ contract PermitTest is Test {
 
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(msgSender != address(evc));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
@@ -271,7 +273,8 @@ contract PermitTest is Test {
         vm.assume(msgSender != address(evc));
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
@@ -320,7 +323,8 @@ contract PermitTest is Test {
         address alice = vm.addr(privateKey);
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data2 = abi.encode(keccak256(data2));
@@ -364,7 +368,8 @@ contract PermitTest is Test {
         address alice = vm.addr(privateKey);
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
@@ -392,11 +397,18 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
-        alice = option % 3 == 0
-            ? option % 2 == 0
-                ? address(uint160(bound(uint160(alice), 0, 0xFF)))
-                : address(uint160(bound(uint160(alice), uint160(EIP_7587_PRECOMPILES), uint160(EIP_7587_PRECOMPILES) + 0xFF)))
-            : address(uint160(bound(uint160(alice), uint160(COMMON_PREDEPLOYS), uint160(COMMON_PREDEPLOYS) + 0xFF)));
+        option = bound(option, 0, 3);
+
+        if (option == 0) {
+            alice = address(uint160(bound(uint160(alice), 0, 0xFF)));
+        } else if (option == 1) {
+            alice = address(uint160(bound(uint160(alice), uint160(EIP_7587_PRECOMPILES), uint160(EIP_7587_PRECOMPILES) + 0xFF)));
+        } else if (option == 2) {
+            alice = address(uint160(bound(uint160(alice), uint160(COMMON_PREDEPLOYS), uint160(COMMON_PREDEPLOYS) + 0xFF)));
+        } else if (option == 3) {
+            alice = address(uint160(bound(uint160(alice), uint160(MORPH_PREDEPLOYS), uint160(MORPH_PREDEPLOYS) + 0xFF)));
+        }
+
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(nonce > 0 && nonce < type(uint256).max);
@@ -425,7 +437,8 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(nonce < type(uint256).max);
         vm.warp(deadline);
@@ -460,7 +473,8 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.assume(deadline < type(uint256).max);
@@ -493,7 +507,8 @@ contract PermitTest is Test {
         data = abi.encode(keccak256(data));
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.assume(value > 0);
@@ -529,7 +544,8 @@ contract PermitTest is Test {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.warp(deadline);
@@ -564,7 +580,8 @@ contract PermitTest is Test {
 
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && alice != address(evc)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
+                && alice != address(evc)
         );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
         vm.warp(deadline);
@@ -605,7 +622,8 @@ contract PermitTest is Test {
     ) public {
         vm.assume(
             !evc.haveCommonOwner(signer, address(0)) && !evc.haveCommonOwner(signer, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(signer, COMMON_PREDEPLOYS) && signer != address(evc)
+                && !evc.haveCommonOwner(signer, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(signer, MORPH_PREDEPLOYS)
+                && signer != address(evc)
         );
         vm.assume(nonce > 0 && nonce < type(uint256).max);
 
@@ -636,7 +654,7 @@ contract PermitTest is Test {
 
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
         );
         vm.warp(deadline);
 
@@ -737,7 +755,7 @@ contract PermitTest is Test {
 
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
-                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS) && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
         );
         vm.warp(deadline);
 
@@ -831,6 +849,7 @@ contract PermitTest is Test {
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, bob)
                 && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES) && !evc.haveCommonOwner(alice, COMMON_PREDEPLOYS)
+                && !evc.haveCommonOwner(alice, MORPH_PREDEPLOYS)
         );
         vm.deal(address(this), type(uint128).max);
         signerECDSA.setPrivateKey(privateKey);
