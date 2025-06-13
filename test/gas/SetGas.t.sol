@@ -84,10 +84,16 @@ contract SetGasTest is Test {
     function testGas_insert_size05_duplicateOfLast() public {
         size05.insert(ELEMENT_19);
     }
+ 
+    // Necessary to catch the revert, as otherwise the function call
+    // is inlined and the revert is not catched by `vm.expectRevert()`.
+    function _size10Insert(address element) public {
+        size10.insert(element);
+    }
 
-    function testGas_insert_siz10_reverts() public {
+    function testGas_insert_size10_reverts() public {
         vm.expectRevert();
-        size10.insert(ELEMENT_11);
+        this._size10Insert(ELEMENT_11);
     }
 
     function testGas_insert_size10_duplicateOfFirst() public {

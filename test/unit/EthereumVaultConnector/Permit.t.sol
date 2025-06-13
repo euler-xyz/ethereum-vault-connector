@@ -208,6 +208,7 @@ contract PermitTest is Test {
         bytes memory data,
         uint16 value
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -263,6 +264,7 @@ contract PermitTest is Test {
         bytes calldata signature,
         uint16 value
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         address alice = address(new SignerERC1271(evc));
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         address msgSender = sender == address(0) ? address(uint160(uint256(keccak256(abi.encode(alice))))) : sender;
@@ -313,6 +315,7 @@ contract PermitTest is Test {
         uint128 value,
         bytes memory data2
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -357,6 +360,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -392,6 +396,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         alice = option % 3 == 0
             ? option % 2 == 0
                 ? address(uint160(bound(uint160(alice), 0, 0xFF)))
@@ -421,6 +426,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(
@@ -456,6 +462,7 @@ contract PermitTest is Test {
         bytes memory data,
         bytes calldata signature
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));
         vm.assume(
@@ -484,6 +491,7 @@ contract PermitTest is Test {
         uint128 value,
         bytes memory data
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -526,6 +534,7 @@ contract PermitTest is Test {
         uint256 value,
         bytes calldata signature
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(
             !evc.haveCommonOwner(alice, address(0)) && !evc.haveCommonOwner(alice, EIP_7587_PRECOMPILES)
@@ -552,6 +561,7 @@ contract PermitTest is Test {
         uint128 value,
         bytes memory data
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         vm.chainId(5); // for coverage
         vm.assume(
             privateKey > 0
@@ -603,6 +613,7 @@ contract PermitTest is Test {
         bytes calldata signature,
         uint16 value
     ) public {
+        deadline = bound(deadline, 0, type(uint64).max - 1);
         vm.assume(
             !evc.haveCommonOwner(signer, address(0)) && !evc.haveCommonOwner(signer, EIP_7587_PRECOMPILES)
                 && !evc.haveCommonOwner(signer, COMMON_PREDEPLOYS) && signer != address(evc)
@@ -627,6 +638,7 @@ contract PermitTest is Test {
     }
 
     function test_RevertIfInvalidECDSASignature_Permit(uint256 privateKey, uint128 deadline) public {
+        vm.assume(deadline < type(uint64).max);
         vm.assume(
             privateKey > 0
                 && privateKey < 115792089237316195423570985008687907852837564279074904382605163141518161494337
@@ -732,6 +744,7 @@ contract PermitTest is Test {
     }
 
     function test_RevertIfInvalidERC1271Signature_Permit(uint128 deadline, bytes calldata signature) public {
+        vm.assume(deadline < type(uint64).max);
         address alice = address(new SignerERC1271(evc));
         SignerERC1271(alice).setSignatureHash(signature);
 
