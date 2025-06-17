@@ -105,6 +105,12 @@ contract SetTest is Test {
         }
     }
 
+    // Necessary to catch the revert, as otherwise the function call
+    // is inlined and the revert is not catched by `vm.expectRevert()`.
+    function _insert(address element) public {
+        setStorage.insert(element);
+    }
+
     function test_RevertIfTooManyElements_Insert(uint256 seed) public {
         seed = bound(seed, 101, type(uint256).max);
         delete setStorage;
@@ -114,7 +120,7 @@ contract SetTest is Test {
         }
 
         vm.expectRevert(Set.TooManyElements.selector);
-        setStorage.insert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, seed)))))));
+        this._insert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, seed)))))));
     }
 
     function test_FirstElement_Insert(address element) public {
@@ -187,6 +193,12 @@ contract SetTest is Test {
         }
     }
 
+    // Necessary to catch the revert, as otherwise the function call
+    // is inlined and the revert is not catched by `vm.expectRevert()`.
+    function _reorder(uint8 index1, uint8 index2) public {
+      setStorage.reorder(index1, index2);
+    }
+
     function test_RevertIfInvalidIndex_Reorder(
         uint8 numberOfElements,
         address firstElement,
@@ -204,28 +216,28 @@ contract SetTest is Test {
         index2 = index1;
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this._reorder(index1, index2);
 
         // index1 is greater than index2
         index1 = uint8(bound(index1, 1, numberOfElements - 1));
         index2 = uint8(bound(index2, 0, index1 - 1));
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this._reorder(index1, index2);
 
         // both indices are out of bounds
         index1 = numberOfElements;
         index2 = numberOfElements + 1;
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this._reorder(index1, index2);
 
         // index2 is out of bounds
         index1 = uint8(bound(index1, 0, numberOfElements - 1));
         index2 = numberOfElements;
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this._reorder(index1, index2);
     }
 
     function test_setMetadata(uint80 metadata) public {
