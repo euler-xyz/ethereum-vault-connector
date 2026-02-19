@@ -6,6 +6,7 @@
   "author": "Euler Labs",
   "license": "GPL-2.0-or-later",
   "scripts": {},
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@usecannon/cli": "2.26.0-alpha.0"
+  }
 }

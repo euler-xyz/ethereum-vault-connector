@@ -1,0 +1,5 @@
+name = "ethereum-vault-connector"
+version = "1.0.1"
+
+[deploy.EthereumVaultConnector]
+artifact = "EthereumVaultConnector"
