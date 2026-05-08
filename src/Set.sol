@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 /// @dev Represents the maximum number of elements that can be stored in the set.
 /// Must not exceed 255 due to the uint8 data type limit.
-uint8 constant SET_MAX_ELEMENTS = 50;
+uint8 constant SET_MAX_ELEMENTS = 100;
 
 /// @title ElementStorage
 /// @notice This struct is used to store the value and stamp of an element.
