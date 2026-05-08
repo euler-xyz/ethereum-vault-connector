@@ -16,6 +16,15 @@ contract SetTest is Test {
         delete expectedElements;
     }
 
+    // External wrappers used so vm.expectRevert can catch reverts from internal library calls.
+    function externalInsert(address element) external returns (bool) {
+        return setStorage.insert(element);
+    }
+
+    function externalReorder(uint8 index1, uint8 index2) external {
+        setStorage.reorder(index1, index2);
+    }
+
     // ----- AUXILIARY FOR TESTING -----
     SetStorage internal expectedElements;
 
@@ -114,7 +123,7 @@ contract SetTest is Test {
         }
 
         vm.expectRevert(Set.TooManyElements.selector);
-        setStorage.insert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, seed)))))));
+        this.externalInsert(address(uint160(uint256(bytes32(keccak256(abi.encode(seed, seed)))))));
     }
 
     function test_FirstElement_Insert(address element) public {
@@ -204,28 +213,28 @@ contract SetTest is Test {
         index2 = index1;
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this.externalReorder(index1, index2);
 
         // index1 is greater than index2
         index1 = uint8(bound(index1, 1, numberOfElements - 1));
         index2 = uint8(bound(index2, 0, index1 - 1));
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this.externalReorder(index1, index2);
 
         // both indices are out of bounds
         index1 = numberOfElements;
         index2 = numberOfElements + 1;
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this.externalReorder(index1, index2);
 
         // index2 is out of bounds
         index1 = uint8(bound(index1, 0, numberOfElements - 1));
         index2 = numberOfElements;
 
         vm.expectRevert(Set.InvalidIndex.selector);
-        setStorage.reorder(index1, index2);
+        this.externalReorder(index1, index2);
     }
 
     function test_setMetadata(uint80 metadata) public {
