@@ -72,10 +72,15 @@ contract SetLockdownModeTest is Test {
     }
 
     function test_Integration_SetLockdownMode(address alice, address vault, address operator) public {
+        // deploy upfront so vault can be excluded from these addresses in the assume below
+        address targetContract = address(new Target());
+        address controller = address(new Vault(evc));
+
         vm.assume(alice != address(0) && alice != address(evc) && !evc.haveCommonOwner(alice, operator));
         vm.assume(
             vault != address(0) && vault != address(evc) && vault != address(this) && vault != alice
-                && vault != operator && !evc.haveCommonOwner(vault, address(0)) && vault.code.length == 0
+                && vault != operator && vault != targetContract && vault != controller
+                && !evc.haveCommonOwner(vault, address(0)) && vault.code.length == 0
         );
         vm.assume(operator != address(0) && operator != address(evc));
 
@@ -128,7 +133,6 @@ contract SetLockdownModeTest is Test {
         vm.prank(alice);
         evc.setLockdownMode(addressPrefix, false);
 
-        address targetContract = address(new Target());
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector, address(evc), address(evc), 0, alice, false
         );
@@ -145,8 +149,6 @@ contract SetLockdownModeTest is Test {
         evc.call(targetContract, alice, 0, data);
 
         // control collateral works when not in lockdown mode
-        address controller = address(new Vault(evc));
-
         vm.prank(alice);
         evc.setLockdownMode(addressPrefix, false);
 
