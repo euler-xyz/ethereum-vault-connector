@@ -205,6 +205,8 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         bytes calldata signature
     ) public payable override {
         if (uint160(signer) <= 255 || signer == address(this)) return;
+        // skip foundry-reserved addresses (HEVM cheatcode, console) so vm.etch doesn't clobber them
+        if (signer == address(vm) || signer == CONSOLE) return;
         if (nonce == type(uint256).max) return;
         if (data.length == 0 || bytes4(data) == 0) return;
         vm.etch(signer, signerMock.code);
