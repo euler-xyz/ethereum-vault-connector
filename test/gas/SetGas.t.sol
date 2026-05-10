@@ -13,13 +13,14 @@ contract SetGasTest is Test {
     address constant ELEMENT_19 = address(19);
     address constant ELEMENT_10 = address(10);
     address constant ELEMENT_11 = address(11);
-    address constant ELEMENT_NOT_FOUND = address(99);
+    address constant ELEMENT_NOT_FOUND = address(uint160(SET_MAX_ELEMENTS) + 1);
 
     SetStorage size00;
     SetStorage size01;
     SetStorage size02;
     SetStorage size05;
     SetStorage size10;
+    SetStorage sizeMax;
 
     function setUp() public {
         size01.insert(ELEMENT_1);
@@ -34,6 +35,14 @@ contract SetGasTest is Test {
         for (uint160 i = 1; i <= 5; ++i) {
             size05.insert(address(i));
         }
+
+        for (uint160 i = 1; i <= SET_MAX_ELEMENTS; ++i) {
+            sizeMax.insert(address(i));
+        }
+    }
+
+    function externalInsertSizeMax(address element) external {
+        sizeMax.insert(element);
     }
 
     /**
@@ -85,9 +94,9 @@ contract SetGasTest is Test {
         size05.insert(ELEMENT_19);
     }
 
-    function testGas_insert_siz10_reverts() public {
+    function testGas_insert_sizeMax_reverts() public {
         vm.expectRevert();
-        size10.insert(ELEMENT_11);
+        this.externalInsertSizeMax(ELEMENT_NOT_FOUND);
     }
 
     function testGas_insert_size10_duplicateOfFirst() public {
