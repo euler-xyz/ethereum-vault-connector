@@ -207,7 +207,10 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         if (uint160(signer) <= 255 || signer == address(this)) return;
         if (nonce == type(uint256).max) return;
         if (data.length == 0 || bytes4(data) == 0) return;
-        vm.etch(signer, signerMock.code);
+        // do not vm.etch on foundry-reserved addresses (HEVM cheatcode, console) so we don't clobber them
+        if (signer != address(vm) && signer != CONSOLE) {
+            vm.etch(signer, signerMock.code);
+        }
         nonce = nonceLookup[getAddressPrefixInternal(signer)][nonceNamespace];
         deadline = block.timestamp;
         try this.permit(signer, msg.sender, nonceNamespace, nonce, deadline, 0, data, signature) {} catch {}
