@@ -102,6 +102,26 @@ contract AccountStatusTest is Test {
         }
     }
 
+    function test_BoundaryNumberOfAccounts_RequireAccountStatusCheck() external {
+        // deterministic boundary test: the account status checks set must support exactly SET_MAX_ELEMENTS elements.
+        // accounts are added to the set only while checks are deferred
+        evc.setChecksDeferred(true);
+
+        // schedule exactly SET_MAX_ELEMENTS distinct deferred account status checks
+        for (uint256 i = 0; i < SET_MAX_ELEMENTS; ++i) {
+            address account = address(uint160(uint256(keccak256(abi.encode("account", i)))));
+            evc.requireAccountStatusCheck(account);
+            assertTrue(evc.isAccountStatusCheckDeferred(account));
+        }
+
+        // scheduling one more account status check exceeds the Set capacity and reverts on the
+        // (SET_MAX_ELEMENTS + 1)-th element
+        address extraAccount = address(uint160(uint256(keccak256(abi.encode("account", SET_MAX_ELEMENTS)))));
+        vm.expectRevert(Set.TooManyElements.selector);
+        evc.requireAccountStatusCheck(extraAccount);
+        assertFalse(evc.isAccountStatusCheckDeferred(extraAccount));
+    }
+
     function test_RevertIfChecksReentrancy_RequireAccountStatusCheck(address account) external {
         evc.setChecksInProgress(true);
 
