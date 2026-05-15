@@ -13,6 +13,7 @@ contract SetGasTest is Test {
     address constant ELEMENT_19 = address(19);
     address constant ELEMENT_10 = address(10);
     address constant ELEMENT_11 = address(11);
+    address constant ELEMENT_MAX = address(uint160(SET_MAX_ELEMENTS));
     address constant ELEMENT_NOT_FOUND = address(uint160(SET_MAX_ELEMENTS) + 1);
 
     SetStorage size00;
@@ -111,6 +112,18 @@ contract SetGasTest is Test {
         size10.insert(ELEMENT_10);
     }
 
+    function testGas_insert_sizeMax_duplicateOfFirst() public {
+        sizeMax.insert(ELEMENT_1);
+    }
+
+    function testGas_insert_sizeMax_duplicateOfSecond() public {
+        sizeMax.insert(ELEMENT_2);
+    }
+
+    function testGas_insert_sizeMax_duplicateOfLast() public {
+        sizeMax.insert(ELEMENT_MAX);
+    }
+
     /**
      *
      */
@@ -176,6 +189,22 @@ contract SetGasTest is Test {
         size10.contains(ELEMENT_10);
     }
 
+    function testGas_contains_sizeMax_notFound() public view {
+        sizeMax.contains(ELEMENT_NOT_FOUND);
+    }
+
+    function testGas_contains_sizeMax_foundAtFirst() public view {
+        sizeMax.contains(ELEMENT_1);
+    }
+
+    function testGas_contains_sizeMax_foundAtIndex1() public view {
+        sizeMax.contains(ELEMENT_2);
+    }
+
+    function testGas_contains_sizeMax_foundAtLastIndex() public view {
+        sizeMax.contains(ELEMENT_MAX);
+    }
+
     /**
      *
      */
@@ -239,5 +268,21 @@ contract SetGasTest is Test {
 
     function testGas_remove_size10_foundAtLastIndex() public {
         size10.remove(ELEMENT_10);
+    }
+
+    function testGas_remove_sizeMax_notFound() public {
+        sizeMax.remove(ELEMENT_NOT_FOUND);
+    }
+
+    function testGas_remove_sizeMax_foundAtFirst() public {
+        sizeMax.remove(ELEMENT_1);
+    }
+
+    function testGas_remove_sizeMax_foundAtIndex1() public {
+        sizeMax.remove(ELEMENT_2);
+    }
+
+    function testGas_remove_sizeMax_foundAtLastIndex() public {
+        sizeMax.remove(ELEMENT_MAX);
     }
 }

@@ -171,6 +171,30 @@ contract CollateralsManagementTest is Test {
         }
     }
 
+    function test_BoundaryNumberOfCollaterals_CollateralsManagement() public {
+        // deterministic boundary test: the collateral set must support exactly SET_MAX_ELEMENTS elements
+        address alice = address(0xa11ce);
+
+        // enable exactly SET_MAX_ELEMENTS collaterals for the account
+        for (uint256 i = 0; i < SET_MAX_ELEMENTS; ++i) {
+            address vault = address(new Vault(evc));
+            vm.prank(alice);
+            evc.enableCollateral(alice, vault);
+        }
+
+        assertEq(evc.getCollaterals(alice).length, SET_MAX_ELEMENTS);
+
+        // enabling one more collateral exceeds the Set capacity and reverts on the (SET_MAX_ELEMENTS + 1)-th element
+        address extraVault = address(new Vault(evc));
+        vm.prank(alice);
+        vm.expectRevert(Set.TooManyElements.selector);
+        evc.enableCollateral(alice, extraVault);
+
+        // the collateral set still holds exactly SET_MAX_ELEMENTS elements
+        assertEq(evc.getCollaterals(alice).length, SET_MAX_ELEMENTS);
+        assertFalse(evc.isCollateralEnabled(alice, extraVault));
+    }
+
     function test_RevertIfNotOwnerOrNotOperator_CollateralsManagement(address alice, address bob) public {
         vm.assume(alice != address(0) && alice != address(evc) && bob != address(0) && bob != address(evc));
         vm.assume(!evc.haveCommonOwner(alice, bob));

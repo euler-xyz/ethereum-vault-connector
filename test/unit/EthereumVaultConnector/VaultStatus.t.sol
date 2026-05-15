@@ -76,6 +76,28 @@ contract VaultStatusTest is Test {
         }
     }
 
+    function test_BoundaryNumberOfVaults_RequireVaultStatusCheck() external {
+        // deterministic boundary test: the vault status checks set must support exactly SET_MAX_ELEMENTS elements.
+        // vaults are added to the set only while checks are deferred
+        evc.setChecksDeferred(true);
+
+        // schedule exactly SET_MAX_ELEMENTS distinct deferred vault status checks
+        for (uint256 i = 0; i < SET_MAX_ELEMENTS; ++i) {
+            address vault = address(uint160(uint256(keccak256(abi.encode("vault", i)))));
+            vm.prank(vault);
+            evc.requireVaultStatusCheck();
+            assertTrue(evc.isVaultStatusCheckDeferred(vault));
+        }
+
+        // scheduling one more vault status check exceeds the Set capacity and reverts on the
+        // (SET_MAX_ELEMENTS + 1)-th element
+        address extraVault = address(uint160(uint256(keccak256(abi.encode("vault", SET_MAX_ELEMENTS)))));
+        vm.prank(extraVault);
+        vm.expectRevert(Set.TooManyElements.selector);
+        evc.requireVaultStatusCheck();
+        assertFalse(evc.isVaultStatusCheckDeferred(extraVault));
+    }
+
     function test_RevertIfChecksReentrancy_RequireVaultStatusCheck(uint8 index, uint8 vaultsNumber) external {
         vm.assume(index < vaultsNumber);
         vm.assume(vaultsNumber > 0 && vaultsNumber <= SET_MAX_ELEMENTS);
