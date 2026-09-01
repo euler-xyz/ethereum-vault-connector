@@ -18,7 +18,7 @@ jobs:
               submodules: recursive
 
         - name: Install foundry
-          uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+          uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
           with:
               version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
 
@@ -35,7 +35,7 @@ jobs:
           - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
             with:
                 submodules: recursive
-          - uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+          - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
             with:
                 version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
 
@@ -51,7 +51,7 @@ jobs:
           - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
             with:
                 submodules: recursive
-          - uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+          - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
             with:
                 version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
           - name: Run foundry tests
@@ -67,7 +67,7 @@ jobs:
           - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
             with:
                 submodules: recursive
-          - uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+          - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
             with:
                 version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
           - name: Run foundry coverage
