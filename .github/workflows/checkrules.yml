@@ -6,22 +6,39 @@ on:
       - certora
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   checkrules:
     name: Run Certora prover on all configs
     runs-on: ubuntu-latest
+    # CERTORAKEY lives in the "certora" environment so runs need reviewer
+    # approval before the secret is exposed to workflow code.
+    environment: certora
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          persist-credentials: false
           submodules: recursive
 
-      - name: setup cvt
+      - name: setup solc
+        # Official 0.8.24 release binary, checksum-verified. The certora conf
+        # files reference the compiler as "solc8.24".
         run: |
-          pip install certora-cli
-          echo "`pwd`/.github/executables" >> $GITHUB_PATH
+          mkdir -p "$RUNNER_TEMP/solc-bin"
+          curl -sSfL -o "$RUNNER_TEMP/solc-bin/solc8.24" \
+            "https://binaries.soliditylang.org/linux-amd64/solc-linux-amd64-v0.8.24+commit.e11b9ed9"
+          echo "fb03a29a517452b9f12bcf459ef37d0a543765bb3bbc911e70a87d6a37c30d5f  $RUNNER_TEMP/solc-bin/solc8.24" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/solc-bin/solc8.24"
+          ln -s "$RUNNER_TEMP/solc-bin/solc8.24" "$RUNNER_TEMP/solc-bin/solc"
+          echo "$RUNNER_TEMP/solc-bin" >> "$GITHUB_PATH"
+
+      - name: setup cvt
+        run: pip install certora-cli==8.19.1
 
       - name: run certora prover on conf files
         run: .github/executables/checkAllSpecs
