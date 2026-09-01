@@ -10,7 +10,8 @@ gas_reports = [
 ]
 remappings = [
     "forge-std/=lib/forge-std/src/",
-    "openzeppelin/=lib/openzeppelin-contracts/contracts"
+    "openzeppelin/=lib/openzeppelin-contracts/contracts",
+    "credible-std/=lib/credible-std/src/"
 ]
 
 
@@ -58,4 +59,59 @@ targets = [
     "outOfBounds",
     "overflow",
     "underflow",
+]
+
+[profile.assertions]
+src = "assertions/src"
+test = "assertions/test"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer_runs = 10000
+remappings = [
+    "credible-std/=lib/credible-std/src/",
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/"
+]
+
+[profile.unit-assertions]
+src = "assertions/src"
+test = "assertions/test/unit"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer_runs = 10000
+remappings = [
+    "credible-std/=lib/credible-std/src/",
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/"
+]
+
+[profile.fuzz-assertions]
+src = "assertions/src"
+test = "assertions/test/fuzz"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer_runs = 10000
+remappings = [
+    "credible-std/=lib/credible-std/src/",
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/"
+]
+
+[profile.fuzz-assertions.fuzz]
+runs = 16  # Low runs for development speed
+
+[profile.backtesting-assertions]
+src = "assertions/src"
+test = "assertions/test/backtesting"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer_runs = 10000
+remappings = [
+    "credible-std/=lib/credible-std/src/",
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/"
 ]

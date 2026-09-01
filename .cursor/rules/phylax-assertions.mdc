@@ -1,0 +1,533 @@
+---
+alwaysApply: true
+---
+# Phylax Credible Layer Assertion Rules
+
+## Project Structure
+
+### Directory Organization
+
+```bash
+project/
+├── assertions/
+│   ├── src/           # Assertion source files (.a.sol)
+│   └── test/          # Assertion test files (.t.sol)
+├── src/               # Protocol smart contracts
+├── test/              # Protocol tests
+├── script/            # Deployment scripts
+├── foundry.toml       # Foundry configuration with assertions profile
+└── remappings.txt     # Import remappings for dependencies
+```
+
+### File Naming Conventions
+
+- Assertion files: `{ContractOrFeatureName}Assertion.a.sol`
+- Test files: `{ContractOrFeatureName}Assertion.t.sol`
+- Use descriptive names that indicate the component or module being protected
+
+### Assertion Function Naming
+
+- Assertion functions must start with `assertion{PropertyOrInvariant}`
+- Examples: `assertionOwnershipChange`, `assertionBalanceInvariant`, `assertionHealthFactor`
+- Use descriptive names that clearly indicate what property or invariant is being verified
+
+### Foundry Configuration
+
+```toml
+[profile.assertions]
+# Use assertions profile for pcl commands
+# FOUNDRY_PROFILE=assertions pcl test
+
+# Optional: Configure specific settings for assertions
+# [profile.assertions]
+# src = "assertions/src"
+# test = "assertions/test"
+# out = "out"
+# libs = ["lib"]
+# remappings = [
+#     "credible-std/=lib/credible-std/src/",
+#     "forge-std/=lib/forge-std/src/"
+# ]
+```
+
+#### Profile Usage
+
+- **Environment Variable**: Set `FOUNDRY_PROFILE=assertions` before running pcl commands
+- **Command Line**: Use `FOUNDRY_PROFILE=assertions pcl test` to run tests with assertions profile
+- **Purpose**: Ensures pcl commands use the correct configuration for assertion development
+- **Separation**: Keeps assertion-specific settings separate from main project configuration
+
+### Dependencies Setup
+
+#### Installing credible-std
+
+```bash
+# Using git submodules (recommended)
+git submodule add https://github.com/phylaxsystems/credible-std.git lib/credible-std
+
+# Or using forge install
+forge install phylaxsystems/credible-std
+```
+
+#### Remappings Configuration
+
+Add to `remappings.txt`:
+
+```bash
+credible-std/=lib/credible-std/src/
+forge-std/=lib/forge-std/src/
+```
+
+#### Required Dependencies
+
+- `credible-std`: Core Credible Layer functionality
+- `forge-std`: Forge standard library for testing
+- `openzeppelin-contracts`: (optional, but recommended during development) For utility functions (Strings, etc.)
+
+## Core Assertion Patterns
+
+### Basic Assertion Structure
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+import {Assertion} from "credible-std/Assertion.sol";
+import {PhEvm} from "credible-std/PhEvm.sol";
+
+contract ProtocolAssertion is Assertion {
+    // Required: Register triggers for assertion functions
+    function triggers() external view override {
+        registerCallTrigger(this.assertionFunction.selector, Protocol.functionToMonitor.selector);
+    }
+
+    // Assertion function - must be public/external
+    function assertionFunction() external {
+        // Get protocol instance
+        Protocol protocol = Protocol(ph.getAssertionAdopter());
+        
+        // State comparison logic
+        ph.forkPreTx();
+        // ... pre-state logic
+        
+        ph.forkPostTx();
+        // ... post-state logic
+        
+        // Require statements for invariants
+        require(condition, "Descriptive error message");
+    }
+}
+```
+
+### Essential Cheatcodes
+
+#### State Management
+
+- `ph.forkPreTx()` - Snapshot before transaction
+- `ph.forkPostTx()` - Snapshot after transaction
+- `ph.forkPreCall(callId)` - Snapshot before specific call
+- `ph.forkPostCall(callId)` - Snapshot after specific call
+
+#### Call Input Tracking
+
+- `ph.getCallInputs(target, selector)` - Get all CALL opcode inputs
+- `ph.getStaticCallInputs(target, selector)` - Get STATICCALL inputs
+- `ph.getDelegateCallInputs(target, selector)` - Get DELEGATECALL inputs
+- `ph.getCallCodeInputs(target, selector)` - Get CALLCODE inputs
+- `ph.getAllCallInputs(target, selector)` - Get all call types (avoid double-counting)
+
+#### State Change Tracking
+
+- `ph.getStateChangesUint(target, slot)` - Track uint state changes
+- `ph.getStateChangesAddress(target, slot)` - Track address state changes
+- `ph.getStateChangesBytes32(target, slot)` - Track bytes32 state changes
+
+#### Protocol Access
+
+- `ph.getAssertionAdopter()` - Get the contract being protected
+
+### Constructor Usage
+
+- **Prefer `ph.getAssertionAdopter()` over constructors** for getting the protected contract address
+- Constructors run against empty state and cannot read from other contracts
+- Use constructors only for additional values your assertion needs (e.g., token addresses)
+- If using constructor arguments, append them to creation code: `abi.encodePacked(type(Assertion).creationCode, abi.encode(arguments))`
+- Constructor storage persists in the assertion contract
+
+### Trigger Registration Patterns
+
+#### Call Triggers
+
+```solidity
+function triggers() external view override {
+    // Single function trigger
+    registerCallTrigger(this.assertionFunction.selector, Protocol.functionToMonitor.selector);
+    
+    // Multiple functions trigger same assertion
+    registerCallTrigger(this.assertionFunction.selector, Protocol.function1.selector);
+    registerCallTrigger(this.assertionFunction.selector, Protocol.function2.selector);
+}
+```
+
+#### Storage Change Triggers
+
+```solidity
+function triggers() external view override {
+    // Trigger on specific storage slot changes
+    registerStorageChangeTrigger(this.assertionFunction.selector, bytes32(uint256(0)));
+}
+```
+
+#### Balance Change Triggers
+
+```solidity
+function triggers() external view override {
+    // Trigger on balance changes
+    registerBalanceChangeTrigger(this.assertionFunction.selector, address(0x...));
+}
+```
+
+### Common Assertion Patterns
+
+#### Pre/Post State Comparison
+
+```solidity
+function assertionStateInvariant() external {
+    Protocol protocol = Protocol(ph.getAssertionAdopter());
+    
+    ph.forkPreTx();
+    uint256 preValue = protocol.someValue();
+    
+    ph.forkPostTx();
+    uint256 postValue = protocol.someValue();
+    
+    require(postValue >= preValue, "Value cannot decrease");
+}
+```
+
+#### Call Input Analysis
+
+```solidity
+function assertionCallValidation() external {
+    Protocol protocol = Protocol(ph.getAssertionAdopter());
+    
+    PhEvm.CallInputs[] memory calls = ph.getCallInputs(
+        address(protocol), 
+        protocol.functionToMonitor.selector
+    );
+    
+    for (uint256 i = 0; i < calls.length; i++) {
+        // Decode function parameters
+        (uint256 param1, address param2) = abi.decode(calls[i].input, (uint256, address));
+        
+        // Validate parameters
+        require(param1 > 0, "Parameter must be positive");
+        require(param2 != address(0), "Address cannot be zero");
+    }
+}
+```
+
+#### Multi-Layered Validation
+
+```solidity
+function assertionComplexInvariant() external {
+    Protocol protocol = Protocol(ph.getAssertionAdopter());
+    
+    // Layer 1: Basic state check (cheapest)
+    ph.forkPreTx();
+    uint256 preBalance = protocol.balance();
+    
+    ph.forkPostTx();
+    uint256 postBalance = protocol.balance();
+    
+    if (postBalance < preBalance) {
+        // Layer 2: Detailed analysis only if basic check fails
+        PhEvm.CallInputs[] memory calls = ph.getCallInputs(
+            address(protocol), 
+            protocol.withdraw.selector
+        );
+        
+        uint256 totalWithdrawn = 0;
+        for (uint256 i = 0; i < calls.length; i++) {
+            uint256 amount = abi.decode(calls[i].input, (uint256));
+            totalWithdrawn += amount;
+        }
+        
+        require(postBalance == preBalance - totalWithdrawn, "Balance mismatch");
+    }
+}
+```
+
+#### Intra-Transaction State Monitoring
+
+```solidity
+function assertionIntraTxOracleDeviation() external {
+    IOracle oracle = IOracle(ph.getAssertionAdopter());
+    
+    // Get initial state before transaction
+    ph.forkPreTx();
+    uint256 initialPrice = oracle.price();
+    
+    // Calculate allowed deviation thresholds
+    uint256 maxAllowedPrice = (initialPrice * 110) / 100; // +10%
+    uint256 minAllowedPrice = (initialPrice * 90) / 100;  // -10%
+    
+    // Check final state after transaction
+    ph.forkPostTx();
+    uint256 finalPrice = oracle.price();
+    require(
+        finalPrice >= minAllowedPrice && finalPrice <= maxAllowedPrice,
+        "Oracle final price deviation exceeds threshold"
+    );
+    
+    // Get all price update calls in this transaction
+    PhEvm.CallInputs[] memory priceUpdates = ph.getCallInputs(
+        address(oracle), 
+        oracle.updatePrice.selector
+    );
+    
+    // Check each intermediate state after each call
+    for (uint256 i = 0; i < priceUpdates.length; i++) {
+        // Snapshot state after this specific call
+        ph.forkPostCall(priceUpdates[i].id);
+        
+        // Check price at this point in the transaction
+        uint256 intermediatePrice = oracle.price();
+        require(
+            intermediatePrice >= minAllowedPrice && intermediatePrice <= maxAllowedPrice,
+            "Oracle intra-tx price deviation exceeds threshold"
+        );
+    }
+}
+```
+
+## Testing Patterns
+
+### Test Structure
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.13;
+
+import {CredibleTest} from "credible-std/CredibleTest.sol";
+import {Test} from "forge-std/Test.sol";
+import {ProtocolAssertion} from "../src/ProtocolAssertion.a.sol";
+import {Protocol} from "../../src/Protocol.sol";
+
+contract TestProtocolAssertion is CredibleTest, Test {
+    Protocol public assertionAdopter;
+    ProtocolAssertion public assertion;
+
+    function setUp() public {
+        assertionAdopter = new Protocol();
+        assertion = new ProtocolAssertion();
+        
+        // Setup test environment
+        vm.deal(address(0xBEEF), 100 ether);
+    }
+
+    function testAssertionPasses() public {
+        // Register assertion for next transaction
+        cl.assertion({
+            adopter: address(assertionAdopter),
+            createData: type(ProtocolAssertion).creationCode,
+            fnSelector: ProtocolAssertion.assertionFunction.selector
+        });
+
+        // Execute valid transaction
+        vm.prank(address(0xBEEF));
+        assertionAdopter.safeFunction();
+    }
+
+    function testAssertionFails() public {
+        cl.assertion({
+            adopter: address(assertionAdopter),
+            createData: type(ProtocolAssertion).creationCode,
+            fnSelector: ProtocolAssertion.assertionFunction.selector
+        });
+
+        // Execute invalid transaction
+        vm.prank(address(0xBEEF));
+        vm.expectRevert("Descriptive error message");
+        assertionAdopter.unsafeFunction();
+    }
+}
+```
+
+### Testing Specifics
+
+- **One `cl.assertion()` can only trigger one assertion function per test**
+- Create separate test functions for each assertion function that can be triggered
+- Test each assertion function in isolation to ensure proper coverage
+- Use different test scenarios for different assertion functions
+
+### Testing Commands
+
+- Use `pcl test` instead of `forge test` for assertion testing
+- Use `FOUNDRY_PROFILE=assertions pcl test` to ensure correct profile
+- Use `pcl build` to compile assertions
+- **pcl test supports all forge test commands** for debugging:
+  - `pcl test --match-test testFunctionName` - Run specific test function
+  - `pcl test --match-contract TestContractName` - Run specific test contract
+  - `pcl test path/to/test/file.t.sol` - Run specific test file
+  - `pcl test -vvv` - Verbose output for debugging
+  - Use these commands to isolate and debug specific test cases
+
+### Testing Best Practices
+
+- Test both positive (should pass) and negative (should fail) cases
+- Use descriptive test function names
+- Test edge cases and boundary conditions
+- Use `vm.expectRevert()` with exact error messages
+- Test with realistic data and scenarios
+- **Utilize forge-std cheatcodes** for testing scenarios:
+  - `vm.deal()` for minting ETH to addresses
+  - `vm.prank()` for impersonating addresses
+  - `vm.roll()` for manipulating block numbers
+  - `vm.warp()` for manipulating timestamps
+  - `vm.mockCall()` for mocking external calls
+  - Use these tools to create comprehensive test scenarios
+
+### Testing with Mock Protocols
+
+- **It may not be possible to simulate failing assertion for well-implemented protocols** - this is expected behavior
+- **Create mock protocols** that simulate vulnerable behavior to test assertion failure cases
+- Use mock contracts that intentionally violate invariants to verify assertions catch violations
+- Test assertion logic by temporarily removing safety checks in mock protocols
+- This ensures assertions are working correctly even when the real protocol is secure
+
+## Common Pitfalls and Anti-Patterns
+
+### Gas Limit Issues
+
+- Avoid expensive operations in loops
+- Use early returns for basic checks
+- Monitor gas usage with `pcl test`
+
+### Call Input Double-Counting
+
+```solidity
+// ❌ WRONG: May include duplicate calls from proxy contracts
+PhEvm.CallInputs[] memory calls = ph.getAllCallInputs(target, selector);
+
+// ✅ CORRECT: Use specific call type
+PhEvm.CallInputs[] memory calls = ph.getCallInputs(target, selector);
+```
+
+### Incorrect Function Selectors
+
+```solidity
+// ❌ WRONG: Using wrong selector or bytes signature
+registerCallTrigger(this.assertionFunction.selector, bytes4(0x12345678));
+
+// ✅ CORRECT: Use actual name of function selector
+registerCallTrigger(this.assertionFunction.selector, Protocol.targetFunction.selector);
+```
+
+### Missing Error Messages
+
+```solidity
+// ❌ WRONG: No error message
+require(condition);
+
+// ✅ CORRECT: Descriptive error message
+require(condition, "Specific invariant violation description");
+```
+
+### State Persistence Issues
+
+- Use `cl.assertion()` for testing
+- State changes from non-reverting transactions are persisted
+
+## Best Practices
+
+### General Solidity Practices
+
+- **Regular Solidity best practices apply** to assertion contracts
+- Follow standard coding conventions and patterns
+- Use proper error handling and validation
+- Implement clean, readable, and maintainable code
+- Follow security best practices for smart contract development
+
+### Single Responsibility
+
+- Each assertion should verify one specific property
+- Split complex assertions into multiple focused functions
+- Use descriptive function names starting with "assertion" (see Assertion Function Naming section)
+
+### Gas Optimization
+
+- Assertions have 100k gas limit per assertion function - aim to stay under this limit
+- Check basic invariants first (fail fast)
+- Use early returns for simple checks
+- Avoid expensive operations in loops
+- Monitor gas usage during development
+
+### Error Handling
+
+- Use descriptive error messages
+- Include context in error messages
+- Test error conditions thoroughly
+
+### Documentation
+
+- Comment complex logic
+- Follow best practice Solidity style for comments
+- Explain the invariant being protected
+- Document any assumptions or limitations
+- Keep documentation in the code files, unless specified otherwise
+
+### Testing Coverage
+
+- Test both valid and invalid scenarios
+- Test edge cases and boundary conditions
+- Test with realistic data
+- Use fuzz testing for parameter validation
+- Create separate tests for each assertion function (see Testing Specifics)
+
+## Debugging Tips
+
+### Console Logging
+
+```solidity
+import {console} from "forge-std/console.sol";
+import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
+
+function assertionFunction() external {
+    // Use string concatenation since console.log only accepts strings
+    console.log(string.concat("Pre-state value: ", Strings.toString(someValue)));
+    ph.forkPreTx();
+    
+    ph.forkPostTx();
+    console.log(string.concat("Post-state value: ", Strings.toString(someValue)));
+}
+```
+
+### Gas Monitoring
+
+- Use `pcl test -vvv` for detailed gas usage
+- Monitor gas consumption in loops
+- Optimize expensive operations
+
+### Common Debugging Patterns
+
+- Add intermediate state checks
+- Use console.log for debugging
+- Test with minimal examples
+- Verify function selectors match expected signatures
+
+## Integration Guidelines
+
+### Protocol Integration
+
+- Use `ph.getAssertionAdopter()` instead of constructor parameters
+- Ensure proper interface definitions
+- Handle protocol-specific edge cases
+
+### Deployment Workflow
+
+1. Write and test assertions locally with `pcl test`
+2. Build assertions with `pcl build`
+3. Deploy protocol contracts
+4. Submit assertions to Credible Layer
+5. Activate assertions for protection
