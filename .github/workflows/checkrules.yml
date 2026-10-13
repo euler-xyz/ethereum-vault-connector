@@ -24,7 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     # CERTORAKEY lives in the "certora" environment so runs need reviewer
     # approval before the secret is exposed to workflow code.
-    environment: certora
+    environment:
+      name: certora
+      deployment: false
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
