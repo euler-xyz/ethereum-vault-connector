@@ -4,7 +4,16 @@ on:
   push:
     branches:
       - certora
+  # Only PRs that can change a proof run it, so dependency and docs PRs don't
+  # wait on the certora environment's approval.
   pull_request:
+    paths:
+      - 'src/**'
+      - 'certora/**'
+      - 'lib/**'
+      - '.github/workflows/checkrules.yml'
+      - '.github/executables/checkAllSpecs'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     # CERTORAKEY lives in the "certora" environment so runs need reviewer
     # approval before the secret is exposed to workflow code.
-    environment: certora
+    environment:
+      name: certora
+      deployment: false
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
