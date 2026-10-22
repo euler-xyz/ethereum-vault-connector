@@ -49,6 +49,13 @@ contract ControllersManagementTest is Test {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 1000);
 
+        // alice sends calls before the test deploys its two vaults, so she must not be at either of their addresses
+        uint256 nonce = vm.getNonce(address(this));
+        vm.assume(
+            alice != computeCreateAddress(address(this), nonce)
+                && alice != computeCreateAddress(address(this), nonce + 1)
+        );
+
         address account = address(uint160(uint160(alice) ^ subAccountId));
         vm.assume(account.code.length == 0);
 

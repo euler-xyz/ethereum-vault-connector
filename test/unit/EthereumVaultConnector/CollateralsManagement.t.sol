@@ -64,6 +64,12 @@ contract CollateralsManagementTest is Test {
         vm.assume(numberOfVaults > 0 && numberOfVaults <= SET_MAX_ELEMENTS);
         vm.assume(seed > 1000);
 
+        // alice sends calls before the test deploys its vaults, so she must not be at any of their addresses
+        uint256 nonce = vm.getNonce(address(this));
+        for (uint256 i = 0; i <= numberOfVaults; ++i) {
+            vm.assume(alice != computeCreateAddress(address(this), nonce + i));
+        }
+
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
         assertEq(evc.getAccountOwner(account), address(0));

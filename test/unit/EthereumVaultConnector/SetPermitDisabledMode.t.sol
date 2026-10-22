@@ -72,10 +72,16 @@ contract SetPermitDisabledModeTest is Test {
     }
 
     function test_Integration_SetPermitDisabledMode(address alice, address vault, address operator) public {
+        // the fuzzed addresses must not be where the test later deploys its Target and its controller Vault
+        uint256 nonce = vm.getNonce(address(this));
+        address expectedTarget = computeCreateAddress(address(this), nonce);
+        address expectedController = computeCreateAddress(address(this), nonce + 1);
+
         vm.assume(alice != address(0) && !evc.haveCommonOwner(alice, operator) && alice.code.length == 0);
+        vm.assume(alice != expectedTarget && alice != expectedController);
         vm.assume(
             uint160(vault) > 255 && vault != alice && vault != operator && vault.code.length == 0
-                && vault != 0xF62849F9A0B5Bf2913b396098F7c7019b51A820a
+                && vault != expectedController
         );
         vm.assume(operator != address(0) && operator.code.length == 0);
 
