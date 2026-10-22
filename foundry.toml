@@ -37,11 +37,14 @@ override_spacing = true
 wrap_comments = true
 ignore = [
     "test/evc/EthereumVaultConnectorScribble.sol",
-    # kept byte-identical to the v1.0.1 release, which an earlier forge formatted
-    "src/EthereumVaultConnector.sol",
-    "src/Set.sol",
-    "src/interfaces/IEthereumVaultConnector.sol"
+    # the core contracts and interfaces stay byte-identical to the v1.0.1 release, which an earlier forge formatted
+    "src/*.sol",
+    "src/interfaces/*.sol"
 ]
+
+[profile.default.lint]
+# forge lint findings in the frozen core contracts cannot be acted on
+lint_on_build = false
 
 
 [profile.default.doc]
