@@ -18,3 +18,5 @@ A contract that answers `isValidSignature`, and any code it reaches, must theref
 Validate the signature against state the `signer` controls, such as an owner's ECDSA key or signatures it has approved on-chain.
 
 The guarantee that `onBehalfOfAccount` can be trusted when `msg.sender` is the EVC (see [Authentication by Vaults](./whitepaper.md#authentication-by-vaults)) does not cover this call.
+
+`EVCUtil` enforces this for contracts built on it: when `msg.sender` is the EVC and the call is `isValidSignature`, `_msgSender()`, `_msgSenderForBorrow()`, `_msgSenderOnlyEVCAccount()`, `_msgSenderOnlyEVCAccountOwner()`, `onlyEVCAccount` and `onlyEVCAccountOwner` revert with `NotAuthorized`. This also applies when `isValidSignature` is the target of an EVC `call` or `batch` item, even though the account is authenticated there. The check keys on the `isValidSignature` selector of the call the EVC makes, so it does not cover contracts built with an `EVCUtil` that predates it, contracts that override these helpers or read the execution context directly, or code reached through a `delegatecall` with different calldata. The rule above still applies to them.
