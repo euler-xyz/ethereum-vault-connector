@@ -30,13 +30,17 @@ line_length = 120
 tab_width = 4
 bracket_spacing = false
 int_types = "long"
-multiline_func_header = "params_first"
+multiline_func_header = "params_first_multi"
 quote_style = "double"
 number_underscore = "preserve"
 override_spacing = true
 wrap_comments = true
 ignore = [
-    "test/evc/EthereumVaultConnectorScribble.sol"
+    "test/evc/EthereumVaultConnectorScribble.sol",
+    # kept byte-identical to the v1.0.1 release, which an earlier forge formatted
+    "src/EthereumVaultConnector.sol",
+    "src/Set.sol",
+    "src/interfaces/IEthereumVaultConnector.sol"
 ]
 
 

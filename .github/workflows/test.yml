@@ -20,7 +20,7 @@ jobs:
         - name: Install foundry
           uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
           with:
-              version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
+              version: v1.8.5
 
         - name: Run foundry build
           run: |
@@ -37,7 +37,7 @@ jobs:
                 submodules: recursive
           - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
             with:
-                version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
+                version: v1.8.5
 
           - name: Run foundry fmt check
             run: |
@@ -53,7 +53,7 @@ jobs:
                 submodules: recursive
           - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
             with:
-                version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
+                version: v1.8.5
           - name: Run foundry tests
             # --ast tests enables inline configs to work https://github.com/foundry-rs/foundry/issues/7310#issuecomment-1978088200
             run: |
@@ -69,7 +69,7 @@ jobs:
                 submodules: recursive
           - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
             with:
-                version: nightly-c99854277c346fa6de7a8f9837230b36fd85850e
+                version: v1.8.5
           - name: Run foundry coverage
             run: |
                 FOUNDRY_PROFILE=coverage forge coverage --report summary

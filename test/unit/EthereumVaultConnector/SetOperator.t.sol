@@ -157,11 +157,7 @@ contract SetOperatorTest is Test {
         }
     }
 
-    function test_RevertIfSenderNotOwner_SetOperator(
-        address alice,
-        address operator,
-        uint256 operatorBitField
-    ) public {
+    function test_RevertIfSenderNotOwner_SetOperator(address alice, address operator, uint256 operatorBitField) public {
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(operator != address(evc));
