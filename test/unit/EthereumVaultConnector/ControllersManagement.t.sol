@@ -49,15 +49,13 @@ contract ControllersManagementTest is Test {
         vm.assume(alice != address(0) && alice != address(evc));
         vm.assume(seed > 1000);
 
-        // alice sends calls before the test deploys its two vaults, so she must not be at either of their addresses
-        uint256 nonce = vm.getNonce(address(this));
-        vm.assume(
-            alice != computeCreateAddress(address(this), nonce)
-                && alice != computeCreateAddress(address(this), nonce + 1)
-        );
+        // deployed before alice's first call: isolated calls raise her nonce, so a later deployment to her address
+        // would collide
+        address vault = address(new Vault(evc));
+        address otherVault = address(new Vault(evc));
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
-        vm.assume(account.code.length == 0);
+        vm.assume(alice.code.length == 0 && account.code.length == 0);
 
         // test controllers management with use of an operator
         address msgSender = alice;
@@ -68,8 +66,6 @@ contract ControllersManagementTest is Test {
         }
 
         // enabling controller
-        address vault = address(new Vault(evc));
-
         assertFalse(evc.isControllerEnabled(account, vault));
         address[] memory controllersPre = evc.getControllers(account);
 
@@ -98,8 +94,6 @@ contract ControllersManagementTest is Test {
         assertTrue(evc.isControllerEnabled(account, vault));
 
         // trying to enable second controller will throw on the account status check
-        address otherVault = address(new Vault(evc));
-
         vm.prank(msgSender);
         vm.expectRevert(Errors.EVC_ControllerViolation.selector);
         evc.handlerEnableController(account, otherVault);

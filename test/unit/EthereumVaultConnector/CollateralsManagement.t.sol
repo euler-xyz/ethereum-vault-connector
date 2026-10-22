@@ -64,11 +64,14 @@ contract CollateralsManagementTest is Test {
         vm.assume(numberOfVaults > 0 && numberOfVaults <= SET_MAX_ELEMENTS);
         vm.assume(seed > 1000);
 
-        // alice sends calls before the test deploys its vaults, so she must not be at any of their addresses
-        uint256 nonce = vm.getNonce(address(this));
-        for (uint256 i = 0; i <= numberOfVaults; ++i) {
-            vm.assume(alice != computeCreateAddress(address(this), nonce + i));
+        // deployed before alice's first call: isolated calls raise her nonce, so a later deployment to her address
+        // would collide
+        address controller = address(new Vault(evc));
+        address[] memory vaults = new address[](numberOfVaults + 1);
+        for (uint256 i = 1; i <= numberOfVaults; ++i) {
+            if (i % 5 != 0) vaults[i] = address(new Vault(evc));
         }
+        vm.assume(alice.code.length == 0);
 
         address account = address(uint160(uint160(alice) ^ subAccountId));
 
@@ -84,7 +87,6 @@ contract CollateralsManagementTest is Test {
         }
 
         // enable a controller to check if account status check works properly
-        address controller = address(new Vault(evc));
         if (seed % 3 == 0) {
             vm.prank(alice);
             evc.enableController(account, controller);
@@ -96,7 +98,7 @@ contract CollateralsManagementTest is Test {
             Vault(controller).clearChecks();
             address[] memory collateralsPre = evc.getCollaterals(account);
 
-            address vault = i % 5 == 0 ? collateralsPre[seed % collateralsPre.length] : address(new Vault(evc));
+            address vault = i % 5 == 0 ? collateralsPre[seed % collateralsPre.length] : vaults[i];
 
             bool alreadyEnabled = evc.isCollateralEnabled(account, vault);
 

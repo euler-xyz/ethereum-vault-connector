@@ -72,17 +72,12 @@ contract SetPermitDisabledModeTest is Test {
     }
 
     function test_Integration_SetPermitDisabledMode(address alice, address vault, address operator) public {
-        // the fuzzed addresses must not be where the test later deploys its Target and its controller Vault
-        uint256 nonce = vm.getNonce(address(this));
-        address expectedTarget = computeCreateAddress(address(this), nonce);
-        address expectedController = computeCreateAddress(address(this), nonce + 1);
+        // deployed before the assumptions below, whose code-length checks then keep the fuzzed addresses off them
+        address targetContract = address(new Target());
+        address controller = address(new Vault(evc));
 
         vm.assume(alice != address(0) && !evc.haveCommonOwner(alice, operator) && alice.code.length == 0);
-        vm.assume(alice != expectedTarget && alice != expectedController);
-        vm.assume(
-            uint160(vault) > 255 && vault != alice && vault != operator && vault.code.length == 0
-                && vault != expectedController
-        );
+        vm.assume(uint160(vault) > 255 && vault != alice && vault != operator && vault.code.length == 0);
         vm.assume(operator != address(0) && operator.code.length == 0);
 
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
@@ -133,7 +128,6 @@ contract SetPermitDisabledModeTest is Test {
         vm.prank(alice);
         evc.setPermitDisabledMode(addressPrefix, false);
 
-        address targetContract = address(new Target());
         bytes memory data = abi.encodeWithSelector(
             Target(targetContract).callTest.selector, address(evc), address(evc), 0, alice, false
         );
@@ -149,7 +143,6 @@ contract SetPermitDisabledModeTest is Test {
         evc.call(targetContract, alice, 0, data);
 
         // control collateral works when not in permit disabled mode
-        address controller = address(new Vault(evc));
 
         vm.prank(alice);
         evc.setPermitDisabledMode(addressPrefix, false);
