@@ -15,6 +15,9 @@ abstract contract EVCUtil {
     using ExecutionContext for EC;
 
     uint160 internal constant ACCOUNT_ID_OFFSET = 8;
+    /// @dev The EVC calls an ERC-1271 signer during `permit` before it sets the permit's execution context, so during
+    /// that call the execution context holds the account of the enclosing call, which may not have been authenticated.
+    bytes4 private constant ERC1271_IS_VALID_SIGNATURE_SELECTOR = 0x1626ba7e;
     IEVC internal immutable evc;
 
     error EVC_InvalidAddress();
@@ -51,7 +54,8 @@ abstract contract EVCUtil {
 
     /// @notice Ensures a standard authentication path on the EVC allowing the account owner or any of its EVC accounts.
     /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
-    /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
+    /// It reverts if the operator is authenticated, control collateral is in progress, checks are in progress, or the
+    /// EVC is calling `isValidSignature`.
     /// @dev This modifier must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
     /// @dev This modifier must not be used on checkAccountStatus and checkVaultStatus functions.
     /// @dev This modifier can be used on access controlled functions to prevent non-standard authentication paths on
@@ -63,7 +67,8 @@ abstract contract EVCUtil {
 
     /// @notice Ensures a standard authentication path on the EVC.
     /// @dev This modifier checks if the caller is the EVC and if so, verifies the execution context.
-    /// It reverts if the operator is authenticated, control collateral is in progress, or checks are in progress.
+    /// It reverts if the operator is authenticated, control collateral is in progress, checks are in progress, or the
+    /// EVC is calling `isValidSignature`.
     /// It reverts if the authenticated account owner is known and it is not the account owner.
     /// @dev It assumes that if the caller is not the EVC, the caller is the account owner.
     /// @dev This modifier must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
@@ -99,12 +104,14 @@ abstract contract EVCUtil {
 
     /// @notice Retrieves the message sender in the context of the EVC.
     /// @dev This function returns the account on behalf of which the current operation is being performed, which is
-    /// either msg.sender or the account authenticated by the EVC.
+    /// either msg.sender or the account authenticated by the EVC. It reverts if the EVC is calling `isValidSignature`.
     /// @return The address of the message sender.
     function _msgSender() internal view virtual returns (address) {
         address sender = msg.sender;
 
         if (sender == address(evc)) {
+            if (msg.sig == ERC1271_IS_VALID_SIGNATURE_SELECTOR) revert NotAuthorized();
+
             (sender,) = evc.getCurrentOnBehalfOfAccount(address(0));
         }
 
@@ -114,13 +121,16 @@ abstract contract EVCUtil {
     /// @notice Retrieves the message sender in the context of the EVC for a borrow operation.
     /// @dev This function returns the account on behalf of which the current operation is being performed, which is
     /// either msg.sender or the account authenticated by the EVC. This function reverts if this contract is not enabled
-    /// as a controller for the account on behalf of which the operation is being executed.
+    /// as a controller for the account on behalf of which the operation is being executed, or if the EVC is calling
+    /// `isValidSignature`.
     /// @return The address of the message sender.
     function _msgSenderForBorrow() internal view virtual returns (address) {
         address sender = msg.sender;
         bool controllerEnabled;
 
         if (sender == address(evc)) {
+            if (msg.sig == ERC1271_IS_VALID_SIGNATURE_SELECTOR) revert NotAuthorized();
+
             (sender, controllerEnabled) = evc.getCurrentOnBehalfOfAccount(address(this));
         } else {
             controllerEnabled = evc.isControllerEnabled(sender, address(this));
@@ -134,7 +144,8 @@ abstract contract EVCUtil {
     }
 
     /// @notice Retrieves the message sender, ensuring it's any EVC account meaning that the execution context is in a
-    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress, not an
+    /// `isValidSignature` call by the EVC).
     /// @dev This function must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
     /// @dev This function must not be used on checkAccountStatus and checkVaultStatus functions.
     /// @dev This function can be used on access controlled functions to prevent non-standard authentication paths on
@@ -145,7 +156,8 @@ abstract contract EVCUtil {
     }
 
     /// @notice Retrieves the message sender, ensuring it's the EVC account owner and that the execution context is in a
-    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress).
+    /// standard state (not operator authenticated, not control collateral in progress, not checks in progress, not an
+    /// `isValidSignature` call by the EVC).
     /// @dev It assumes that if the caller is not the EVC, the caller is the account owner.
     /// @dev This function must not be used on functions utilized by liquidation flows, i.e. transfer or withdraw.
     /// @dev This function must not be used on checkAccountStatus and checkVaultStatus functions.
@@ -196,13 +208,16 @@ abstract contract EVCUtil {
 
     /// @notice Ensures that the function is called only by the EVC account owner or any of its EVC accounts
     /// @dev This function checks if the caller is the EVC and if so, verifies that the execution context is not in a
-    /// special state (operator authenticated, collateral control in progress, or checks in progress). If
-    /// onlyAccountOwner is true and the owner was already registered on the EVC, it verifies that the onBehalfOfAccount
-    /// is the owner. If onlyAccountOwner is false, it allows any EVC account of the owner to call the function.
+    /// special state (operator authenticated, collateral control in progress, or checks in progress) and that the
+    /// EVC is not calling `isValidSignature`. If onlyAccountOwner is true and the owner was already registered on
+    /// the EVC, it verifies that the onBehalfOfAccount is the owner. If onlyAccountOwner is false, it allows any EVC
+    /// account of the owner to call the function.
     /// @param onlyAccountOwner If true, only allows the account owner; if false, allows any EVC account of the owner
     /// @return The address of the message sender.
     function _authenticateCallerWithStandardContextState(bool onlyAccountOwner) internal view returns (address) {
         if (msg.sender == address(evc)) {
+            if (msg.sig == ERC1271_IS_VALID_SIGNATURE_SELECTOR) revert NotAuthorized();
+
             EC ec = EC.wrap(evc.getRawExecutionContext());
 
             if (ec.isOperatorAuthenticated() || ec.isControlCollateralInProgress() || ec.areChecksInProgress()) {
