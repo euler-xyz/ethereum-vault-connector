@@ -23,9 +23,10 @@ contract VaultStatusTest is Test {
 
             // check all the options: vault state is ok, vault state is violated with
             // vault returning false and reverting
-            Vault(vault).setVaultStatusState(
-                allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
-            );
+            Vault(vault)
+                .setVaultStatusState(
+                    allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
+                );
 
             vm.prank(vault);
             if (allStatusesValid || uint160(vault) % 3 == 0) {
@@ -51,9 +52,10 @@ contract VaultStatusTest is Test {
 
             // check all the options: vault state is ok, vault state is violated with
             // vault returning false and reverting
-            Vault(vault).setVaultStatusState(
-                allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
-            );
+            Vault(vault)
+                .setVaultStatusState(
+                    allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
+                );
 
             Vault(vault).setVaultStatusState(1);
             evc.setChecksDeferred(true);

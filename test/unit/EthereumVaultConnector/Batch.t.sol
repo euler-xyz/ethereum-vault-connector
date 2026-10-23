@@ -361,9 +361,9 @@ contract BatchTest is Test {
         evc.controlCollateral(collateral, alice, 0, abi.encodeWithSelector(VaultMalicious.callBatch.selector));
     }
 
-    function test_RevertIfControlCollateralReentrancy_AcquireControlCollateralLock_BatchRevert_BatchSimulation(
-        address alice
-    ) external {
+    function test_RevertIfControlCollateralReentrancy_AcquireControlCollateralLock_BatchRevert_BatchSimulation(address alice)
+        external
+    {
         vm.assume(alice != address(0) && alice != address(evc));
 
         evc.setControlCollateralInProgress(true);

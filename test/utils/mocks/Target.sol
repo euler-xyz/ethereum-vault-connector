@@ -109,12 +109,13 @@ contract TargetWithNesting {
             "nct/operator-authenticated"
         );
 
-        bytes memory result = IEVC(evc).call(
-            targetContract,
-            address(this),
-            0,
-            abi.encodeWithSelector(Target.callTest.selector, evc, evc, 0, address(this), false, false)
-        );
+        bytes memory result = IEVC(evc)
+            .call(
+                targetContract,
+                address(this),
+                0,
+                abi.encodeWithSelector(Target.callTest.selector, evc, evc, 0, address(this), false, false)
+            );
         require(abi.decode(result, (uint256)) == 0, "nct/result");
 
         try IEVC(evc).getCurrentOnBehalfOfAccount(address(0)) returns (address _onBehalfOfAccount, bool) {

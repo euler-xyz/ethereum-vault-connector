@@ -70,7 +70,8 @@ contract CallTest is Test {
         );
         vm.assume(
             nestedTargetContract != alice && nestedTargetContract != address(evc)
-                && !evc.haveCommonOwner(nestedTargetContract, alice) && !evc.haveCommonOwner(nestedTargetContract, account)
+                && !evc.haveCommonOwner(nestedTargetContract, alice)
+                && !evc.haveCommonOwner(nestedTargetContract, account)
         );
 
         vm.prank(alice);

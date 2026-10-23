@@ -50,13 +50,15 @@ contract AccountAndVaultStatusTest is Test {
 
             // check all the options: states are ok, states are violated with
             // vault/controller returning false and reverting
-            Vault(controller).setAccountStatusState(
-                allStatusesValid ? 0 : uint160(account) % 3 == 0 ? 0 : uint160(account) % 3 == 1 ? 1 : 2
-            );
+            Vault(controller)
+                .setAccountStatusState(
+                    allStatusesValid ? 0 : uint160(account) % 3 == 0 ? 0 : uint160(account) % 3 == 1 ? 1 : 2
+                );
 
-            Vault(vault).setVaultStatusState(
-                allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
-            );
+            Vault(vault)
+                .setVaultStatusState(
+                    allStatusesValid ? 0 : uint160(vault) % 3 == 0 ? 0 : uint160(vault) % 3 == 1 ? 1 : 2
+                );
 
             bool alreadyExpectsRevert;
             if (allStatusesValid || uint160(account) % 3 == 0) {

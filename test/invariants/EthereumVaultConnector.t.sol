@@ -44,11 +44,13 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
 
     address internal vaultMock;
     address internal signerMock;
+    address internal invariantTest;
     address[] public touchedAccounts;
 
     constructor() {
         vaultMock = address(new VaultMock(IEVC(address(this))));
         signerMock = address(new SignerMock());
+        invariantTest = msg.sender;
     }
 
     fallback() external payable {}
@@ -62,6 +64,8 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
     }
 
     function setup(address account, address vault) internal {
+        // etching the invariant test contract makes the next invariant call revert; etching signerMock breaks permit
+        if (vault == invariantTest || vault == signerMock) revert();
         touchedAccounts.push(account);
         vm.etch(vault, vaultMock.code);
     }
@@ -204,7 +208,7 @@ contract EthereumVaultConnectorHandler is EthereumVaultConnectorScribble, Test {
         bytes calldata data,
         bytes calldata signature
     ) public payable override {
-        if (uint160(signer) <= 255 || signer == address(this)) return;
+        if (uint160(signer) <= 255 || signer == address(this) || signer == invariantTest || signer == vaultMock) return;
         if (nonce == type(uint256).max) return;
         if (data.length == 0 || bytes4(data) == 0) return;
         // do not vm.etch on foundry-reserved addresses (HEVM cheatcode, console) so we don't clobber them

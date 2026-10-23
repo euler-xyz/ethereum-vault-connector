@@ -395,7 +395,9 @@ contract PermitTest is Test {
         alice = option % 3 == 0
             ? option % 2 == 0
                 ? address(uint160(bound(uint160(alice), 0, 0xFF)))
-                : address(uint160(bound(uint160(alice), uint160(EIP_7587_PRECOMPILES), uint160(EIP_7587_PRECOMPILES) + 0xFF)))
+                : address(
+                    uint160(bound(uint160(alice), uint160(EIP_7587_PRECOMPILES), uint160(EIP_7587_PRECOMPILES) + 0xFF))
+                )
             : address(uint160(bound(uint160(alice), uint160(COMMON_PREDEPLOYS), uint160(COMMON_PREDEPLOYS) + 0xFF)));
         bytes19 addressPrefix = evc.getAddressPrefix(alice);
         data = abi.encode(keccak256(data));

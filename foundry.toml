@@ -30,14 +30,21 @@ line_length = 120
 tab_width = 4
 bracket_spacing = false
 int_types = "long"
-multiline_func_header = "params_first"
+multiline_func_header = "params_first_multi"
 quote_style = "double"
 number_underscore = "preserve"
 override_spacing = true
 wrap_comments = true
 ignore = [
-    "test/evc/EthereumVaultConnectorScribble.sol"
+    "test/evc/EthereumVaultConnectorScribble.sol",
+    # the core contracts and interfaces stay byte-identical to the v1.0.1 release, which an earlier forge formatted
+    "src/*.sol",
+    "src/interfaces/*.sol"
 ]
+
+[profile.default.lint]
+# forge lint findings in the frozen core contracts cannot be acted on
+lint_on_build = false
 
 
 [profile.default.doc]
