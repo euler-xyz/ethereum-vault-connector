@@ -104,7 +104,7 @@ Always include thorough tests when using the Ethereum Vault Connector to ensure 
 
 ## Known limitations
 
-Refer to the [whitepaper](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations.
+Refer to the [whitepaper](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/whitepaper.md#security-considerations) for a list of known limitations and security considerations. The [security notes](https://github.com/euler-xyz/ethereum-vault-connector/tree/master/docs/security-notes.md) cover behaviour of the deployed EVC that integrating contracts must account for.
 
 ## Contributing
 
