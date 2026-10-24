@@ -16,6 +16,16 @@ EXCLUDE_CONFS = [
     "certora/conf/CER-15-Permit/CER-51-Permit-msg-sender.conf"
 ]
 
+# The harnesses import the sources and libraries, so a change under these paths
+# can change the outcome of every config.
+RUN_ALL_PREFIXES = (
+    'src/',
+    'lib/',
+    'certora/harness/',
+    '.github/workflows/checkrules.yml',
+    '.github/executables/checkAllSpecs',
+)
+
 def listConfigs() -> list[str]:
     """List all config files."""
     subdir_confs = glob.glob('certora/conf/**/*.conf', recursive=True)
@@ -23,14 +33,29 @@ def listConfigs() -> list[str]:
     confs = subdir_confs + root_confs
     return [x for x in confs if x not in EXCLUDE_CONFS]
 
+def loadSpecImports(spec: str) -> set[str]:
+    """Load a spec and the specs it imports, transitively."""
+    found = set()
+    pending = [os.path.normpath(spec)]
+    while pending:
+        current = pending.pop()
+        if current in found:
+            continue
+        found.add(current)
+        with open(current) as f:
+            imports = re.findall(r'^\s*import\s+"([^"]+\.spec)"', f.read(), re.MULTILINE)
+        pending += [os.path.normpath(os.path.join(os.path.dirname(current), i)) for i in imports]
+    return found
+
 def loadConfigDependencies(filename: str) -> set[str]:
     """Load all files a config depends on."""
     try:
         conf = json.load(open(filename))
-        spec = re.findall('certora/specs/.+\.spec', conf['verify'])
-        return set([filename, *spec, *conf['files']])
-    except:
-        print(f'invalid json in {filename}!')
+        specs = re.findall(r'certora/specs/.+\.spec', conf['verify'])
+        imported = set().union(*(loadSpecImports(s) for s in specs))
+        return set([filename, *imported, *conf['files']])
+    except Exception as e:
+        print(f'cannot load the dependencies of {filename}: {e}')
         return set()
 
 def listChangedConfigs() -> list[str]:
@@ -42,6 +67,11 @@ def listChangedConfigs() -> list[str]:
         subprocess.run(['git', 'fetch', 'origin', BASEREF])
         diff = subprocess.run(['git', '-P', 'diff', '--name-only', f'origin/{BASEREF}', 'HEAD'], capture_output=True)
         changed = set(diff.stdout.decode().splitlines())
+        if any(f.startswith(RUN_ALL_PREFIXES) for f in changed):
+            changed = listConfigs()
+            print(f'changed configs (all): {changed}')
+            print('::endgroup::')
+            return changed
         cfiles = { c: loadConfigDependencies(c) for c in listConfigs() }
         changed = [ c for c in cfiles if (not cfiles[c]) or (cfiles[c] & changed)]
         print(f'changed configs: {changed}')
