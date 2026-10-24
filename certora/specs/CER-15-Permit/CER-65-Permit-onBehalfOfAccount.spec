@@ -16,6 +16,8 @@ function getOnBehalfOfAccountCheckInEVC(env e, uint256 ec) returns address {
     return ecGetOnBehalfOfAccount(e, ec);
 }
 
+// Any contract may call getCurrentOnBehalfOfAccount. What it returns to a
+// permit's ERC-1271 signer is covered by misc/Permit-ERC1271-signer-context.spec.
 rule onBehalfOfAccountOnlyInPermit(method f) filtered { f ->
     !isMustRevertFunction(f) &&
     f.selector != sig:EthereumVaultConnectorHarness.getCurrentOnBehalfOfAccount(address).selector
