@@ -43,11 +43,13 @@ rule vault_status_check_scheduling (method f) filtered { f ->
 
 persistent ghost bool onlyInsertSender;
 persistent ghost address savedSender;
+// firstElement shares its slot with numElements, so inserting a later element
+// stores firstElement again unchanged. Only a changed value is an insertion.
 hook Sstore currentContract.vaultStatusChecks.elements[INDEX uint256 _index].value address newValue (address oldValue) {
-    onlyInsertSender = onlyInsertSender && (newValue == savedSender);
+    onlyInsertSender = onlyInsertSender && (newValue == savedSender || newValue == oldValue);
 }
-hook Sstore currentContract.vaultStatusChecks.firstElement address newValue {
-    onlyInsertSender = onlyInsertSender && (newValue == savedSender);
+hook Sstore currentContract.vaultStatusChecks.firstElement address newValue (address oldValue) {
+    onlyInsertSender = onlyInsertSender && (newValue == savedSender || newValue == oldValue);
 }
 
 rule insert_status_checks_only_by_sender (method f) filtered {f ->
