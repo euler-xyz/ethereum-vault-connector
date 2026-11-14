@@ -4,3 +4,6 @@
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "lib/credible-std"]
+	path = lib/credible-std
+	url = https://github.com/phylaxsystems/credible-std
